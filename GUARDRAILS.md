@@ -61,7 +61,7 @@ ist selbst eine Änderung, die menschliche Freigabe braucht (**G-G3**).
 | [**G-A**](#g-a--secrets-und-zugangsdaten) | Secrets und Zugangsdaten | G-A1 – G-A5 |
 | [**G-B**](#g-b--personenbezogene-daten) | Personenbezogene Daten | G-B1 – G-B7 |
 | [**G-C**](#g-c--autorisierung-und-sichtbarkeit) | Autorisierung und Sichtbarkeit | G-C1 – G-C9 |
-| [**G-D**](#g-d--geschützte-tests) | Geschützte Tests | G-D1 – G-D11 |
+| [**G-D**](#g-d--geschützte-tests) | Geschützte Tests | G-D1 – G-D13 |
 | [**G-E**](#g-e--datenbank-und-migrationen) | Datenbank und Migrationen | G-E1 – G-E5 |
 | [**G-F**](#g-f--datenbestandsverzeichnis) | Datenbestandsverzeichnis | G-F1 – G-F3 |
 | [**G-G**](#g-g--test--und-ci-disziplin) | Test- und CI-Disziplin | G-G1 – G-G5 |
@@ -534,6 +534,8 @@ und ein Mensch, der den Diff liest. **Diese Lücke wird hier offen benannt, nich
 | **G-D9** | **`became_resident_id` wird nie auf `null` gesetzt** | Der Rückwärtsübergang `moved_in → offer_made` (P-4) und jeder andere Pfad lassen das Feld unberührt. Der Test führt den Rückweg aus und prüft, dass V-1 danach **weiter greift**. |
 | **G-D10** | **Kein Kontext-Leck über den Verbindungspool** | Zwei Anfragen aus verschiedenen Haushalten laufen nacheinander über **dieselbe** physische Verbindung; die zweite sieht nichts von der ersten (G-C8). |
 | **G-D11** | **Der Offline-Stimmpuffer überlebt den Versand nicht** | Drei Prüfungen aus G-B7, jede scheitert sonst still: Ein Eintrag älter als **7 Tage** wird verworfen statt versendet; nach einem **Profilwechsel** ist der Puffer leer; dieselbe Nutzlast **zweimal** eingespielt erzeugt einen `Vote` und lässt den Quorum-Nenner unverändert. |
+| **G-D12** | **Invite-Token-Einlösung schlägt bei bestehendem `ResidentProfile` fehl, statt zu überschreiben** | Für eine `Session`, deren `Account` im Ziel-`Household` bereits ein `ResidentProfile` hat, liefert das Einlösen eines gültigen `ApplicationInviteToken` (nicht `expires_at`, nicht `used_at`, nicht `revoked_at`) einen erklärten Fehler ("Du bist bereits als Bewohner:in registriert") statt eines Ergebnisses. Kein Merge, keine Überschreibung, kein stiller No-op; `became_resident_id` der betroffenen `Application` bleibt unverändert. Ergänzt G-D9 um den *Prozess*-Fall — G-D9 sichert den *Datenzustand* (nie `null`), G-D12 sichert den *Weg dorthin* (kein zweiter Durchlauf, der ihn überschreibt). |
+| **G-D13** | **Der Notiz-Erinnerungs-Reminder respektiert Selbst-Redaktion** | Für ein `Appointment`, dessen `Application` für die Empfängerin/den Empfänger selbst-redigiert ist (V-1, G-D1), wird `casting.note_reminder_due` weder erzeugt noch zugestellt — unabhängig vom Stand des `AppointmentAttendance.note_written`-Flags. Der Reminder liest zur Entscheidung ausschließlich dieses Flag, nie `CastingNote.body` (G-B5 bleibt insoweit unverändert in Kraft). |
 
 > **G-D1 ist die wichtigste Zeile dieses Dokuments.** Sie ist die eine testbare Regel, die im Brief
 > ausdrücklich an die Stelle einer Statusabfrage gesetzt wurde, „die man an fünf Stellen vergessen
@@ -554,6 +556,18 @@ und ein Mensch, der den Diff liest. **Diese Lücke wird hier offen benannt, nich
 > nirgends als prüfbare Zusicherung — genau die Konstellation, gegen die die Durchsetzungsklassen
 > dieses Dokuments gebaut sind. Ohne G-D7 ist der Satz „das Log ist kein Umweg um V-1" eine
 > Behauptung; mit G-D7 ist er eine Eigenschaft.
+
+> **Herkunft von G-D12 und G-D13.** Beide Einträge sichern Regeln ab, die `04-Domaenenmodell.md` mit
+> zwei neuen Entitäten aus dem SRD-Scope einführt: `ApplicationInviteToken` (**S-42**, Kontext
+> `identity`) und `AppointmentAttendance` (**S-46**, Kontext `casting`, Event-Typ
+> `casting.note_reminder_due`). Beide Regeln laufen über einen **neuen** Pfad auf eine **bestehende**
+> Invariante zu — I-3 im Fall von G-D12 (Anschluss an G-D9), V-1 im Fall von G-D13 (Anschluss an
+> G-D1/G-C6/G-D5) — und wären ohne eigenen Eintrag genau dort ungeschützt, wo die alten Pfade längst
+> abgesichert sind: G-D9 prüft den *Datenzustand*, nicht den *Registrierungsvorgang*; G-D5 prüft
+> Benachrichtigungen, deren *Inhalt* Beratungsartefakte enthielte, nicht eine Benachrichtigung, die
+> allein durch ihre Zustellung Teilnahme an einer Beurteilung verrät. Dieselbe Konstellation wie bei
+> G-D7 bis G-D9 (siehe oben): Eine Regel, die nur in der Fachspezifikation steht, kann keinen Build
+> brechen.
 
 ---
 
@@ -1134,6 +1148,8 @@ bleibt die Regel Prosa, bis der Ablauftest sie mit abdeckt.
 | G-D9 `became_resident_id` nie `null` | 🟢 | geschützter Test über den Rückwärtsübergang |
 | G-D10 Kein Leck über den Verbindungspool | 🟢 | geschützter Test, zwei Haushalte über eine Verbindung |
 | G-D11 Stimmpuffer: TTL, Profilwechsel, Idempotenz | 🟢 | drei geschützte Tests (G-B7, Zusicherungen 1, 5, 6) |
+| G-D12 Invite-Token: Fehler statt Überschreibung bei bestehendem Profil | 🟢 | geschützter Test über den Einlösepfad (Anschluss an G-D9/I-3) |
+| G-D13 Notiz-Reminder respektiert Selbst-Redaktion | 🟢 | geschützter Test, prüft nur `AppointmentAttendance.note_written` (Anschluss an G-D1/G-C6/G-D5) |
 | G-E1 Destruktives DDL | 🟢 | Migrations-Muster-Check + CODEOWNERS |
 | G-E2 Migrationen reversibel | 🟢 | up/down/up im CI |
 | G-E3 Nur Migrationen | 🟢 | Drift-Erkennung |
@@ -1172,7 +1188,7 @@ bleibt die Regel Prosa, bis der Ablauftest sie mit abdeckt.
 | G-M2 Kein Feature ohne SRD-Zeile | 🔴 | **keiner** — nur kleiner Diff und Review |
 | G-M3 Kein Link-Zwang für Bewerbende | 🟢/🔴 | Ablauftest ohne Bewerber-Interaktion; neue Features Prosa |
 
-**Bilanz.** Von 66 aufgeführten Positionen sind **49 vollständig automatisierbar**, **5
+**Bilanz.** Von 68 aufgeführten Positionen sind **51 vollständig automatisierbar**, **5
 teilautomatisiert**, **7 gemischt** (automatisierter Kern, prosaischer Rest) und **5 rein
 prosaisch**.
 
@@ -1207,7 +1223,7 @@ zuerst kommen, und teuer, wenn sie nachgezogen werden:
    `test/guarded.manifest.json`, Migrationsverzeichnis, Solver-Adapter (G-G3, G-D, G-E1, G-K1)
 4. `data-inventory.yml` mit Schema-Abgleich als Pflicht-Gate (G-F1) — **vor** der ersten Tabelle
 5. RLS-Positiv-Test über alle Tabellen mit `household_id` (G-C2, G-C5) — **vor** der ersten Tabelle
-6. `test/guarded.manifest.json` mit den elf Invarianten aus G-D, zunächst als scheiternde Tests —
+6. `test/guarded.manifest.json` mit den dreizehn Invarianten aus G-D, zunächst als scheiternde Tests —
    die Sichtbarkeitsinvarianten je **zweimal**, gegen die Policy-Schicht und als rohes SQL (G-C7)
 7. Sitzungskontext ausschließlich über eine Transaktions-Hilfsfunktion, `SET` ohne `LOCAL` per Lint
    gesperrt (G-C8) — **vor** der ersten Policy, nicht danach
@@ -1230,3 +1246,4 @@ zuerst kommen, und teuer, wenn sie nachgezogen werden:
 > | V0.4 | 2026-08-19 | **G-B6** (Service Worker cacht nur die App-Hülle — die Löschautomatik erreicht kein Endgerät, ADR-011 hätte sonst das Löschkonzept unterlaufen) und **G-E5** (Löschung atomar, kein Feld mit eigener Frist — sonst wird der Inhalt einer gelöschten Beurteilung aus der verbliebenen Gegendarstellung rekonstruierbar) ergänzt; G-D4 entsprechend erweitert. Bilanz auf 64 Positionen, 67 Regeln. |
 > | V0.6 | 2026-08-19 | Präzisierung ohne neue Regeln — **Bilanz unverändert bei 66 Positionen und 68 Regeln**. Zusicherung 6 von G-B7 auf **Art. 5 Abs. 1 lit. d** und **Art. 16** zurückgeführt. Neuer Merksatz **„Wiederkehrende Fehlerstelle: der Profilwechsel"** unter G-C7: Er ist keine Abmeldung, und an ihm sind zweimal unabhängig Annahmen gebrochen (V-1 hängt deshalb am `Account`, der Stimmpuffer wird deshalb auch beim Wechsel geleert). Als 🔴 gekennzeichnet — eine Prüffrage, kein Mechanismus. |
 > | V0.5 | 2026-08-19 | **G-B7** ergänzt: der Offline-Stimmpuffer als einzige, benannte Ausnahme von G-B6 — zulässig, weil er eine noch nicht abgeschlossene Transaktion hält, aber nur solange „kann den Versand nicht überleben" erzwungen ist. Sechs Zusicherungen, davon zwei über den Auftrag hinaus ergänzt: Leeren beim **Profilwechsel** (nicht nur bei Abmeldung) und **idempotente Wiedereinspielung**. **G-D11** als geschützter Test für die drei still scheiternden Zusicherungen. Bilanz auf 66 Positionen, 68 Regeln. |
+> | V0.7 | 2026-08-31 | Produkt-Audit-Konsistenzabgleich. **G-D12** ergänzt (Invite-Token aus SRD S-42/`ApplicationInviteToken` schlägt bei bereits bestehendem `ResidentProfile` fehl statt zu überschreiben — Anschluss an G-D9/I-3) und **G-D13** (Notiz-Erinnerungs-Reminder aus S-46/`AppointmentAttendance` respektiert Selbst-Redaktion — Anschluss an G-D1/G-C6/G-D5, liest nur das `note_written`-Flag, nie `CastingNote.body`). Bilanz auf 68 Positionen, 70 Regeln. |
