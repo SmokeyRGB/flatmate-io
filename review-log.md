@@ -316,3 +316,80 @@ hier, weil ein Review-Log, das Beiträge großzügiger zuschreibt als sie waren,
 Vor der ersten Zeile Code: Aufwandsgegenprobe des v1-Scope (die 🔴-Lücke oben), Baseline-Erhebung
 im Testhaushalt (SRD O-07, danach nicht rekonstruierbar), und Klärung von Q-1 bis Q-4 aus
 `06-Compliance-Anhang.md`.
+
+---
+
+## Durchgang 2 — 2026-08-31 (Produkt-Audit-Konsistenzabgleich)
+
+**Auslöser.** `Product-Audit-Hypotheses.md` (V0.4) hatte 21 ungeprüfte Annahmen benannt. Der
+Autor gab dazu neun Rückmeldungen — teils Korrekturen an der Prämisse des Audits, teils neue
+Produktentscheidungen, teils Bestätigungen, dass etwas bereits geklärt ist. Ziel dieses
+Durchgangs: die sieben Kern-Spec-Dokumente und `GUARDRAILS.md` konsistent nachziehen, dann das
+Audit selbst auf V0.5 heben. Methode: drei parallele Explore-Agents zum Auffinden der
+Fundstellen, danach neun Bearbeitungs-Agenten (einer je Zieldokument, in Abhängigkeitsreihenfolge:
+Domänenmodell → SRD → fünf parallele Dokumente → Audit-Dokument), gefolgt von einem manuellen
+Konsistenz-Sweep.
+
+### Was geändert wurde
+
+| # | Rückmeldung | Ergebnis | Betroffene Dokumente |
+|---|---|---|---|
+| 1 | „Werkzeug nicht ausgesucht" ist zu absolut — die organisierende Person ist selbst Bewohnende, informelle Vorab-Zustimmung ist der Regelfall | Zehn Stellen umformuliert; R-02 heißt jetzt „Low-Commitment-Zustimmung, nicht Nicht-Zustimmung" | `01`, `02`, `05`, Audit (H-D1) |
+| 2 | CastingNote-Erinnerung nach dem Casting-Termin | Neue Scope-Zeile **S-46**, Entität `AppointmentAttendance` (löst O-7), Guardrail **G-D13** | `02`, `03`, `04`, `GUARDRAILS`, Audit (H-D2) |
+| 3 | „Werkzeug-Reduktion" impliziert fälschlich Ersatz von WhatsApp/WG-Gesucht | Ziel umformuliert: Casting-Vorgänge laufen nicht mehr parallel im Chat, kein Ersatzanspruch | `02`, Audit (H-D3) |
+| 4 | Ist die Informationspflicht bei WG-Gesucht-Übernahme wirklich offen? | **Keine Änderung** — `06` §4 hatte das bereits korrekt geklärt (Art. 13 beim Haushalt, nicht Art. 14) | — |
+| 5 | Zeitliche Begrenzung von Abstimmungsrunden | Neue Scope-Zeile **S-44** (`phase_deadline_at`), **v1** statt Kandidat — speist CTA-Sortierung im Dashboard | `01`, `02`, `04`, Audit (H-D8) |
+| 6/7 | Einladungslink-Sichtbarkeit generalisieren, Doppelregistrierung als Fehler statt stiller Überschreibung | Neue Scope-Zeile **S-42**, Entität `ApplicationInviteToken`, Guardrail **G-D12**; `joined_at` bekommt zweiten Zweck (Moderatoren-Sichtbarkeit) | `02`, `03`, `04`, `GUARDRAILS`, Audit (H-F5) |
+| 8/10 | E-Mail-Benachrichtigungen ins Backlog, PWA-Installation verbindlich führen | Web Push von v1.1 nach **v1** vorgezogen, E-Mail wird Fallback-Kanal; neue Scope-Zeile **S-45** (Install-Banner + zurückhaltende Resident-E-Mail-Abfrage); neue Entität `PushSubscription`; **E-22 korrigiert** (V0.2→V0.3 in `01`); ADR-011-Begründung umgedreht | `01`, `02`, `03`, `04`, `05`, `06`, Audit (H-F6) |
+| 9 | Spenden-E-Mail nach 3–4 Runden statt offenem Ort | **O-05 aufgelöst** zu Scope-Zeile **S-43** (v1.1): einmalige E-Mail an die Household-E-Mail, außerhalb des In-App-Flows | `01`, `02`, Audit (H-V4, H-V7) |
+
+**Neues E-Mail-Konzeptmodell**, weil eine erste Fassung fälschlich drei Felder unterschied:
+Household-E-Mail (`Account.email` des Haushalts-Admin-Accounts, Pflicht) und Resident-E-Mail
+(`Account.email` eines Resident-Accounts, jetzt optional/nachpflegbar) — zwei Konzepte, nicht
+drei. `Household.contact_email` (Art.-13-Kontakt für Bewerbende) bleibt unbeteiligt.
+
+### Ein eigener Fehler in diesem Durchgang, stehengelassen als Beleg
+
+Der Ausführungsplan wies jedem Zieldokument eine Liste zu erledigender Themen zu — und verlor
+dabei **Thema 2** aus der Zuordnung für `02-SRD.md`, obwohl der Plantext selbst bereits „Neue
+Scope-Zeile S-43" für die CastingNote-Erinnerung festgehalten hatte. Der SRD-Bearbeitungs-Agent
+bekam diesen Auftrag nie und vergab **S-43 stattdessen an die Spenden-E-Mail** (Rückmeldung 9,
+die in derselben Sitzung ebenfalls eine neue Nummer brauchte). Der Fehler fiel erst beim Lesen
+der Agenten-Zusammenfassung auf, nicht vorher — die CastingNote-Erinnerung bekam per Nachtrag
+**S-46**. Betroffen war nur diese eine Datei; kein anderer Agent hatte zu dem Zeitpunkt bereits
+mit der falschen Nummer gearbeitet.
+
+**Lehre:** Eine Pro-Dokument-Aufgabentabelle, die aus mehreren Themenabschnitten heraus manuell
+zusammengestellt wird, ist selbst eine Fehlerquelle — jede Zeile „Dokument X bekommt Themen A, B,
+C" muss gegen **jeden** Themenabschnitt geprüft werden, der dieses Dokument erwähnt, nicht nur
+gegen die eigene Spalte der Tabelle. Eine `grep` nach dem Dateinamen über alle Themenabschnitte
+hinweg hätte die Lücke vor dem Dispatch gefunden, nicht danach. Dasselbe Muster wie in Durchgang
+1 (Feldnamen-Divergenz bei paralleler Arbeit): **Nummern- und Zuordnungs-Konflikte bei
+paralleler Vergabe verlangen einen Abgleichsschritt, der nicht optional ist, weil „eine Tabelle
+geschrieben zu haben" nicht dasselbe ist wie „sie gegengeprüft zu haben."**
+
+### Weitere Nacharbeiten aus dem manuellen Konsistenz-Sweep
+
+Drei Stellen hatten die Bearbeitungs-Agenten korrekt als außerhalb ihres Auftrags liegend
+gemeldet, statt sie unbeauftragt zu ändern — genau das richtige Verhalten, aber es brauchte einen
+Nachlauf: die „Übernommen aus SRD"-Phasentabelle in `03-PRD.md` §7.1 (fehlende S-42/44/45/46,
+veraltete Web-Push-Zuordnung), die v1-Scope-Liste in `01-Problem-Framing.md` (gleiches Muster),
+und die `GUARDRAILS.md`-Zusammenfassungstabelle samt Bilanz-Zählung (neue G-D12/G-D13 fehlten in
+der Übersichtstabelle, obwohl sie im Haupttext standen). Alle drei sind jetzt nachgezogen.
+
+**Bestätigtes Muster aus Durchgang 1:** „Spezifikationsdichte ist nicht Durchsetzung" gilt
+spiegelbildlich auch für Konsistenz-Updates — eine Regel an ihrer Hauptstelle zu ändern reicht
+nicht, wenn dieselbe Datei an anderer Stelle eine eigene, redundante Zusammenfassung derselben
+Information führt (Zähltabellen, Phasenübersichten, Scope-Listen). Jede Redundanz ist ein
+zusätzlicher Ort, an dem eine Änderung vergessen werden kann.
+
+### Ergebnis
+
+Alle neun Rückmeldungen sind jetzt in den Spec-Dokumenten verankert (S-42 bis S-46, E-22
+korrigiert, O-05 aufgelöst) und `Product-Audit-Hypotheses.md` steht auf **V0.5**, konsistent mit
+dem neuen Spec-Stand. Zwei neue Guardrails (G-D12, G-D13) sichern die beiden neuen
+Prozessregeln. Offen bleibt, was auch Durchgang 1 offenließ: Die tatsächliche Wirkung von S-44
+(Rundenfrist) und S-46 (Notiz-Erinnerung) ist ungeprüft — beide sind jetzt spezifiziert, nicht
+validiert. Das ist der Unterschied, den das Audit selbst zwischen „Entscheidung" und „Hypothese"
+zieht, und er gilt für die in diesem Durchgang neu entstandenen Scope-Zeilen genauso wie für die
+alten.
