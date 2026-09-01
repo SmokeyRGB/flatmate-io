@@ -293,23 +293,39 @@ sichtbar.
 
 #### 4.1.1 Beitritt und erste Stimme
 
-Der kürzeste Weg der Anwendung (S-03, SRD §10). Ein Bildschirm, drei Felder: Name, E-Mail,
-Passwort. Der Beitrittscode gilt für den **ganzen Haushalt**, nicht pro Person (E-05), ist
-über den Link bereits gesetzt und wird nur zur Bestätigung angezeigt („Du trittst *WG
-Hauptstraße 12* bei").
+Der kürzeste Weg der Anwendung (S-03, SRD §10). Ein Bildschirm, **zwei Pflichtfelder: Name
+und Passwort. E-Mail ist optional.** Der Beitrittscode gilt für den **ganzen Haushalt**,
+nicht pro Person (E-05), ist über den Link bereits gesetzt und wird nur zur Bestätigung
+angezeigt („Du trittst *WG Hauptstraße 12* bei").
 
-- Passwort ist die primäre und universelle Methode (P-2, ADR-007). Passkey wird **nach**
-  der Registrierung als optionaler Komfort angeboten und ist jederzeit abschaltbar
-- E-Mail-Verifikation läuft nachgelagert und blockiert die erste Abstimmung nicht
+> **Dieselbe Begründung wie beim Passkey-Präzedenzfall unten:** Was für die erste Stimme
+> nicht gebraucht wird, wird beim Beitritt nicht verlangt. Die **Resident-E-Mail**
+> (`Account.email` des Resident-Accounts, zu unterscheiden von der Pflicht-**Household-E-Mail**
+> des Haushalts-Admin-Accounts) ist nach dem Beitritt jederzeit in den persönlichen
+> Einstellungen nachpflegbar — mit zurückhaltender Aufforderung dazu auf dem Dashboard
+> (§4.1.13), nicht als weiteres Pflichtfeld im Beitrittsformular. Kerngedanke: Der Weg von
+> Onboarding bis zur ersten Stimmabgabe bleibt so kurz, streamlined und unobstructed wie
+> möglich — jedes Feld, das nicht zur ersten `Vote` beiträgt, gehört danach, nicht davor.
+
+- Passwort ist die primäre und universelle Methode (P-2, ADR-007) und das einzige neben dem
+  Namen zwingend erforderliche Feld. Passkey wird **nach** der Registrierung als optionaler
+  Komfort angeboten und ist jederzeit abschaltbar
+- Wird eine E-Mail-Adresse angegeben, läuft ihre Verifikation nachgelagert und blockiert die
+  erste Abstimmung nicht; wird keine angegeben, entfällt dieser Schritt einfach
 - Direkt nach dem Beitritt führt der Weg **in den Screening-Durchlauf**, nicht in ein
   Profil oder eine Übersicht — es sei denn, es gibt keine offene Bewerbung
+- **Das PWA-Install-Banner und die Resident-E-Mail-Nachfrage gehören nicht in diesen Pfad.**
+  Beide sind Dashboard-Elemente und erscheinen erst danach auf dem Rundenkopf (§4.1.13) —
+  nicht als zusätzlicher Bildschirm oder zusätzliches Feld zwischen Beitritt und erster Stimme
 
 **Akzeptanzkriterien §4.1.1**
 
-- [ ] Vom Öffnen des Beitrittslinks bis zur ersten möglichen `Vote` sind maximal zwei Bildschirme zu durchlaufen
+- [ ] Vom Öffnen des Beitrittslinks bis zur ersten möglichen `Vote` sind maximal zwei Bildschirme zu durchlaufen — **unverändert gültig**, auch nach Ergänzung von Install-Banner und E-Mail-Nachfrage, weil beide ausschließlich auf dem Dashboard erscheinen (§4.1.13)
 - [ ] Der Beitritt verlangt keine Angabe, die für die Stimmabgabe nicht benötigt wird
+- [ ] Das Beitrittsformular verlangt ausschließlich Name und Passwort; das E-Mail-Feld ist als optional erkennbar und lässt sich leer abschicken
 - [ ] Ein abgelaufener oder widerrufener Code zeigt einen Zustand, der benennt, wen die Person kontaktieren soll — nicht „ungültig"
 - [ ] Passkey wird nie während der Registrierung angeboten
+- [ ] Weder das PWA-Install-Banner noch die Resident-E-Mail-Nachfrage erscheinen im Beitrittsformular oder auf einem Zwischenbildschirm davor
 - [ ] Die Bewohnerliste ist unmittelbar nach dem Beitritt für alle Bewohnenden sichtbar (Duplikatsschutz, S-05)
 - [ ] Ein neuer Beitritt erzeugt einen `ActivityEvent`, der im Feed aller Bewohnenden erscheint
 
@@ -536,6 +552,20 @@ Begründungsfeld, wenn der Übergang aus einem Endzustand herausführt.
 > was die Invariante verhindern soll. Der Fehler tritt **ohne Fehlermeldung** ein und fällt
 > beim Testen mit frischen Daten nie auf.
 
+##### Bevorzugter Weg: automatischer Einladungslink bei `moved_in` (S-42)
+
+Erreicht eine `Application` den Zustand `moved_in`, erzeugt die Anwendung **automatisch**
+einen einmalig verwendbaren Einladungslink — Entität `ApplicationInviteToken`
+(`application_id`, `token_hash`, `expires_at`, `used_at`, `revoked_at`). Registriert sich die
+eingezogene Person über diesen Link, wird `Application.became_resident_id` **automatisch**
+gesetzt — ohne den manuellen Zuordnungsschritt unten. Das ist der bevorzugte, weil
+fehlerfreie Weg: Die Verknüpfung entsteht aus derselben Handlung, die die Person ohnehin
+ausführt (sich registrieren), statt aus einer zusätzlichen, leicht vergessenen Handaktion.
+
+Der im Folgenden beschriebene **manuelle** Weg bleibt für alle übrigen Fälle bestehen: kein
+Token (mehr) vorhanden — abgelaufen, bereits verbraucht, widerrufen, oder die `Application`
+stammt aus einer Zeit vor diesem Flow —, oder es handelt sich um eine spätere Korrektur.
+
 Zwei Stellen, an denen die Anwendung das aktiv adressiert:
 
 1. **Aktion an der Bewerberkarte:** „Diese frühere Bewerbung derselben Person zuordnen" —
@@ -549,7 +579,16 @@ Zwei Stellen, an denen die Anwendung das aktiv adressiert:
 **Bewusst kein automatischer Abgleich** über Namen, Kontaktdaten oder Ähnlichkeit: Das wäre
 ein Personenabgleich über Datensätze hinweg — heikel, fehleranfällig in beide Richtungen
 (zwei verschiedene „Lea Müller" zu verschmelzen wäre schlimmer als die Lücke) und rechtlich
-schwerer zu begründen als eine bewusste menschliche Handlung.
+schwerer zu begründen als eine bewusste menschliche Handlung. Der Einladungslink oben ist
+davon nicht betroffen — er verknüpft nicht anhand einer Ähnlichkeitsvermutung, sondern weil
+die Person denselben, ihr exklusiv zugestellten Token verwendet.
+
+**Fehlerfall: bereits registrierte Person klickt den Token.** Ist die klickende Person
+**bereits registriert und angemeldet** — sie hat also schon einen `Account`/ein
+`ResidentProfile` —, endet der Vorgang mit einer erklärten Fehlermeldung: „Du bist bereits
+als Bewohner:in registriert." Es findet **keine** stille Verknüpfung und **keine**
+Überschreibung eines bestehenden Profils statt. Doppelregistrierung und Merge zweier
+Identitäten sind ausdrücklich keine Lösungswege dieses Fehlerfalls.
 
 **Akzeptanzkriterien §4.1.7**
 
@@ -560,7 +599,11 @@ schwerer zu begründen als eine bewusste menschliche Handlung.
 - [ ] `moved_in → offer_made` und `moved_in → declined_by_applicant` sind ohne Datenverlust möglich; bereits gesetzte `became_resident_id` bleibt bestehen (§4.2.5)
 - [ ] Der Übergang auf `invited` erzeugt den Copy-Paste-Text inklusive Datenschutzhinweis (S-16), versendet aber **nichts**
 - [ ] Die Anwendung versendet an keiner Stelle eine Nachricht an eine bewerbende Person
-- [ ] Die Aktion „diese frühere Bewerbung derselben Person zuordnen" ist an jeder Bewerberkarte erreichbar und wird beim Übergang nach `moved_in` sichtbar angeboten
+- [ ] Der Übergang einer `Application` auf `moved_in` erzeugt automatisch genau einen einmalig verwendbaren `ApplicationInviteToken` für diese `Application`
+- [ ] Registriert sich eine Person über einen gültigen, noch nicht verbrauchten und nicht widerrufenen `ApplicationInviteToken`, wird `became_resident_id` automatisch gesetzt (`used_at` wird belegt), ohne dass die manuelle Zuordnungsaktion nötig ist
+- [ ] Ein abgelaufener, bereits verwendeter oder widerrufener Token zeigt einen erklärten Fehlerzustand statt eines stillen Fehlschlags
+- [ ] Klickt eine **bereits registrierte, angemeldete** Person den Einladungslink, endet der Vorgang mit der erklärten Fehlermeldung „Du bist bereits als Bewohner:in registriert" — keine stille Verknüpfung, keine Überschreibung eines bestehenden Profils, keine Doppelregistrierung, kein Merge
+- [ ] Die Aktion „diese frühere Bewerbung derselben Person zuordnen" ist an jeder Bewerberkarte erreichbar und wird beim Übergang nach `moved_in` sichtbar angeboten — unabhängig davon, ob zusätzlich ein Einladungslink existiert
 - [ ] Beim Anlegen eines `ResidentProfile` aus einer `Application` erscheint der Hinweis auf möglicherweise vorhandene frühere Bewerbungen mit direktem Weg zur Zuordnung
 - [ ] Die Zuordnung setzt `became_resident_id` der älteren `Application` auf dasselbe `ResidentProfile` und erzeugt einen `ActivityEvent`
 - [ ] Nach der Zuordnung liefert die ältere `Application` für dieses Profil keine `Vote`, kein Aggregat, keine `CastingNote` und kein `Veto` mehr — geprüft auf API-Ebene (§6.5)
@@ -717,6 +760,35 @@ Der Feed ist die Antwort auf „was ist passiert, während ich weg war" und spei
 | Haushalts-Einstellungen | siehe §4.3 | Moderation |
 | Persönliche Einstellungen | Benachrichtigungen, Passkey, Passwort, Kontext | Beteiligung |
 | Aufbewahrungs-/Datenauskunftsansicht | siehe §4.3 | Moderation |
+
+##### Neue Dashboard-Elemente (S-45): kein eigener Bildschirm, zwei Einblendungen
+
+PWA-Install-Banner und Resident-E-Mail-Nachfrage sind **keine eigenen Bildschirme im
+Beitrittsflow** (§4.1.1 bleibt davon unberührt) — beide erscheinen als Einblendungen auf dem
+bestehenden Rundenkopf/Dashboard-Bildschirm (§4.1.2), **nachdem** die erste `Vote` möglich
+ist. Zwei getrennte Botschaften, bewusst unterschiedlich zurückhaltend:
+
+| Element | Botschaft | Beharrlichkeit |
+|---------|-----------|-----------------|
+| **PWA-Install-Banner** | Aufforderung, die App zu installieren | **Darf sichtbar und beharrlich sein.** Das ist Voraussetzung für die Beteiligung an notwendigen Schritten (u. a. Empfang von Web Push, jetzt v1), kein bloßer Komfort |
+| **Resident-E-Mail-Nachfrage** | Führt mit **„Zugang wiederherstellen, falls Passwort verloren geht"** — **nicht** mit Benachrichtigungs-Komfort | **Bleibt zurückhaltend.** Die Resident-E-Mail ist optional und jederzeit in den persönlichen Einstellungen nachpflegbar (§4.1.1); wer die Einblendung übergeht, wird nicht erneut gedrängt |
+
+**Verzahnung mit dem E-Mail-Fallback (§6.2):** Sobald für ein Profil tatsächlich eine
+Fallback-E-Mail versendet wird — weil keine aktive `PushSubscription` vorliegt —, trägt
+**genau diese E-Mail** zusätzlich den Installations-Nudge: „Installiere die App, um direkt
+benachrichtigt zu werden und dein Postfach zu schonen", mit Link zur Installationsanleitung.
+Web-Push-Zustellungen und reine In-App-Benachrichtigungen tragen diesen Nudge nicht — er
+gehört an die Stelle, an der das Fehlen der Installation gerade spürbar wird.
+
+**Akzeptanzkriterien (Dashboard-Elemente)**
+
+- [ ] Weder das PWA-Install-Banner noch die Resident-E-Mail-Nachfrage erscheinen im Beitrittsformular oder auf einem Bildschirm zwischen Beitritt und erster `Vote` (§4.1.1)
+- [ ] Beide Elemente erscheinen ausschließlich auf dem Rundenkopf/Dashboard-Bildschirm (§4.1.2)
+- [ ] Das PWA-Install-Banner ist nicht dauerhaft wegklickbar, solange die App nicht installiert ist
+- [ ] Die Resident-E-Mail-Nachfrage führt mit der Zugangswiederherstellung, nicht mit einem Benachrichtigungsargument
+- [ ] Die Resident-E-Mail-Nachfrage ist übergehbar, ohne die Nutzung der Anwendung einzuschränken, und wird nach dem Übergehen nicht bei jedem Aufruf erneut prominent gezeigt
+- [ ] Eine tatsächlich versendete Fallback-E-Mail (§6.2, kein aktives `PushSubscription`) trägt den Installations-Nudge mit Link zur Installationsanleitung
+- [ ] Eine Web-Push-Zustellung oder eine reine In-App-`Notification` trägt diesen Installations-Nudge **nicht**
 
 #### 4.1.14 Plattformunterschiede
 
@@ -898,7 +970,8 @@ Der Feed ist die Antwort auf „was ist passiert, während ich weg war" und spei
   `Application` (solverfrei), Vorschlagsberechnung hinter einem **Solver-Port** mit
   Begründungsdaten, Slot-Reaktionen, Terminbestätigung
 - `ActivityEvent`: append-only, Fan-out zu `Notification`; Feed nach Policy gefiltert
-- `Notification`: In-App und E-Mail, Digest-Bündelung, zwei Ebenen der Ereignisauswahl
+- `Notification`: In-App und Web Push primär, E-Mail als Fallback ohne aktive
+  `PushSubscription`, Digest-Bündelung, zwei Ebenen der Ereignisauswahl
 - Aufbewahrung: Fristberechnung, 14-Tage-Vorwarnung, protokollierte Verlängerung,
   Löschlauf mit Ereignis
 - Autorisierung: eine zentrale Policy-Schicht, durch die **jede** Abfrage läuft, plus
@@ -962,6 +1035,36 @@ Eindrucksebene wäre die rechtlich heikelste und produktseitig unnötigste Verdo
 | Weitere Angaben | Freie Notizen zur Person (Hobbys, Alter, Kontext) ohne vorgegebene Kategorien — bewusst kein Kategoriensystem, damit nicht Art.-9-Merkmale strukturiert werden (C-5) |
 | Veto-Begründung | Freitext, bei aktiver Begründungspflicht erforderlich. Trägt zusätzlich zum Hinweis nach C-3 den **Offenlegungshinweis** aus §4.1.10: „Diese Begründung kann der Person auf Auskunftsverlangen offengelegt werden — und lässt möglicherweise auf dich schließen." |
 | `subject_statement` | Gegendarstellung der betroffenen Person am Datensatz (S-41). **Datenmodell in v1, Oberfläche in v1.1.** Sachlich die richtige Antwort auf Art. 16, weil sich eine subjektive Beurteilung nicht *berichtigen* lässt, man ihr aber eine Stellungnahme beistellen kann. Erscheint in der Datenauskunft (C-7); ändert oder löscht **keine** fremden `Vote`s, `Veto`s oder `CastingNote`s. **Aufbewahrung: siehe C-9 — kein eigener Zeitgeber, atomare Löschung** |
+
+#### 4.6.4 Erinnerung ans Notizenschreiben (S-46)
+
+Nach dem `Application`-Übergang `scheduled → interviewed` (Schritt 15 in §4.0.2) versendet
+die Anwendung automatisch eine Erinnerungs-Notification (`casting.note_reminder_due`, S-46)
+an alle `AppointmentAttendance`-Einträge mit `attended = true` — also an genau die Personen,
+die beim Casting persönlich dabei waren und deshalb etwas für die Abwesenden festhalten
+können. Der Text lehnt sich an die strukturierten Prompts aus §4.6.2 an (S-22), statt einen
+neuen, unstrukturierten Aufruf zu formulieren:
+
+> „Wie lief das Casting mit X? Schreib ein paar Sätze für alle, die nicht dabei waren."
+
+**Selbst-Redaktion greift auch hier:** Ist die betreffende `Application` für die Empfängerin
+oder den Empfänger selbst-redigiert (`became_resident_id` der Empfängerin/des Empfängers,
+Invariante V-1, §4.2.5), wird an diese Person **keine** Erinnerung verschickt — dieselbe
+Invariante, die ihr auch keine `CastingNote` zu dieser `Application` ausliefert, darf nicht
+durch eine Erinnerungs-Notification unterlaufen werden, deren Betreff bereits preisgibt, dass
+es um „ihr" Casting geht.
+
+**Erfolgsmetrik:** Kein eigenes Telemetrie-Ereignis für den Trigger. Das bereits bestehende
+`note_created` (§5.1) bleibt die Erfolgsmetrik — es misst, ob die Erinnerung tatsächlich zu
+einer geschriebenen `CastingNote` führt.
+
+**Akzeptanzkriterien §4.6.4**
+
+- [ ] Der Übergang `scheduled → interviewed` löst für jeden `AppointmentAttendance`-Eintrag mit `attended = true` genau eine `casting.note_reminder_due`-Notification an das zugehörige `resident_profile_id` aus
+- [ ] Der Text der Erinnerung nennt die gecastete Person und lehnt sich an die Prompts aus §4.6.2 an, statt einen unstrukturierten Eindrucksaufruf zu formulieren
+- [ ] Ist die betroffene `Application` für die Empfängerin oder den Empfänger selbst-redigiert (`became_resident_id`, §4.2.5), wird an diese Person **keine** Erinnerung verschickt
+- [ ] Ein `AppointmentAttendance`-Eintrag mit `attended = false` löst keine Erinnerung aus
+- [ ] `note_created` (§5.1) bleibt die Erfolgsmetrik dieses Triggers; es wird kein separates Telemetrie-Ereignis für die Erinnerung selbst eingeführt
 
 **Akzeptanzkriterien §4.6**
 
@@ -1052,7 +1155,8 @@ dient genau einer Kennzahl aus `02-SRD.md` §6.
 | **Verbindungsverlust im Screening-Durchlauf** | Abgegebene `Vote`s werden lokal gepuffert und nachgesendet; sichtbarer Offline-Hinweis. Keine Stimme geht verloren — höchste Priorität, weil ein verlorener Stimmabgabe-Versuch direkt die Kernmetrik trifft. Der Sendepuffer ist die **einzige benannte Ausnahme** von der Regel in der folgenden Zeile; seine vier erzwungenen Eigenschaften stehen darunter |
 | **Offline-Fähigkeit hat eine harte Grenze** | **Der Service Worker cacht ausschließlich die App-Hülle** — Markup, Skripte, Stile, Icons. **Niemals** Bewerber- oder Beratungsdaten. „Offline" heißt: *die App startet ohne Netz* und zeigt einen erklärenden Zustand — **nicht**: *die Daten sind ohne Netz da*.<br>**Warum das eine Datenschutzanforderung und keine Optimierung ist:** Ein Cache mit `Application`-Daten legt personenbezogene Daten auf die Geräte der Bewohnenden — **außerhalb der Reichweite der 180-Tage-Löschautomatik**. Ein Löschjob auf dem Server erreicht keinen Gerätecache; was dort liegt, erscheint in keiner Datenauskunft und überlebt jede Fristkürzung. Der wahrscheinliche Implementierungsfehler ist ein großzügiger Runtime-Cache, der API-Antworten „für die Performance" mitnimmt (S-30, ADR-011, § 25 TDDDG) |
 | **Der Sendepuffer für `Vote`s — die benannte, begrenzte Ausnahme** | Der Puffer ist **keine gespeicherte Kopie, sondern eine noch nicht abgeschlossene Transaktion**: die Nutzlast einer Handlung, die die Person selbst ausgelöst hat und die noch läuft. § 25 TDDDG deckt genau das als „unbedingt erforderlich für den ausdrücklich gewünschten Dienst" — und **stärker** als das Caching der App-Hülle, weil hier eine konkret angeforderte Aktion sonst verlorengeht.<br>**Verworfene Begründung — bewusst dokumentiert, nicht gestrichen:** Diese Ausnahme stand zunächst auf dem Argument *„es ist kein fremdes Datum betroffen, nur die eigene Stimme"*. Das ist **falsch**: Eine `Vote` besteht aus `application_id` plus Wert und ist damit ihrem Wesen nach eine **Beurteilung über eine dritte Person** — eine Stimme ist immer über jemand anderen. Der Satz bleibt hier stehen, weil eine Entscheidung, die aus dem falschen Grund richtig ist, brüchig bleibt: Wer „keine fremden Daten betroffen" als tragendes Argument liest, **erweitert die Ausnahme per Analogie** und hält als nächstes einen lokalen Notizentwurf für ebenso unproblematisch — und der ist es nicht. Die Ausnahme trägt allein deshalb, weil der Puffer den Versand **nicht überleben kann** — und das muss eine erzwungene Eigenschaft sein, keine Erwartung. Vier Zusicherungen:<br>**(1) Harte Höchstlebensdauer von 7 Tagen**, unabhängig vom Versanderfolg. Danach wird der Eintrag verworfen und die Person informiert („deine Stimme zu … konnte nicht gesendet werden"). Ohne diese Grenze trägt ein Gerät, das offline geht und Monate später zurückkommt, eine Beurteilung über eine Bewerbung, deren Daten serverseitig längst gelöscht sind — **dasselbe Leck durch die Hintertür**.<br>**(2) Keine Anzeigedaten:** nur `application_id`, Wert und Rundenstufe. **Kein Name, kein Profiltext, keine denormalisierte Karte.** Sobald der Puffer speichert, *wem* die Stimme galt, um es anzeigen zu können, ist er eine Datenkopie und keine Warteschlange mehr — und das ist die naheliegendste Bequemlichkeit, die die ganze Konstruktion kippt.<br>**(3) Verwerfen statt Wiederholen bei Ablehnung:** Wurde die `Application` oder die `CastingRound` inzwischen serverseitig gelöscht, lehnt der Server ab und der Client verwirft **still**. Kein Wiederholungsversuch; in der Meldung erscheint kein Bewerbername, weil er dem Client nach (2) nicht bekannt ist.<br>**(4) Leerung bei Abmeldung und Sitzungsentzug** — die WG-Realität ist ein geteilter Laptop im Wohnzimmer |
-| **E-Mail-Versand fehlgeschlagen** | In-App-`Notification` bleibt unberührt; Fehler wird protokolliert und dem Moderator angezeigt. Keine Wiederholung, die eine Beratungsinhalt-Mail an die falsche Adresse riskiert |
+| **Kein Web Push zustellbar** (keine aktive `PushSubscription` für das Profil) | **E-Mail ist jetzt selbst der Rückfall, nicht mehr der Primärkanal.** Kanalreihenfolge: Web Push → E-Mail-Fallback → nur In-App. Die Fallback-E-Mail trägt zusätzlich den Installations-Nudge (§4.1.13), damit der Rückfall selten bleibt |
+| **E-Mail-Versand (als Fallback) fehlgeschlagen** | **In-App-`Notification` ist die letzte Ebene** und bleibt unberührt; Fehler wird protokolliert und dem Moderator angezeigt. Keine Wiederholung, die eine Beratungsinhalt-Mail an die falsche Adresse riskiert |
 | **Löschlauf fehlgeschlagen** | Kein stiller Fehlschlag: Es wird protokolliert und beim nächsten Lauf nachgeholt. Die ausgebliebene Vorwarnung ist das erkennbare Signal (§4.2.6) |
 | **Parser liefert Unsinn** | Kein Fehlerzustand — Formular mit dem Rohtext, Vorschläge verworfen. Der Parser darf nie ein Speichern verhindern |
 | **Policy-Prüfung nicht auflösbar** | **Zugriff verweigern, nicht gewähren.** Fehler beim Auflösen des Sichtbarkeitskontexts führt zu leerem Ergebnis mit Erklärung, nie zu ungefiltertem Inhalt |
@@ -1116,7 +1220,7 @@ ausdrücklich kein Interesse an der Indexierung von Bewerberdaten. Zwei Anforder
 - [ ] Ruft Profil A die API-Antwort einer `Application` mit `became_resident_id == A` ab, enthält die Antwort kein `Vote`-Objekt, kein Aggregat, keinen Score, keinen Rangplatz, keine `Veto`-Angabe und keine `CastingNote` — geprüft auf der API-Ebene, nicht in der Oberfläche
 - [ ] Dieselbe Prüfung besteht bei `open`, bei `closed` und bei wiedereröffneter Runde
 - [ ] Dieselbe Prüfung besteht für die Rangliste (die `Application` fehlt vollständig), den Abschnitt „Warten auf Stimmen", jede Sortierung und jede Zählung
-- [ ] Dieselbe Prüfung besteht für `Notification`-Betreff, Vorschautext und Inhalt sowie für den Digest
+- [ ] Dieselbe Prüfung besteht **kanalneutral**: bei E-Mail für Betreff, Vorschautext und Inhalt, beim Web-Push-Payload für Titel und Body (kein „Betreff", aber dieselbe Prüfpflicht) — sowie für den Digest
 - [ ] Dieselbe Prüfung besteht für den `ActivityEvent`-Feed und für jeden Export
 - [ ] Wird die Bedingung in der Anwendungsschicht künstlich entfernt, liefert die Datenhaltung dennoch keine Zeilen (Row-Level-Security als zweite Schicht)
 - [ ] Profil A eines Haushalts erhält unter keiner Abfrage Daten eines anderen `Household`s — auch wenn die Anwendungsschicht die Bedingung auslässt
@@ -1174,8 +1278,8 @@ ausdrücklich kein Interesse an der Indexierung von Bewerberdaten. Zwei Anforder
 
 | Stufe | Inhalt | Vorführbar als |
 |-------|--------|----------------|
-| **v1** | S-01 bis S-40 sowie das **Datenmodell** von S-41 (inkl. `Application.collected_from`, Absatzverwerfung, Zuordnung früherer Bewerbungen, Datenmodell des Verfügbarkeits-Tokens) | „Ein echter Haushalt führt eine vollständige Runde von der ersten `Application` bis `moved_in` durch, ohne nach WhatsApp auszuweichen" |
-| **v1.1** | **Bewerberseitige Token-Seite** für Verfügbarkeiten (Datenmodell liegt bereits in v1 — SRD O-08, Nutzerentscheidung, ob vorgezogen) · **Oberfläche für `subject_statement`** (S-41) · Web Push (mit iOS-Vorbehalt) · Punkte-Budget als Option · Textbausteine | „Der Komfort kommt nach" — jedes Feature ist eine Bequemlichkeit über einem vollständigen manuellen Pfad (P-1). Ausnahme mit eigener Begründung: `subject_statement` ist kein Komfort, sondern ein Betroffenenrecht, dessen Datenmodell deshalb bereits in v1 steht |
+| **v1** | S-01 bis S-40 sowie das **Datenmodell** von S-41 (inkl. `Application.collected_from`, Absatzverwerfung, Zuordnung früherer Bewerbungen, Datenmodell des Verfügbarkeits-Tokens), dazu **S-42** (Einladungstoken bei `moved_in`) · **S-44** (weiche Rundenfrist) · **S-45** (PWA-Install-Hinweis, Web Push jetzt v1 statt v1.1) · **S-46** (Erinnerungs-Notification nach Casting-Termin) | „Ein echter Haushalt führt eine vollständige Runde von der ersten `Application` bis `moved_in` durch, ohne nach WhatsApp auszuweichen" |
+| **v1.1** | **Bewerberseitige Token-Seite** für Verfügbarkeiten (Datenmodell liegt bereits in v1 — SRD O-08, Nutzerentscheidung, ob vorgezogen) · **Oberfläche für `subject_statement`** (S-41) · Punkte-Budget als Option · Textbausteine · **S-43** einmalige Spenden-E-Mail an die Household-E-Mail nach der 3.–4. abgeschlossenen `CastingRound` (löst O-05) | „Der Komfort kommt nach" — jedes Feature ist eine Bequemlichkeit über einem vollständigen manuellen Pfad (P-1). Ausnahme mit eigener Begründung: `subject_statement` ist kein Komfort, sondern ein Betroffenenrecht, dessen Datenmodell deshalb bereits in v1 steht |
 | **v1.2** | Nutzerinitiierte Browser-Extension für Portal-Import | „Erfassungsarbeit sinkt, ohne API und ohne Scraping" |
 | **v2** | Kalender-Sync · KI-Parsing (nur Extraktion, P-5) · Vermieter-Persona **nach** AGG- und AI-Act-Prüfung · Freemium | Produktoption |
 
