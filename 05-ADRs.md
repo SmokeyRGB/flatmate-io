@@ -641,9 +641,12 @@ einzeln verhandelbar, ohne diese mitzuverhandeln:
 ### Kontext
 
 **P-2 Geräteneutralität:** kein Bewohnender darf durch sein Gerät ausgeschlossen werden. Die
-Nutzungsrealität ist unbequem konkret — fünf bis zehn Personen, die das Tool **nicht ausgesucht
-haben**, mit Geräten von neu bis sehr alt, und einer Motivation, die beim ersten Hindernis endet.
-Die Kernmetrik ist die **Beteiligungsquote**; jede Registrierungshürde greift sie direkt an.
+Nutzungsrealität ist unbequem konkret — fünf bis zehn Personen, die das Tool in der Regel als
+Haushalt **informell gewählt haben**: eine organisierende Person schlägt es vor, der Rest stimmt
+vorher zumindest stillschweigend zu. Dass eine organisierende Person über den Kopf der WG hinweg
+entscheidet, ist die Ausnahme, nicht die Regel — an der Geräterealität ändert das nichts: Geräte
+von neu bis sehr alt, und eine Motivation, die beim ersten Hindernis endet. Die Kernmetrik ist die
+**Beteiligungsquote**; jede Registrierungshürde greift sie direkt an.
 
 Gleichzeitig existiert ein echtes Problem: **Duplikatsschutz.** Wer zweimal abstimmt, verzerrt das
 Ergebnis. Die naheliegende technische Lösung — Geräte-Fingerprinting — ist nach **§ 25 TDDDG
@@ -1041,10 +1044,11 @@ Listen, die auseinanderlaufen.
 
 ### Kontext
 
-**P-2 Geräteneutralität** und die Nutzungsrealität: fünf bis zehn Personen, die das Tool nicht
-ausgesucht haben, mobile Nutzung in Schüben von zwei bis drei Wochen, mehrmals pro Jahr. Zwei
-Funktionen wollen „App-Nähe": **Benachrichtigungen** (Beteiligungsanreiz — Kernmetrik) und ein
-**Icon auf dem Startbildschirm** (Wiedereinstieg ohne URL).
+**P-2 Geräteneutralität** und die Nutzungsrealität: fünf bis zehn Personen, die das Tool in der
+Regel als Haushalt informell gewählt haben — eine organisierende Person schlägt es vor, der Rest
+stimmt vorher zumindest stillschweigend zu —, mobile Nutzung in Schüben von zwei bis drei Wochen,
+mehrmals pro Jahr. Zwei Funktionen wollen „App-Nähe": **Benachrichtigungen** (Beteiligungsanreiz —
+Kernmetrik) und ein **Icon auf dem Startbildschirm** (Wiedereinstieg ohne URL).
 
 ### Betrachtete Optionen
 
@@ -1057,12 +1061,23 @@ Funktionen wollen „App-Nähe": **Benachrichtigungen** (Beteiligungsanreiz — 
 
 ### Entscheidung
 
-**Installierbare PWA in v1**, kein App-Store. **v1: In-App- und E-Mail-Benachrichtigungen**, Digest
-als Default. **Web Push in v1.x** mit **dokumentiertem iOS-Vorbehalt**: dort funktioniert es nur für
-PWAs, die zur Startseite hinzugefügt wurden.
+**Installierbare PWA in v1**, kein App-Store. **Web Push ist in v1 der primäre
+Benachrichtigungskanal** — getragen von einer **verbindlichen Installationsführung** (SRD **S-45**):
+ein sichtbarer, beharrlicher Dashboard-Hinweis, der **nach dem Beitritt** erscheint (nicht davor —
+sonst würde er die Registrierungshürde wiederholen, die ADR-007 gerade abbaut) und zur Installation
+auf den Startbildschirm sowie zur Aktivierung von Push anleitet.
 
-E-Mail ist damit in v1 der **verlässliche** Kanal und Web Push später der bequeme — nicht umgekehrt.
-Das ist die Konsequenz aus P-2: der Kanal, der überall funktioniert, trägt die Funktion.
+**E-Mail ist der Fallback-Kanal**, nicht der Standardkanal: für Bewohnende, die (noch) keine PWA
+installiert oder Push (noch) nicht aktiviert haben. Der **iOS-Vorbehalt bleibt unverändert
+bestehen** — Web Push funktioniert dort weiterhin nur für PWAs, die zur Startseite hinzugefügt
+wurden —, aber er ist jetzt keine Endstation mehr: Solange diese Installation nicht erfolgt ist,
+greift der E-Mail-Fallback und überbrückt genau die Zeit bis dahin.
+
+Damit dreht sich die Reihenfolge aus früheren Fassungen dieses Records um: **Web Push plus
+verbindlicher Installationsführung ist jetzt der verlässliche Pfad, E-Mail der Fallback für die
+Übergangszeit** — nicht umgekehrt. Das ist weiterhin die Konsequenz aus P-2, nur mit vertauschten
+Rollen: der Kanal, der bei konsequenter Führung fast alle erreicht, trägt die Funktion; E-Mail
+fängt die Lücke auf, die vor der Installation entsteht, statt sie offenzulassen.
 
 ### Konsequenzen
 
@@ -1077,8 +1092,12 @@ Das ist die Konsequenz aus P-2: der Kanal, der überall funktioniert, trägt die
 
 - **Der iOS-Vorbehalt ist eine echte Einschränkung**, und sie trifft die Kernmetrik: wer die PWA
   nicht zur Startseite hinzufügt, bekommt kein Push. Der Beteiligungsanreiz hängt damit auf iOS an
-  einem Nutzerschritt, den viele nicht kennen. E-Mail-Digest muss deshalb **gut** sein, nicht nur
-  vorhanden.
+  einem Nutzerschritt, den viele nicht kennen — die Installationsführung (S-45) mildert das, ersetzt
+  ihn aber nicht: Sie kann zur Installation anleiten, sie nicht erzwingen. Genau dafür fängt der
+  **E-Mail-Fallback** die Lücke auf, statt sie offenzulassen — wer ohne installierte PWA sonst gar
+  keinen asynchronen Kanal hätte, bekommt jetzt E-Mail statt nichts. Der E-Mail-Fallback muss deshalb
+  **gut** sein, nicht nur vorhanden — nicht weil er der Standardkanal ist, sondern weil er für die
+  Übergangszeit die einzige Brücke ist.
 - **„Zur Startseite hinzufügen" ist ein erklärungsbedürftiger Schritt** — ein Onboarding-Hinweis, der
   auf jedem Gerät anders aussieht.
 - **Keine Auffindbarkeit über App-Stores.** Für ein Non-Profit ohne Marketing ein realer
