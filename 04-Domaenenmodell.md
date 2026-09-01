@@ -163,7 +163,7 @@ zwischen beiden wechseln.
 | Feld | Typ | Klasse | Erläuterung |
 |---|---|:--:|---|
 | `id` | `uuid` | ⚙️ | |
-| `email` | `text` | 🟠 | eindeutig. Beim Haushalts-Account als **gemeinsam genutzte Adresse** empfohlen (Hinweis im Registrierungsformular), damit das Eigentum am Zugang beim Auszug nicht mitwandert |
+| `email` | `text?` | 🟠 | **Pflicht beim Haushalts-Admin-Account** (der erste, bei der Registrierung angelegte Account, `Membership.is_resident = false`) — eindeutig, dort als **gemeinsam genutzte Adresse** empfohlen (Hinweis im Registrierungsformular), damit das Eigentum am Zugang beim Auszug nicht mitwandert. **Nullable bei Resident-Accounts** (`Membership.is_resident = true`, angelegt beim Beitritt per Code): nicht mehr Pflichtfeld im Beitrittsformular, nach dem Onboarding optional nachpflegbar — Voraussetzung dafür, dass `web_push` als bevorzugter Kanal tragfähig ist (§2.5). Nicht zu verwechseln mit `Household.contact_email` oben, das davon unberührt bleibt |
 | `password_hash` | `text` | 🟠 | Argon2id. Passwort ist die **primäre und universelle** Methode (P-2, ADR-007) |
 | `email_verified_at` | `timestamptz?` | 🟠 | Verifikation ist **nachgelagert** und blockiert die erste Abstimmung nicht — aber Voraussetzung für jeden Benachrichtigungsversand und für Mailinhalte mit Beratungsbezug |
 | `passkey_enabled` | `bool` | ⚙️ | optionaler Komfort-Aufsatz, jederzeit abschaltbar (ADR-007) |
@@ -379,7 +379,7 @@ die sie nicht passen — der Vermieter-Fall (Objekt ohne eigenes Bewohner-Profil
 | `permissions` | `text[]` | 🟠 | **einzeln vergebbar**, Werte siehe unten. Ebenfalls 🟠 |
 | `notification_event_mask` | `jsonb?` | ⚙️ | persönliche Ebene; überschreibt die Haushalts-Ebene |
 | `joined_via_code` | `text?` | ⚙️ | welcher `join_code` verwendet wurde — speist den Feed |
-| `joined_at` | `timestamptz` | ⚙️ | Beitritte erscheinen im Aktivitäts-Feed (struktureller Duplikatsschutz) |
+| `joined_at` | `timestamptz` | ⚙️ | Beitritte erscheinen im Aktivitäts-Feed (struktureller Duplikatsschutz). Zweiter Zweck: ein von `became_resident_id` unabhängiges Kriterium für moderierende Sichtbarkeit, z. B. Zugriff auf die Rundenhistorie zu Auditzwecken |
 | `revoked_at` | `timestamptz?` | ⚙️ | jedes Mitglied kann entfernen |
 
 Vergebbare Werte in `permissions` (Vorschlag, erweiterbar):
@@ -416,6 +416,34 @@ Vergebbare Werte in `permissions` (Vorschlag, erweiterbar):
 > Periode. Der Umbau ist überschaubar, solange V-3 weiter gegen den Profilstatus prüft und nicht
 > gegen die Datumsfelder direkt — das ist die Bedingung, unter der dieser Aufstiegspfad billig bleibt.
 
+#### `ApplicationInviteToken` — der Link „diese Bewerbung wird jetzt Bewohner:in"
+
+**Neu in diesem Update.** Der Mechanismus stand bisher nur als Vorschlag in
+`Product-Audit-Hypotheses.md:537–591` (S-42). Er erweitert diesen Vorschlag um die dort offen
+gelassene Frage, was passiert, wenn eine **bereits registrierte** Person auf den Link klickt —
+siehe Kasten.
+
+| Feld | Typ | Klasse | Erläuterung |
+|---|---|:--:|---|
+| `id` | `uuid` | ⚙️ | |
+| `application_id` | `uuid` | 🔴 | die Bewerbung, die eingelöst werden soll. Reiner Fremdschlüssel zum Nachschlagen, kein Join über die Kontextgrenze (wie z. B. `Notification.event_id`) — der Token identifiziert eine bewerbende Person, ist also personenbeziehbar |
+| `token_hash` | `text` | ⚙️ | **nur der Hash** — dasselbe Muster wie bei `Session.token_hash` und `AvailabilityToken.token_hash`: ein Klartext-Token in der Datenbank ist ein Passwortäquivalent |
+| `expires_at` | `timestamptz` | ⚙️ | kurze Lebensdauer, analog `AvailabilityToken` |
+| `used_at` | `timestamptz?` | ⚙️ | erste Einlösung |
+| `revoked_at` | `timestamptz?` | ⚙️ | |
+
+> „Ein Invite-Token wird nur verarbeitet, wenn `Session.account_id` noch kein `ResidentProfile` in
+> diesem Haushalt hat — sonst Fehler (‚Du bist bereits als Bewohner:in registriert'), kein Merge,
+> keine Überschreibung von `became_resident_id`."
+>
+> Das ist die **Prozess-Ebene zu I-3** (§3.1): `became_resident_id` ist nach dem Setzen technisch
+> unveränderlich, aber I-3 verhindert nur das stille Überschreiben, nicht den Versuch selbst. Ohne
+> eine explizite Prüfung bliebe offen, was beim Klick passiert — stillschweigendes Nichtstun wäre
+> verwirrend, ein Merge zweier Profile wäre eine eigene, riskante Entscheidung. Der erklärte Fehler
+> ist deshalb die einzige Antwort, die mit I-3 konsistent bleibt.
+>
+> Für `GUARDRAILS.md`: der Satz oben ist ein geschützter Test, kein Kommentar.
+
 ### 2.2 Kontext `casting`
 
 #### `Room` — das Zimmer als eigene Entität
@@ -448,6 +476,7 @@ mit einem Zähler nicht darstellbar. Zustandsmaschine in §3.3.
 | `room_ids` | `uuid[]` | ⚙️ | die Zimmer dieser Runde |
 | `settings_snapshot` | `jsonb` | ⚙️ | **Kopie der Verfahrensregeln beim Öffnen.** Sichert die Regel-Sperre ab: ändert der Haushalt später die Gewichte, bleibt die laufende Runde nach ihren eigenen Regeln bewertet |
 | `opened_at` | `timestamptz?` | ⚙️ | |
+| `phase_deadline_at` | `timestamptz?` | ⚙️ | optionale weiche Frist der aktuellen Rundenphase (S-44), sichtbar als „Stimme ab bis X" / „X Tage/Stunden übrig". **Blockiert nichts** — nach Ablauf bleibt die Runde entscheidungsfähig, die moderierende Person entscheidet aktiv weiter oder verlängert. Speist nur die CTA-Sortierung im Dashboard, analog zur bloß anzeigenden Rolle von `opened_at`/`closed_at` in dieser Tabelle |
 | `closed_at` | `timestamptz?` | ⚙️ | **Ankerpunkt der Aufbewahrungsfrist** |
 | `quorum_denominator_frozen` | `int?` | ⚙️ | beim Schließen eingefroren, damit abgeschlossene Runden nachträglich nicht ihre Quoten verändern |
 | `retention_until` | `date?` | ⚙️ | `closed_at + retention_days`, verlängerbar (siehe unten) |
@@ -605,6 +634,32 @@ gewählt haben.** Entsprechend die strengste Datenhaltung.
 > (Duplikaterkennung über Bewerberdaten). Für `GUARDRAILS.md` vormerken: ein geschützter Test
 > deckt V-1 nur bei **verknüpften** Bewerbungen ab; die Lücke ist prozessual, nicht technisch.
 
+#### `AppointmentAttendance` — wer beim Termin da war, und wer schon notiert hat
+
+**Löst O-7 auf** (entschieden, §10.2), Grundlage für die Erinnerungs-Notification aus SRD-Scope-Zeile **S-46**. `Appointment.expected_attendee_profile_ids` (§2.4) trägt nur
+die *Absicht* teilzunehmen. Sobald mehr als Absicht festzuhalten ist — war die Person wirklich da,
+hat sie schon eine `CastingNote` geschrieben — reicht ein Array nicht mehr: es kann „wollte
+teilnehmen, war aber nicht da" nicht von „war da, hat aber noch nichts geschrieben" unterscheiden.
+Genau diese Unterscheidung braucht die Erinnerung, die nach `scheduled → interviewed` (§3.1, der
+reale „Casting fand statt"-Moment) an noch fehlende Notizen erinnert (`casting.note_reminder_due`,
+siehe unten bei `ActivityEvent`/`Notification`).
+
+| Feld | Typ | Klasse | Erläuterung |
+|---|---|:--:|---|
+| `id` | `uuid` | ⚙️ | |
+| `appointment_id` | `uuid` | ⚙️ | |
+| `resident_profile_id` | `uuid` | 🟠 | analog zu `Appointment.expected_attendee_profile_ids` |
+| `attended` | `bool` | 🟠 | von der moderierenden Person nach dem Termin gesetzt |
+| `note_written` | `bool` | ⚫ | ob diese Person zu dieser Bewerbung bereits eine `CastingNote` verfasst hat — dieselbe Beratungs-Sensibilität wie `CastingNote.author_profile_id` |
+
+> **Warum eine eigene Tabelle und kein weiteres Feld auf `Appointment`.** Beides — Anwesenheit und
+> Notizstatus — ist eine Aussage **pro Teilnehmenden**, nicht pro Termin: ein Termin mit vier
+> eingeladenen Bewohnenden kann drei Anwesende und eine Notiz von nur zweien haben.
+> `expected_attendee_profile_ids` kann diese Kombination nicht tragen, ohne selbst zu einer
+> verkappten Tabelle zu werden — genau das war die Lücke, die O-7 benannte. Die Tabelle steht im
+> `casting`-Kontext statt bei `Appointment` in `scheduling`, weil ihr eigentlicher Zweck die
+> CastingNote-Erinnerung ist, nicht die Terminverwaltung.
+
 ### 2.3 Kontext `deliberation`
 
 Alles in diesem Kontext ist ⚫ — Beratungsinhalt über eine Person.
@@ -753,10 +808,10 @@ das Modell nirgends geführt hat.
 | `explanation` | `jsonb?` | ⚙️ | verletzte Soft-Terme im Klartext, z. B. `[{term: "resident_coverage", detail: "5/7 können"}]` — Erklärbarkeit ist Pflicht (P-3, §8.4) |
 | `created_at` · `cancelled_at` | `timestamptz` · `timestamptz?` | ⚙️ | |
 
-> ⚠️ Offener Punkt (O-7) — `expected_attendee_profile_ids` als Array ist die bequeme, nicht die richtige Lösung.
-> Sobald pro Teilnehmenden mehr festzuhalten ist als die Absicht (Zu-/Absage, Anwesenheit,
-> „hat Notiz geschrieben"), braucht es eine eigene Verknüpfungstabelle. Ihr Name ist nicht Teil des
-> Bezeichner-Kontrakts.
+> **O-7 — entschieden** (§10.2): `expected_attendee_profile_ids` als Array bleibt für die reine
+> Teilnahme-*Absicht* stehen. Für Anwesenheit und Notizstatus gibt es jetzt die eigene
+> Verknüpfungstabelle **`AppointmentAttendance`** (§2.2, bewusst im `casting`-Kontext, weil sie die
+> CastingNote-Erinnerung speist, nicht die Terminverwaltung) — Feldtabelle und Begründung dort.
 
 ### 2.5 Kontexte `audit` und `notifications`
 
@@ -771,7 +826,7 @@ Benachrichtigungs-Fan-out, „was ist passiert, während ich weg war", Undo und 
 | `id` | `uuid` | ⚙️ | |
 | `household_id` | `uuid` | ⚙️ | RLS-Anker |
 | `round_id` | `uuid?` | ⚙️ | |
-| `event_type` | `text` | ⚙️ | z. B. `application.state_changed`, `vote.cast`, `settings.changed`, `retention.extended` |
+| `event_type` | `text` | ⚙️ | z. B. `application.state_changed`, `vote.cast`, `settings.changed`, `retention.extended`, `casting.note_reminder_due` |
 | `subject_type` · `subject_id` | `text` · `uuid` | ⚙️ | worauf sich das Ereignis bezieht |
 | `actor_account_id` | `uuid?` | 🟠 | `null` bei Systemereignissen (Aufbewahrungsautomatik) |
 | `actor_profile_id` | `uuid?` | 🟠 | `null` = **im Verwaltungskontext gehandelt** → Feed sagt ehrlich „Verwaltung hat Lea eingeladen" statt einen Namen zu erfinden |
@@ -795,6 +850,26 @@ Benachrichtigungs-Fan-out, „was ist passiert, während ich weg war", Undo und 
 > ⚠️ Offener Punkt (O-5) — diese Redaktionsregel gehört mit einer Zeile in `06-Compliance-Anhang.md` und als
 > überprüfbare Regel in `GUARDRAILS.md`.
 
+#### `PushSubscription` — die aktive Web-Push-Berechtigung
+
+**Neu in diesem Update.** Web Push wird vorgezogen und wird der **bevorzugte** Kanal, E-Mail der
+Fallback (§2.1, `Account.email`) — ohne eine geführte Subscription lässt sich nicht auflösen,
+welcher Kanal greift, siehe `Notification.channel` unten.
+
+| Feld | Typ | Klasse | Erläuterung |
+|---|---|:--:|---|
+| `id` | `uuid` | ⚙️ | |
+| `account_id` | `uuid` | 🟠 | mehrere Subscriptions pro Account sind möglich (mehrere Geräte), analog zu `PasskeyCredential` |
+| `endpoint` | `text` | 🟠 | vom Push-Dienst des Browsers/Betriebssystems vergeben, geräte- und accountbezogen |
+| `keys` | `jsonb` | 🟠 | öffentliche Verschlüsselungsschlüssel für den Push-Versand (`p256dh`, `auth`) — kein Geheimnis der Gegenseite, aber accountbezogen wie `PasskeyCredential.public_key` |
+| `created_at` | `timestamptz` | ⚙️ | |
+| `revoked_at` | `timestamptz?` | ⚙️ | Abmelden vom Push-Kanal |
+
+> **Widerrufen einer `PushSubscription` darf nie die Benachrichtigung als Ganzes entziehen** —
+> dasselbe Prinzip wie bei `PasskeyCredential` (§2.1): sie ist ein Kanal, keine Voraussetzung.
+> Fällt die letzte aktive Subscription weg, greift die Auflösungsreihenfolge in
+> `Notification.channel` und die Person bekommt Benachrichtigungen weiter per E-Mail oder `in_app`.
+
 #### `Notification` — die Benachrichtigung
 
 | Feld | Typ | Klasse | Erläuterung |
@@ -803,18 +878,53 @@ Benachrichtigungs-Fan-out, „was ist passiert, während ich weg war", Undo und 
 | `household_id` · `account_id` | `uuid` | ⚙️ | Empfänger ist der **Account** (er hat die E-Mail) |
 | `resident_profile_id` | `uuid?` | ⚙️ | in welchem Kontext sie gilt — entscheidend für V-1 |
 | `event_id` | `uuid?` | ⚙️ | auslösendes `ActivityEvent` |
-| `type` | `text` | ⚙️ | z. B. `new_application`, `vote_pending`, `appointment_confirmed`, `retention_warning` |
-| `channel` | `enum(in_app, email, web_push)` | ⚙️ | `web_push` erst v1.x, mit dokumentiertem iOS-Vorbehalt (ADR-011) (nur für zur Startseite hinzugefügte PWAs) |
+| `type` | `text` | ⚙️ | z. B. `new_application`, `vote_pending`, `appointment_confirmed`, `retention_warning`, `casting.note_reminder_due`, `pwa_install_prompt_due` |
+| `channel` | `enum(in_app, email, web_push)` | ⚙️ | **`web_push` ist jetzt der bevorzugte Kanal** (vorgezogen, vormals als „erst v1.x" vermerkt), mit dokumentiertem iOS-Vorbehalt (ADR-011) (nur für zur Startseite hinzugefügte PWAs). Auflösungslogik siehe Kasten unten |
 | `state` | `enum(pending, batched, sent, read, suppressed, failed)` | ⚙️ | |
 | `digest_batch_id` | `uuid?` | ⚙️ | Digest ist **Default**, Einzelversand die Ausnahme |
 | `payload` | `jsonb` | 🔴 / ⚫ | derselbe Redaktionsvorbehalt wie beim Ereignis-Log |
 | `suppressed_reason` | `enum(self_redaction, unverified_email, muted_by_mask, not_participant)?` | ⚙️ | **explizit protokollieren, warum nicht zugestellt wurde** — sonst ist ein Sichtbarkeitsfehler von einem Zustellfehler nicht unterscheidbar |
 | `scheduled_for` · `sent_at` · `read_at` | `timestamptz` | ⚙️ | |
 
+> **Kanal-Auflösung für `channel`, in dieser Reihenfolge:**
+> 1. `web_push`, wenn für den empfangenden `Account` eine aktive `PushSubscription`
+>    (`revoked_at = null`) vorliegt.
+> 2. sonst `email`, wenn `Account.email` gesetzt **und** `email_verified_at` gesetzt ist.
+> 3. sonst nur `in_app` — die Benachrichtigung wartet im Feed, es wird nichts aktiv zugestellt.
+>
+> Das dreht die bisherige v1-Reihenfolge um: **E-Mail war der Standardkanal, jetzt ist sie der
+> Fallback.** Betrifft vor allem Resident-Accounts, deren `email` jetzt nullable ist (§2.1) — ohne
+> aktive `PushSubscription` **und** ohne E-Mail bleibt nur `in_app`. Genau diesen Fall deckt die
+> PWA-Install-Erinnerung unten ab.
+
 > **Benachrichtigungen unterliegen derselben Sichtbarkeitspolicy wie die Anwendung.** Die
 > Prüfung erfolgt **beim Versand**, nicht beim Erzeugen — zwischen Erzeugen und Zustellen kann eine
 > Person ausziehen oder zur bewohnenden Person werden. `suppressed_reason = self_redaction` ist
 > deshalb ein normaler, erwarteter Zustand und kein Fehler.
+>
+> **Konkret für `casting.note_reminder_due`:** die Erinnerung bezieht sich auf eine `Application`;
+> ist deren `became_resident_id` beim Versand auf das eigene Profil der Empfängerin/des Empfängers
+> gesetzt, wird sie wie jede andere Benachrichtigung zu dieser Bewerbung mit
+> `suppressed_reason = self_redaction` unterdrückt. Das ist keine neue Regel, sondern dieselbe
+> Prüfung, hier nur für diesen Typ ausdrücklich benannt.
+
+**PWA-Install-Erinnerung — Trigger nach demselben Muster wie die Aufbewahrungs-Vorwarnung** (§7,
+`retention_warning`):
+
+```text
+erster Login eines Accounts, keine aktive PushSubscription vorhanden
+                                            →  Notification(type = 'pwa_install_prompt_due')
+                                               an diesen Account, Kanal in_app,
+                                               zeigt das PWA-Install-Banner
+                                               ("zum Startbildschirm hinzufügen")
+
+PushSubscription danach angelegt           →  Trigger feuert für diesen Account nicht erneut
+```
+
+Speist **dieselbe CTA-Sortierung im Dashboard** wie `CastingRound.phase_deadline_at` (§2.2, S-44):
+ein Account ohne aktive `PushSubscription` sieht den Install-Hinweis weiter oben einsortiert, aus
+demselben Grund wie eine näher rückende Rundenfrist — beides sind zeitkritische Hinweise, die die
+Sortierung, aber keine Berechtigung beeinflussen.
 
 ---
 
@@ -1195,6 +1305,13 @@ keine Härtung.
 hinzugefügt und sehen die Runde **inklusive Historie zu anderen Kandidaten**. Das ist gewollt: ohne
 Kontext ist keine sinnvolle Mitentscheidung möglich. Der heikle Teil — Beratung über die Person
 selbst — ist durch V-1 abgedeckt und nicht durch einen Zugriffsschnitt.
+
+**Für bereits abgeschlossene Runden gilt dasselbe, hier ausdrücklich als Feature benannt:** eine
+neu eingetretene Person bekommt vor ihrem eigenen `RoundParticipation`-Eintritt **keine automatische
+Sichtbarkeit** auf **abgeschlossene** Runden — `can_see_round` fragt oben nie nach `round.status`,
+sondern ausschließlich nach einem aktiven `RoundParticipation`-Eintrag. Das folgt bereits implizit
+aus der Formel; wer die Vergangenheit einer geschlossenen Runde sehen soll, braucht weiterhin einen
+expliziten `source = added_manually`-Eintrag, keine Nebenfolge des bloßen Beitritts zum Haushalt.
 
 ### 5.3 V-3 — Entzug bei `moved_out`, inklusive Quorum-Nenner
 
@@ -1882,7 +1999,13 @@ nicht, damit Querverweise aus den Nachbardokumenten weiter treffen.
 | O-6 | Passkey-Credentials nicht modelliert | **`PasskeyCredential` modelliert.** Löschen des letzten Passkeys entzieht nie den Zugang (P-2) | §2.1 |
 | O-9 | Klassifizierung `Membership.role`/`.permissions` und `Household.join_code` | **`role`/`permissions` → 🟠** (gegen den V0.1-Vorschlag). **`join_code` → ⚙️** plus drei Auflagen, TOM-Liste statt Art.-30-Verzeichnis | §2.1, §9.3 |
 
-### 10.2 Weiter offen
+### 10.2 In diesem Update entschieden (CastingNote-Erinnerung, Einladungstoken, Push-Kanal)
+
+| # | Punkt | Entscheidung | Fundstelle |
+|---|---|---|---|
+| O-7 | `Appointment.expected_attendee_profile_ids` als Array statt Verknüpfungstabelle | **Verknüpfungstabelle `AppointmentAttendance`** (`appointment_id`, `resident_profile_id`, `attended`, `note_written`) ergänzt, bewusst im `casting`-Kontext, weil sie die CastingNote-Erinnerung speist. `expected_attendee_profile_ids` bleibt für die reine Teilnahme-Absicht bestehen | §2.2 |
+
+### 10.3 Weiter offen
 
 **Sortiert nach Dringlichkeit** — O-1 sollte vor der ersten Migration adressiert sein, weil es das
 Kernversprechen betrifft.
@@ -1891,7 +2014,6 @@ Kernversprechen betrifft.
 |---|---|---|---|
 | O-1 | **Frühere Bewerbungen derselben Person werden nur manuell mit dem Profil verknüpft.** Wer die Zuordnung vergisst, erzeugt genau das Leck, das V-1 verhindern soll. Automatischer Personenabgleich bleibt **ausgeschlossen** | §2.2 | V-1 ist das Kernversprechen. Die Lücke ist prozessual, nicht technisch: sie braucht eine **verpflichtende UI-Aktion** im PRD („diese frühere Bewerbung derselben Person zuordnen"), einen Risikoposten in `06` und eine **benannte Grenze** des geschützten Tests in `GUARDRAILS.md` |
 | O-5 | **Redaktionsregel für `ActivityEvent.payload`** am Fristende — Struktur bleibt, 🔴/⚫-Inhalte werden `null` | §2.5, ADR-003 | Maßgebliche Fassung; `06` §5.6 richtet sich danach. Braucht in `GUARDRAILS.md` noch die prüfbare Zusicherung **„kein Freitext in `ActivityEvent.payload`"** — dort bisher keine Referenz auf ADR-003 |
-| O-7 | **`Appointment.expected_attendee_profile_ids` als Array** statt Verknüpfungstabelle | §2.4 | sobald pro Teilnehmenden mehr als die Absicht festzuhalten ist (Zu-/Absage, Anwesenheit) |
 | O-8 | **Rangfolge als Solver-Eingabe** ist bewusst ausgeschlossen; falls später gewollt, als abschaltbare Einstellung modellieren, nicht als stille Gewichtung | §4 | Nur als Warnschild — jetzt nichts zu tun |
 | O-10 | **`Application.subject_statement`: Einreichungsweg nicht entschieden.** Modell in v1, UI in v1.1 — aber die bewerbende Person hat kein Konto (P-1) | §2.2 | Betrifft nur die UI, nicht das Schema. Kandidaten: Token-Link analog `AvailabilityToken`, oder Eintragung durch den Haushalt auf Zuruf |
 | O-11 | **Verfügbarkeits-Link: v1 oder v1.1?** Der Session-Brief ist in sich widersprüchlich (Entscheidungsteil v1, Phasentabelle v1.1). Auflösung: **`AvailabilityToken` in v1 modelliert, bewerberseitige Seite v1.1** | §2.4 | Unter dieser Auflösung ist unter beiden Lesarten **keine Migration** nötig. Ob die Seite nach v1 vorgezogen wird, entscheidet der Nutzer |
