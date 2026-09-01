@@ -830,7 +830,7 @@ Zwei Anwendungsfälle, an denen die Abbildung schon gearbeitet hat:
 | Feld | Kategorie | Zweck | Rechtsgrundlage | Verantw. | Frist |
 |---|---|---|---|---|---|
 | `Notification.recipient_profile_id` | ID | Zustellung | 6b, 6f | H | siehe unten |
-| `Notification.channel` (`in_app` / `email`) | KONFIG | v1: In-App und E-Mail; Web Push ab v1.x | 6b | H | — |
+| `Notification.channel` (`in_app` / `email` / `push`) | KONFIG | v1: Web Push bevorzugt, E-Mail als Fallback, sonst nur In-App | 6b | H | — |
 | `Notification.payload` | **BEURTEILUNG (potenziell)** | Inhalt der Benachrichtigung — **unterliegt derselben Sichtbarkeitspolicy**; kein Leak von Beratungsinhalten an die falsche Person | 6f | H | **30 Tage** (Vorschlag) |
 | `Notification.sent_at`, `read_at` | VERHALTEN | Digest-Bildung, „was ist passiert, während ich weg war" | 6f | H | 30 Tage |
 | `HouseholdSettings.*` | KONFIG | Aufbewahrungsdauer (30/90/180), Veto-Budget, Begründungspflicht, verdeckte Ergebnisse (Default an), Ereignisauswahl | 6b | H | bis Löschung des Haushalts |
@@ -1175,11 +1175,17 @@ löst das Problem nicht.
 |---|---|---|
 | **Caching der App-Hülle** — Markup, Skripte, Stile, Icons, Schriften | **einwilligungsfrei** (Abs. 2 Nr. 2) | Für die Bereitstellung der ausdrücklich gewünschten, von der Person **selbst installierten** Anwendung (P-2) unbedingt erforderlich |
 | **Caching von Bewerber- oder Beratungsdaten** | — | **findet nicht statt** — und zwar nicht aus TDDDG-Gründen, sondern weil es das Löschkonzept unterlaufen würde ([§5.8](#58-grenze-des-löschkonzepts-das-gerät)) |
-| **Push-Subscription** (Web Push, v1.x) | **nicht** einwilligungsfrei | Sie ist kein für den Kernzweck erforderlicher Zugriff. Der Browser fragt ohnehin — aber der **Zweck muss vorher erklärt werden**, statt den Systemdialog ungefragt auszulösen. Zusätzlich der dokumentierte iOS-Vorbehalt: nur für zur Startseite hinzugefügte PWAs |
+| **Push-Subscription** (Web Push, v1) | **nicht** einwilligungsfrei | Sie ist kein für den Kernzweck erforderlicher Zugriff. Der Browser fragt ohnehin — aber der **Zweck muss vorher erklärt werden**, statt den Systemdialog ungefragt auszulösen. Zusätzlich der dokumentierte iOS-Vorbehalt: nur für zur Startseite hinzugefügte PWAs |
 
 Die beiden ersten Zeilen tragen dieselbe Entscheidung aus zwei Richtungen: Die App-Hülle darf
 gecacht werden **und** die Daten dürfen es nicht. Dass beides zusammenfällt, ist günstig — es
 bedeutet, dass die datenschutzfreundliche Variante auch die rechtlich unproblematische ist.
+
+Die Reihenfolge ist damit für v1 verbindlich festgelegt und deckt sich mit dem PWA-Install-Hinweis
+aus SRD **S-45**: Der Hinweis erklärt den Zweck („direkt benachrichtigt werden, wenn sich etwas in
+der WG tut"), **bevor** der native Push-Berechtigungsdialog des Betriebssystems ausgelöst wird —
+nicht umgekehrt. Ein `PushSubscription`-Datensatz entsteht ausschließlich nach dieser Erklärung und
+der aktiven Zustimmung im Systemdialog, nie vorab und nie stillschweigend.
 
 ### 10.5 Die Ausnahme: Offline-Puffer für abgegebene Stimmen
 
