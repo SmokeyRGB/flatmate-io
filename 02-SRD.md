@@ -2,7 +2,30 @@
 
 ### Solution Requirements Document · Casting-Prozess für WGs und Wohnprojekte
 
-> **Version:** V0.4 — *Änderung ggü. V0.3: Die Begründung der Sendepuffer-Ausnahme in **S-30**
+> **Version:** V0.5 — *Änderung ggü. V0.4, zwei Nachträge in einem Schritt, weil der erste bisher
+> ohne Versionszeile blieb:*
+> *(a) Nachgetragen aus dem Spec-Update vom 01.09.2026 (Commit `15e1fa0`), das fünf Scope-Zeilen,
+> die Neufassung von **S-28/S-03** und die **§5.4**-Phasentabelle geändert hatte, ohne die
+> Versionszeile mitzuziehen: neue Scope-Zeilen **S-42** (Einladungstoken `ApplicationInviteToken`,
+> setzt `became_resident_id` automatisch), **S-43** (einmalige Spendenmail nach der 3.–4.
+> abgeschlossenen Runde, löst O-05), **S-44** (weiche Rundenfrist `phase_deadline_at`), **S-45**
+> (PWA-Install-Hinweis, zurückhaltender Resident-E-Mail-Pitch), **S-46** (Notiz-Erinnerung nach
+> dem Casting); **S-28/S-03** neu gefasst auf das Kanalmodell Push → E-Mail (falls hinterlegt) →
+> In-App und optionale E-Mail beim Beitritt.*
+> *(b) UX-Schicht-Nachzug nach dem Plan „ich-habe-zahlreiche-anforderungen-quiet-dusk.md" (V5):
+> neue Scope-Zeilen **S-47** (zweiter Durchlauf statt eigenem Feinschliff-Bildschirm — reine
+> UI-Musterentscheidung, ergänzt **S-11**, das die Schwellenlogik weiterhin trägt), **S-48**
+> (Aufgabenmodell mit Vorrangregel — die Regel selbst steht in `07-Screen-Inventar.md` §2), **S-49**
+> (Einladungslink: Ablauf, Nutzungsgrenze, Warnhinweis — seit dem Wegfall der für Bewohnende
+> sichtbaren Bewohnerliste **Voraussetzung, nicht Verbesserung**), **S-50** (Verwaltung ohne
+> `ResidentProfile` erreicht keine Castings, zwei benannte Ausnahmen), **S-51** (Anwesenheit gilt
+> als angenommen statt erfasst, inklusive des bisher nicht modellierten Absagefalls einzelner
+> Personen) · **S-05** korrigiert: „für alle sichtbare Bewohnerliste" und „jedes Mitglied kann
+> entfernen" entfallen (Bewohnerliste jetzt Verwaltung voll / Moderator lesend / Bewohnende ohne
+> Zugriff, K-19/U-22) · **S-11** von „Feinschliff"-Screen auf „zweiter Durchlauf" umformuliert ·
+> §6 um eine Beobachtungsmetrik zum Moderationsaufwand sowie eine Umformulierung ergänzt · §10 um
+> zwei UI/UX-Prinzipien ergänzt.*
+> V0.4 — *Änderung ggü. V0.3: Die Begründung der Sendepuffer-Ausnahme in **S-30**
 > und §7 korrigiert — sie stand auf „kein fremdes Datum betroffen", was falsch ist: eine `Vote`
 > ist `application_id` plus Wert und damit eine Beurteilung **über eine dritte Person**. Sie
 > steht jetzt auf „unabgeschlossene Transaktion" (§ 25 TDDDG, ausdrücklich gewünschter Dienst)
@@ -20,7 +43,7 @@
 > **S-20** Verhalten am Solver-Zeitlimit ergänzt · **S-32** Semantik bei Auszug während
 > einer offenen Runde präzisiert · §5.4, §7 und §11 entsprechend nachgezogen.*
 > V0.1: Erstfassung auf Basis `00-Session-Brief.md` und `01-Problem-Framing.md`
-> **Datum:** 2026-08-19
+> **Datum:** 2026-09-02
 > **Autor:** Samuel Zink (@SmokeyRGB)
 > **Vorgänger:** `01-Problem-Framing.md`
 > **Nachfolger:** `03-PRD.md` · `04-Domaenenmodell.md` → `05-ADRs.md` ·
@@ -258,13 +281,13 @@ zurückführen lassen muss. Die Phasenzuordnung steht in §5.4.
 | **S-02** `ResidentProfile` anlegen und Kontextwechsel Verwaltung ↔ Bewohner aus dem Haushalts-Account heraus | Mehrere Haushalte pro `Account` in einer Oberfläche |
 | **S-03** **Ein** Beitrittscode/-Link für den ganzen Haushalt; Ein-Schritt-Registrierung mit **nur Name und Passwort als Pflichtfelder** — `Account.email` ist beim Beitritt für Resident-Accounts **optional** und später im Profil nachpflegbar (analog zum bestehenden Präzedenzfall „Passkey wird nie während der Registrierung angeboten", `03-PRD.md`); Passwort primär und universell; Passkey als optionaler, abschaltbarer Aufsatz; E-Mail-Verifikation, falls eine Adresse hinterlegt ist, nachgelagert und nicht abstimmungsblockierend | Einladung pro Person, Magic-Link-Login (verworfen: nicht gerätegebunden), SMS-Verifikation, E-Mail-Pflichtfeld im Beitrittsformular |
 | **S-04** `Membership` mit orthogonalen `is_resident` / `role` plus einzeln vergebbare Berechtigungen (Bewerber anlegen, Status ändern, Runde schließen, Termine bestätigen) | Rollenhierarchie, frei definierbare Rollen, Berechtigungsvorlagen |
-| **S-05** Struktureller Duplikatsschutz: sichtbare Bewohnerliste, Beitritte im Feed, Quorum gegen Bewohnerzahl, jedes Mitglied kann entfernen | Geräte-Fingerprinting (§ 25 TDDDG), Identitätsprüfung |
+| **S-05** Struktureller Duplikatsschutz — von den ursprünglich vier Mechanismen tragen nach dem Wegfall der für Bewohnende sichtbaren Bewohnerliste und ihres Entfernen-Rechts (K-19/U-22, `07-Screen-Inventar.md` §7–8) nur noch zwei: Beitritte im `ActivityEvent`-Feed, Quorum gegen die Bewohnerzahl. Die Bewohnerliste (Namen, Beitrittsdatum, Kontakt, Status; entfernen/`moved_out`/reaktivieren/Code) bleibt der Verwaltung voll und dem Moderator lesend vorbehalten; eine separate Teilnehmendenliste (nur Namen der Rundenteilnehmenden, keine Handlungen) bleibt allen Bewohnenden sichtbar. Die Absicherung des Einladungslinks (**S-49**) ist damit nicht mehr Ergänzung, sondern Voraussetzung dieses Schutzes | Geräte-Fingerprinting (§ 25 TDDDG), Identitätsprüfung, Entfernen-Recht für Bewohnende |
 | **S-06** `CastingRound` mit mehreren `Room`s, eigener Zustandsmaschine und `RoundParticipation`-Snapshot der Teilnehmenden beim Start | Mehrere gleichzeitig laufende Runden pro Haushalt als beworbener Anwendungsfall (technisch nicht ausgeschlossen) |
 | **S-07** `Room` als eigene Entität mit eigenem Status — „3 Zimmer, eines vergeben, Runde läuft weiter" | Zimmerpläne, Grundrisse, Miethöhen, Mietverträge |
 | **S-08** `Application` erfassen: manuelles Formular (Name Pflicht; Kontakt, Alter, Freitext, weitere Angaben optional) **und** regelbasierter Paste-Parser mit Pflichtbestätigung durch einen Menschen | KI-Parsing (v2, nur Extraktion), Portal-API, Scraping, Anhänge/Dateiupload |
 | **S-09** Karten-Screening-Durchlauf über alle offenen `Application`s der Runde | Wischgesten als einziger Weg, Stapelbewertung |
-| **S-10** Abstimmung Runde 1: vierstufige Skala (0/1/3/5), Gewichte in der UI offengelegt, jederzeit revidierbar bis Rundenphase wechselt | Punkte-Budget als Abstimmungsverfahren (v1.1 als **Option**), 0–10-Skala, Ja/Nein-Skala |
-| **S-11** „Feinschliff"-Screen nach dem Durchlauf, falls `Anzahl Unbedingt > ceil(Zimmer × 1,5)`; Budget nur sichtbar wenn überschritten; abschaltbar | Erzwungene Herabstufung, Budget während des Durchlaufs |
+| **S-10** Abstimmung Runde 1: vierstufige Skala (0/1/3/5), Gewichte in der UI offengelegt, revidierbar innerhalb derselben `Vote.stage`, solange die `CastingRound` `open` ist | Punkte-Budget als Abstimmungsverfahren (v1.1 als **Option**), 0–10-Skala, Ja/Nein-Skala |
+| **S-11** Bei Überschreiten der Budgetschwelle (`Anzahl Unbedingt > ceil(Zimmer × 1,5)`) ein zweiter, kürzerer Durchlauf ausschließlich über die eigenen „Unbedingt"-Karten, gleiche vierstufige Skala; Budget nur sichtbar wenn überschritten; jederzeit abbrechbar ohne Stimmenänderung; abschaltbar | Erzwungene Herabstufung, Budget während des ersten Durchlaufs, ein eigens gestalteter Vergleichsbildschirm (→ **S-47**) |
 | **S-12** Rangliste: Score als Mittelwert auf 0–100, sortierbar; Einzelansicht mit gestapeltem 4-Farben-Stimmungsbild | Gewichtete Stimmen je Person, Delegation, Enthaltung als eigene Stufe |
 | **S-13** Quorum-Anzeige und Trennung: Ein Kandidat erscheint in der Rangliste, sobald **mindestens die Hälfte** der Stimmberechtigten abgestimmt hat (`quorum_share = 0,5`, konfigurierbar); darunter steht er im eigenen Abschnitt „Warten auf Stimmen (3 von 7)". **Quorum ist Anzeige, keine Sperre** | Quorum als harte Blockade eines Zustandsübergangs; eine hohe Schwelle (z. B. 2/3), die die Rangliste in den ersten Tagen leer lässt |
 | **S-14** Verdeckte Ergebnisse bis zur eigenen Stimmabgabe (Einstellung, Standard an) | Dauerhaft anonyme Abstimmung, Ergebnisse dauerhaft verborgen |
@@ -299,6 +322,11 @@ zurückführen lassen muss. Die Phasenzuordnung steht in §5.4.
 | **S-44** Optionale weiche Frist je Rundenphase (`CastingRound.phase_deadline_at`), sichtbar als „Stimme ab bis X" / „X Tage/Stunden übrig". Blockiert nichts (analog Quorum S-13) — nach Ablauf bleibt die Runde entscheidungsfähig, der Moderator entscheidet aktiv weiter oder verlängert. Speist die CTA-Sortierung im Dashboard: Runden/Bewerbungen mit näher rückender Frist werden dort weiter oben angezeigt | Harte Frist, die einen Zustandsübergang blockiert oder automatisch auslöst |
 | **S-45** PWA-Install-Hinweis: sichtbar und beharrlich — das ist Voraussetzung für zuverlässige Beteiligung an notwendigen Schritten, nicht bloß Komfort. Beim Beitritt überspringbar, danach eine gut sichtbare, wiederkehrende Dashboard-Einblendung bis zur Installation. Die Resident-E-Mail-Abfrage bleibt dagegen zurückhaltend: der Pitch führt mit „Zugang wiederherstellen, falls Passwort verloren geht" — nicht mit Benachrichtigungs-Komfort. Wird tatsächlich eine Fallback-E-Mail verschickt (S-28), trägt sie den Installations-Nudge „Installiere die App, um direkt benachrichtigt zu werden und dein Postfach zu schonen" mit Link zur Installationsanleitung | Erzwungene Installation, Blockade der Nutzung ohne installierte PWA, E-Mail-Pflichtfeld beim Beitritt |
 | **S-46** Erinnerungs-Notification an `AppointmentAttendance`-Teilnehmende mit tatsächlicher Anwesenheit, ausgelöst beim Übergang `scheduled → interviewed` (`casting.note_reminder_due`): „Wie lief das Casting mit X? Schreib ein paar Sätze für alle, die nicht dabei waren" — Text in Anlehnung an die Prompts aus S-22. Wird nicht verschickt, wenn die betroffene `Application` für die Empfängerin/den Empfänger selbst-redigiert ist (V-1) | Automatisch vorformulierter Notiztext, Erinnerung an Personen ohne bestätigte Anwesenheit |
+| **S-47** Der zweite Durchlauf (S-11) nutzt dasselbe Kartenmuster wie das erste Screening — kein eigens gestalteter Vergleichs- oder Feinschliff-Bildschirm. Löst die im `review-log.md` als 🔴 geführte Lücke „Feinschliff-Screen ohne Gestaltungsspezifikation" durch **Wegfall der Interaktion**, nicht durch ihre Spezifikation (Details in `07-Screen-Inventar.md` §9) | Ein eigenständiges Vergleichs-UI (Nebeneinanderstellung, Drag-Herabstufung), eine zweite Bedienlogik, die Bewohnende neu lernen müssten |
+| **S-48** Genau eine Vorrangregel entscheidet, welche von mehreren gleichzeitig offenen Bewohner-Aufgaben (Stimmen R1/R2, Slot-Reaktion, Verfügbarkeit eintragen, Casting-Notiz, zweiter Durchlauf) zuerst angezeigt wird: Aufgaben mit einem echten Fälligkeitsdatum zuerst und nach Fälligkeit sortiert (S-44 liefert das Datum für Stimmen), Aufgaben ohne Datum danach in fester Reihenfolge. Die Regel selbst und die Datumsherkunft je Aufgabenart sind in `07-Screen-Inventar.md` §2 definiert — diese Zeile schneidet nur den Scope, wiederholt die Regel nicht | Eine feste, situationsunabhängige Rangliste der Aufgabenarten; eine automatisch gelernte oder KI-gestützte Priorisierung |
+| **S-49** `join_code` erhält zusätzlich zur bestehenden Rotation (G-A5 — ergänzt sie, ersetzt sie nicht) einen Ablauf (`join_code_expires_at`, Vorschlag 7 Tage) und eine Nutzungsgrenze (`join_code_max_uses`, vorbelegt mit der Zahl fehlender Bewohnender), beide in `HouseholdSettings` änderbar, sowie einen Warnhinweis auf der Teilen-Seite („nur direkt mit Mitbewohnenden teilen — wer ihn hat, kann mitstimmen"). Seit **S-03** die E-Mail-Pflicht beim Beitritt gestrichen hat und mit **S-05** die für Bewohnende sichtbare Bewohnerliste samt Entfernen-Recht entfällt, ist der Link die **einzige verbliebene Zugangskontrolle** — diese Absicherung ist deshalb Voraussetzung, nicht Verbesserung | Verifikation, zweiter Faktor, Geräte-Fingerprinting (§ 25 TDDDG) |
+| **S-50** Ein Konto ohne aktives `ResidentProfile` (Verwaltung) erreicht ausschließlich Haushaltsverwaltung — Zimmer, Mitglieder, Beitrittscode, Verfahrensregeln, Aufbewahrung; `CastingRound`, `Application`, `Slot`, `Appointment` und `CastingNote` setzen ein `ResidentProfile` voraus. Zwei benannte Ausnahmen bleiben bei der Verwaltung: Aufbewahrung (verlängern/kürzen/löschen/archivieren) und Datenauskunft **als Export ohne Einsicht**. Wird der letzte Moderator handlungsunfähig, kann sich die Verwaltung jederzeit selbst ein `ResidentProfile` anlegen und Moderatoren ernennen — ein benannter Handelnder statt direktem Zugriff. **Keine Sicherheitsgrenze:** wer die Haushaltszugangsdaten kennt, kann sich weiterhin ein Profil anlegen und handeln; was sich ändert, ist Zurechenbarkeit, nicht Zugriffsschutz | Verwaltung mit direktem Lese- oder Schreibzugriff auf Beratungsinhalte; ein zweiter, undokumentierter Zugriffspfad |
+| **S-51** `AppointmentAttendance` startet bei Terminbestätigung mit `attended = true` für alle `expected_attendee_profile_ids` — die Moderation setzt an dieser Stelle nichts aktiv. Eine betroffene Person kann sich vor dem Termin kurzfristig für sich allein absagen; dieses Feld/Ereignis existiert im Domänenmodell bisher nicht und wird dort ergänzt. Die Moderation korrigiert `attended` nur im Ausnahmefall danach. Die Notiz-Erinnerung (S-46) geht ausschließlich an Profile mit `attended = true` | Anwesenheit als verpflichtender Erfassungsschritt der Moderation nach jedem Termin; eine Absage im Namen einer anderen Person |
 | — | **Dauerhaft ausgeschlossen:** jede KI-gestützte Bewertung, Rangbildung, Empfehlung oder Entscheidung über Personen (P-5) · Profiling · automatisierte Vorauswahl · Portal-Scraping · Geräte-Fingerprinting |
 
 ### 5.4 Phasenplanung
@@ -307,7 +335,7 @@ zurückführen lassen muss. Die Phasenzuordnung steht in §5.4.
 
 | Phase | Umfang | Ziel | Abhängigkeit |
 |-------|--------|------|--------------|
-| **v1** | S-01 bis S-40 sowie das **Datenmodell** von S-41, dazu S-42, S-44, S-45, S-46: Haushalts- und Bewohner-Onboarding (E-Mail beim Beitritt optional, S-03) · `CastingRound` mit `Room`s und optionaler weicher Rundenfrist (S-44) · Bewerbererfassung (Formular + regelbasierter Paste-Parser, mit Art.-13/14-Weiche und Absatzverwerfung) · Zuordnung früherer Bewerbungen · Einladungstoken bei `moved_in` (S-42) · Card-Screening · Abstimmung R1 mit Feinschliff · Rangliste + Quorum · Status-Pipeline komplett · Verfügbarkeits-Raster + Feasibility + Solver-Knopf · `CastingNote`s mit Erinnerungs-Notification nach dem Termin (S-46) · Abstimmung R2 + `Veto` · Kalenderansicht · `ActivityEvent`-Feed · In-App-/Web-Push-/E-Mail-Fallback-`Notification` mit dokumentiertem iOS-Vorbehalt für Web Push (S-28) · PWA mit Install-Hinweis (S-45) · Aufbewahrungsautomatik mit Vorwarnung · Datenauskunft-Export | **„Ein echter Haushalt führt eine vollständige Runde von der ersten `Application` bis `moved_in` durch, ohne nach WhatsApp auszuweichen."** Die Beteiligungsquote wird hier zum ersten Mal messbar | — |
+| **v1** | S-01 bis S-40 sowie das **Datenmodell** von S-41, dazu S-42, S-44, S-45, S-46, **S-47 bis S-51**: Haushalts- und Bewohner-Onboarding (E-Mail beim Beitritt optional, S-03; Einladungslink mit Ablauf und Nutzungsgrenze, S-49) · `CastingRound` mit `Room`s und optionaler weicher Rundenfrist (S-44) · Bewerbererfassung (Formular + regelbasierter Paste-Parser, mit Art.-13/14-Weiche und Absatzverwerfung) · Zuordnung früherer Bewerbungen · Einladungstoken bei `moved_in` (S-42) · Aufgaben-first-Dashboard mit Vorrangregel (S-48) · Card-Screening · Abstimmung R1 mit zweitem Durchlauf statt eigenem Feinschliff-Bildschirm (S-47) · Rangliste + Quorum · Status-Pipeline komplett · Verwaltungsfläche ohne Casting-Zugriff (S-50) · Verfügbarkeits-Raster + Feasibility + Solver-Knopf · `CastingNote`s mit angenommener statt erfasster Anwesenheit (S-51) und Erinnerungs-Notification nach dem Termin (S-46) · Abstimmung R2 + `Veto` · Kalenderansicht · `ActivityEvent`-Feed · In-App-/Web-Push-/E-Mail-Fallback-`Notification` mit dokumentiertem iOS-Vorbehalt für Web Push (S-28) · PWA mit Install-Hinweis (S-45) · Aufbewahrungsautomatik mit Vorwarnung · Datenauskunft-Export | **„Ein echter Haushalt führt eine vollständige Runde von der ersten `Application` bis `moved_in` durch, ohne nach WhatsApp auszuweichen."** Die Beteiligungsquote wird hier zum ersten Mal messbar | — |
 | **v1.1** | **Bewerberseitige Token-Seite** für Verfügbarkeiten (Zeitraster, kein Konto — Datenmodell liegt bereits in v1, S-17, O-08) · **Oberfläche für `subject_statement`** (S-41) · Punkte-Budget-Variante als wählbare Option · Textbausteine für die Kontaktaufnahme · **S-43** Spenden-E-Mail an die Household-E-Mail nach der 3.–4. abgeschlossenen `CastingRound` eines Haushalts, außerhalb des In-App-Flows (löst O-05) — bedingt durch H-V4 aus dem Audit, erst nach der Concierge-Runde geprüft | „Der Komfort kommt nach, ohne dass v1 davon abhängig war." Jedes v1.1-Feature ist bewusst eine **Bequemlichkeit über einem vollständigen manuellen Pfad** (P-1) | v1 |
 | **v1.2** | Nutzerinitiierte Browser-Extension für den Portal-Import | „Erfassungsarbeit sinkt weiter, ohne API und ohne Scraping." | v1.1 |
 | **v2** | Kalender-Sync (CalDAV/Google) · leichtgewichtiges KI-Parsing unstrukturierter Texte (**nur Extraktion, nie Bewertung** — P-5, mit EU-Verarbeitung und AVV) · Vermieter-Persona mit vorgeschalteter AGG- und AI-Act-Prüfung · Freemium | Produktoption | v1.2 |
@@ -336,9 +364,10 @@ Kernmetrik und Verzicht auf A/B-Tests folgen aus **E-24**.
 | Beobachtung | Aktivierte Bewohnende pro Haushalt | ≥ 5 bzw. ≥ 80 % der bekannten Bewohnerzahl | Anzahl `ResidentProfile` mit erfolgter Erstanmeldung. Trennt „Onboarding kaputt" von „Abstimmen unattraktiv" — beide würden sonst die Kernmetrik gleich aussehen lassen |
 | Beobachtung | Abgeschlossene / gestartete Runden | > 70 % | `CastingRound` im Endzustand gegen gestartete. Misst, ob der Prozess in der Mitte abbricht (Abwanderung nach WhatsApp) |
 | Beobachtung | Zeit bis Entscheidung | Richtung: sinkend | Zeit vom Rundenstart bis zum ersten `offer_made`. Kein absoluter Zielwert, weil er stark von der Bewerberlage abhängt |
-| Beobachtung | Bewerbungen pro Runde | — | Anzahl `Application` je `CastingRound`. Kalibriert die Erwartung an das Screening und begründet die Feinschliff-Schwelle (E-08) |
+| Beobachtung | Bewerbungen pro Runde | — | Anzahl `Application` je `CastingRound`. Kalibriert die Erwartung an das Screening und begründet die Budgetschwelle des zweiten Durchlaufs (E-08, S-11) |
 | Beobachtung | Medianzahl Stimmen pro Bewerbung | ≥ Quorum | Zeigt, ob die Beteiligung sich gleichmäßig verteilt oder sich auf die ersten drei Karten konzentriert |
 | Beobachtung | Runden pro Haushalt und Jahr | ≈ 2–4 | Prüft die Kernannahme aus E-01. Liegt der Wert bei 1, war der Beachhead falsch geschnitten und das Spenden-/Freemium-Modell trägt nicht |
+| Beobachtung | Handlungen der moderierenden Person je abgeschlossener Runde | Richtung: sinkend | Zählt Statuswechsel, Terminbestätigungen und sonstige Eingriffe der Moderation je Runde (`ActivityEvent`, Klasse `process`, Akteur mit Moderationsrecht). Macht das Ziel „Organisationsaufwand senken ist ein Ziel, keine Nettigkeit" (`07-Screen-Inventar.md`) zum ersten Mal prüfbar |
 
 **Metriken zweiter Ordnung** (ohne Zielwert, als Entscheidungshilfen für v1.1/v2):
 
@@ -346,7 +375,7 @@ Kernmetrik und Verzicht auf A/B-Tests folgen aus **E-24**.
 |----------|---------------------|
 | Anteil `Application`s über Paste-Parser vs. Formular | Rechtfertigt den Parser — oder macht das KI-Parsing in v2 dringlicher (E-15) |
 | Korrekturquote der Parser-Vorschläge (Zeitfenster und Bewerberdaten) | Fällt sie schlecht aus, ist der regelbasierte Ansatz am Ende und v2 wird zur Notwendigkeit, nicht zum Komfort |
-| Anteil Runden mit ausgelöstem Feinschliff-Screen | Prüft die Schwelle `ceil(Zimmer × 1,5)`. Löst er fast immer aus, ist die Skala zu grob |
+| Anteil Runden mit ausgelöstem zweitem Durchlauf (S-47) | Prüft die Schwelle `ceil(Zimmer × 1,5)`. Löst er fast immer aus, ist die Skala zu grob |
 | Anteil Runden mit mindestens einem `Veto` | Wird das Veto nie genutzt, ist es teure Mechanik; wird es ständig genutzt, ist die Skala nicht ausdrucksstark genug |
 | Anteil `Appointment`s über „Vorschlag berechnen" vs. manuelles Legen | Rechtfertigt den Solver — die teuerste Einzelentscheidung der Architektur (ADR-005) |
 | Anzahl Rückwärtsübergänge je Runde | Belegt oder widerlegt, dass P-4 ein Praxisbedarf und nicht eine Vorsichtsmaßnahme ist |
@@ -405,10 +434,10 @@ Kernmetrik und Verzicht auf A/B-Tests folgen aus **E-24**.
 > Bei einem gemeinsamen Entscheidungsprozess ist die Gruppe die Einheit, nicht die Person.
 >
 > **Was stattdessen entscheidet:** die Metriken zweiter Ordnung aus §6 als qualitative
-> Entscheidungsgrundlage (Feinschliff-Auslösequote, Veto-Nutzung, Solver-Nutzung,
+> Entscheidungsgrundlage (Auslösequote des zweiten Durchlaufs, Veto-Nutzung, Solver-Nutzung,
 > Parser-Korrekturquote) plus die Ein-Frage-Rückmeldung aus §8.1. Zwei Einstellungen sind
 > bewusst als Schalter statt als Experiment gebaut — verdeckte Ergebnisse (S-14) und
-> Feinschliff (S-11) — sodass ein Haushalt sie *bewusst* ändern kann und die Wirkung
+> der zweite Durchlauf (S-11) — sodass ein Haushalt sie *bewusst* ändern kann und die Wirkung
 > berichtet, statt sie unbemerkt zugeteilt zu bekommen.
 >
 > **Wann es relevant wird:** ab mehreren Dutzend aktiven Haushalten, dann mit dem
@@ -495,12 +524,14 @@ Vollständig in `03-PRD.md` §4.1 und §6. Die Prinzipien, aus denen sich dort a
 | **Nichts Verstecktes, was das Ergebnis beeinflusst** | Stufenwerte, Score-Formel, Quorum-Nenner, verletzte Terminconstraints sind sichtbar — nicht in einer Hilfeseite, sondern dort, wo das Ergebnis steht (P-3) |
 | **Ehrlichkeit über Grenzen statt beruhigender Formulierungen** | „In einer Fünfer-WG ist ein anonymes Veto mit Begründung nicht wirklich anonym." · „Das ist deine eigene Bewerbung — Stimmen und Notizen dazu sind für dich dauerhaft ausgeblendet." · „Verwaltung hat Lea eingeladen" statt eines erfundenen Personennamens. Wo das Produkt etwas nicht leisten kann, sagt es das |
 | **Fehlende Beteiligung sichtbar, nicht weggerechnet** | „Warten auf Stimmen (3 von 7)" als eigener Abschnitt; „5 von 7 haben abgestimmt" im Rundenkopf. Nie ein Score, der so aussieht, als hätten alle abgestimmt |
-| **Ein Zustand pro Bildschirm, eine Frage pro Karte** | Der Screening-Durchlauf stellt genau eine Frage. Der Feinschliff-Screen ist ein eigener Schritt, kein Modal im Durchlauf |
+| **Ein Zustand pro Bildschirm, eine Frage pro Karte** | Der Screening-Durchlauf stellt genau eine Frage. Der zweite Durchlauf (S-11) ist ein eigener Schritt im selben Kartenmuster, kein Modal im ersten Durchlauf und kein eigens gestalteter Bildschirm (S-47) |
 | **Wiedereinstieg ohne Erinnerung** | Nach Monaten Pause muss der Rundenkopf in einem Blick beantworten: Was läuft? Was wird von mir erwartet? Was ist passiert, während ich weg war? |
 | **Alle vier Zustände je Bildschirm** | Laden · Leer (mit Handlungsaufforderung) · Fehler (mit Wiederholung) · Keine Berechtigung (mit **Erklärung** statt Sperre — besonders bei greifender Selbst-Redaktion) |
 | **Rückwärts ist ein normaler Weg, kein Fehlerdialog** | Zustandsrücknahmen sind sichtbar erreichbar und werden protokolliert, nicht hinter Warnungen versteckt (P-4) |
 | **Barrierefreiheit als Pflicht** | Die vier Abstimmungsstufen nie allein über Farbe (Symbol + Text); der gestapelte Stimmungsbalken hat eine textliche Entsprechung; vollständige Tastaturbedienbarkeit des Screening-Durchlaufs; Kontrast ≥ 4,5:1 |
 | **Keine Gamification des Sozialen** | Beteiligungsanzeigen benennen den Stand der Gruppe, nicht das Versäumnis Einzelner. Kein Ranking unter Bewohnenden, kein öffentlicher „hat noch nicht abgestimmt"-Pranger |
+| **Reihenfolge nach Zeitdruck, mit genanntem Grund** | Offene Aufgaben werden nicht nach einer festen Rangliste, sondern nach echtem Fälligkeitsdatum sortiert, wo eines existiert; jede Aufgabe nennt ihren Grund („Termin morgen 17:00", „4 andere warten auf deine Notiz"). Regel und Datumsherkunft je Aufgabenart in `07-Screen-Inventar.md` §2, gespeist u. a. aus S-44/S-48 |
+| **Moderation ist Mehraufwand, kein Nebeneffekt** | Jede Orga-Aufgabe führt direkt auf die Handlung, nie auf eine Liste zum Wiederfinden; was das System selbst weiß, wird keine Aufgabe; kein Zähler ohne Handlung. Trägt das Ziel „Organisationsaufwand senken" (§6) |
 
 ---
 
