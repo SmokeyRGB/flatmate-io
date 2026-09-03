@@ -2,17 +2,44 @@
 
 ### Entitäten · Zustandsmaschinen · Bounded Contexts · Sichtbarkeitsinvarianten · Rechenmodelle
 
-> **Version:** V0.3 — *Änderung ggü. V0.2: Rückläufer aus `06-Compliance-Anhang.md` und `03-PRD.md`.
-> **Neue Felder in `Household`:** `contact_email` sowie die vier `privacy_notice_*`-Felder (§2.1) —
-> Flatmate.io **erzeugt** die Datenschutzseite, veröffentlichen muss der Verantwortliche.
-> **`Application.subject_statement`** erbt die Frist der Bewerbung, kein eigener Zeitgeber, Löschung
-> in derselben Transaktion (§2.2, §7). Feldsumme 52 (§9).*
+> **Version:** V0.4 — *zwei Änderungssätze, beide bisher unverzeichnet (siehe Kasten unten).*
+>
+> **Satz 1 — Spec-Update vom 02.09.2026, bis heute nicht in dieser Versionszeile geführt:**
+> drei neue Entitäten `ApplicationInviteToken`, `AppointmentAttendance`, `PushSubscription` (§2.1,
+> §2.2, §2.5); neues Feld `CastingRound.phase_deadline_at` (§2.2); `Account.email` bei
+> Resident-Accounts nullable (§2.1); Kanalreihenfolge in `Notification.channel` auf
+> **Push → E-Mail → In-App** gedreht (§2.5). **Feldsumme dadurch bereits auf 59 gestiegen** (11 ⚫ ·
+> 15 🔴 · 33 🟠) — §9 war seither nicht mehr vollständig, siehe Korrekturkasten dort.
+>
+> **Satz 2 — Nachzug aus dem UX/UI-Plan** (`Ideas/Flatmate.io/07-Screen-Inventar.md`, U-1…U-26):
+> `phase_hint`-Berechnungsregel als Pseudocode ergänzt (§8.6, vorher nur „Begründung unten" ohne
+> Formel); Geltungsbereich von `phase_deadline_at` ausgeschrieben (§2.2) — **jetzt blockierend**,
+> weil das Feld sich auf eine Phase bezog, die nirgends berechnet war; CTA-Sortierung als eigene
+> Regel (§8.7), auf die S-44/S-45/S-46/S-48 verweisen, statt dass drei Scope-Zeilen sie
+> stillschweigend voraussetzen; **PWA-Install-Hinweis aus der Aufgabensortierung entfernt** (§2.5)
+> — er wurde fälschlich wie eine fristgebundene Aufgabe behandelt, ist aber keine; `AppointmentAttendance.attended`
+> umgedreht (§2.2, U-23): entsteht mit `true` bei Terminbestätigung, die betroffene Person sagt
+> selbst ab, die Moderation korrigiert nur Ausnahmen — schließt damit auch die bisher fehlende
+> **kurzfristige Einzelabsage**; `ActivityEvent.audience_class` als abgeleitetes Feld (§2.5, §8.8);
+> `Household.join_code_expires_at`/`.join_code_max_uses`/`.join_code_uses` ergänzt (§2.1) — der
+> Link ist seit Wegfall der E-Mail-Pflicht (S-03) die einzige verbliebene Zugangskontrolle;
+> Anmeldung ohne E-Mail entschieden: `(household_id, display_name)` + Passwort (§2.1, O-D → O-12);
+> `Session` um die Langzeit-Sitzung für „angemeldet bleiben" ergänzt (§2.1, O-C → O-13);
+> `Session.acting_profile_id`-Rechteableitung als geschützter Test formuliert (§2.1, U-21);
+> `Membership.revoked_at`-Erläuterung „jedes Mitglied kann entfernen" korrigiert — stimmt seit U-22
+> nicht mehr (§2.1).
+>
+> *Ggü. V0.2: Rückläufer aus `06-Compliance-Anhang.md` und `03-PRD.md`. Neue Felder in `Household`:
+> `contact_email` sowie die vier `privacy_notice_*`-Felder (§2.1) — Flatmate.io **erzeugt** die
+> Datenschutzseite, veröffentlichen muss der Verantwortliche. `Application.subject_statement` erbt
+> die Frist der Bewerbung, kein eigener Zeitgeber, Löschung in derselben Transaktion (§2.2, §7).*
 >
 > *Ggü. V0.1: Querprüfung gegen `06-Compliance-Anhang.md` eingearbeitet. Neue Felder
 > `Application.collected_from`, `Application.subject_statement` (§2.2); neue Entitäten `Session`,
 > `PasskeyCredential` (§2.1), `AvailabilityToken` (§2.4); entschieden O-2 (§5.3), O-3 (§8.3),
 > O-4 (§2.1), O-6, O-9 (§9.3); `Membership.role` und `.permissions` von ⚙️ auf 🟠 umklassifiziert.*
-> **Datum:** 2026-08-19
+>
+> **Datum:** 2026-09-02
 > **Autor:** Samuel Zink (@SmokeyRGB)
 > **Vorgänger:** `00-Session-Brief.md` · `01-Problem-Framing.md` · `02-SRD.md` · `03-PRD.md`
 > **Nachfolger:** `05-ADRs.md` · `06-Compliance-Anhang.md` · `GUARDRAILS.md`
@@ -144,10 +171,12 @@ Zwei Dinge sind an dieser Karte wichtiger als die Kästen:
 
 Die **17 Namen** aus dem Bezeichner-Kontrakt sind verbindlich (siehe Statusbanner).
 
-**Drei weitere Entitäten sind in V0.2 aus der Querprüfung mit `06-Compliance-Anhang.md`
-hinzugekommen:** `Session`, `PasskeyCredential`, `AvailabilityToken`. Sie sind technisch notwendig —
-der Compliance-Anhang stützt Aussagen darauf, die im Modell kein Gegenstück hatten. Sie sind
-aber **nicht** Teil des ursprünglichen Kontrakts: ihre Namen dürfen beim Aufsetzen des Auth- bzw.
+**Sechs weitere Entitäten liegen außerhalb des ursprünglichen Kontrakts.** Drei aus der
+Querprüfung mit `06-Compliance-Anhang.md` in V0.2: `Session`, `PasskeyCredential`,
+`AvailabilityToken` — technisch notwendig, weil der Compliance-Anhang Aussagen darauf stützt, die
+im Modell kein Gegenstück hatten. Drei weitere aus dem Spec-Update vom 02.09.2026: `ApplicationInviteToken`,
+`AppointmentAttendance`, `PushSubscription` (§2.1, §2.2, §2.5). Für keine der sechs gilt der
+Namensschutz aus dem Statusbanner: ihre Namen dürfen beim Aufsetzen des Auth-, Casting- bzw.
 Scheduling-Moduls noch geändert werden, ohne dass Verweise brechen.
 
 Reihenfolge nach Bounded Context.
@@ -172,6 +201,45 @@ zwischen beiden wechseln.
 | `created_at` | `timestamptz` | ⚙️ | |
 | `deleted_at` | `timestamptz?` | ⚙️ | Soft-Delete; harte Löschung über das Löschkonzept |
 
+> **Womit meldet sich ein Resident-Account ohne E-Mail an — entschieden (O-D → O-12, §10.2).**
+> `email` ist nullable, aber eine Anmeldekennung fehlte bis hierher. **`(Household, `display_name`) +
+> Passwort.** Beim Anmeldeformular wird zuerst der Haushalt gewählt (typischerweise bereits durch das
+> Gerät bekannt, siehe „angemeldet bleiben" bei `Session`), danach der eigene Anzeigename und das
+> Passwort — kein zweites Feld, keine zweite Kennung.
+>
+> **Voraussetzung ist eine Eindeutigkeit, die es bisher nicht gab:** `ResidentProfile.display_name`
+> muss innerhalb eines Haushalts unter den nicht ausgezogenen Profilen (`status != moved_out`)
+> eindeutig sein — sonst ist die Anmeldung nicht auflösbar. Bisher war `display_name` reine
+> Feed-Beschriftung ohne Eindeutigkeitsanspruch; mit dieser Entscheidung wird daraus eine Invariante.
+> Kollidiert ein neuer Beitritt mit einem bestehenden Namen, verlangt das Beitrittsformular eine
+> Unterscheidung (z. B. „Lea" → „Lea K.") — dieselbe Lösung, die Messenger-Apps für denselben Fall
+> verwenden.
+>
+> **Was das für den Haushalts-Account nicht ändert:** Er bleibt bei `email` + Passwort (Pflichtfeld,
+> siehe oben) — die neue Anmeldekennung betrifft ausschließlich Resident-Accounts ohne `email`.
+
+> **Passwort-Reset ohne E-Mail — ein bewusster Tauschhandel, kein Versehen (O-16, §10.2; vormals
+> Plan-O-A).** Ohne
+> `email` gibt es **keine Wiederherstellung durch die Person selbst**. Auflösung: Die Verwaltung
+> (`Membership.is_resident = false`, `manage_members`) kann das Passwort eines `ResidentProfile`
+> zurücksetzen — und verschafft sich damit Zugang zu diesem Profil, einschließlich seiner Stimmen.
+> Das ist der Preis dafür, dass ein Beitritt ohne E-Mail überhaupt möglich ist **und** ein
+> vergessenes Passwort nicht zum dauerhaften Verlust des Profils führt.
+>
+> **Nicht als Härtung darstellen** — dieselbe Regel wie beim Verwaltungskontext selbst (§2.1,
+> Kasten „Klarstellung"): E-03 hält fest, dass die Trennung Verwaltung/Bewohner keine
+> Sicherheitsgrenze ist, und ein Passwort-Reset-Recht der Verwaltung ändert daran nichts.
+>
+> **Die Lücke schließt sich selbst**, sobald eine Person eine eigene `email` hinterlegt: ab diesem
+> Moment läuft die Wiederherstellung über diese Adresse, und die Verwaltung kann das Passwort nicht
+> mehr zurücksetzen. Das ist das eigentliche Argument dafür, die E-Mail später zu erfragen — nicht
+> Benachrichtigungs-Komfort.
+>
+> **Solange die Lücke besteht, bleibt sie sichtbar:** jeder administrative Reset erzeugt einen
+> `ActivityEvent` im Feed aller Bewohnenden (`account.password_reset_by_admin`) und beendet **alle**
+> aktiven `Session`s des betroffenen Profils (§2.1, `Session.revoked_at`) — keine stille
+> Zugriffsübernahme.
+
 #### `Session` — die angemeldete Sitzung
 
 **Neu in V0.2** (Querprüfung). Login-Sessions sind personenbezogen und nach **§ 25 Abs. 2 Nr. 2
@@ -184,11 +252,12 @@ dem Auth-Modul zu überlassen.
 | `id` | `uuid` | ⚙️ | |
 | `token_hash` | `text` | 🟠 | **nur der Hash.** Ein Session-Token im Klartext in der Datenbank ist ein Passwortäquivalent |
 | `account_id` | `uuid` | 🟠 | |
-| `acting_profile_id` | `uuid?` | 🟠 | **hier lebt der Profilwechsel.** `null` = Verwaltungskontext, gesetzt = Bewohnerkontext |
-| `expires_at` | `timestamptz` | ⚙️ | |
+| `acting_profile_id` | `uuid?` | 🟠 | **hier lebt der Profilwechsel** — und **hier lebt die handelnde Identität** eines Requests: jede Policy-Prüfung liest dieses Feld, nie ein anderes. `null` = Verwaltungskontext, gesetzt = Bewohnerkontext |
+| `remember_me` | `bool` | ⚙️ | Default `true` (K-9/S-03 — beim Erstbeitritt vorbelegt). Steuert nur die `expires_at`-Dauer, siehe unten |
+| `expires_at` | `timestamptz` | ⚙️ | **`remember_me = false`:** kurze Sitzung (Vorschlag 12 h). **`remember_me = true`:** lange Sitzung (Vorschlag **90 Tage**, gleitend verlängert bei Aktivität) — Auflösung O-13, damit „auf diesem Gerät angemeldet bleiben" (§10 des Plans) ein Feld hat, nicht nur eine Checkbox in der UI |
 | `user_agent` | `text?` | 🟠 | zur Wiedererkennung eigener Geräte in einer Sitzungsliste |
 | `created_at` | `timestamptz` | ⚙️ | |
-| `revoked_at` | `timestamptz?` | ⚙️ | „überall abmelden" nach einem Passwortwechsel |
+| `revoked_at` | `timestamptz?` | ⚙️ | **drei Auslöser, nicht einer:** „überall abmelden" nach einem Passwortwechsel (das gilt weiterhin) · Passwort-Reset durch die Verwaltung (§2.1, Kasten „Passwort-Reset") · `ResidentProfile.moved_out_on` wird gesetzt — eine ausgezogene Person behält sonst eine bereits lange Sitzung trotz V-3 |
 
 > **`acting_profile_id` ist die technische Heimat von V-1.** Der Sitzungskontext aus §5 — `account_id`
 > plus `profile_id` — wird aus dieser Zeile gefüllt und pro Request per `SET LOCAL` an Postgres
@@ -199,6 +268,19 @@ dem Auth-Modul zu überlassen.
 > Daraus folgt eine harte Regel für den Auth-Baustein: `acting_profile_id` darf nur auf ein Profil
 > zeigen, für das eine gültige `Membership` desselben Accounts existiert. Ohne diese Prüfung wäre der
 > Profilwechsel eine Rechteausweitung.
+>
+> **Und, weil die Verwechslung naheliegt (U-21): `acting_profile_id = null` verleiht nichts.** Eine
+> frühere Formulierung dieses Plans las sich so, als würde `null` Verwaltungsrechte *verleihen* — das
+> ist falsch und wurde korrigiert. `acting_profile_id = null` heißt ausschließlich „für diese Sitzung
+> ist kein Bewohnerprofil aktiv". Sämtliche Rechte kommen aus `Membership.role`
+> (`household_admin`/`moderator`/`member`) und `Membership.permissions`, nie aus dem Sitzungsfeld.
+> Ein Konto mit `role = member` bekommt durch `acting_profile_id = null` nichts dazu — es verliert
+> nur seine Stimmidentität.
+>
+> Für `GUARDRAILS.md` als geschützter Test, kein Kommentar: **„Welche Abschnitte der
+> Organisationsfläche ein Konto sieht, entscheidet ausschließlich `Membership.role`/`.permissions`.
+> Ein Konto ohne `household_admin` sieht den Abschnitt ‚Haushalt' auch dann nicht, wenn
+> `acting_profile_id` `null` ist."**
 
 #### `PasskeyCredential` — der optionale Passkey
 
@@ -234,8 +316,12 @@ Neutral gegenüber WG, Wohnprojekt, Haus und Vermieter-Objekt. UI-Label in v1 du
 | `privacy_notice_version` | `int` | ⚙️ | jede Veröffentlichung erhöht die Version; frühere Fassungen bleiben nachweisbar |
 | `privacy_notice_published_at` | `timestamptz?` | ⚙️ | |
 | `privacy_notice_published_by_account_id` | `uuid?` | 🟠 | **wer veröffentlicht hat** — die Erklärung wird im Namen des Verantwortlichen abgegeben, also braucht sie einen Urheber |
-| `join_code` | `text` | ⚙️ | **ein Code für den ganzen Haushalt**, nicht pro Person. Drei Auflagen, siehe Kasten unten |
+| `join_code` | `text` | ⚙️ | **ein Code für den ganzen Haushalt**, nicht pro Person. Fünf Auflagen, siehe Kasten unten |
 | `join_code_rotated_at` | `timestamptz?` | ⚙️ | |
+| `join_code_expires_at` | `timestamptz?` | ⚙️ | **Neu (S-49).** Vorschlag `join_code_rotated_at + 7 Tage`, mit einem Tippen verlängerbar (O-15). Abgelaufen ⇒ Code lehnt jeden Beitritt ab, unabhängig von `join_code_max_uses` |
+| `join_code_max_uses` | `int?` | ⚙️ | **Neu (S-49).** `null` = unbegrenzt (Default für Bestandshaushalte bei Migration). Für neue Haushalte vorbelegt mit der Zahl der noch fehlenden Bewohnenden (O-15) |
+| `join_code_uses` | `int` | ⚙️ | **Neu (S-49).** Zähler, hochgesetzt bei jedem erfolgreichen Beitritt über diesen Code. Setzt sich bei Rotation zurück, weil ein rotierter Code ohnehin ein neuer Wert ist |
+| `entity_label` | `enum(wg, wohnprojekt, haus, objekt)` | ⚙️ | in v1 fest `wg`, später pro Objekt wählbar |
 | `entity_label` | `enum(wg, wohnprojekt, haus, objekt)` | ⚙️ | in v1 fest `wg`, später pro Objekt wählbar |
 | `created_at` | `timestamptz` | ⚙️ | |
 | `deleted_at` | `timestamptz?` | ⚙️ | |
@@ -285,20 +371,32 @@ Neutral gegenüber WG, Wohnprojekt, Haus und Vermieter-Objekt. UI-Label in v1 du
 > `privacy_notice_version` ist dabei kein Zierrat: der Nachweis, **welche Fassung** einer bewerbenden
 > Person zu einem Zeitpunkt gezeigt wurde, ist genau das, was im Streitfall zählt.
 
-> **`join_code`: drei Auflagen, keine Empfehlungen** (entschieden in der Querprüfung, O-9 Grenzfall 2).
-> Der Code identifiziert einen **Haushalt, keine Person** — deshalb ⚙️ und keine Zeile im
-> Art.-30-Verzeichnis. Er gehört stattdessen in die **TOM-Liste**, denn wer ihn hat, kommt an
-> Beratungsinhalte. Daraus folgt:
+> **`join_code`: fünf Auflagen, keine Empfehlungen** (drei entschieden in der Querprüfung, O-9
+> Grenzfall 2; zwei neu, S-49). Der Code identifiziert einen **Haushalt, keine Person** — deshalb ⚙️
+> und keine Zeile im Art.-30-Verzeichnis. Er gehört stattdessen in die **TOM-Liste**, denn wer ihn
+> hat, kommt an Beratungsinhalte. Daraus folgt:
 >
 > 1. **Rotierbar** durch die organisierende Person. Rotation **entwertet ausstehende Einladungen** —
 >    das ist der ganze Zweck.
 > 2. **Niemals in einem Log**, auch nicht im Zugriffslog. Der Einladungslink trägt den Code im
 >    **Pfad**, also braucht genau diese Route **Pfad-Redaktion** im Zugriffslog.
 > 3. **Niemals in einem Query-String.**
+> 4. **Ablauf** (`join_code_expires_at`). **Neu und keine Zugabe:** Seit `Account.email` bei
+>    Resident-Accounts nullable ist und die E-Mail-Pflicht im Beitrittsformular entfällt (S-03), gibt
+>    es **keine zweite Zugangskontrolle** mehr — weder E-Mail-Verifikation noch ein zweiter Faktor.
+>    Der Code trägt die gesamte Absicherung allein, und ein Code ohne Ablauf ist dann ein
+>    Passwortäquivalent ohne Verfallsdatum.
+> 5. **Nutzungsgrenze** (`join_code_max_uses`/`join_code_uses`). Derselbe Grund wie 4: ohne Grenze
+>    kann derselbe Code beliebig oft eingelöst werden, auch nachdem alle erwarteten Bewohnenden
+>    bereits beigetreten sind.
 >
 > Punkt 2 ist die unbequemste: „nicht ins Anwendungslog schreiben" ist trivial, „das Zugriffslog des
 > Webservers für eine Route redigieren" ist eine Konfigurationsaufgabe, die man vergisst. Sie gehört
 > als überprüfbare Regel in `GUARDRAILS.md`, nicht als Hinweis.
+>
+> **Was Punkt 4/5 ausdrücklich nicht ersetzen** (G-A5 bleibt gültig, siehe Plan „Nicht angefasst"):
+> sie **ergänzen** die Rotation, sie **ersetzen** sie nicht — eine organisierende Person, die einen
+> falsch verschickten Link sofort entwerten will, rotiert weiterhin, statt auf den Ablauf zu warten.
 
 #### `HouseholdSettings` — Verfahrensregeln des Haushalts
 
@@ -349,7 +447,7 @@ Stimmen aber einer Person zurechenbar bleiben müssen.
 |---|---|:--:|---|
 | `id` | `uuid` | ⚙️ | |
 | `household_id` | `uuid` | ⚙️ | |
-| `display_name` | `text` | 🟠 | Anzeigename im Feed („Jonas hat Lea eingeladen") |
+| `display_name` | `text` | 🟠 | Anzeigename im Feed („Jonas hat Lea eingeladen"). **Seit O-12 (§2.1) zusätzlich die Anmeldekennung** für Resident-Accounts ohne E-Mail — deshalb **eindeutig pro Haushalt unter `status != moved_out`**, nicht mehr nur Beschriftung |
 | `status` | `enum(prepared, active, moved_out)` | ⚙️ | `prepared` = vom Haushalts-Account angelegt, noch von keinem Account übernommen |
 | `moved_in_on` | `date?` | 🟠 | |
 | `moved_out_on` | `date?` | 🟠 | setzt `status = moved_out` → **sofortiger Zugriffsentzug** (V-3) |
@@ -380,7 +478,7 @@ die sie nicht passen — der Vermieter-Fall (Objekt ohne eigenes Bewohner-Profil
 | `notification_event_mask` | `jsonb?` | ⚙️ | persönliche Ebene; überschreibt die Haushalts-Ebene |
 | `joined_via_code` | `text?` | ⚙️ | welcher `join_code` verwendet wurde — speist den Feed |
 | `joined_at` | `timestamptz` | ⚙️ | Beitritte erscheinen im Aktivitäts-Feed (struktureller Duplikatsschutz). Zweiter Zweck: ein von `became_resident_id` unabhängiges Kriterium für moderierende Sichtbarkeit, z. B. Zugriff auf die Rundenhistorie zu Auditzwecken |
-| `revoked_at` | `timestamptz?` | ⚙️ | jedes Mitglied kann entfernen |
+| `revoked_at` | `timestamptz?` | ⚙️ | **Korrigiert (U-22):** nicht mehr „jedes Mitglied kann entfernen" — das galt für den durch E-06 vorausgesetzten strukturellen Schutz, der mit der getrennten Bewohnerliste entfällt (§10.2). Setzbar nur über `manage_members`; die genaue Rechteabstufung zwischen Verwaltung und Moderator ist Sache der Rechtematrix in `03-PRD.md` |
 
 Vergebbare Werte in `permissions` (Vorschlag, erweiterbar):
 `create_application` · `change_application_state` · `close_round` · `confirm_appointment` ·
@@ -476,13 +574,13 @@ mit einem Zähler nicht darstellbar. Zustandsmaschine in §3.3.
 | `room_ids` | `uuid[]` | ⚙️ | die Zimmer dieser Runde |
 | `settings_snapshot` | `jsonb` | ⚙️ | **Kopie der Verfahrensregeln beim Öffnen.** Sichert die Regel-Sperre ab: ändert der Haushalt später die Gewichte, bleibt die laufende Runde nach ihren eigenen Regeln bewertet |
 | `opened_at` | `timestamptz?` | ⚙️ | |
-| `phase_deadline_at` | `timestamptz?` | ⚙️ | optionale weiche Frist der aktuellen Rundenphase (S-44), sichtbar als „Stimme ab bis X" / „X Tage/Stunden übrig". **Blockiert nichts** — nach Ablauf bleibt die Runde entscheidungsfähig, die moderierende Person entscheidet aktiv weiter oder verlängert. Speist nur die CTA-Sortierung im Dashboard, analog zur bloß anzeigenden Rolle von `opened_at`/`closed_at` in dieser Tabelle |
+| `phase_deadline_at` | `timestamptz?` | ⚙️ | optionale weiche Frist der aktuellen Rundenphase (S-44), sichtbar als „Stimme ab bis X" / „X Tage/Stunden übrig" — **nie ohne die Phase, aus der sie stammt** (siehe Kasten „Geltungsbereich" unten). **Blockiert nichts** — nach Ablauf bleibt die Runde entscheidungsfähig, die moderierende Person entscheidet aktiv weiter oder verlängert. Speist die CTA-Sortierung (§8.7), analog zur bloß anzeigenden Rolle von `opened_at`/`closed_at` in dieser Tabelle. **Gesetzt und verlängert wird sie von der moderierenden Person, ohne Voreinstellung** (O-14) — eine automatisch gesetzte Frist wäre eine Erwartung, die niemand vereinbart hat |
 | `closed_at` | `timestamptz?` | ⚙️ | **Ankerpunkt der Aufbewahrungsfrist** |
 | `quorum_denominator_frozen` | `int?` | ⚙️ | beim Schließen eingefroren, damit abgeschlossene Runden nachträglich nicht ihre Quoten verändern |
 | `retention_until` | `date?` | ⚙️ | `closed_at + retention_days`, verlängerbar (siehe unten) |
 | `retention_extensions` | `jsonb` | ⚙️ | Liste `{extended_at, by_account_id, reason}` — **protokollierter** Verlängerungsknopf, nicht unbegrenzt |
 | `retention_warned_at` | `timestamptz?` | ⚙️ | 14-Tage-Vorwarnung an die moderierende Person |
-| *`phase_hint`* | *abgeleitet* | ⚙️ | für die UI aus den Bewerbungszuständen berechnet — **nicht gespeichert**, Begründung unten |
+| *`phase_hint`* | *abgeleitet* | ⚙️ | für die UI aus den Bewerbungszuständen berechnet — **nicht gespeichert**, Begründung unten, Formel in §8.6 |
 
 > **Warum der Rundenzustand absichtlich dünn ist.** Naheliegend wäre gewesen, die Prozessphasen
 > (Screening → Terminfindung → Entscheidung) als Rundenzustände zu modellieren. Wir schlagen das
@@ -498,6 +596,25 @@ mit einem Zähler nicht darstellbar. Zustandsmaschine in §3.3.
 > durchlaufen wollen („wir screenen jetzt alle zusammen, dann laden wir zusammen ein"). Dann wird
 > `phase_hint` zu einem echten Feld mit eigener Zustandsmaschine — und die Bewerbungszustände
 > bekommen ein Tor davor.
+
+> **Geltungsbereich von `phase_deadline_at` — jetzt blockierend, vorher ein Schönheitsfehler.**
+> Solange `phase_hint` keine Formel hatte, war unklar, wofür genau `phase_deadline_at` gilt und wann
+> sie wechselt (Konflikt 1 des Spec-Updates, siehe Plan). Mit der Formel in §8.6 ist das entschieden:
+>
+> - **Ein Feld, eine Frist gleichzeitig.** `phase_deadline_at` ist ein einzelnes Feld auf der Runde —
+>   es gibt nie zwei Fristen nebeneinander.
+> - **Sie gehört zu genau der Phase, die `phase_hint` im selben Moment berechnet.** Wird sie gesetzt,
+>   gilt sie für die aktuell angezeigte Phase, nicht für eine kommende.
+> - **Wechselt `phase_hint` (weil die am weitesten fortgeschrittene Bewerbung eine neue Phase
+>   erreicht), während eine Frist läuft, bleibt die alte Frist stehen** und wird in der UI als „aus
+>   der vorherigen Phase" gekennzeichnet, bis die moderierende Person sie ändert oder löscht. Weder
+>   still übernehmen (sie war für etwas anderes gedacht) noch still löschen (dann verschwindet eine
+>   Absprache ohne Anlass) ist zulässig — beides muss eine sichtbare Handlung sein.
+> - **Nie ohne ihre Phase angezeigt** (U-18): „Abstimmung Runde 1 — noch 2 Tage", nie „noch 2 Tage"
+>   allein. Sonst bezieht sich ein gespeichertes Datum auf nichts Benanntes.
+>
+> Die Organisationsfläche zeigt einen Phasenwechsel mit stehengebliebener Frist als **Aufgabe**, nicht
+> als Warnung — konsistent mit der CTA-Sortierung in §8.7.
 
 #### `RoundParticipation` — wer an dieser Runde teilnimmt
 
@@ -649,7 +766,7 @@ siehe unten bei `ActivityEvent`/`Notification`).
 | `id` | `uuid` | ⚙️ | |
 | `appointment_id` | `uuid` | ⚙️ | |
 | `resident_profile_id` | `uuid` | 🟠 | analog zu `Appointment.expected_attendee_profile_ids` |
-| `attended` | `bool` | 🟠 | von der moderierenden Person nach dem Termin gesetzt |
+| `attended` | `bool` | 🟠 | **Umgedreht (U-23), korrigiert gegenüber der vorherigen Fassung.** Entsteht mit `true`, wenn `Appointment.status → confirmed` wechselt (§3.1) — nicht erst danach. Von der **betroffenen Person selbst** vor dem Termin auf `false` änderbar (Absage einer einzelnen Person, siehe Kasten). Von der Moderation **jederzeit korrigierbar**, aber nur als Ausnahmefall gedacht |
 | `note_written` | `bool` | ⚫ | ob diese Person zu dieser Bewerbung bereits eine `CastingNote` verfasst hat — dieselbe Beratungs-Sensibilität wie `CastingNote.author_profile_id` |
 
 > **Warum eine eigene Tabelle und kein weiteres Feld auf `Appointment`.** Beides — Anwesenheit und
@@ -659,6 +776,30 @@ siehe unten bei `ActivityEvent`/`Notification`).
 > verkappten Tabelle zu werden — genau das war die Lücke, die O-7 benannte. Die Tabelle steht im
 > `casting`-Kontext statt bei `Appointment` in `scheduling`, weil ihr eigentlicher Zweck die
 > CastingNote-Erinnerung ist, nicht die Terminverwaltung.
+
+> **Anwesenheit wird angenommen, nicht erfasst (U-23) — und das schließt zugleich die bisher
+> fehlende kurzfristige Einzelabsage (S-51).** Der Grund für die Umkehr: die Information liegt
+> ohnehin vor — wer auf den `Slot` reagiert hat und im `Appointment` als Teilnehmender steht, wollte
+> da sein. Im Normalfall tut die moderierende Person deshalb **nichts**:
+>
+> | Wann | Was passiert | Wer handelt |
+> |---|---|---|
+> | `Appointment.status → confirmed` | `AppointmentAttendance`-Zeilen entstehen aus `expected_attendee_profile_ids`, `attended = true` | niemand |
+> | vor dem Termin | Erinnerung an die Teilnehmenden; **„Ich kann doch nicht"** setzt `attended = false` für genau diese Person | die betroffene Person, nur im Ausnahmefall |
+> | `scheduled → interviewed` | Notiz-Erinnerung (`casting.note_reminder_due`) geht an alle mit `attended = true` **und** `note_written = false` | niemand |
+> | danach | „War jemand doch nicht da?" — Korrektur, erreichbar, aber **nie erforderlich** | Moderation, nur im Ausnahmefall |
+>
+> **Das schließt die Lücke, die B-3/S-51 benannt hatten:** Vorher kannte `Appointment.status` nur
+> Zustände für den **ganzen** Termin (`cancelled`, `no_show`); eine Absage **einer einzelnen** Person
+> aus einer Gruppe von Teilnehmenden hatte weder Feld noch Weg. Jetzt trägt `AppointmentAttendance`
+> genau das — ohne dass `Appointment` selbst eine eigene Zustandsmaschine braucht (§3.4 bleibt
+> gültig: der Fall, der dort als Auslöser für eine echte `Appointment`-Maschine genannt wird, „Zu-/
+> Absagen einzelner Bewohnender", ist damit auf Ebene der Attendance-Zeile gelöst, nicht auf Ebene
+> des Termins).
+>
+> **Was ausdrücklich kein neues Feld bekommt:** wer die letzte Änderung an `attended` vorgenommen hat
+> (`self` vs. `moderation`). Diese Information trägt bereits `ActivityEvent.actor_profile_id` am
+> auslösenden Ereignis — ein zweites Feld dafür wäre eine zweite Wahrheit neben dem Log.
 
 ### 2.3 Kontext `deliberation`
 
@@ -835,6 +976,7 @@ Benachrichtigungs-Fan-out, „was ist passiert, während ich weg war", Undo und 
 | `correlation_id` | `uuid?` | ⚙️ | bündelt Ereignisse einer Aktion (z. B. Solver-Lauf legt zwölf Termine) |
 | `reverses_event_id` | `uuid?` | ⚙️ | Rückwärtsübergänge und Undo verweisen auf das Ereignis, das sie zurücknehmen (P-4) |
 | `visibility_scope` | `enum(household, round_participants, actor_only)` | ⚙️ | Vorfilter; die eigentliche Prüfung bleiben V-1 bis V-4 |
+| *`audience_class`* | *abgeleitet* | ⚙️ | **Neu**, löst U-3/U-4 auf. `enum(outcome, process)` aus `event_type` berechnet — **nicht gespeichert**, gleiche Bauform wie `phase_hint` und `Vote.weight`. Formel und Zuordnungstabelle in §8.8 |
 
 > **Die Payload ist die zweite Stelle, an der Beratungsinhalte lecken können.** Ein Ereignis
 > `vote.cast` mit `{value: "no"}` im Payload macht das Log zum bequemen Umweg um V-1. Vorschlag:
@@ -921,10 +1063,19 @@ erster Login eines Accounts, keine aktive PushSubscription vorhanden
 PushSubscription danach angelegt           →  Trigger feuert für diesen Account nicht erneut
 ```
 
-Speist **dieselbe CTA-Sortierung im Dashboard** wie `CastingRound.phase_deadline_at` (§2.2, S-44):
-ein Account ohne aktive `PushSubscription` sieht den Install-Hinweis weiter oben einsortiert, aus
-demselben Grund wie eine näher rückende Rundenfrist — beides sind zeitkritische Hinweise, die die
-Sortierung, aber keine Berechtigung beeinflussen.
+> **Korrektur (U-19, K-1 der zweiten Runde): kein Teil der CTA-Sortierung.** Eine vorherige Fassung
+> dieses Satzes behauptete, ein Account ohne aktive `PushSubscription` sehe den Install-Hinweis „weiter
+> oben einsortiert, aus demselben Grund wie eine näher rückende Rundenfrist" — als wäre er eine
+> fristgebundene Aufgabe wie T-4/T-5 (§8.7). **Das ist ein bestätigter Fehler, kein Stilurteil:**
+> `pwa_install_prompt_due` wird nie „erledigt" im Sinne einer Runde und würde, weil er bis zur
+> Installation wiederkehrt, echte Aufgaben **dauerhaft** verdrängen — genau das, was §8.7 ausschließen
+> soll.
+>
+> **Stattdessen:** ein eigenes, optisch abgesetztes Band **unterhalb** des primären CTA aus §8.7.
+> Sichtbar und wiederkehrend, wie S-45 verlangt, aber **nie auf dem CTA-Platz und nie über einer
+> Aufgabe mit Frist**. S-45 fordert Sichtbarkeit, nicht den ersten Rang. `pwa_install_prompt_due`
+> nimmt an der Sortierfunktion aus §8.7 **nicht teil** — es ist ein Element neben der Aufgabenliste,
+> nicht ihr Bestandteil.
 
 ---
 
@@ -1883,6 +2034,118 @@ Fünf Bedingungen, alle notwendig, keine verhandelbar (Begründung in ADR-005):
 > man nicht glaubt. Das ist genau der Grund, warum genetische Verfahren ausgeschlossen sind (P-3,
 > ADR-005).
 
+### 8.6 `phase_hint`
+
+**Bisher unbeziffert — jetzt blockierend**, weil `phase_deadline_at` (§2.2) sich auf „die aktuelle
+Rundenphase" beruft und diese Formel bis hierher nirgends stand (Konflikt 1 des Spec-Updates).
+**Dieselbe Regel wie `07-Screen-Inventar.md` §3.1**, hier nur als Pseudocode statt in einfacher
+Sprache — beide Fassungen sind bewusst dieselbe Regel in zwei Registern, keine zweite Formulierung.
+Wer hier ändert, muss §3.1 dort mitziehen (und umgekehrt).
+
+```text
+MAIN_PATH_ORDER = [new, screened, invited, scheduled, interviewed, offer_made, moved_in]
+// Seitenzustände (rejected_by_household, declined_by_applicant, withdrawn, archived) zählen nicht
+// mit — sie sind Sackgassen, kein Fortschritt entlang der Runde.
+
+function phase_hint(round) -> text
+    live = [ a ∈ Application | a.round_id = round.id ∧ a.state ∈ MAIN_PATH_ORDER ]
+    if |live| = 0:
+        return "Warten auf Bewerbungen"
+
+    furthest = argmax( a ∈ live, MAIN_PATH_ORDER.index_of(a.state) )   // am weitesten fortgeschrittene Bewerbung
+
+    return case furthest.state:
+        new, screened               -> "Abstimmung Runde 1"
+        invited, scheduled          -> "Terminfindung"
+        interviewed                 -> "Abstimmung Runde 2"
+        offer_made, moved_in        -> "Zusage läuft"
+
+function phase_distribution(round) -> { label: count }
+    // dieselbe Bucket-Einteilung wie oben, aber über ALLE `live`, nicht nur die weiteste —
+    // speist die Verteilungszeile darunter, z. B. "7 in Sichtung · 2 im Termin · 1 gecastet"
+    group_and_count(live, by: bucket_of(a.state))
+```
+
+**Warum „am weitesten", nicht „wo die Masse liegt".** Verworfene Alternative: den Bucket zu zeigen,
+in dem die meisten Bewerbungen stehen. Verworfen, weil die dringendste Entscheidung der Runde dann
+unsichtbar würde, sobald sie nur eine einzige Bewerbung betrifft — bei 20 Bewerbungen, von denen
+eine bei `offer_made` steht, ist „Zusage läuft" die richtige Anzeige, nicht „Abstimmung Runde 1"
+nur weil die übrigen 19 dort stehen. Die Verteilungszeile fängt die dadurch entstehende Ungenauigkeit
+auf, ohne die dringendste Phase zu verschweigen.
+
+**Was diese Formel nicht ist: ein Tor.** Sie sperrt und verbirgt nichts — wer eine Bewerbung
+weiterschieben will, kann das unabhängig davon, was `phase_hint` gerade anzeigt (unverändert
+gegenüber der Begründung in §2.2, „warum der Rundenzustand absichtlich dünn ist").
+
+### 8.7 CTA-Sortierung (Aufgabenpriorität)
+
+**Bisher unbeziffert.** S-44, S-45, S-46 und S-48 setzen eine Sortierung nach Zeitdruck voraus,
+ohne dass eine der Zeilen sie definiert — dieselbe Lücke wie bei `phase_hint`. **Ausformuliert in
+`07-Screen-Inventar.md` §2.2** (Aufgabenkatalog T-1…T-6, Bildschirmtexte, in einfacher Sprache);
+hier steht die formale Gegenstelle als Pseudocode — dieselbe Regel, nicht umformuliert. Wer hier
+ändert, muss §2.2 dort mitziehen. Der Zweck dieser Fassung: alle vier Scope-Zeilen können dieselbe
+Funktion zitieren, statt die Sortierung stillschweigend vorauszusetzen.
+
+```text
+function task_priority(task) -> sort key
+    if task.due_at is not null:
+        return (0, task.due_at)        // Gruppe 0: hat ein Datum — aufsteigend, nächstfällige zuerst
+    else:
+        return (1, task.fixed_rank)    // Gruppe 1: kein Datum — feste Reihenfolge als Fallback
+```
+
+**Zwei Dinge erzeugen ein `due_at`, sonst keine drei:**
+
+1. **Eine harte Frist** — ein Datum, nach dem die Aufgabe nichts mehr nützt (Termin vorbei, Veto
+   gesperrt, Einzug erfolgt).
+2. **Andere hängen von mir ab** — solange ich nicht handle, kommt die Gruppe nicht weiter.
+
+**Welche Felder dieses Modells `due_at` tatsächlich liefern:**
+
+| Aufgabenart (Screen-Inventar) | Datenquelle in diesem Modell |
+|---|---|
+| Stimmen zu Einladung/Zusage | `CastingRound.phase_deadline_at` (§2.2, S-44) — nur, wenn gesetzt; sonst Gruppe 1 |
+| Reaktion auf einen Terminvorschlag | `Slot.starts_at` (§2.4) |
+| Casting-Notiz schreiben | ein fester Versatz nach `Appointment`-Abschluss (`interviewed`, §3.1) — Vorschlag: ein Tag |
+| Verfügbarkeit eintragen | das Zeitfenster, in dem gecastet werden soll, sobald `Application.state = invited` vorliegt |
+
+**Was diese Regel ausdrücklich nicht tut: blockieren.** Wie `phase_deadline_at` selbst (§2.2) und
+das Quorum (S-13) verändert ein abgelaufenes `due_at` nur Sortierung und Anzeigetext, nie die
+Verfügbarkeit einer Handlung.
+
+**Was an dieser Regel ausdrücklich nicht teilnimmt: der PWA-Install-Hinweis.** `Notification.type =
+'pwa_install_prompt_due'` (§2.5) hat kein `due_at` in diesem Sinne und läuft **nicht** durch
+`task_priority` — siehe die Korrektur im Kasten dort (U-19). Er ist ein eigenes Element unterhalb
+der sortierten Liste, nicht einer ihrer Einträge.
+
+### 8.8 `ActivityEvent.audience_class`
+
+Löst U-3/U-4 auf: „Seit deinem letzten Besuch" zeigt nur **Ergebnisse**, das vollständige Log liegt
+im Activity Center.
+
+```text
+OUTCOME_EVENT_TYPES = {
+    'appointment.confirmed',   // bestätigter Termin
+    'application.offer_made',  // erteilte Zusage
+    'application.moved_in',    // Einzugsdatum, "X zieht ein"
+    'round.closed',            // Rundenschluss
+    'membership.joined',       // neue Mitbewohnende
+}
+
+function audience_class(event) -> enum(outcome, process)
+    return event.event_type ∈ OUTCOME_EVENT_TYPES  ?  outcome  :  process
+```
+
+| Klasse | Bedeutung | Ziel |
+|---|---|---|
+| `outcome` | steht für mich fest, habe ich nicht selbst ausgelöst | „Seit deinem letzten Besuch" auf dem Start, höchstens fünf Zeilen |
+| `process` | alles Übrige — einzelne Statuswechsel, Codeausgaben, Notizanlagen | nur im Activity Center |
+
+**Default ist `process`, nicht `outcome`.** Eine Allowlist statt einer Denylist, weil ein neuer
+`event_type` sonst stillschweigend in „Seit deinem letzten Besuch" auftauchen würde — dieselbe
+Fehlerrichtung, die bei `collected_from` (§2.2) schon einmal vermieden wurde: **ein Default darf
+die Einordnung nicht im Verborgenen entscheiden.**
+
 ---
 
 ## 9. Anhang — personenbezogene Felder (Querprüfungsliste)
@@ -1893,7 +2156,7 @@ Rechtsgrundlage, Datenkategorie und Löschfrist. Fehlt eine, bricht der CI-Check
 
 Sortiert nach Klasse, weil die Klasse den Aufwand bestimmt.
 
-### 9.1 Klasse ⚫ — personenbezogen **und** Beratungsinhalt (10 Felder)
+### 9.1 Klasse ⚫ — personenbezogen **und** Beratungsinhalt (11 Felder)
 
 Strengste Klasse: unterliegt zusätzlich **V-1** und ist im Auskunftsexport enthalten.
 
@@ -1907,10 +2170,11 @@ Strengste Klasse: unterliegt zusätzlich **V-1** und ist im Auskunftsexport enth
 | `Veto` | `reason` | Bewerbende | Freitext, häufig wertend |
 | `CastingNote` | `author_profile_id` | Schreibende | Art. 15 Abs. 4 schützt die **Identität**, nicht den Inhalt |
 | `CastingNote` | `body` | Bewerbende | **der rechtlich heikelste Inhalt des Produkts** |
+| `AppointmentAttendance` | `note_written` | Bewerbende | **neu, bisher fehlend** — dieselbe Beratungs-Sensibilität wie `CastingNote.author_profile_id` (§2.2) |
 | `ActivityEvent` | `payload` (Beratungsereignisse) | beide | Vorschlag: nur Referenzen, keine Werte — §2.5 |
 | `Notification` | `payload` (Beratungsereignisse) | beide | dito |
 
-### 9.2 Klasse 🔴 — personenbezogen, Bewerbende (14 Felder)
+### 9.2 Klasse 🔴 — personenbezogen, Bewerbende (15 Felder)
 
 Dritte, die das Produkt nicht gewählt haben. **180-Tage-Frist, Löschautomatik, Auskunftsexport.**
 
@@ -1929,8 +2193,9 @@ Dritte, die das Produkt nicht gewählt haben. **180-Tage-Frist, Löschautomatik,
 | `Room` | `promised_to_application_id` | Verknüpfung, personenbeziehbar |
 | `AvailabilityWindow` | `application_id`, `raw_input` | `raw_input` ist der Originalfreitext („Di 16–19", „nur abends") |
 | `AvailabilityToken` | `application_id` | **neu in V0.2** — der Token identifiziert eine bewerbende Person |
+| `ApplicationInviteToken` | `application_id` | **neu, bisher fehlend** — analog zu `AvailabilityToken.application_id`: der Token identifiziert eine bewerbende Person (§2.1) |
 
-### 9.3 Klasse 🟠 — personenbezogen, Bewohnende und Accounts (28 Felder)
+### 9.3 Klasse 🟠 — personenbezogen, Bewohnende und Accounts (33 Felder)
 
 Nutzende mit eigenem Zugang. Betroffenenrechte gelten, aber **keine** automatische Löschfrist —
 Nutzende löschen selbst.
@@ -1943,32 +2208,45 @@ Nutzende löschen selbst.
 | `Account` | `last_seen_at` | speist „was ist passiert, während ich weg war" |
 | `Household` | `contact_email` | **neu in V0.3** — nach außen genannte Kontaktangabe für Art. 13 Abs. 1 lit. a. **Nicht** `Account.email`; **keine Postanschrift** (`06` §4.6) |
 | `Household` | `privacy_notice_published_by_account_id` | **neu in V0.3** — wer die Datenschutzseite des Haushalts veröffentlicht hat. Die übrigen drei `privacy_notice_*`-Felder sind ⚙️ |
-| `Session` | `token_hash`, `account_id`, `acting_profile_id`, `user_agent` | § 25 Abs. 2 Nr. 2 TDDDG einwilligungsfrei. `acting_profile_id` ist die technische Heimat des Profilwechsels (V0.2) |
+| `Session` | `token_hash`, `account_id`, `acting_profile_id`, `user_agent` | § 25 Abs. 2 Nr. 2 TDDDG einwilligungsfrei. `acting_profile_id` ist die technische Heimat des Profilwechsels (V0.2) und, seit U-21, der geschützte Test gegen Rechteausweitung |
 | `PasskeyCredential` | `account_id`, `credential_id`, `public_key`, `label`, `created_at`, `last_used_at` | **neu in V0.2** — optionaler Aufsatz (ADR-007), löschbar ohne Zugangsverlust |
 | `Membership` | `role`, `permissions` | **in V0.2 von ⚙️ auf 🟠 umklassifiziert** — „X ist Moderator" ist eine Information über eine identifizierte Person (Art. 4 Nr. 1). Keine automatische Frist, aber **auf Auskunftsverlangen offenzulegen** |
-| `ResidentProfile` | `display_name` | Anzeigename im Feed |
-| `ResidentProfile` | `moved_in_on`, `moved_out_on` | Wohnsituation; `moved_out_on` löst V-3 aus |
+| `ResidentProfile` | `display_name` | Anzeigename im Feed, **seit O-12 zusätzlich Anmeldekennung** — eindeutig pro Haushalt (§2.1) |
+| `ResidentProfile` | `moved_in_on`, `moved_out_on` | Wohnsituation; `moved_out_on` löst V-3 aus **und beendet seit V0.4 auch aktive `Session`s** (§2.1) |
 | `Application` | `became_resident_id` | **Verknüpfung Bewerbung ↔ Person.** Technisch ein Schlüssel, faktisch die Aussage „diese Person ist eingezogen" — und der Träger von V-1 |
 | `Room` | `current_resident_profile_id` | wer aktuell darin wohnt |
+| `AppointmentAttendance` | `resident_profile_id`, `attended` | **neu, bisher fehlend.** `attended` seit V0.4 umgedreht (U-23): entsteht mit `true`, von der betroffenen Person selbst und von der Moderation änderbar (§2.2) |
 | `AvailabilityWindow` | `resident_profile_id` | Verfügbarkeit ist ein Verhaltensdatum |
 | `Appointment` | `expected_attendee_profile_ids` | wer teilnehmen wollte |
 | `AvailabilityToken` | `created_by_profile_id` | **neu in V0.2**; `null` = im Verwaltungskontext erzeugt |
+| `PushSubscription` | `account_id`, `endpoint`, `keys` | **neu, bisher fehlend** — geräte- und accountbezogen wie `PasskeyCredential` (§2.5) |
 | `ActivityEvent` | `actor_account_id`, `actor_profile_id` | Handelnde; `null` = im Verwaltungskontext gehandelt |
 
-**Summe: 52 Felder** (10 ⚫ · 14 🔴 · 28 🟠) in **16 der 20 Entitäten.**
+**Summe: 59 Felder** (11 ⚫ · 15 🔴 · 33 🟠) in **19 der 23 Entitäten.**
 
 Ohne Inventarzeile: `HouseholdSettings`, `CastingRound`, `RoundParticipation`, `Slot` — sie enthalten
 Konfiguration, Zeitraster und Verknüpfungen, aber keine Aussage über eine Person. **`Household` ist in
 V0.3 aus dieser Liste herausgefallen**, weil `contact_email` und
 `privacy_notice_published_by_account_id` hinzugekommen sind.
 
+> **Korrektur gegenüber V0.3 — derselbe Fehler, den dieser Kasten schon zweimal dokumentiert hat.**
+> Das Spec-Update vom 02.09.2026 hat `ApplicationInviteToken`, `AppointmentAttendance` und
+> `PushSubscription` ins Modell aufgenommen (§2.1, §2.2, §2.5), aber diese Querprüfungsliste nie
+> nachgezogen — sieben Feldzeilen fehlten, bis heute unbemerkt, weil die Zeilensumme selbst keine
+> Prüfung auslöst. Zuwachs auf **59** (von **52**): `AppointmentAttendance.note_written` (⚫),
+> `ApplicationInviteToken.application_id` (🔴), `AppointmentAttendance.{resident_profile_id,
+> attended}` und `PushSubscription.{account_id, endpoint, keys}` (🟠, 5 Felder). Entitäten-Nenner von
+> 20 auf **23**, weil dieselben drei Entitäten dort nie gezählt wurden (§2, „Sechs weitere Entitäten").
+>
 > **Korrektur gegenüber V0.1:** dort stand „33 Felder in 11 der 17 Entitäten". Die Zahl war falsch
 > gezählt — die richtige Summe für V0.1 wäre **35** gewesen (10 ⚫ · 12 🔴 · 13 🟠). Der Zuwachs auf
 > 50 in V0.2 kam aus `Session`, `PasskeyCredential`, `AvailabilityToken`,
 > `Application.subject_statement` und der Umklassifizierung von `Membership.role`/`.permissions`; die
 > zwei weiteren in V0.3 aus `Household`. **Maßgeblich sind die Tabellen, nicht die Summe** — genau
 > deshalb ist das Datenbestandsverzeichnis ein CI-Gate (ADR-010) und nicht eine Zahl in einem Dokument.
-> Dass dieses Dokument seine eigene Summe zweimal nachziehen musste, ist das beste Argument dafür.
+> Dass dieses Dokument seine eigene Summe jetzt zum dritten Mal nachziehen musste, ist das beste
+> Argument dafür — und ein Argument für den Mechanismus, den `Session-Sprint-Log.md` §4 für
+> `GUARDRAILS.md` vorschlägt (Versionszeilen- und Nummern-Prüfung als Build-Gate).
 
 > **Die beiden Grenzfälle aus V0.1 sind entschieden** (Querprüfung mit `06-Compliance-Anhang.md`):
 >
@@ -1977,9 +2255,12 @@ V0.3 aus dieser Liste herausgefallen**, weil `contact_email` und
 >    Person. Inventarzeile ja, keine automatische Frist, auf Auskunftsverlangen offenzulegen. Es
 >    kostet eine Zeile, und sie auszulassen wäre falsch gewesen.
 > 2. **`Household.join_code`: ⚙️, TOM-Liste statt Art.-30-Verzeichnis** — Vorschlag von V0.1
->    angenommen. Der Code identifiziert einen Haushalt, keine Person. Dazu drei **Auflagen**
->    (rotierbar, niemals in einem Log inklusive Zugriffslog, niemals in einem Query-String) —
->    ausgeführt in §2.1 und als überprüfbare Regel an `GUARDRAILS.md` gemeldet.
+>    angenommen. Der Code identifiziert einen Haushalt, keine Person. Dazu seit V0.4 **fünf
+>    Auflagen** (rotierbar, niemals in einem Log inklusive Zugriffslog, niemals in einem
+>    Query-String, dazu neu Ablauf und Nutzungsgrenze, S-49) — ausgeführt in §2.1 und als
+>    überprüfbare Regel an `GUARDRAILS.md` gemeldet. `join_code_expires_at`,
+>    `join_code_max_uses` und `join_code_uses` bleiben aus demselben Grund ⚙️: sie identifizieren
+>    den Code, nicht eine Person.
 
 ---
 
@@ -1997,13 +2278,18 @@ nicht, damit Querverweise aus den Nachbardokumenten weiter treffen.
 | O-3 | Default für `settings.quorum_share` | **`0.5`** = mindestens die Hälfte der Stimmberechtigten, konfigurierbar. Quorum ist eine **Anzeigeschwelle**, keine Beschlussfähigkeitsgrenze | §8.3 |
 | O-4 | Doppelte Statusführung `ResidentProfile` vs. `Membership` | **Beibehalten, ohne `residency_period`:** Wohn-Tatsachen am Profil, Zugang an der Membership. `residency_period` ist der **v2-Aufstiegspfad** für Aus- und Wiedereinzug | §2.1 |
 | O-6 | Passkey-Credentials nicht modelliert | **`PasskeyCredential` modelliert.** Löschen des letzten Passkeys entzieht nie den Zugang (P-2) | §2.1 |
-| O-9 | Klassifizierung `Membership.role`/`.permissions` und `Household.join_code` | **`role`/`permissions` → 🟠** (gegen den V0.1-Vorschlag). **`join_code` → ⚙️** plus drei Auflagen, TOM-Liste statt Art.-30-Verzeichnis | §2.1, §9.3 |
+| O-9 | Klassifizierung `Membership.role`/`.permissions` und `Household.join_code` | **`role`/`permissions` → 🟠** (gegen den V0.1-Vorschlag). **`join_code` → ⚙️** plus drei Auflagen, TOM-Liste statt Art.-30-Verzeichnis (seit V0.4 fünf, siehe O-15) | §2.1, §9.3 |
 
-### 10.2 In diesem Update entschieden (CastingNote-Erinnerung, Einladungstoken, Push-Kanal)
+### 10.2 In diesem Update entschieden (CastingNote-Erinnerung, Einladungstoken, Push-Kanal — Spec-Update 02.09.; UX-Nachzug aus `07-Screen-Inventar.md`)
 
 | # | Punkt | Entscheidung | Fundstelle |
 |---|---|---|---|
-| O-7 | `Appointment.expected_attendee_profile_ids` als Array statt Verknüpfungstabelle | **Verknüpfungstabelle `AppointmentAttendance`** (`appointment_id`, `resident_profile_id`, `attended`, `note_written`) ergänzt, bewusst im `casting`-Kontext, weil sie die CastingNote-Erinnerung speist. `expected_attendee_profile_ids` bleibt für die reine Teilnahme-Absicht bestehen | §2.2 |
+| O-7 | `Appointment.expected_attendee_profile_ids` als Array statt Verknüpfungstabelle | **Verknüpfungstabelle `AppointmentAttendance`** (`appointment_id`, `resident_profile_id`, `attended`, `note_written`) ergänzt, bewusst im `casting`-Kontext, weil sie die CastingNote-Erinnerung speist. `expected_attendee_profile_ids` bleibt für die reine Teilnahme-Absicht bestehen. **`attended` seit V0.4 umgedreht (U-23):** entsteht mit `true`, die betroffene Person sagt selbst ab, die Moderation korrigiert nur Ausnahmen — schließt zugleich die kurzfristige Einzelabsage (S-51), die zuvor weder Feld noch Weg hatte | §2.2 |
+| O-12 | Anmeldekennung für Resident-Accounts ohne `email` (vormals Plan-O-D) | **`(Household, ResidentProfile.display_name)` + Passwort.** Voraussetzung: `display_name` wird pro Haushalt eindeutig (unter `status != moved_out`) | §2.1 |
+| O-13 | Dauer der „angemeldet bleiben"-Sitzung (vormals Plan-O-C) | **`Session.remember_me`** steuert `expires_at`: 90 Tage gleitend statt kurzer Sitzung. Endet bei Passwortwechsel, Admin-Reset **und** `moved_out_on` | §2.1 |
+| O-14 | Wer setzt/verlängert `CastingRound.phase_deadline_at`, gibt es eine Voreinstellung? (vormals Plan-O-E) | **Die moderierende Person, ohne Voreinstellung.** Eine automatisch gesetzte Frist wäre eine Erwartung, die niemand vereinbart hat | §2.2 |
+| O-15 | Standardwerte für `join_code_expires_at`/`.max_uses` (vormals Plan-O-B) | **Ablauf 7 Tage, Nutzungsgrenze = Zahl der noch fehlenden Bewohnenden** — beides nur Vorschlagswerte beim Setzen, jederzeit über `Household.join_code_expires_at`/`.join_code_max_uses` änderbar, kein hartcodierter Wert | §2.1 |
+| O-16 | Passwort-Rücksetzung für Bewohnende ohne `email` (vormals Plan-O-A) | **Durch den Haushalts-`Account`** (`manage_members`), mit sichtbarem `ActivityEvent` (`account.password_reset_by_admin`) und Beendigung aller aktiven `Session`s des betroffenen Profils. Schließt sich selbst, sobald die Person eine eigene `email` hinterlegt | §2.1 |
 
 ### 10.3 Weiter offen
 
@@ -2027,6 +2313,7 @@ Kernversprechen betrifft.
 | `00-Session-Brief.md` | verbindliches Entscheidungsprotokoll; alles hier ist daraus abgeleitet |
 | `02-SRD.md` | Scope, Metriken, Risiken, Aufwand — lösungsneutral |
 | `03-PRD.md` | Nutzerflüsse und Akzeptanzkriterien, insbesondere zur Sichtbarkeitsinvariante |
+| `07-Screen-Inventar.md` | **neu.** Narrative Gegenstelle zu §8.6–§8.8: `phase_hint` (dort §3.1), CTA-Sortierung (dort §2.2) und die UI-Sprachregelung — dieselben Regeln in einfacher Sprache statt Pseudocode |
 | `05-ADRs.md` | ADR-001 bis ADR-012 — die Architekturentscheidungen hinter diesem Modell |
 | `06-Compliance-Anhang.md` | Rechtsanalyse und Art.-30-Verzeichnis zu §9 |
 | `GUARDRAILS.md` | geschützte Tests zu V-1 bis V-4, I-1 bis I-10 und zum Solver-Determinismus |
