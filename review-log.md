@@ -393,3 +393,132 @@ Prozessregeln. Offen bleibt, was auch Durchgang 1 offenließ: Die tatsächliche 
 validiert. Das ist der Unterschied, den das Audit selbst zwischen „Entscheidung" und „Hypothese"
 zieht, und er gilt für die in diesem Durchgang neu entstandenen Scope-Zeilen genauso wie für die
 alten.
+
+---
+
+## Durchgang 3 — 2026-09-02 (UX-Schicht: Aufgabenmodell, Rollenschnitt, Screen-Inventar)
+
+**Auslöser:** Die Frage des Autors, wie die Anforderungen als Oberfläche aussehen sollen — was ein
+Bewohner sieht, was der Moderator zusätzlich tut, und wie beim Öffnen der App ohne Navigieren klar
+wird, was gerade ansteht. Damit ist genau die Lücke adressiert, die Durchgang 1 unter 🎨 Design
+als bewusst abgewählt vermerkt hatte.
+
+**Stand dieses Eintrags:** Er dokumentiert **Entscheidungen und Befunde**, nicht abgeschlossene
+Dateiänderungen. Die Umsetzung läuft parallel in vier Sitzungen (Screen-Inventar, SRD, PRD,
+Domänenmodell); ihre Ergebnisse werden hier nachgetragen. Diese Trennung ist Absicht — ein
+Review-Log, das Vorhaben als Vollzug verbucht, ist wertlos.
+
+### Was maschinell geprüft wurde
+
+| Prüfung | Befund |
+|---|---|
+| **Versionszeilen gegen Dateiinhalt** | ❌ **Das Spec-Update vom 02.09. hat ~1600 Zeilen geändert, fünf Scope-Zeilen und drei Entitäten ergänzt — und keine einzige Versionszeile mitgezogen.** `02-SRD` steht auf V0.4, `03-PRD` auf V0.5, `04-Domaenenmodell` auf V0.3, alle datiert 19.08. Die Revisionshistorie des PRD endet bei V0.5 und kennt die September-Änderungen nicht |
+| Höchste vergebene Scope-Nummer | ❌ Die UX-Planung wollte S-42…S-45 vergeben — sämtlich belegt (S-42 Einladungstoken, S-44 Rundenfrist, S-45 PWA-Hinweis, S-46 Notiz-Erinnerung). Korrigiert auf **S-47…S-51**, bevor etwas geschrieben wurde |
+| `phase_deadline_at` gegen den Phasenbegriff | ❌ Das neue Feld heißt „Frist der aktuellen **Rundenphase**". Eine Rundenphase ist aber kein Zustand: `CastingRound.status` kennt nur `draft/open/paused/closed/archived`, und `phase_hint` ist ausdrücklich „abgeleitet, nicht gespeichert" — **ohne Berechnungsregel**. Ein Datenfeld hängt damit an einem Begriff, den kein Dokument definiert |
+| CTA-Sortierung: wer definiert sie? | ❌ **Drei** Scope-Zeilen speisen sie (S-44 Rundenfrist, S-45 PWA-Hinweis, S-46 Notiz-Erinnerung), **keine** definiert sie. „Speist die CTA-Sortierung im Dashboard" steht dreimal da, die Sortierung selbst nirgends |
+| PWA-Hinweis in der Aufgabensortierung | ❌ Das Domänenmodell ordnet den Install-Hinweis „weiter oben ein, aus demselben Grund wie eine näher rückende Rundenfrist". **Als Fehler bestätigt:** Er ist keine Aufgabe im Castingprozess, wird nie erledigt und würde, weil er bis zur Installation wiederkehrt, echte Aufgaben dauerhaft verdrängen |
+| Absage einzelner Personen zu einem Termin | ❌ **Nicht modelliert.** `Appointment.status` kennt `cancelled` und `no_show`, gilt aber für den ganzen Termin. `expected_attendee_profile_ids` trägt nur die Absicht. Damit hat die kurzfristige Absage einer einzelnen Person weder Feld noch Weg — und S-46 schickt die Notiz-Erinnerung an die Falschen |
+| `join_code`-Auflagen | ❌ Weiterhin nur Rotation. **Kein Ablauf, keine Nutzungsgrenze** — obwohl S-03 die E-Mail-Pflicht beim Beitritt gestrichen hat und der Link damit die einzige verbleibende Zugangskontrolle ist |
+| Anmeldekennung ohne E-Mail | ❌ `Account.email` ist korrekt auf `text?` umgestellt (Pflicht beim Admin-Account, nullable bei Resident-Accounts). **Womit sich ein Resident-Account dann anmeldet, steht nirgends** |
+| Rechteableitung | 🟡 Kein Defekt im Modell — `Membership.role`/`permissions` tragen die Rechte korrekt. Aber die Verwechslungsgefahr mit `Session.acting_profile_id = null` ist real genug, dass daraus ein geschützter Test wird |
+
+### Was entschieden wurde
+
+Vollständig als U-1…U-26 im Plan. Die sechs Festlegungen, die die Dokumente wirklich verändern:
+
+| # | Entscheidung | Warum |
+|---|---|---|
+| **Aufgabenmodell mit Vorrangregel** (S-48) | Der Rundenkopf hat bisher **einen** Handlungsaufruf. Stimmen laufen aber pro Bewerbung (`Vote.stage`), also können Runde-1-Stimmen, Runde-2-Stimmen, Verfügbarkeit, Slot-Reaktionen und Notizen gleichzeitig offen sein | Sortiert wird nach **Zeitdruck** mit genanntem Grund („Termin morgen 17:00"), nicht nach fester Liste. S-44 liefert dafür das Datum |
+| **Kein Feinschliff-Bildschirm** (S-47) | Durchgang 1 führte ihn als 🔴 „einzige wirklich neue Interaktion, ohne Gestaltungsspezifikation" | Statt die Lücke zu füllen, entfällt sie: ein zweiter kurzer Durchlauf im bereits gelernten Kartenmuster. Der Bewohner lernt keine zweite Bedienweise. **E-08 bleibt gültig** — seine Begründung trägt beide Formen |
+| **Verwaltung erreicht keine Castings** (S-50) | Heute darf der Haushalts-Account Bewerbungen anlegen, Status ändern, Termine bestätigen und löschen — protokolliert als „Verwaltung", also ohne Person | Danach trägt jede Casting-Handlung einen Namen. **Ausdrücklich keine Härtung:** E-03 bleibt gültig, wer die Zugangsdaten kennt, legt sich ein Profil an. Was sich ändert, ist Zurechenbarkeit, nicht Zugriffsschutz. Ausnahmen: Aufbewahrung und Datenauskunft-Export |
+| **Anwesenheit wird angenommen, nicht erfasst** (S-51) | Das Modell legt das Setzen von `attended` bei der moderierenden Person ab — nach jedem Termin, für jede Person | Erzeugt genau den Organisationsaufwand, den das Produkt senken soll (PB-2). Umgekehrt: `attended` startet auf `true`, wer verhindert ist, sagt selbst ab, die Moderation korrigiert nur Ausnahmen |
+| **Zwei Listen statt einer** | Bewohnerliste war Duplikatsschutz *und* Verwaltungswerkzeug in einem | Getrennt in Teilnehmendenliste (alle, nur Namen) und Bewohnerliste (Verwaltung voll, Moderator lesend). **Mit einer Folge, die benannt gehört:** von E-06s vier strukturellen Schutzmechanismen fallen damit zwei weg, und S-49 wird von einer Verbesserung zur Voraussetzung |
+| **Rahmenwerk: zwei Tabs statt fünf** | Die Navigation (Runde · Bewerbungen · Termine · Feed · Ich) ist das mentale Modell des *Moderators*; ein Bewohner muss erst entscheiden, wo er nachsieht | Start · Casting, Kopfzeile mit Glocke und Avatar. Organisation liegt hinter dem Avatar-Menü oder einer CTA aus der Benachrichtigung |
+
+### Eine Regel, die zu weit ausgelegt worden war
+
+Die UX-Planung hatte gefordert, Oberflächentexte müssten „beschreibend, nie empfehlend" sein, und
+sich dafür auf **P-5** berufen. Das ist falsch: P-5 verbietet, dass **KI** Bewertungen, Rankings
+oder Empfehlungen über Personen erzeugt. Die Anwendung rankt ohnehin — Score und Rangliste sind
+E-07 und S-12, zulässig, weil sie menschliche Stimmen nach offengelegten Regeln zusammenrechnen.
+Ein von Hand geschriebener Oberflächensatz ist gar keine KI-Ausgabe.
+
+Die Grenze verläuft stattdessen zwischen **Prozess** und **Person**: „Alle haben abgestimmt — ihr
+könnt jetzt entscheiden, wen ihr einladet" ist zulässig, „drei vielversprechende Kandidaten" nicht.
+Dazu zwei Auflagen: nachrechenbar per Tippen (P-3), und **nur Schwellen zitieren, die es wirklich
+gibt**. Der zwischenzeitlich erwogene Satz „bereit für die Einladung" ist daran gescheitert — er
+hätte eine Eignungsschwelle vorausgesetzt, die `HouseholdSettings` nicht kennt und die auch nicht
+erfunden wird.
+
+Der Befund ist derselbe wie in Durchgang 1 bei den Feldnamen, nur andersherum: **Eine Regel aus
+dem Gedächtnis zu verschärfen ist so fehleranfällig wie sie zu vergessen.** Vor dem Ableiten einer
+Einschränkung gehört der Wortlaut zitiert.
+
+### Sprache: eine Zielgruppe, die im Dokument fehlte
+
+Bisher regelte die Kette die Sprache nur auf Bezeichnerebene (ADR-012: Dokument deutsch,
+Bezeichner englisch). Nicht geregelt war, dass die **Oberfläche** für junge Mitbewohnende ohne
+Vorwissen und ohne Einarbeitung lesbar sein muss. „Quorum", „Stage", „Feasibility" und „Score"
+stehen im Modell zu Recht — auf einem Bildschirm haben sie nichts verloren. Als
+Übersetzungstabelle im Screen-Inventar verankert, gültig für die gesamte Oberfläche.
+
+### Die drei Design-Lücken
+
+| Lücke aus Durchgang 1 | Stand |
+|---|---|
+| ⚠️ Kein Screen-Inventar | ✅ **Geschlossen** — `07-Screen-Inventar.md` V0.1, 41 Bildschirme, vier Pflichtzustände je Bildschirm, §13 Abweichungsliste AW-1…AW-13 |
+| 🔴 Feinschliff-Screen ohne Gestaltung | ✅ **Geschlossen, aber anders als erwartet** — nicht durch eine Gestaltungsspezifikation, sondern durch **Wegfall der Interaktion** (S-47, §9 des Inventars). Ein zweiter kurzer Durchlauf im bereits gelernten Kartenmuster ersetzt den eigenen Bildschirm; damit lernt niemand eine zweite Bedienweise. **E-08 bleibt gültig** |
+| ⚠️ Onboarding beim Erstbeitritt | ✅ **Geschlossen** — zwei Pflichtfelder (Name, Passwort), „angemeldet bleiben" vorbelegt, E-Mail später mit dem ehrlichen Pitch „Zugang wiederherstellen". Die Absicherung wandert auf die **Teilen-Seite** des Einladungslinks (S-49), damit sie dem Beitretenden nicht im Weg steht |
+
+Die vier Dokumente stehen: `02-SRD.md` **V0.5** · `03-PRD.md` **V0.6** ·
+`04-Domaenenmodell.md` **V0.4** · `07-Screen-Inventar.md` **V0.1**. Die Konsistenzprüfung über
+alle vier ist durchgeführt und in `Session-Sprint-Log.md` §4a protokolliert.
+
+### Ergebnis
+
+Sechs Defekte gefunden, von denen fünf ohne diesen Durchgang unbemerkt geblieben wären: die
+stehengebliebenen Versionszeilen, der undefinierte Phasenbegriff unter `phase_deadline_at`, die
+dreifach referenzierte aber nirgends definierte CTA-Sortierung, der PWA-Hinweis in der
+Aufgabenliste und die fehlende Einzelabsage zu einem Termin.
+
+**Das wiederkehrende Muster ist dasselbe wie in Durchgang 1 und 2, nur an neuer Stelle:** Ein
+Dokument beschreibt, dass etwas „gespeist" oder „mitgezogen" wird, ohne dass irgendwo steht,
+wovon. Drei Scope-Zeilen konnten auf eine Sortierung verweisen, die es nicht gab, weil ein
+Verweis auf eine nicht existierende Regel niemanden stört — bis sie gebaut werden soll.
+
+**Und die Schwesterform dieses Musters ist in diesem Durchgang dreimal aufgetreten** — eine Regel
+wird beschlossen, an ihrer Hauptstelle korrekt angewandt und dann nicht bis zur letzten
+Anwendungsstelle durchgezogen:
+
+| Wo | Was stehenblieb | Gefunden von |
+|---|---|---|
+| Plan, Verifikationsliste | „Entfernen steht allen Bewohnenden offen" nach dem Beschluss U-22 | der PRD-Sitzung beim ersten Lesen |
+| `02-SRD.md` §6/§8.2/§10 | drei „Feinschliff"-Reste nach dem Beschluss, den Bildschirm abzuschaffen | der SRD-Sitzung selbst |
+| `07-Screen-Inventar.md` | sieben Bildschirme ohne Pflicht-Leerzustand, obwohl drei andere im selben Dokument das Muster zeigten | der Screen-Inventar-Sitzung bei gezielter Gegenprobe |
+| `04-Domaenenmodell.md` §9 | **Querprüfungsliste seit dem Spec-Update tot** — drei Entitäten fehlten ganz, sieben Feldzeilen, Summe 52 statt 59, Nenner 20 statt 23 | der Domänenmodell-Sitzung |
+| `04-Domaenenmodell.md` `Membership.revoked_at` | „jedes Mitglied kann entfernen" nach dem Beschluss U-22 — derselbe Rest wie im Plan | ebenda |
+| `02-SRD.md` S-10 | Revidierbarkeit von Stimmen noch an „Rundenphase" gebunden — nachdem der Begriff als **nicht sperrende Anzeige** definiert wurde, band das eine Regel an eine Anzeige | der Konsistenzprüfung am Ende |
+| `07-Screen-Inventar.md` AW-7 **und** §15 | falsche Dateiangabe für E-06 — an **zwei** Stellen, die zweite fiel erst beim Korrigieren der ersten auf | ebenda |
+
+**Alle sieben wurden beim Gegenprüfen gefunden, keiner beim Schreiben.** Das ist der eigentliche
+Befund: In jedem Fall war die Regel bekannt, richtig formuliert und an ihrer Hauptstelle korrekt
+umgesetzt — es fehlte die Vollprüfung über alle Anwendungsstellen. Sorgfalt adressiert das nicht.
+
+**Der §9-Fall verdient eine eigene Bemerkung, weil er diesen Log widerlegt.** Durchgang 1 hatte
+denselben Defekt an derselben Liste bereits zweimal notiert und daraus geschlossen: *„die
+Feldtabellen sind maßgeblich, nicht die Summe"* — und weiter, dass genau das *„das stärkste
+Argument für ADR-010"* sei. Der Schluss war richtig, ADR-010 wurde beschlossen, und der Defekt
+ist trotzdem ein drittes Mal aufgetreten, diesmal mit drei komplett fehlenden Entitäten.
+
+Der Grund ist, dass ADR-010 die falsche Hälfte absichert: Es macht `data-inventory.yml` zum
+CI-Gate, während **§9 eine von Hand gepflegte Zweitschrift derselben Information in Prosa** ist.
+Damit ist §9 genau das, was Durchgang 2 als Fehlerquelle benannt hat — eine Redundanz, also „ein
+zusätzlicher Ort, an dem eine Änderung vergessen werden kann". **Empfehlung: §9 aus
+`data-inventory.yml` generieren oder streichen.** Von Hand gepflegt veraltet die Liste ein viertes
+Mal; dass es diesmal auffiel, lag allein daran, dass eine Sitzung ohnehin jede Entität durchgehen
+musste.
+
+Der Gegenvorschlag steht in `Session-Sprint-Log.md` §4: **drei** kleine CI-Prüfungen —
+Versionszeilen gegen den letzten inhaltlichen Commit, Scope-Nummern gegen ihre Verweise, und die
+vier Pflichtzustände je Bildschirm im Screen-Inventar. Nach demselben Argument, das Durchgang 1
+für ADR-010 gemacht hat: eine Zusicherung ohne Mechanismus hält nicht.
