@@ -26,10 +26,7 @@
 > **Projekttyp:** Cross-Page-Flow · Nutzergruppen-Differenzierung · phasiertes Rollout
 
 > **Nummerierungshinweis.** Diese Kette folgt der logischen Reihenfolge
-> **Problem Framing → SRD → PRD**: `01` → `02-SRD.md` → `03-PRD.md`. Das weicht bewusst von
-> `Ideas/Notella/` ab (dort PRD `02`, SRD `03`). Dieses Dokument **wiederholt die
-> Argumentation nicht** — es verweist auf die Scope-Zeilen S-01…S-51 aus `02-SRD.md` §5.3
-> und die Rahmenentscheidungen E-01…E-27 aus `01-Problem-Framing.md`.
+> **Problem Framing → SRD → PRD**: `01` → `02-SRD.md` → `03-PRD.md`.
 
 > **Sprachregelung.** Dokument deutsch, alle Bezeichner, Schema-, Feld- und Zustandsnamen
 > englisch (ADR-012). UI-Label für `Household` ist in v1 durchgängig **„WG"** (E-02).
