@@ -1,0 +1,766 @@
+<title>How to Fill the Themes Board</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;800&family=IBM+Plex+Mono:wght@400;600&family=Public+Sans:ital,wght@0,400;0,600;1,400&display=swap">
+
+<style>
+  :root {
+    --ground:        #F5F2FC;
+    --panel:         #FFFFFF;
+    --panel-edge:    #E2DAF4;
+    --ink:           #231B38;
+    --ink-soft:      #574D74;
+    --ink-mute:      #7C7396;
+    --rule:          #DDD5F0;
+
+    --t1: #4F46B8;
+    --t2: #6B57DE;
+    --t3: #9333C6;
+    --t4: #B32FA6;
+    --t5: #C94A78;
+
+    --frame-ink:     #FFFFFF;
+    --frame-ink-dim: rgba(255,255,255,.74);
+    --chip-bg:       rgba(0,0,0,.24);
+
+    --sticky:        #FFFFFF;
+    --sticky-ink:    #241C39;
+    --sticky-mute:   #6F6689;
+    --sticky-gloss:  #554C71;
+    --sticky-edge:   rgba(0,0,0,.10);
+
+    --note:          #FCF0A6;
+    --note-ink:      #4A3D08;
+    --note-edge:     #E4D276;
+
+    --yes:           #1E7A5A;
+    --no:            #A33055;
+    --yes-bg:        #E2F3EC;
+    --no-bg:         #FBE6EC;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground:      #17122A;
+      --panel:       #1F1938;
+      --panel-edge:  #322A52;
+      --ink:         #F0EBFB;
+      --ink-soft:    #C3BADD;
+      --ink-mute:    #9187B0;
+      --rule:        #322A52;
+
+      --t1: #5D54C9;
+      --t2: #7A66E8;
+      --t3: #A247D4;
+      --t4: #C242B4;
+      --t5: #D45C87;
+
+      --sticky:      #2B2448;
+      --sticky-ink:  #F2EEFC;
+      --sticky-mute: #A79CC6;
+      --sticky-gloss:#BDB3D6;
+      --sticky-edge: rgba(255,255,255,.10);
+
+      --note:        #4A4118;
+      --note-ink:    #FBEEA8;
+      --note-edge:   #6E6026;
+
+      --yes:         #6FD8AE;
+      --no:          #F38DAE;
+      --yes-bg:      #1B3A30;
+      --no-bg:       #3B1E2B;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --ground:      #17122A;
+    --panel:       #1F1938;
+    --panel-edge:  #322A52;
+    --ink:         #F0EBFB;
+    --ink-soft:    #C3BADD;
+    --ink-mute:    #9187B0;
+    --rule:        #322A52;
+
+    --t1: #5D54C9;
+    --t2: #7A66E8;
+    --t3: #A247D4;
+    --t4: #C242B4;
+    --t5: #D45C87;
+
+    --sticky:      #2B2448;
+    --sticky-ink:  #F2EEFC;
+    --sticky-mute: #A79CC6;
+    --sticky-gloss:#BDB3D6;
+    --sticky-edge: rgba(255,255,255,.10);
+
+    --note:        #4A4118;
+    --note-ink:    #FBEEA8;
+    --note-edge:   #6E6026;
+
+    --yes:         #6FD8AE;
+    --no:          #F38DAE;
+    --yes-bg:      #1B3A30;
+    --no-bg:       #3B1E2B;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: "Public Sans", ui-sans-serif, system-ui, "Segoe UI", sans-serif;
+    font-size: 15px;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 40px 24px 72px;
+    display: flex;
+    flex-direction: column;
+    gap: 40px;
+  }
+
+  /* ---------- masthead ---------- */
+
+  .masthead { display: flex; flex-direction: column; gap: 14px; }
+
+  .eyebrow {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 11.5px;
+    font-weight: 600;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    color: var(--ink-mute);
+  }
+
+  h1 {
+    margin: 0;
+    font-family: "Archivo", ui-sans-serif, system-ui, sans-serif;
+    font-weight: 800;
+    font-size: clamp(30px, 5vw, 46px);
+    line-height: 1.02;
+    letter-spacing: -.022em;
+    text-wrap: balance;
+  }
+
+  .standfirst {
+    margin: 0;
+    max-width: 62ch;
+    font-size: 17px;
+    color: var(--ink-soft);
+  }
+
+  .standfirst strong { color: var(--ink); font-weight: 600; }
+
+  /* ---------- the three moves ---------- */
+
+  .moves {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 2px;
+    background: var(--rule);
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+
+  .move {
+    background: var(--panel);
+    padding: 20px 22px 22px;
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+  }
+
+  .move-n {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--t3);
+    letter-spacing: .06em;
+  }
+
+  .move h3 {
+    margin: 0;
+    font-family: "Archivo", sans-serif;
+    font-size: 16px;
+    font-weight: 600;
+    letter-spacing: -.008em;
+  }
+
+  .move p { margin: 0; font-size: 14px; color: var(--ink-soft); }
+
+  /* ---------- board ---------- */
+
+  .board-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 12px 18px;
+    padding-bottom: 14px;
+    border-bottom: 2px solid var(--ink);
+  }
+
+  .board-head h2 {
+    margin: 0;
+    font-family: "Archivo", sans-serif;
+    font-weight: 800;
+    font-size: 22px;
+    letter-spacing: -.015em;
+  }
+
+  .board-head .meta {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 12px;
+    color: var(--ink-mute);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .scroller { overflow-x: auto; padding-bottom: 8px; }
+
+  .board {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(232px, 1fr));
+    gap: 14px;
+    min-width: 1160px;
+    align-items: stretch;
+  }
+
+  .col {
+    border-radius: 14px;
+    padding: 14px 14px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .col-1 { background: var(--t1); }
+  .col-2 { background: var(--t2); }
+  .col-3 { background: var(--t3); }
+  .col-4 { background: var(--t4); }
+  .col-5 { background: var(--t5); }
+
+  .col-head { display: flex; flex-direction: column; gap: 8px; }
+
+  .chip {
+    align-self: flex-start;
+    background: var(--chip-bg);
+    color: var(--frame-ink);
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    padding: 4px 9px;
+    border-radius: 4px;
+  }
+
+  .col-head h3 {
+    margin: 0;
+    color: var(--frame-ink);
+    font-family: "Archivo", sans-serif;
+    font-weight: 600;
+    font-size: 16.5px;
+    line-height: 1.22;
+    letter-spacing: -.01em;
+    text-wrap: balance;
+    min-height: 3.66em;
+  }
+
+  .col-sub {
+    color: var(--frame-ink-dim);
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .stickies { display: flex; flex-direction: column; gap: 10px; }
+
+  .sticky {
+    background: var(--sticky);
+    color: var(--sticky-ink);
+    border: 1px solid var(--sticky-edge);
+    border-radius: 3px;
+    padding: 11px 12px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    box-shadow: 0 2px 5px rgba(20,10,45,.14);
+  }
+
+  .sticky-id {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 10.5px;
+    font-weight: 600;
+    color: var(--sticky-mute);
+    letter-spacing: .05em;
+  }
+
+  .sticky-title {
+    font-family: "Archivo", sans-serif;
+    font-size: 14.5px;
+    font-weight: 600;
+    line-height: 1.28;
+    letter-spacing: -.008em;
+  }
+
+  .sticky-gloss {
+    font-size: 12.5px;
+    line-height: 1.42;
+    color: var(--sticky-gloss);
+  }
+
+  .sticky-foot {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 8px;
+    margin-top: 2px;
+    padding-top: 7px;
+    border-top: 1px dashed var(--sticky-edge);
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 10.5px;
+    color: var(--sticky-mute);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .col-add {
+    border: 2px dashed var(--frame-ink-dim);
+    border-radius: 3px;
+    padding: 10px 12px;
+    color: var(--frame-ink-dim);
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 11px;
+    line-height: 1.45;
+  }
+
+  /* ---------- annotation ---------- */
+
+  .annotations {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 18px;
+  }
+
+  .note {
+    background: var(--note);
+    color: var(--note-ink);
+    border: 1px solid var(--note-edge);
+    border-radius: 2px;
+    padding: 16px 18px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    box-shadow: 0 3px 10px rgba(20,10,45,.12);
+  }
+
+  .note h4 {
+    margin: 0;
+    font-family: "Archivo", sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: .01em;
+  }
+
+  .note p { margin: 0; font-size: 13.5px; line-height: 1.5; }
+  .note em { font-style: normal; font-weight: 600; }
+
+  /* ---------- naming rule ---------- */
+
+  .rule-panel {
+    background: var(--panel);
+    border: 1px solid var(--panel-edge);
+    border-radius: 4px;
+    padding: 26px 26px 28px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .rule-panel h2 {
+    margin: 0;
+    font-family: "Archivo", sans-serif;
+    font-weight: 800;
+    font-size: 20px;
+    letter-spacing: -.015em;
+  }
+
+  .swaps { display: flex; flex-direction: column; gap: 2px; background: var(--rule); border: 1px solid var(--rule); border-radius: 3px; overflow: hidden; }
+
+  .swap {
+    background: var(--panel);
+    display: grid;
+    grid-template-columns: minmax(0,1fr) auto minmax(0,1fr);
+    align-items: center;
+    gap: 14px;
+    padding: 13px 16px;
+  }
+
+  .swap .was { color: var(--no); font-size: 14px; text-decoration: line-through; text-decoration-thickness: 1px; }
+  .swap .arrow { font-family: "IBM Plex Mono", monospace; font-size: 13px; color: var(--ink-mute); }
+  .swap .now { font-family: "Archivo", sans-serif; font-weight: 600; font-size: 14.5px; color: var(--ink); }
+
+  .tests { display: flex; flex-direction: column; gap: 10px; }
+  .tests li { font-size: 14px; color: var(--ink-soft); }
+  .tests ol { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; }
+  .tests li strong { color: var(--ink); }
+
+  /* ---------- sticky test ---------- */
+
+  .test {
+    background: var(--panel);
+    border: 1px solid var(--panel-edge);
+    border-radius: 4px;
+    padding: 26px 26px 28px;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+  }
+
+  .test h2 {
+    margin: 0;
+    font-family: "Archivo", sans-serif;
+    font-weight: 800;
+    font-size: 20px;
+    letter-spacing: -.015em;
+  }
+
+  .test-cols {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 22px;
+  }
+
+  .test-col { display: flex; flex-direction: column; gap: 10px; }
+
+  .test-label {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    padding: 4px 9px;
+    border-radius: 3px;
+    align-self: flex-start;
+  }
+
+  .test-label.on  { color: var(--yes); background: var(--yes-bg); }
+  .test-label.off { color: var(--no);  background: var(--no-bg); }
+
+  .test-col ul { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 7px; }
+  .test-col li { font-size: 14px; color: var(--ink-soft); }
+  .test-col li em { font-style: normal; color: var(--ink); font-weight: 600; }
+
+  /* ---------- footer ---------- */
+
+  .colophon {
+    border-top: 1px solid var(--rule);
+    padding-top: 18px;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 11.5px;
+    line-height: 1.7;
+    color: var(--ink-mute);
+  }
+
+  @media (max-width: 720px) {
+    .swap { grid-template-columns: 1fr; gap: 5px; }
+    .swap .arrow { display: none; }
+  }
+
+  @media (max-width: 640px) {
+    .wrap { padding: 28px 16px 56px; gap: 32px; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; }
+  }
+</style>
+
+<div class="wrap">
+
+  <header class="masthead">
+    <div class="eyebrow">Flatmate.io &middot; Exercise 10 &middot; Board 2 reference</div>
+    <h1>How to Fill the Themes Board</h1>
+    <p class="standfirst">
+      One column is <strong>one User Activity</strong> from the story map. One sticky inside it is
+      <strong>one Epic</strong>. That is the whole rule &mdash; the board is just the story map's top two
+      rows, stood upright. Every epic gets a name that works alone on a wall, plus one line underneath
+      so nobody has to open the map to know what it means.
+    </p>
+  </header>
+
+  <section class="moves" aria-label="How to fill the board">
+    <div class="move">
+      <div class="move-n">MOVE 1</div>
+      <h3>Copy the backbone across</h3>
+      <p>The five activities become the five columns, left to right, in journey order. Do not rename
+        them here &mdash; if a name is wrong, fix it in the story map first.</p>
+    </div>
+    <div class="move">
+      <div class="move-n">MOVE 2</div>
+      <h3>Drop the epics in as stickies</h3>
+      <p>Each activity has up to three epics. Name, then one line of plain English. Fifteen stickies
+        total, three per column.</p>
+    </div>
+    <div class="move">
+      <div class="move-n">MOVE 3</div>
+      <h3>Leave the 100 stories off</h3>
+      <p>Stories stay in the story map. This board exists to be readable across a room, and 100
+        stickies is not readable across a room.</p>
+    </div>
+  </section>
+
+  <section aria-labelledby="board-title">
+    <div class="board-head">
+      <h2 id="board-title">2. Feature Themes / Epics &mdash; filled out</h2>
+      <span class="meta">5 columns &middot; 15 stickies &middot; 100 stories held back</span>
+    </div>
+
+    <div class="scroller">
+      <div class="board">
+
+        <div class="col col-1">
+          <div class="col-head">
+            <span class="chip">Theme / Epic 1</span>
+            <h3>Join the round and know what is on me</h3>
+            <span class="col-sub">3 epics &middot; 20 stories</span>
+          </div>
+          <div class="stickies">
+            <div class="sticky">
+              <div class="sticky-id">EPIC 1.1</div>
+              <div class="sticky-title">Link to first vote in one minute</div>
+              <div class="sticky-gloss">One link, a name, a password. No email, no install, no waiting.</div>
+              <div class="sticky-foot"><span>6 stories</span><span>S-03 &middot; S-45 &middot; S-49</span></div>
+            </div>
+            <div class="sticky">
+              <div class="sticky-id">EPIC 1.2</div>
+              <div class="sticky-title">What is next, and who is waiting on me</div>
+              <div class="sticky-gloss">One task at the top with the reason beside it: &ldquo;4 others are waiting on your note.&rdquo;</div>
+              <div class="sticky-foot"><span>9 stories</span><span>S-48 &middot; S-44 &middot; S-29</span></div>
+            </div>
+            <div class="sticky">
+              <div class="sticky-id">EPIC 1.3</div>
+              <div class="sticky-title">What happened while I was away</div>
+              <div class="sticky-gloss">One feed and one digest, instead of piecing it together from the WhatsApp history.</div>
+              <div class="sticky-foot"><span>5 stories</span><span>S-27 &middot; S-28 &middot; S-31</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="col col-2">
+          <div class="col-head">
+            <span class="chip">Theme / Epic 2</span>
+            <h3>Get every application into one place</h3>
+            <span class="col-sub">3 epics &middot; 18 stories</span>
+          </div>
+          <div class="stickies">
+            <div class="sticky">
+              <div class="sticky-id">EPIC 2.1</div>
+              <div class="sticky-title">Open a round: which rooms, by when, who votes</div>
+              <div class="sticky-gloss">Three rooms, a soft deadline that nudges but never blocks, and a snapshot of voters taken at the start.</div>
+              <div class="sticky-foot"><span>6 stories</span><span>S-06 &middot; S-07 &middot; S-44</span></div>
+            </div>
+            <div class="sticky">
+              <div class="sticky-id">EPIC 2.2</div>
+              <div class="sticky-title">Paste it or type it, same card either way</div>
+              <div class="sticky-gloss">WhatsApp, email, portal or spoken at the door. One record, however it arrived.</div>
+              <div class="sticky-foot"><span>6 stories</span><span>S-08 &middot; S-40</span></div>
+            </div>
+            <div class="sticky">
+              <div class="sticky-id">EPIC 2.3</div>
+              <div class="sticky-title">Know where the data came from</div>
+              <div class="sticky-gloss">Applicant or third party, the notice duty that follows, and an export when they ask.</div>
+              <div class="sticky-foot"><span>6 stories</span><span>S-38 &middot; S-39 &middot; S-34</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="col col-3">
+          <div class="col-head">
+            <span class="chip">Theme / Epic 3</span>
+            <h3>Pick who we invite</h3>
+            <span class="col-sub">3 epics &middot; 18 stories</span>
+          </div>
+          <div class="stickies">
+            <div class="sticky">
+              <div class="sticky-id">EPIC 3.1</div>
+              <div class="sticky-title">Card by card, four ratings, two minutes</div>
+              <div class="sticky-gloss">No &middot; Rather not &middot; Like &middot; Must have &mdash; one rating per applicant. What each is worth is shown before you use it.</div>
+              <div class="sticky-foot"><span>6 stories</span><span>S-09 &middot; S-10</span></div>
+            </div>
+            <div class="sticky">
+              <div class="sticky-id">EPIC 3.2</div>
+              <div class="sticky-title">Too many &ldquo;must haves&rdquo; get a second pass</div>
+              <div class="sticky-gloss">Only your own must-have cards, same deck, skippable, never a forced downgrade.</div>
+              <div class="sticky-foot"><span>4 stories</span><span>S-11 &middot; S-47</span></div>
+            </div>
+            <div class="sticky">
+              <div class="sticky-id">EPIC 3.3</div>
+              <div class="sticky-title">A ranking I can check, an invite I can send</div>
+              <div class="sticky-gloss">A score you can recompute, under-quorum candidates kept separate, a ready text to paste.</div>
+              <div class="sticky-foot"><span>8 stories</span><span>S-12 &middot; S-13 &middot; S-14 &middot; S-16</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="col col-4">
+          <div class="col-head">
+            <span class="chip">Theme / Epic 4</span>
+            <h3>Get everyone to the casting, and everyone informed</h3>
+            <span class="col-sub">3 epics &middot; 21 stories</span>
+          </div>
+          <div class="stickies">
+            <div class="sticky">
+              <div class="sticky-id">EPIC 4.1</div>
+              <div class="sticky-title">&ldquo;Tuesdays from 16:00&rdquo; becomes a real time window</div>
+              <div class="sticky-gloss">Grid or plain text &mdash; plain text always confirmed by a human before it is saved.</div>
+              <div class="sticky-foot"><span>5 stories</span><span>S-17</span></div>
+            </div>
+            <div class="sticky">
+              <div class="sticky-id">EPIC 4.2</div>
+              <div class="sticky-title">&ldquo;Tue 17:00 &mdash; 5 of 7 can make it&rdquo;</div>
+              <div class="sticky-gloss">A heatmap, impossible slots greyed out, and a computed proposal that shows its working.</div>
+              <div class="sticky-foot"><span>8 stories</span><span>S-18 &middot; S-19 &middot; S-20 &middot; S-21</span></div>
+            </div>
+            <div class="sticky">
+              <div class="sticky-id">EPIC 4.3</div>
+              <div class="sticky-title">Lock the date, then tell the ones who were not there</div>
+              <div class="sticky-gloss">Confirm the slot, then a prompted note so the absentees can still decide.</div>
+              <div class="sticky-foot"><span>8 stories</span><span>S-51 &middot; S-22 &middot; S-46</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="col col-5">
+          <div class="col-head">
+            <span class="chip">Theme / Epic 5 &mdash; added</span>
+            <h3>Decide, offer, and welcome the new flatmate</h3>
+            <span class="col-sub">3 epics &middot; 23 stories</span>
+          </div>
+          <div class="stickies">
+            <div class="sticky">
+              <div class="sticky-id">EPIC 5.1</div>
+              <div class="sticky-title">Round two, with a veto that ranks instead of deletes</div>
+              <div class="sticky-gloss">The same four ratings after meeting them. One strong no, with a reason, that does not block the group.</div>
+              <div class="sticky-foot"><span>7 stories</span><span>S-23 &middot; S-24</span></div>
+            </div>
+            <div class="sticky">
+              <div class="sticky-id">EPIC 5.2</div>
+              <div class="sticky-title">Make the offer, and survive a no after a yes</div>
+              <div class="sticky-gloss">Room and move-in date recorded, a ready copy-paste text for the offer, a status you can take back.</div>
+              <div class="sticky-foot"><span>7 stories</span><span>S-25 &middot; S-15 &middot; S-26</span></div>
+            </div>
+            <div class="sticky">
+              <div class="sticky-id">EPIC 5.3</div>
+              <div class="sticky-title">People come and go, the round does not leak</div>
+              <div class="sticky-gloss">Self-redaction from day one for the person arriving, a clean exit for the person leaving, and votes that still count either way.</div>
+              <div class="sticky-foot"><span>9 stories</span><span>S-42 &middot; S-31 &middot; S-27</span></div>
+            </div>
+          </div>
+          <div class="col-add">
+            The template ships with four columns. Duplicate one to get this fifth &mdash; the journey
+            does not reach move-in without it.
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <section class="rule-panel">
+    <h2>Why these names, and not the first ones</h2>
+
+    <div class="swaps">
+      <div class="swap">
+        <span class="was">See what is expected of me right now</span>
+        <span class="arrow">&rarr;</span>
+        <span class="now">What is next, and who is waiting on me</span>
+      </div>
+      <div class="swap">
+        <span class="was">Get in without friction</span>
+        <span class="arrow">&rarr;</span>
+        <span class="now">Link to first vote in one minute</span>
+      </div>
+      <div class="swap">
+        <span class="was">Land on a time we can all live with</span>
+        <span class="arrow">&rarr;</span>
+        <span class="now">&ldquo;Tue 17:00 &mdash; 5 of 7 can make it&rdquo;</span>
+      </div>
+      <div class="swap">
+        <span class="was">Welcome them without them reading about themselves</span>
+        <span class="arrow">&rarr;</span>
+        <span class="now">People come and go, the round does not leak</span>
+      </div>
+    </div>
+
+    <div class="tests">
+      <ol>
+        <li><strong>Does it name a thing, not a feeling?</strong> &ldquo;See what is expected of me right
+          now&rdquo; describes a mood. &ldquo;What is next, and who is waiting on me&rdquo; describes the
+          screen you would actually build.</li>
+        <li><strong>Could it be a screen name?</strong> Then it is too technical. &ldquo;Ranking
+          page&rdquo; fails; &ldquo;A ranking I can check, an invite I can send&rdquo; passes, because it
+          names the outcome rather than the page.</li>
+        <li><strong>Could it be a single story?</strong> Then it is too small. The gloss line carries the
+          detail so the name doesn't have to.</li>
+      </ol>
+      <p style="margin:0;font-size:14px;color:var(--ink-soft)">Where the product already has a good
+        phrase, use it verbatim. &ldquo;Tue 17:00 &mdash; 5 of 7 can make it&rdquo; is lifted straight from
+        <strong>02-SRD.md</strong> S-20, and it explains the whole epic faster than any paraphrase.</p>
+    </div>
+  </section>
+
+  <section class="annotations" aria-label="Facilitator notes">
+    <div class="note">
+      <h4>Why columns are activities, not epics</h4>
+      <p>Putting all fifteen epics across the top gives you fifteen columns nobody can hold in their
+        head. Five is a backbone. The hue runs indigo to rose left to right so the journey direction
+        is visible even from the back of the room.</p>
+    </div>
+    <div class="note">
+      <h4>Do this board before boards 1, 3 and 4</h4>
+      <p>Impact/effort and Now-Next-Later both sort <em>these fifteen stickies</em>. Sorting things you
+        have not named yet is guesswork, and it quietly turns the exercise into estimation.</p>
+    </div>
+    <div class="note">
+      <h4>Nothing here is prioritised yet</h4>
+      <p>Column order is journey order, not importance. Sticky order inside a column is reading order,
+        not sequence. The MVP line has not been drawn &mdash; that is the next exercise, not this one.</p>
+    </div>
+  </section>
+
+  <section class="test">
+    <h2>The sticky test</h2>
+    <div class="test-cols">
+      <div class="test-col">
+        <span class="test-label on">Goes on this board</span>
+        <ul>
+          <li>An outcome a resident would recognise. <em>&ldquo;A ranking I can check, an invite I can send.&rdquo;</em></li>
+          <li>Something that takes more than one story to deliver, but reads as one job.</li>
+          <li>Wording a resident would use, not a name from the schema.</li>
+        </ul>
+      </div>
+      <div class="test-col">
+        <span class="test-label off">Stays off</span>
+        <ul>
+          <li>A single story. <em>&ldquo;See a heatmap of who can make each slot&rdquo;</em> is one card inside epic 4.2.</li>
+          <li>A screen or a component. <em>&ldquo;Ranking page&rdquo;</em> names a build, not an outcome.</li>
+          <li>Anything only the household admin account can do &mdash; wrong persona for this map.</li>
+          <li>System internals: the solver, push delivery, the retention job.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <footer class="colophon">
+    Content from <strong>Exercise 10/02-User-Story-Map.md</strong> V1.3 &middot; column-and-sticky reasoning in
+    <strong>03-Story-Map-Review-Notes.md</strong> &sect;4 &middot; naming and sizing rules in map Appendix E<br>
+    S-numbers trace to <strong>02-SRD.md</strong> &sect;5.3 &middot; persona: Lukas, resident, seven-person WG in Tuebingen &middot;
+    spec fact-check record: <strong>06-Correction-Pass-Findings.md</strong>
+  </footer>
+
+</div>
