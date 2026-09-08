@@ -2,6 +2,22 @@
 
 ### ADR-001 bis ADR-012 · Entscheidungen, Optionen, Konsequenzen
 
+> ⚠️ **Sieben dieser Records tragen v0.1 — und stehen alle noch auf `Vorschlag — anfechtbar`.**
+>
+> **ADR-001** (modularer Monolith) · **ADR-002** (explizite Zustandsmaschine) · **ADR-004**
+> (Autorisierung doppelt: Policy **und** RLS) · **ADR-006** (Stack; Postgres ist von ADR-004
+> gefordert, nicht frei gewählt) · **ADR-008** (vierstufige Skala, Mittelwert-Score) ·
+> **ADR-010** (Datenbestandsverzeichnis als CI-Gate) · **ADR-012** (Deutsch im Dokument,
+> Englisch im Code).
+>
+> `02-SRD.md` §5.4 legt S-15, S-31, S-36 und S-37 in **v0.1**, gerade weil sie sich nicht
+> nachrüsten lassen. Damit fällt der Widerspruch dieses Dokuments zusammen: wird einer der sieben
+> Records später gekippt, ist nicht ein Absatz zu ändern, sondern gebauter Code. **Vor der ersten
+> Zeile Code sind sie zu bestätigen oder ihr Widerspruch ist hier zu vermerken.** Diese Notiz
+> ersetzt keine Entscheidung — sie benennt nur, dass eine aussteht. Die übrigen fünf Records
+> (ADR-003, -005, -007, -009, -011) dürfen ohne Weiteres offen bleiben; ADR-005 (Solver) ist mit
+> S-19/S-20 ohnehin nach v1.1 gewandert.
+
 > **Version:** V0.5 — *Änderung ggü. V0.4: **ADR-011** — die Zusicherungen des Stimmen-Puffers von
 > vier auf **sechs** ergänzt (Leeren beim **Profilwechsel**, **idempotente** Wiedereinspielung), damit
 > der Record deckungsgleich mit G-B7 und G-D11 in `GUARDRAILS.md` ist. Ohne die beiden würde der ADR
@@ -682,14 +698,18 @@ Benachrichtigungszustellung an unverifizierte Adressen.
 verwaltet, verschickt und nachverfolgt werden — Organisationsarbeit, die das Produkt gerade abschaffen
 will.
 
-**Duplikatsschutz strukturell statt technisch** — vier Maßnahmen, die zusammen mehr wirken als ein
-Fingerprint:
+**Duplikatsschutz strukturell statt technisch** — von den ursprünglich vier Maßnahmen tragen
+nach **S-05**/**U-22** noch **zwei**:
 
-1. Die **Bewohnerliste ist für alle sichtbar** — ein Doppelkonto steht namentlich darin.
-2. **Beitritte erscheinen im Aktivitäts-Feed** — niemand tritt unbemerkt bei.
-3. Die **Quorum-Anzeige läuft gegen die Bewohnerzahl** („5 von 7") — ein Doppelkonto verschiebt den
+1. **Beitritte erscheinen im Aktivitäts-Feed** — niemand tritt unbemerkt bei.
+2. Die **Quorum-Anzeige läuft gegen die Bewohnerzahl** („5 von 7") — ein Doppelkonto verschiebt den
    Nenner sichtbar.
-4. **Jedes Mitglied kann entfernen.**
+
+> **Korrigiert (S-05/U-22).** Die beiden übrigen Maßnahmen sind entfallen: die für Bewohnende
+> sichtbare **Bewohnerliste** (getrennt in Teilnehmendenliste B4 und Verwaltungs-Bewohnerliste O16,
+> `07-Screen-Inventar.md` §7) und das **Entfernen-Recht jedes Mitglieds** (nur noch über
+> `manage_members`). Damit ist die Absicherung des Beitrittslinks (**S-49**) nicht mehr Ergänzung,
+> sondern **Voraussetzung** dieses Schutzes.
 
 ### Konsequenzen
 
