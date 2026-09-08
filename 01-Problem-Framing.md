@@ -2,7 +2,7 @@
 
 ### Zusammengeführter Casting-Prozess für neue Mitbewohnende in größeren WGs und Wohnprojekten
 
-> **Status:** Entwurf V0.3 · 2026-08-31
+> **Status:** Entwurf V0.4 · 2026-09-08
 > **Autor:** Samuel Zink (@SmokeyRGB)
 >
 > **Änderung ggü. V0.1:** ADR-009-Verweis an P-1 ergänzt · Hinweis aufgenommen, dass die
@@ -13,6 +13,11 @@
 > installierte PWA/aktivierten Push) und E-23 um den O-05-Verweis ergänzt, dazu Präzisierungen bei
 > WHO-Feld/R-02/R-03 zur informellen Werkzeug-Zustimmung — passend zu den neuen Scope-Zeilen
 > **S-42 bis S-46** in `02-SRD.md`.
+> **Änderung ggü. V0.3:** „Web Push" aus **Nicht enthalten** gestrichen — es stand dort noch als
+> v1.1, während E-22 im selben Dokument es bereits nach v1 gezogen hatte · v1-Scope-Punkt 4 auf
+> **S-47** nachgezogen (zweiter Durchlauf im Screening-Kartenmuster statt eigener
+> Feinschliff-Screen) · v1-Scope um **S-48 bis S-51** ergänzt, die bisher fehlten · Lesehinweis zur
+> E-Tabelle ergänzt, welche Beschlüsse inzwischen im Detail durch S-Zeilen überholt sind.
 > **Vorgänger:** `Initial Claude Prompt.md` → `00-Session-Brief.md` (verbindliches Entscheidungsprotokoll)
 > **Nachfolger:** `02-SRD.md` → `03-PRD.md` ·
 > `04-Domaenenmodell.md` → `05-ADRs.md` · `06-Compliance-Anhang.md` → `GUARDRAILS.md` ·
@@ -177,6 +182,18 @@ E-Nummern sind Zitierhilfen dieses Dokuments; die inhaltliche Quelle ist der Bri
 | E-26 | **Modularer Monolith mit Bounded Contexts** `identity` · `casting` · `deliberation` · `scheduling` · `notifications` · `audit`, Domain-Events dazwischen, keine Cross-Context-Joins (ADR-001). **Reiner Domänenkern:** Voting-Mathematik, Ranking, Zustandsmaschine, Termin-Kostenmodell und Zeitfenster-Parser als pure Funktionen ohne Datenbankzugriff. | Die fachlich heiklen Teile sind damit ohne Infrastruktur testbar — die Voraussetzung dafür, dass Sichtbarkeitsinvariante, Quorum und Zustandsübergänge als geschützte Tests überhaupt formulierbar sind (`GUARDRAILS.md`). |
 | E-27 | **Löschung und Aufbewahrung eingebaut, nicht angebaut** (ADR-010): jedes personenbezogene Feld wird in einer maschinenlesbaren `data-inventory.yml` deklariert (Zweck, Rechtsgrundlage, Aufbewahrung, Kategorie); ein CI-Check bricht bei nicht deklarierter Spalte. | Dient gleichzeitig als Art.-30-Verzeichnis. Ohne Gate wandert die Deklaration in den Rückstand — besonders bei AI-gestützter Implementierung. |
 
+> **Lesehinweis — zwei Beschlüsse sind im Detail überholt, bleiben hier aber unverändert stehen.**
+> Nach der oben genannten Regel bildet diese Tabelle die Anforderungs-Session ab; Korrekturen leben
+> als S-Zeilen. Wer nach dem aktuellen Stand implementiert, liest zusätzlich:
+>
+> - **E-06** (Duplikatsschutz) → **S-05** in `02-SRD.md`. Die für Bewohnende sichtbare
+>   Bewohnerliste und das Entfernen-Recht jedes Mitglieds sind mit **U-22** entfallen; es tragen
+>   nur noch der `ActivityEvent`-Feed und der Quorum-Nenner. Deshalb ist **S-49** (Beitrittslink
+>   absichern) Voraussetzung und nicht Zugabe.
+> - **E-08** (Feinschliff) → **S-11/S-47** in `02-SRD.md`. Der eigene Vergleichsbildschirm
+>   entfällt als Interaktion; an seine Stelle tritt ein zweiter, kurzer Durchlauf **im bereits
+>   gelernten Screening-Kartenmuster**. Die Begründung von E-08 trägt beide Formen.
+
 ---
 
 ## v1-Scope (bestätigt)
@@ -189,7 +206,7 @@ Verdichtet:
 1. Haushalts- und Bewohner-Onboarding (`Household`, `Account`, `ResidentProfile`, `Membership`, ein Beitrittscode; E-Mail beim Beitritt optional, S-03)
 2. `CastingRound` mit `Room`-Zuordnung, eigener Zustandsmaschine und optionaler weicher Rundenfrist (S-44)
 3. Bewerbererfassung: Formular + regelbasierter Paste-Parser (E-15); Einladungstoken bei `moved_in` (S-42)
-4. Karten-Screening und Abstimmung Runde 1 mit Feinschliff-Screen (E-07, E-08)
+4. Karten-Screening und Abstimmung Runde 1, bei Budgetüberschreitung mit einem **zweiten Durchlauf im Screening-Kartenmuster** statt eines eigenen Feinschliff-Bildschirms (E-07, E-08, S-11/S-47)
 5. Rangliste mit Score, Quorum-Trennung und verdeckten Ergebnissen (E-09, E-10)
 6. Vollständige Status-Pipeline mit auditierten Rückwärtsübergängen (E-20)
 7. Verfügbarkeitsraster, Feasibility-Schicht und „Vorschlag berechnen" mit Erklärung (E-16, E-17)
@@ -199,8 +216,10 @@ Verdichtet:
 11. `ActivityEvent`-Feed und `Notification`s (In-App und Web Push primär, E-Mail als Fallback, Digest-Standard — E-22)
 12. Installierbare PWA mit verbindlichem Install-Hinweis (P-2, ADR-011, S-45)
 13. Aufbewahrungsautomatik mit 14-Tage-Vorwarnung (E-18) und Datenauskunft-Export (E-19)
+14. Aufgabenmodell im Start-Bildschirm mit **genau einer Vorrangregel** — Aufgaben mit echter Fälligkeit zuerst, nach Fälligkeit sortiert (S-48; Regel in `07-Screen-Inventar.md` §2)
+15. Zugangs- und Zurechenbarkeitsschnitt des UX-Nachzugs: Beitrittslink mit Warnhinweis, Ablauf und Nutzungsgrenze (**S-49**) · Verwaltung ohne `ResidentProfile` erreicht `CastingRound`, `Application`, `CastingNote`, `Slot` und `Appointment` **nicht** mehr, Ausnahmen nur Aufbewahrung und Datenauskunft-Export ohne Einsicht (**S-50**) · Anwesenheit wird bei Terminbestätigung **angenommen** statt erfasst, mit Selbstabsage einzelner Personen (**S-51**)
 
-**Nicht enthalten:** Verfügbarkeits-Link für Bewerbende, Web Push, Punkte-Budget-Variante
+**Nicht enthalten:** Verfügbarkeits-Link für Bewerbende, Punkte-Budget-Variante
 und Textbausteine (v1.1) · nutzerinitiierte Browser-Extension für Portal-Import (v1.2) ·
 Kalender-Sync, KI-Parsing, Vermieter-Persona und Freemium (v2). **Dauerhaft
 ausgeschlossen:** jede KI-gestützte Bewertung, Rangbildung oder Empfehlung über Personen
