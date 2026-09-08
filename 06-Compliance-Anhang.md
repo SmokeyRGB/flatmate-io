@@ -98,8 +98,19 @@ Ergebnisse hängen an ihr.
 | Unterauftragsverarbeiter (Art. 28 Abs. 2 und 4) | Flatmate.io | Hosting und E-Mail-Versand; Liste in der AVV, EU-Verarbeitung nach ADR-006 |
 | Meldung von Verletzungen (Art. 33 Abs. 2) | Flatmate.io meldet **an den `Household`**, dieser an die Aufsichtsbehörde | Prozess in [§11.5](#115--organisatorische-maßnahmen) |
 
-> ⚠️ TBD — zu ergänzen: konkrete Liste der Unterauftragsverarbeiter (Hosting-Anbieter,
-> Transaktions-E-Mail-Dienst). ADR-006 legt EU-Hosting fest, benennt aber keinen Anbieter.
+> ⚠️ **TBD — und ab v0.2 ein Blocker, keine Fußnote.** Zu ergänzen ist die konkrete Liste der
+> Unterauftragsverarbeiter (Hosting-Anbieter, Transaktions-E-Mail-Dienst). ADR-006 legt EU-Hosting
+> fest, benennt aber keinen Anbieter, und hier wird bewusst keiner erfunden.
+>
+> **Warum das terminiert ist:** Ohne diese Liste ist die AVV nach Art. 28 Abs. 2 und 4 unvollständig,
+> und damit hängt **Q-3** (Genügt ein Klick-AVV der Textform des Art. 28 Abs. 9?) an einem Dokument,
+> das noch nicht fertig ist. `02-SRD.md` §5.4 führt die Liste deshalb im **Gate vor dem ersten
+> echten Haushalt** (v0.2). Für **v0.1** ist sie nicht erforderlich, weil dort ausschließlich
+> synthetische Daten verarbeitet werden.
+>
+> **Je Eintrag anzugeben:** Firma und Sitz · Verarbeitungszweck · Verarbeitungsort (EU-Nachweis
+> nach ADR-006) · Bestehen einer eigenen AVV · Weisungskette. Danach in `§4` und `§11.5`
+> gegenprüfen und den Haushalten offenlegen.
 
 ### 1.4 Der unscharfe Rand: Bewohnerdaten
 
@@ -1155,10 +1166,15 @@ um jemanden am Betrügen zu hindern, den man dabei fragen muss. Praktisch unbrau
 
 | Mechanismus | Wirkung |
 |---|---|
-| Bewohnerliste für **alle** sichtbar | Ein zusätzliches Profil fällt auf |
 | Beitritte erscheinen im **`ActivityEvent`-Feed** | Der Zeitpunkt ist nachvollziehbar |
 | **Quorum-Anzeige gegen die Bewohnerzahl** („5 von 7 haben abgestimmt") | Ein Profil zu viel verschiebt den Nenner sichtbar |
-| **Jedes Mitglied** kann Profile entfernen | Korrektur ohne Moderationsnadelöhr |
+
+> **Korrigiert (S-05/U-22).** Zwei zuvor hier geführte Mechanismen sind entfallen: die für
+> Bewohnende sichtbare **Bewohnerliste** und das **Entfernen-Recht jedes Mitglieds**. Beide
+> stützten den strukturellen Schutz, den `02-SRD.md` **S-05** inzwischen auf die oben genannten
+> zwei Mechanismen zurückgeführt hat. Der Beitrittslink ist damit die letzte verbliebene
+> Zugangskontrolle, weshalb seine Absicherung (**S-49**: Warnhinweis, Ablauf, Nutzungsgrenze)
+> Voraussetzung und nicht Zugabe ist.
 
 Auch der **Magic-Link-Ansatz wurde verworfen** — nicht gerätegebunden, muss gespeichert werden und
 löst das Problem nicht.
