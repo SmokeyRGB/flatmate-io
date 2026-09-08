@@ -386,7 +386,7 @@ einzeln ausgeführt, wo sie inhaltlich vom Standard abweichen.
 | O3 | Bewerbung erfassen | O | Organisation | |
 | O4 | Pipeline | O | Organisation | |
 | O5 | Statuswechsel + Copy-Paste-Text | O | Organisation | |
-| O6 | Frühere Bewerbung zuordnen | O | Organisation | v1.1 |
+| O6 | Frühere Bewerbung zuordnen | O | Organisation | v0.2 |
 | O7 | Verfügbarkeitsraster / Heatmap | O | Organisation | |
 | O8 | Bewerber-Verfügbarkeit eintragen | O | Organisation | |
 | O9 | Terminvorschlag | O | Organisation | |
@@ -926,7 +926,7 @@ Prozess vs. Person, nicht bei „beschreibend vs. empfehlend".
 
 | Zustand | Verhalten |
 |---|---|
-| Parser erkennt nichts | Vorbelegtes Formular ohne Fehlermeldung |
+| Parser erkennt nichts | Formular mit dem Rohtext im Freitextfeld, keine geratenen Felder, keine Fehlermeldung (`03-PRD.md` §4.1.3) |
 
 ---
 
@@ -1419,6 +1419,22 @@ Kette, die diesem Inventar widerspricht oder die es voraussetzt.
 | AW-11 | Verwaltung mit vollem Zugriff auf Runden, Bewerbungen, Termine, Notizen | 03-PRD.md §4.0.1 (Rechtematrix) | §4.3 — Verwaltung ohne `ResidentProfile` erreicht keine Castings, zwei benannte Ausnahmen |
 | AW-12 | „rein deskriptiv, nie empfehlend" als UI-Textregel unter Berufung auf P-5 | — (frühere Planformulierung) | §7 (Organisation-Einleitung) — Grenze liegt bei Prozess vs. Person, nicht bei beschreibend vs. werbend |
 | AW-13 | Bildschirmliste in 03-PRD.md §4.1.13 nennt „Persönliche Einstellungen" und „Passwort/Passkey" als getrennte Ziele | 03-PRD.md §4.1.13 | §7 (E1) — ein Bildschirm mit Abschnitten |
+
+> **Stand 2026-09-08 — sieben dieser Abweichungen sind in den Quelldokumenten angekommen** und
+> stehen hier nur noch als Nachweis, nicht als offene Forderung:
+>
+> | # | Erledigt in |
+> |---|---|
+> | AW-1 (fünf Tabs) | `03-PRD.md` V0.6 §4.1.0 — zwei Tabs plus Kopfzeile (U-2) |
+> | AW-2 („Rundenphase" als Zustand) | `03-PRD.md` V0.6 §4.1.4/§4.1.6/§4.2.4 — Terminologie auf `Vote.stage` |
+> | AW-3 (`phase_hint` ohne Formel) | `04-Domaenenmodell.md` V0.4 §8.6 — Pseudocode ergänzt |
+> | AW-4 (Install-Hinweis in der Aufgabensortierung) | `04-Domaenenmodell.md` V0.4 §8.7 — CTA-Sortierung schließt das Band aus |
+> | AW-5 (Feinschliff-Bildschirm) | `03-PRD.md` V0.6 §4.1.5 — zweiter Durchlauf im Kartenmuster (S-47) |
+> | AW-9 (Einzelabsage nicht modelliert) | `04-Domaenenmodell.md` V0.4 — `AppointmentAttendance` samt Selbstabsage (U-23, S-51) |
+> | AW-10 (Anwesenheit nachträglich gesetzt) | `04-Domaenenmodell.md` V0.4 — `attended` startet `true` (U-23, S-51) |
+>
+> **Noch offen bzw. bewusst stehengelassen:** AW-6, AW-7 (E-06 bleibt historischer Beschluss),
+> AW-8, AW-11, AW-12, AW-13.
 
 Nummern S-47 bis S-51 (SRD, vergeben laut `Session-Sprint-Log.md` §1) werden in diesem Dokument
 zitiert, nicht neu definiert: **S-47** zweiter Durchlauf (§9) · **S-48** Aufgabenmodell mit
