@@ -2156,6 +2156,13 @@ Rechtsgrundlage, Datenkategorie und Löschfrist. Fehlt eine, bricht der CI-Check
 
 Sortiert nach Klasse, weil die Klasse den Aufwand bestimmt.
 
+> **Die Zahlen in den folgenden Überschriften sind nachrichtlich, nicht maßgeblich.**
+> Maßgeblich ist `data-inventory.yml` (ADR-010) und der CI-Check darüber. Grund: Diese Liste ist
+> **dreimal** verrutscht — die Kästen unten dokumentieren es selbst —, und jede Korrektur per Hand
+> erzeugt die nächste Abweichung. Wer eine belastbare Feldzahl braucht, zählt sie aus der
+> Inventardatei; wer eine Spalte hinzufügt, deklariert sie dort, und der Build erzwingt den Rest.
+> Die Klassenzuordnung hier bleibt fachlich verbindlich — nur die Summen sind es nicht.
+
 ### 9.1 Klasse ⚫ — personenbezogen **und** Beratungsinhalt (11 Felder)
 
 Strengste Klasse: unterliegt zusätzlich **V-1** und ist im Auskunftsexport enthalten.
