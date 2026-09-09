@@ -75,7 +75,9 @@ if [ -f "$PRD" ] && sed -n '/^### 7.1/,/^### 7.2/p' "$PRD" | grep -qi '| *Inhalt
 else
   ok "$PRD §7.1 carries no scope column"
 fi
-if [ -n "$ROADMAP" ] && grep -q 'Bei Abweichung gilt §5.4' "$ROADMAP"; then
+# The chain documents are German; the Exercise 10 artifacts are English by the
+# recorded ADR-012 exception. Accept the governing declaration in either language.
+if [ -n "$ROADMAP" ] && grep -qE 'Bei Abweichung gilt §5\.4|§5\.4 governs' "$ROADMAP"; then
   ok "roadmap declares §5.4 as governing"
 else
   bad "roadmap does not declare §5.4 as governing" "add the sentence 03-PRD.md §7 already carries"
