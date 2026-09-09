@@ -19,7 +19,7 @@ round end to end without falling back to WhatsApp.
 |---|---------|-------------|---------|
 | [F1](F1-open-a-casting-round.md) | Open a casting round for the rooms you are actually casting for | S-01, S-02, S-04, S-05, S-06, S-07, S-35, S-50 | A1, O1 ⚡, O2, O14 |
 | [F2](F2-join-in-two-fields.md) | Join in two fields, and land on the one thing to do next | S-03, S-49, S-48 | A3 ⚡, B1 ⚡ |
-| [F3](F3-capture-an-application.md) | Capture an application, on the record | S-08 (form half), S-38, S-39 | O3, O4 |
+| [F3](F3-capture-an-application.md) | Capture an application, on the record | S-08 (form half), S-38, S-33 (manual-delete half) | O3, O4 |
 | [F4](F4-screen-and-vote.md) | Screen the applications card by card, four ratings | S-09, S-10 | C1 ⚡ |
 | [F5](F5-ranking-hidden-until-you-vote.md) | A ranking you can check, hidden until you have voted | S-12, S-13, S-14, S-16, S-31 | D1 ⚡, D2, D3 |
 

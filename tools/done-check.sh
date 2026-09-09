@@ -193,7 +193,35 @@ else
     [ -n "$row" ] || continue
     printf '%s' "$row" | grep -qE '(FR-|AC-)[0-9]' || bad "$s has no FR-/AC- id in COVERAGE.md" ""
   done
+
+  # Cross-check: every FR-/AC- id named in COVERAGE.md must actually exist in the
+  # packet its own number points at (FR-1.25 -> F1). The scope-line-to-requirement
+  # link cannot be derived from the requirements themselves, because the packets'
+  # convention is that only Constraints carry a Source: line. So the mapping lives
+  # here — and this check makes a drift between it and the packet fail the build
+  # instead of going unnoticed.
+  miss=""
+  while IFS= read -r id; do
+    [ -n "$id" ] || continue
+    n=${id#*-}; n=${n%%.*}
+    pkt=$(ls "docs/backlog/requirements/F$n-requirements.md" \
+             "Exercise 10/AI-Ready Requirements/F$n-requirements.md" 2>/dev/null | head -1)
+    if [ -z "$pkt" ]; then miss="$miss $id(no-F$n)"; continue; fi
+    grep -qF "$id" "$pkt" || miss="$miss $id(not-in-F$n)"
+  done < <(grep -oE '\b(FR|AC)-[0-5]\.[0-9]+' "$COV" | tr -d '\r' | sort -u)
+  [ -n "$miss" ] && bad "COVERAGE.md names ids that are not in their packet:" \
+                        "$(echo "$miss" | tr ' ' '\n' | grep . | head -12 | tr '\n' ' ')" \
+                 || ok "every FR-/AC- id in COVERAGE.md exists in its packet"
 fi
+
+# S-39 belongs to the paste parser (v0.2), not the form. It was listed in v0.1 in
+# two places; assert it stays out of every v0.1 list.
+for src in "$MVPRM" "$PRD"; do
+  [ -n "$src" ] && [ -f "$src" ] || continue
+  if grep -E '^\|' "$src" | grep -E 'S-08 \(form|Formularhälfte' | grep -q 'S-39'; then
+    bad "S-39 still listed beside the form half of S-08 in $src" "it is v0.2, with the parser"
+  fi
+done
 # the specific closures this sprint promised
 F1=$(ls docs/backlog/requirements/F1-requirements.md "Exercise 10/AI-Ready Requirements/F1-requirements.md" 2>/dev/null | head -1)
 F0=$(ls docs/backlog/requirements/F0-requirements.md "Exercise 10/AI-Ready Requirements/F0-requirements.md" 2>/dev/null | head -1)

@@ -182,6 +182,29 @@ then its license is checked against an allow-list and its version is pinned rath
 or an open range.
 Source: `GUARDRAILS.md`, Minimal-Gate item 9 (G-H2, G-H3, G-H4).
 
+**AC-0.10 — The transition table is complete and closed, and reverse moves are audited**
+Given the `Application` state machine, when the schema is first migrated, then all **eleven**
+states exist; and when a transition is attempted, then it succeeds only if it is a row in the
+table of `03-PRD.md` §4.2.1 and throws otherwise — with no silent fallthrough and no "unknown
+state" branch; and when a permitted **backward** transition runs, then an `ActivityEvent` records
+it, naming the account and the acting profile. No boolean field anywhere may stand in for a
+state.
+Source: S-15, `03-PRD.md` §4.2.1, `05-ADRs.md` ADR-002. Covers FR-0.9 to FR-0.12.
+
+**AC-0.11 — The audit log cannot be rewritten**
+Given an existing `ActivityEvent`, when an `UPDATE` or a `DELETE` is attempted — through the
+application, through a migration, or in raw SQL — then it fails; and given a redaction at the end
+of a retention period, when it runs, then the event row survives with its 🔴/⚫ payload fields set
+to `null` rather than being removed, so the fact of the event remains provable after its content
+is gone.
+Source: S-27, `05-ADRs.md` ADR-003, `GUARDRAILS.md` G-D7 and G-D8. Covers FR-0.13 to FR-0.15.
+
+> **Why these two are not Minimal-Gate items.** `AC-0.1` to `AC-0.9` are the nine items of
+> `GUARDRAILS.md`'s Minimal-Gate, in its order. None of the nine tests the state machine's own
+> rules or the audit log's immutability — the gate is about *infrastructure being in place*, not
+> about these two behaving. `AC-0.10` and `AC-0.11` close that gap, so that every functional
+> requirement in §3 has an acceptance criterion above it.
+
 ---
 
 ## 5. Constraints
