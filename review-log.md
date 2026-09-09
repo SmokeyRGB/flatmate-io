@@ -1,5 +1,130 @@
 # Review-Log — Requirements Flatmate.io
 
+> **Version:** V0.2
+> **Datum:** 2026-09-09
+> **Autor:** Samuel Zink (@SmokeyRGB)
+> **Inhalt:** das Offene-Punkte-Register (unten) sowie die Protokolle der drei Prüfdurchgänge
+
+---
+
+## Offene-Punkte-Register
+
+**Dies ist der einzige Ort, an dem der Status eines offenen Punkts steht.** Die Fachdokumente
+tragen weiterhin die Frage und ihre Begründung — aber nicht mehr den Status. Wer wissen will,
+ob etwas offen ist, schaut hier und nirgends sonst.
+
+### Warum es dieses Register gibt
+
+Der Status offener Punkte wurde an **vier** Stellen von Hand geführt: `02-SRD.md` §11,
+`03-PRD.md` §8, `04-Domaenenmodell.md` §10.3 und `07-Screen-Inventar.md` §14. Alle vier sind
+auseinandergelaufen, und zwar genau so wie §9 des Domänenmodells dreimal auseinandergelaufen
+ist — aus demselben Grund, den dieses Dokument weiter unten selbst benennt: eine Zusicherung
+ohne Mechanismus hält nicht.
+
+Der Befund im Einzelnen, Stand 2026-09-09:
+
+- `03-PRD.md` §8 führte **P-O-08** und **P-O-09** als offen. Beide waren **am selben Tag**, an
+  dem sie entstanden, im Domänenmodell §10.2 beantwortet worden (O-13, O-14).
+- `07-Screen-Inventar.md` §14 führte **alle sechs** Punkte O-A bis O-F als offen. Alle sechs
+  waren aufgelöst; der Sprint-Log hält das fest, die Tabelle wurde nie nachgezogen.
+- `07-Screen-Inventar.md` §13 führte **AW-1 bis AW-13** ohne Statusspalte. Alle dreizehn waren
+  abgearbeitet — nur ließ sich das der Tabelle nicht ansehen.
+- `04-Domaenenmodell.md` §10.3 führte **O-5** als offen, obwohl die verlangte prüfbare
+  Zusicherung längst als **G-D7** und **G-D8** in `GUARDRAILS.md` stand.
+
+### Die fünf Regeln
+
+1. **Eine Zeile wird nie gelöscht.** Beim Schließen werden ID *und* Fragetext durchgestrichen,
+   die Zeile bleibt stehen. Die Begründung, warum etwas *nicht* gemacht wurde, ist der
+   wertvollere Teil.
+2. **Eine ID ist dauerhaft.** Nummern werden nie neu vergeben — dieselbe Regel wie für
+   ADR-Nummern (`05-ADRs.md`, Aufteilungsregel 1) und Scope-Zeilen (`02-SRD.md` §5.3).
+3. **Eine geschlossene Zeile trägt Datum und Quelle:** `**Geklärt:** <ein Satz>. Maßgeblich:
+   <Datei> §<n>`. Der Entscheidungstext steht in **genau einem** Dokument; jede weitere
+   Erwähnung ist ein Verweis darauf.
+4. **Eine Frage, eine tragende ID.** Steht dieselbe Frage unter mehreren IDs, ist eine die
+   tragende und die anderen werden einzeilige Verweise. Zuständigkeit nach Dokument: SRD für
+   Scope und Phasen, `04` für das Schema, PRD für Verhalten, `06` für Recht.
+5. **Offene Zeilen tragen keine Auszeichnung.** Damit zählt `grep -c '^| \*\*O-'` die
+   tatsächlich offenen.
+
+Durchgesetzt wird das von **G-N5** (`GUARDRAILS.md`) und geprüft von `tools/done-check.sh`.
+
+### ⚠ Zwei Nummernräume, die sich fast berühren
+
+`02-SRD.md` nummeriert **null-gefüllt** (`O-01` … `O-08`), `04-Domaenenmodell.md` **ohne
+führende Null** (`O-1` … `O-16`). Acht IDs unterscheiden sich damit **nur durch eine Null** und
+bedeuten völlig Verschiedenes:
+
+| Sieht gleich aus | `02-SRD.md` §11 | `04-Domaenenmodell.md` §10 |
+|---|---|---|
+| `O-06` / `O-6` | Grenzwerte des Solvers | `PasskeyCredential` modelliert |
+| `O-05` / `O-5` | Spendenkommunikation | Redaktionsregel für `ActivityEvent.payload` |
+| `O-01` / `O-1` | Quorum-Schwelle | Manuelle Verknüpfung früherer Bewerbungen |
+
+Die Nummern bleiben (Regel 2) — umbenennen würde 100+ Verweise brechen. Stattdessen wird in
+diesem Register **jede ID mit ihrem Dokument qualifiziert**, und ein Verweis in Prosa nennt
+immer die Datei mit. Ein unqualifiziertes „O-6" ist mehrdeutig und damit ein Fehler.
+
+### Offen — Entscheidung oder Erhebung nötig
+
+| Schlüssel | Frage | Zuständig / Nächster Schritt |
+|---|---|---|
+| **`02-SRD.md` O-07** | Baseline-Erhebung im Testhaushalt (§8.3) | **Zeitkritisch, einziger Punkt dieser Art.** Wird retrospektiv aus den Chatverläufen der letzten Runde erhoben (Nachrichtenzahl, Tage von erster Bewerbung bis Entscheidung, Zahl der Antwortenden). Nach dem ersten Einsatz nicht mehr rekonstruierbar, und mit jedem Monat schwerer. Ersetzt zugleich den Befund „Baseline fehlt" aus Durchgang 1 — **ein Punkt, nicht zwei** |
+| **`04-Domaenenmodell.md` O-1** *(Prozessteil)* | Frühere Bewerbungen derselben Person werden **nur von Hand** verknüpft; wer das vergisst, erzeugt genau das Leck, das V-1 verhindern soll | Der Dokumentationsteil ist erledigt (siehe unten). Offen bleibt das Prozessrisiko. Wird zur **harten Vorbedingung**: keine zweite echte Runde auf echten Daten, bevor der S-40-Prompt implementiert und durch den in `03-PRD.md` §4.1.7 verlangten eigenen Testfall gedeckt ist. Rechtlich weiter offen als `06-Compliance-Anhang.md` **Q-14** |
+| **`04-Domaenenmodell.md` O-8** | Rangliste als Solver-Eingabe — Terminplanung nach Abstimmungsergebnis priorisieren | **Bewusst offen gehalten als Entwurfsoption, nicht als Ausschluss.** Zwei Fragen entscheiden es: (a) verkompliziert es den Ablauf für die Nutzenden? (b) verschlechtert es die Solver-Laufzeit so weit, dass es sich nicht mehr lohnt? Kein Beschluss jetzt nötig — automatisches Lösen liegt in v1.1. ADR-005 hält fest, dass der Solver-Port eine zusätzliche Gewichtung je Bewerbung nicht ausschließen darf |
+| **`03-PRD.md` P-O-04** | Wortlaut aller Hinweistexte (Selbst-Redaktion, Anonymitätshinweis, „Verwaltung", Copy-Paste-Datenschutzhinweis) | Sammelarbeit, keine Autorenarbeit: ~80 % der Formulierungen stehen wörtlich in `02-SRD.md` §10, `06-Compliance-Anhang.md` §4.5, `03-PRD.md` §4.6.1 (C-10) und im Screen-Inventar. Zusammenzuführen in einen Textkatalog. **Ausgenommen:** ob der Copy-Paste-Hinweis Art. 14 genügt — das ist eine Rechtsfrage und geht auf die Q-Liste |
+
+### Implementierungspflichten — keine Spezifikationslücken
+
+Diese Punkte sind nicht durch Schreiben zu schließen. Sie sind Auflagen an die Umsetzung und
+stehen als solche in `GUARDRAILS.md`; hier nur als Nachweis, dass sie nicht verlorengegangen sind.
+
+| Schlüssel | Auflage | Fällig |
+|---|---|---|
+| **`02-SRD.md` O-06** = **`03-PRD.md` P-O-06** | Grenzwerte des Solvers messen (Bewerbende × Slots × Bewohnende) auf der Zielhardware, Ergebnis in ADR-005 eintragen | **v1.1**, vor S-19. Bisher als Planungsschuld geführt, obwohl der Solver in v1.1 liegt — neu einsortiert |
+| **`04-Domaenenmodell.md` O-10** | Einreichungsweg für `Application.subject_statement` festlegen | v1.1; betrifft nur die Oberfläche, das Schema ist unberührt |
+| `GUARDRAILS.md` G-H2 | Lizenz-Allowlist | **geschlossen** — permissive Liste, Repo bleibt vorerst privat. Details in `tools/README.md` |
+| `GUARDRAILS.md` Werkzeugwahl | Test-Runner, Modulgrenzen-Lint, Secret-Scanner, Lizenzprüfer | **geschlossen** — Vitest · dependency-cruiser · gitleaks · license-checker-rseidelsohn. Begründung je Werkzeug in `tools/README.md` |
+| Durchgang 1: Teststrategie | Kapitel „was außer den geschützten Tests geprüft wird" | Nach der Werkzeugwahl, in `GUARDRAILS.md` |
+| Durchgang 1: ADR-005-Verpackung | Auslieferung des Python-Kindprozesses skizzieren | v1.1. **Vorbedingung schon jetzt:** ADR-006 muss eine Umgebung wählen, die einen lokalen Python-Kindprozess ausführen kann |
+| Durchgang 1: Backup | RPO 24 h · RTO 8 h · **Backup-Aufbewahrung höchstens 30 Tage** · jeder Restore lässt den Löschlauf durchlaufen, bevor die Anwendung Verkehr annimmt | **Neu und wichtig:** S-33 erlaubt, die Frist auf 30 Tage zu verkürzen. Ein länger gehaltenes Backup überlebt damit die kürzeste zulässige Frist, und ein Restore holt gelöschte Bewerberdaten zurück — ohne jede Warnung. Beide Hälften sind nötig; die Deckelung allein genügt nicht |
+| Durchgang 3: drei CI-Prüfungen | Versionszeile · Scope-Nummern · vier Pflichtzustände je Bildschirm | Aufgegangen in **G-N1**, **G-N2**, **G-N6** |
+| Durchgang 3: `04` §9 | Aus `data-inventory.yml` erzeugen oder streichen | „Erzeugen" ist heute keine Option — die Datei existiert noch nicht. Zwischenschritt: die veralteten Feldzahlen aus den drei §9-Überschriften entfernen |
+
+### Geparkt — mit Eigentümer, nicht durch Dokumentation lösbar
+
+| Schlüssel | Punkt | Warum geparkt |
+|---|---|---|
+| Durchgang 1: Hosting-Kosten | Kosten je Haushalt nie geschätzt | Rechnung gegen einen bereits entschiedenen Stack (ADR-006). Sechs Zeilen, keine Entscheidung |
+| Durchgang 1: NFR-Zielwerte | gesetzt, nicht hergeleitet | Vor der ersten Messung wäre eine Herleitung Scheingenauigkeit. Wird ehrlich umbeschriftet: „gesetzt; Herleitung nach der ersten Messung" |
+| Durchgang 2: S-44 / S-46 | Wirkung von Rundenfrist und Notiz-Erinnerung unbelegt | Beide liegen in v0.2; die Prüfung gehört zu den Prototypen |
+| `Product-Audit-Hypotheses.md` H-D1…H-V7 | 21 unbelegte Annahmen | Durch kein Dokument zu schließen. Erhebung wandert von der geplanten Concierge-Runde zu den **Prototypen** (ab der Woche nach dem 2026-09-09). **Achtung:** die Hypothesen-Datei macht Solver, Kalender, Veto, Benachrichtigungen und PWA — „zwischen einem Drittel und der Hälfte des v1-Aufwands" — von einem Bericht der Concierge-Runde abhängig. Diese Sperre ist auf die Prototypen umzuhängen, sonst hat sie keinen Auslöser mehr |
+| `06-Compliance-Anhang.md` Q-1…Q-14 | Offene Rechtsfragen | **Außerhalb dieses Sprints — anwaltliche Prüfung nötig.** Q-1 bis Q-4 sind launch-blockierend. Sie blockieren den **ersten echten Haushalt**, nicht die Implementierung gegen synthetische Daten |
+
+### In diesem Sprint geschlossen
+
+| Schlüssel | Frage | Geklärt |
+|---|---|---|
+| ~~`02-SRD.md` O-08~~ | ~~Token-Seite für Verfügbarkeiten aus v1.1 nach v1 vorziehen?~~ | **Nein.** v0.1 ist der vertikale Schnitt Bewerbung → Screening → Stimme → Ergebnis; Verfügbarkeiten kommen darin nicht vor, also kann die Seite nicht vorgezogen werden. Bleibt v1.1. **Tragende ID für diese Frage.** Maßgeblich: `02-SRD.md` §5.4 |
+| ~~`03-PRD.md` P-O-07~~ | ~~dieselbe Frage~~ | → Verweis auf `02-SRD.md` O-08 |
+| ~~`04-Domaenenmodell.md` O-11~~ | ~~dieselbe Frage~~ | → Verweis auf `02-SRD.md` O-08 |
+| ~~`03-PRD.md` P-O-08~~ | ~~Dauer der „angemeldet bleiben"-Sitzung~~ | 90 Tage gleitend. Maßgeblich: `04-Domaenenmodell.md` §10.2 (O-13). War am Entstehungstag beantwortet |
+| ~~`03-PRD.md` P-O-09~~ | ~~Wer setzt `phase_deadline_at`?~~ | Die moderierende Person, ohne Voreinstellung. Maßgeblich: `04-Domaenenmodell.md` §10.2 (O-14) |
+| ~~`04-Domaenenmodell.md` O-5~~ | ~~Redaktionsregel für `ActivityEvent.payload`~~ | Bereits erfüllt: **G-D7** (Nutzlast gegen Schlüssel-Allowlist je `event_type` geprüft, mit Test, der Freitext erwartungsgemäß abweist) und **G-D8** (Redaktion am Fristende). Maßgeblich: `GUARDRAILS.md` §G-D |
+| ~~`04-Domaenenmodell.md` O-1~~ *(Dokumentationsteil)* | ~~Drei verlangte Nachweise: Pflichthandlung im PRD, Risiko in `06`, benannte Grenze in `GUARDRAILS.md`~~ | Alle drei vorhanden: `03-PRD.md` §4.1.7, `06-Compliance-Anhang.md` §3.4 samt Q-14, `GUARDRAILS.md` G-D1. **Ein Restpunkt entschieden:** das PRD baut die **Rückfrage** („Gibt es frühere Bewerbungen dieser Person?"), Q-14 schlägt zusätzlich einen **Ähnlichkeitsvorschlag** vor. Das sind zwei verschiedene Funktionen mit verschiedener Rechtslage — die Rückfrage ist die Antwort, der Ähnlichkeitsvorschlag bleibt bei der anwaltlichen Prüfung unter Q-14 |
+| ~~`07-Screen-Inventar.md` O-A…O-F~~ | ~~sechs UX-Punkte~~ | Alle sechs aufgelöst in `04-Domaenenmodell.md` §10.2: O-A→O-16, O-B→O-15, O-C→O-13, O-D→O-12, O-E→O-14, O-F→O-7 (`AppointmentAttendance`, U-23, S-51) |
+| ~~`07-Screen-Inventar.md` AW-1…AW-13~~ | ~~Abweichungsliste gegen die übrige Kette~~ | Alle dreizehn abgearbeitet: AW-1/2/5/11/13 im PRD V0.6, AW-3/4/8/9/10 im Domänenmodell V0.4, AW-6/7/12 im Inventar selbst. §13 erhält eine Statusspalte |
+| ~~Durchgang 1: `moved_out_at` / `moved_out_on`~~ | ~~Restposten aus einer Umbenennung~~ | Bereits behoben. `moved_out_at` steht nur noch an zwei historischen Stellen (Changelog `06`, dieser Befund); jede lebende Fundstelle heißt `moved_out_on` |
+| ~~Durchgang 1: Aufwandsgegenprobe~~ | ~~„Keine Aufwandsschätzung, nirgends"~~ | Geschlossen 2026-09-08 durch den Phasenschnitt `02-SRD.md` §5.4. Die Zeile war noch als offenes 🔴 zitiert — korrigiert |
+
+### Nicht mehr hier geführt
+
+Die Fachdokumente behalten ihre Fragen samt Begründung, verlieren aber die Statusspalte. Wer
+dort eine Statusangabe findet, hat einen Fehler gefunden: **G-N5** prüft das.
+
+---
+
 ## Durchgang 1 — 2026-08-19
 
 **Geprüfter Stand:** `01` V0.2 · `02` V0.4 · `03` V0.5 · `04` V0.3 · `05` V0.5 · `06` V0.6 ·
