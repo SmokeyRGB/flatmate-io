@@ -6,3 +6,7 @@
 # The specification documents are edited on Windows; leave their endings to git's
 # normal handling so diffs stay clean.
 *.md text
+
+# The hash lock is read by `sha256sum -c`, which does not tolerate CR in its
+# input. A CRLF checkout would make rule 4 fail on every machine but this one.
+*.sha256 text eol=lf
