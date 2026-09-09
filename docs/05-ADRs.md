@@ -1,5 +1,13 @@
 # 05 — Architecture Decision Records: Flatmate.io
 
+> ❄️ **Eingefroren am 2026-09-09.** Momentaufnahme des Planungsstands V0.8. Die **gepflegte**
+> Fassung liegt in `adr/` — ein Record pro Datei, mit eigener Statuszeile. **Änderungen an dieser
+> Datei sind nicht zulässig**; `tools/check-refs.sh` erkennt sie per Hash (Regel 4).
+>
+> **Warum die Datei bleibt:** Verweise mit Zeilennummer sind nur in eine eingefrorene Datei
+> dauerhaft zitierfähig. Regel 3 des Prüfskripts erlaubt `:LINE`-Verweise ausschließlich hierher
+> und in die beiden anderen Sammeldateien — deshalb wird diese Datei nie gelöscht.
+
 ### ADR-001 bis ADR-012 · Entscheidungen, Optionen, Konsequenzen
 
 > ✅ **Sieben dieser Records tragen v0.1 — und sind am 2026-09-09 bestätigt worden.**

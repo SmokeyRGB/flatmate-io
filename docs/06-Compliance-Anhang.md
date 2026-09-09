@@ -1368,6 +1368,11 @@ Wahrscheinlichkeit zum Hochrisiko-System.
 > **Verwendung:** Dieser Abschnitt ist als **Auftragsliste an eine Kanzlei** formuliert. Jede Frage
 > nennt den Kontext, die hier vertretene Position und das Risiko, wenn sie falsch ist. Die
 > Reihenfolge ist nach Auswirkung sortiert: Q-1 bis Q-4 sind **launch-blockierend**.
+>
+> ⚠️ **Was „launch-blockierend" heißt — und was nicht.** **Keine** dieser Fragen blockiert die
+> Implementierung gegen **synthetische Daten** (v0.1). Q-1 bis Q-4 blockieren ausschließlich den
+> **ersten echten Haushalt**. Ohne diesen Satz liest die Liste wie ein Stoppschild in genau dem
+> Moment, in dem gebaut werden soll — und das ist sie nicht.
 
 | # | Frage | Hier vertretene Position | Risiko, wenn falsch |
 |---|---|---|---|
@@ -1385,6 +1390,7 @@ Wahrscheinlichkeit zum Hochrisiko-System.
 | **Q-12** | Ist der **Service Worker** der PWA nach § 25 Abs. 2 Nr. 2 TDDDG einwilligungsfrei? | ja, weil für die ausdrücklich gewünschte installierbare Anwendung erforderlich ([§10.2](#102-kein-tracking)) | **Niedrig.** Notfalls Banner — was man vermeiden möchte. |
 | **Q-13** | Welche zusätzlichen Pflichten löst die **Vermieter-Stufe** aus (AGG, AI Act, eigenes Art.-30-Verzeichnis, angepasste AVV, DSFA)? | vollständige Neuprüfung vor Aktivierung ([§12](#12--vermieter-szenario)) | **Aufgeschoben.** Blockiert v1 nicht, blockiert die Monetarisierung. |
 | **Q-14** | Ist eine **Duplikaterkennung über Bewerberdaten** (Ähnlichkeit von Name, E-Mail, Telefonnummer) zulässig, um die Lücke aus [§3.4](#34-lücke-die-selbst-redaktion-schützt-nur-verknüpfte-bewerbungen) zu schließen — und wenn nein, wie wird sie **prozessual** geschlossen? | **Kein automatisches Zusammenführen.** Die App schlägt beim Setzen von `became_resident_id` ähnliche ältere Bewerbungen vor und lässt einen Menschen bestätigen | **Hoch für die betroffene Person, niedrig für das Projekt.** Bleibt die Lücke offen, kann eine eingezogene Person Beratungsinhalte über sich selbst aus einer älteren, unverknüpften Bewerbung lesen — genau die Verletzung, gegen die V-1 gebaut wurde. Die Ähnlichkeitsprüfung ist ihrerseits eine eigene Verarbeitung mit eigener Rechtsgrundlage und erzeugt falsch-positive Verknüpfungen zweier verschiedener Personen. |
+| **Q-15** | Genügt der **Copy-Paste-Datenschutzhinweis** (§4.5), den die Moderation selbst an Bewerbende weitergibt, den Anforderungen von **Art. 14** — und wer ist Absender im Rechtssinn, wenn ein Mensch den Text kopiert und über einen eigenen Kanal versendet? | der Wortlaut genügt inhaltlich; Absender ist der `Household` als Verantwortlicher | **Mittel.** Fällt die Position, braucht der Hinweis eine andere **Zustellform**, nicht einen anderen Text. Aufgeworfen durch `03-PRD.md` §8 (P-O-04): der Textkatalog ist Sammelarbeit, die Rechtsfrage dahinter nicht |
 
 ---
 
