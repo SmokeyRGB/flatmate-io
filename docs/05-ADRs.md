@@ -1369,6 +1369,24 @@ Enum-Werte, Funktionen, Tabellen, Commit-Nachrichten, Codekommentare **englisch*
   nutzersichtbare Texte deutsch über eine Übersetzungsschicht — auch wenn v1 nur `de` kennt, weil
   sonst deutsche Zeichenketten im Code landen und die Grenze verwischen.
 
+**Ausnahme, benannt statt geduldet: die Requirements-Pakete sind englisch.**
+`docs/backlog/` — die Pakete `F0` bis `F5`, die Feature-Kurzfassungen, die Roadmap und der
+MVP-Index — ist durchgängig **englisch**, entstanden im Rahmen einer englischsprachigen
+Workshop-Übung. Diese Ausnahme wird hier festgeschrieben, weil sie sonst als Drift gelesen wird
+und irgendwer sie „korrigiert":
+
+- **Regel:** Begründungsdokumente deutsch (`00`–`08`, `GUARDRAILS.md`, `06-Compliance-Anhang.md`,
+  `review-log.md`), **implementierungsnahe Dokumente englisch** (`docs/backlog/**`,
+  `docs/COVERAGE.md`, `tools/**`).
+- **Warum die Naht klein ist:** Alle Bezeichner sind ohnehin englisch. Ein Paket besteht fast
+  ausschließlich aus Bezeichnern, Zuständen und prüfbaren Sätzen darüber — die deutsche Prosa,
+  die dieser Record schützt, trägt dort kaum Gewicht.
+- **Was trotzdem deutsch bleibt:** wörtliche Zitate aus der Kette stehen in Anführungszeichen
+  auf Deutsch, statt paraphrasiert zu werden. Die Pakete sind damit streng genommen zweisprachig,
+  und das ist beabsichtigt: eine Zusicherung soll im Wortlaut ihrer Quelle zitierbar bleiben.
+- **UI-Sprache ist unberührt.** Sichtbarer Text bleibt deutsch (E-02, U-24); dafür gilt die
+  Übersetzungstabelle in `07-Screen-Inventar.md` §8.6.
+
 > **Das gibt man auf, wenn** das Projekt Beitragende gewinnt, die kein Deutsch lesen. Dann werden die
 > Dokumente zweisprachig — der Code ist es bereits.
 
