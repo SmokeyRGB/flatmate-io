@@ -1434,7 +1434,7 @@ Drei Regeln für die Aufteilung, damit dabei nichts verlorengeht:
 
 | Ziel | Wofür |
 |---|---|
-| `00-Session-Brief.md` | verbindliches Entscheidungsprotokoll und Quellenliste |
+| `00-Session-Brief.md` | Entscheidungsprotokoll und Quellenliste der Session vom 2026-08-19 (historisch) |
 | `02-SRD.md` | Scope, Metriken, Risiken — bewusst lösungsneutral |
 | `03-PRD.md` | Nutzerflüsse und Akzeptanzkriterien |
 | `04-Domaenenmodell.md` | Entitäten, Zustandsmaschinen, V-1 bis V-4, Rechenmodelle |

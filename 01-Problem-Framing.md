@@ -18,7 +18,8 @@
 > **S-47** nachgezogen (zweiter Durchlauf im Screening-Kartenmuster statt eigener
 > Feinschliff-Screen) · v1-Scope um **S-48 bis S-51** ergänzt, die bisher fehlten · Lesehinweis zur
 > E-Tabelle ergänzt, welche Beschlüsse inzwischen im Detail durch S-Zeilen überholt sind.
-> **Vorgänger:** `Initial Claude Prompt.md` → `00-Session-Brief.md` (verbindliches Entscheidungsprotokoll)
+> **Vorgänger:** `Initial-Claude-Prompt.md` → `00-Session-Brief.md` (Entscheidungsprotokoll der
+> Session vom 2026-08-19 — historisch, nicht mehr präzedenzführend)
 > **Nachfolger:** `02-SRD.md` → `03-PRD.md` ·
 > `04-Domaenenmodell.md` → `05-ADRs.md` · `06-Compliance-Anhang.md` → `GUARDRAILS.md` ·
 > `review-log.md`
@@ -83,7 +84,7 @@ von über 80 %** der stimmberechtigten Bewohnenden pro Runde.
 ## Belegkette: Der Ist-Prozess in 13 Schritten
 
 Die folgenden dreizehn Schritte stammen unverändert aus der Ausgangsbeschreibung
-(`Initial Claude Prompt.md`) und sind die empirische Grundlage dieses Dokuments. Jede
+(`Initial-Claude-Prompt.md`) und sind die empirische Grundlage dieses Dokuments. Jede
 Zeile benennt, wo der Schritt heute stattfindet und was dabei verloren geht.
 
 | # | Schritt heute | Wo er stattfindet | Was dabei kaputt geht |
@@ -124,7 +125,7 @@ heute verfügbares Werkzeug mehr als zwei ab (Benchmark in `02-SRD.md` §5.1).
 
 ## Designprinzipien
 
-Diese fünf Prinzipien sind im `00-Session-Brief.md` verbindlich festgelegt und werden in
+Diese fünf Prinzipien wurden im `00-Session-Brief.md` festgelegt und werden in
 allen Folgedokumenten **namentlich** referenziert, nicht umformuliert. Jedes Feature in
 `03-PRD.md` ist gegen sie prüfbar.
 

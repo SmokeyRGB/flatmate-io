@@ -1,4 +1,26 @@
-00-Session-Brief.md
-Initial*Claude*Prompt.md
-Check-In-Presentation*07.09
-.claude
+# Every rule here is ANCHORED with a leading slash.
+#
+# Before this rewrite none of them were, so each pattern matched at any depth.
+# Two consequences, both real:
+#   - `00-Session-Brief.md` stayed invisible to git after it was moved into
+#     claude-logs/, which is why 23 references pointed at a file that a clone
+#     did not contain — while six document headers called it the binding source.
+#   - `Check-In-Presentation*07.09` will stop matching once that folder is
+#     renamed. One `git add -A` at the wrong moment would then commit 42 MB of
+#     .pptx and .mp4 permanently into history. Both the old and the new path are
+#     listed below so no window exists where that folder is unignored.
+
+# --- Local tooling ------------------------------------------------------------
+/.claude/
+
+# --- Coursework binaries: slides, video, and Office lock files ----------------
+# 42 MB, needed for the school submission, useless to an implementer.
+/Check-In-Presentation 07.09/
+/coursework/check-in-presentation-2026-09-07/
+~$*
+
+# --- Deliberately NOT ignored anymore ----------------------------------------
+# `00-Session-Brief.md` and `Initial-Claude-Prompt.md` are now tracked. The
+# brief is the decision protocol the whole chain rests on; shipping specs that
+# name a source of truth absent from the repo was the worst defect in the tree.
+# See docs/README.md for the precedence order it sits in.

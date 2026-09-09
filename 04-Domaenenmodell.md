@@ -2325,7 +2325,7 @@ Kernversprechen betrifft.
 
 | Ziel | Wofür |
 |---|---|
-| `00-Session-Brief.md` | verbindliches Entscheidungsprotokoll; alles hier ist daraus abgeleitet |
+| `00-Session-Brief.md` | Entscheidungsprotokoll der Session vom 2026-08-19; Ausgangspunkt dieses Dokuments, **historisch** — bei Widerspruch gilt die Kette, nicht das Protokoll |
 | `02-SRD.md` | Scope, Metriken, Risiken, Aufwand — lösungsneutral |
 | `03-PRD.md` | Nutzerflüsse und Akzeptanzkriterien, insbesondere zur Sichtbarkeitsinvariante |
 | `07-Screen-Inventar.md` | **neu.** Narrative Gegenstelle zu §8.6–§8.8: `phase_hint` (dort §3.1), CTA-Sortierung (dort §2.2) und die UI-Sprachregelung — dieselben Regeln in einfacher Sprache statt Pseudocode |

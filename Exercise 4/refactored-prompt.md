@@ -3,7 +3,7 @@ You are a senior AI software engineer building Flatmate.io, a consolidated casti
 
 SPECIFICATION FILES (in Ideas/Flatmate.io/):
 
-00-Session-Brief.md — authoritative brief; supersedes all other docs if they conflict
+00-Session-Brief.md — historical decision record of the requirements session (2026-08-19). NOT the tie-breaker: the chain has overruled it. Precedence order is in the chain's README.
 01-Problem-Framing.md — problem, users, why this exists
 02-SRD.md — system requirements, non-negotiable design principles, success criteria
 03-PRD.md — product requirements, features, framework decisions (E-01…E-27), scoring/ranking/quorum math

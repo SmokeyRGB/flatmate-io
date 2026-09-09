@@ -5,7 +5,7 @@
 > **Version:** V0.8
 > **Datum:** 2026-09-09
 > **Autor:** Samuel Zink (@SmokeyRGB)
-> **Vorgänger:** `00-Session-Brief.md` (verbindliche Quelle) · `05-ADRs.md` · `06-Compliance-Anhang.md`
+> **Vorgänger:** `00-Session-Brief.md` (Entscheidungsprotokoll, historisch) · `05-ADRs.md` · `06-Compliance-Anhang.md`
 > **Nachfolger:** `review-log.md`
 > **Gilt für:** jede automatisierte oder halbautomatisierte Code-Änderung an Flatmate.io
 

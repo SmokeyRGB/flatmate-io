@@ -5,7 +5,7 @@
 > **Version:** V0.6
 > **Datum:** 2026-08-19
 > **Autor:** Samuel Zink (@SmokeyRGB)
-> **Vorgänger:** `00-Session-Brief.md` (verbindliche Quelle) · `02-SRD.md` §7 · `04-Domaenenmodell.md`
+> **Vorgänger:** `00-Session-Brief.md` (Entscheidungsprotokoll, historisch) · `02-SRD.md` §7 · `04-Domaenenmodell.md`
 > **Nachfolger:** `GUARDRAILS.md` · `review-log.md`
 > **Korrespondiert mit:** ADR-010 (Datenbestandsverzeichnis als CI-Gate), ADR-004
 > (Autorisierung zweifach erzwungen), Prinzip **P-5**
