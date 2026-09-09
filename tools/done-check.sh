@@ -177,7 +177,7 @@ else
 fi
 # the specific closures this sprint promised
 F1=$(ls docs/backlog/requirements/F1-requirements.md "Exercise 10/AI-Ready Requirements/F1-requirements.md" 2>/dev/null | head -1)
-F0=$(ls docs/backlog/requirements/F0-requirements.md 2>/dev/null | head -1)
+F0=$(ls docs/backlog/requirements/F0-requirements.md "Exercise 10/AI-Ready Requirements/F0-requirements.md" 2>/dev/null | head -1)
 [ -n "$F1" ] && { grep -q 'S-05' "$F1" && ok "S-05 is claimed by the F1 packet" \
                                        || bad "S-05 not claimed by the F1 packet" "$F1"; }
 if [ -n "$F0" ]; then
