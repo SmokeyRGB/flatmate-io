@@ -1401,41 +1401,33 @@ bzw. den Fließtext ausgeschrieben, wo eine Regel greift; die Standardregel gilt
 
 ## §13 — Abweichungsliste gegen die bestehende Kette
 
+> **Der Status offener Punkte steht ausschließlich im Register in `review-log.md`.** Dieser
+> Abschnitt führt die Frage und ihre Begründung; ob sie offen ist, entscheidet das Register.
+> Geschlossene Zeilen bleiben durchgestrichen stehen — die Begründung ist der wertvollere Teil.
+
 Diese Liste ist die Arbeitsvorlage für die drei parallelen Nachzug-Dokumente
 (`02-SRD.md`, `03-PRD.md`, `04-Domaenenmodell.md`). Jede Zeile nennt die Stelle in der bestehenden
 Kette, die diesem Inventar widerspricht oder die es voraussetzt.
 
-| # | Abweichung | Betroffenes Dokument | Auflösung hier |
-|---|---|---|---|
-| AW-1 | Fünf Tabs (Runde · Bewerbungen · Termine · Feed · Ich) | `03-PRD.md` §4.1.0 | §4.1 — zwei Tabs + Kopfzeile |
-| AW-2 | „Rundenphase" als Begriff, den es als Zustand nicht gibt | 03-PRD.md §4.1.4/§4.1.6/§4.2.4 | §3.1 — Terminologie auf `stage` (`invite`/`offer`) korrigiert |
-| AW-3 | `phase_deadline_at` beruft sich auf eine Rundenphase ohne Berechnungsregel | 04-Domaenenmodell.md (B-1 im Sprint-Log) | §3.1 liefert die fehlende Formel — **Korrektur am Domänenmodell**, nicht nur am Inventar |
-| AW-4 | PWA-Install-Hinweis „weiter oben einsortiert, aus demselben Grund wie eine näher rückende Rundenfrist" | 04-Domaenenmodell.md (B-2 im Sprint-Log) | §2.3/§7.6 — eigenes Band unter dem CTA, nie Teil der Aufgabensortierung. **Bestätigter Fehler im Domänenmodell**, dort zu korrigieren |
-| AW-5 | Feinschliff-Bildschirm mit „Unbedingt"-Kandidaten nebeneinander, direkt herabstufbar | 03-PRD.md §4.1.5 | §9 — zweiter Durchlauf ersetzt den eigenen Bildschirm |
-| AW-6 | „acting_profile_id = null" als Auslöser von Verwaltungsrechten (frühere Planformulierung) | — (in diesem Dokument selbst korrigiert) | §4.2 — Rechte kommen ausschließlich aus `role`/`permissions` |
-| AW-7 | Bewohnerliste als eine Liste, für alle sichtbar, jedes Mitglied kann entfernen | 02-SRD.md S-05 | §7 (B4/O16) — zwei getrennte Listen mit unterschiedlichen Rechten. `01-Problem-Framing.md` E-06 bleibt als historischer Beschluss unverändert stehen — spätere Festlegungen leben laut eigener Regel des Dokuments als S-Zeilen im SRD; nur dessen Begründung ist durch U-22 teilweise überholt |
-| AW-8 | `join_code` nur mit Rotation, kein Ablauf, keine Nutzungsgrenze | 04-Domaenenmodell.md (B-4 im Sprint-Log) | §7.16 (O16) — Ablauf und Nutzungsgrenze als Pflicht ergänzt, Rotation bleibt (G-A5 unverändert gültig) |
-| AW-9 | Kurzfristige Absage einer einzelnen Person zu einem Termin nicht modelliert | 04-Domaenenmodell.md (B-3 im Sprint-Log) | §7 (C8/O11) setzt das Feld voraus — Domänenmodell-Sitzung muss es ergänzen |
-| AW-10 | Anwesenheit „von der moderierenden Person nach dem Termin gesetzt" | 04-Domaenenmodell.md `AppointmentAttendance.attended` | §7.11/§7.10 (O10/O11) — Richtung umgekehrt: `attended` startet `true`, Moderation korrigiert nur Ausnahmen |
-| AW-11 | Verwaltung mit vollem Zugriff auf Runden, Bewerbungen, Termine, Notizen | 03-PRD.md §4.0.1 (Rechtematrix) | §4.3 — Verwaltung ohne `ResidentProfile` erreicht keine Castings, zwei benannte Ausnahmen |
-| AW-12 | „rein deskriptiv, nie empfehlend" als UI-Textregel unter Berufung auf P-5 | — (frühere Planformulierung) | §7 (Organisation-Einleitung) — Grenze liegt bei Prozess vs. Person, nicht bei beschreibend vs. werbend |
-| AW-13 | Bildschirmliste in 03-PRD.md §4.1.13 nennt „Persönliche Einstellungen" und „Passwort/Passkey" als getrennte Ziele | 03-PRD.md §4.1.13 | §7 (E1) — ein Bildschirm mit Abschnitten |
+| # | Abweichung | Betroffenes Dokument | Auflösung hier | Status |
+|---|---|---|---|---|
+| AW-1 | Fünf Tabs (Runde · Bewerbungen · Termine · Feed · Ich) | `03-PRD.md` §4.1.0 | §4.1 — zwei Tabs + Kopfzeile | ✅ nachgezogen in `03-PRD.md` V0.6 |
+| AW-2 | „Rundenphase" als Begriff, den es als Zustand nicht gibt | 03-PRD.md §4.1.4/§4.1.6/§4.2.4 | §3.1 — Terminologie auf `stage` (`invite`/`offer`) korrigiert | ✅ nachgezogen in `03-PRD.md` V0.6 |
+| AW-3 | `phase_deadline_at` beruft sich auf eine Rundenphase ohne Berechnungsregel | 04-Domaenenmodell.md (B-1 im Sprint-Log) | §3.1 liefert die fehlende Formel — **Korrektur am Domänenmodell**, nicht nur am Inventar | ✅ nachgezogen in `04-Domaenenmodell.md` V0.4 |
+| AW-4 | PWA-Install-Hinweis „weiter oben einsortiert, aus demselben Grund wie eine näher rückende Rundenfrist" | 04-Domaenenmodell.md (B-2 im Sprint-Log) | §2.3/§7.6 — eigenes Band unter dem CTA, nie Teil der Aufgabensortierung. **Bestätigter Fehler im Domänenmodell**, dort zu korrigieren | ✅ nachgezogen in `04-Domaenenmodell.md` V0.4 |
+| AW-5 | Feinschliff-Bildschirm mit „Unbedingt"-Kandidaten nebeneinander, direkt herabstufbar | 03-PRD.md §4.1.5 | §9 — zweiter Durchlauf ersetzt den eigenen Bildschirm | ✅ nachgezogen in `03-PRD.md` V0.6 |
+| AW-6 | „acting_profile_id = null" als Auslöser von Verwaltungsrechten (frühere Planformulierung) | — (in diesem Dokument selbst korrigiert) | §4.2 — Rechte kommen ausschließlich aus `role`/`permissions` | ✅ in diesem Dokument selbst korrigiert |
+| AW-7 | Bewohnerliste als eine Liste, für alle sichtbar, jedes Mitglied kann entfernen | 02-SRD.md S-05 | §7 (B4/O16) — zwei getrennte Listen mit unterschiedlichen Rechten. `01-Problem-Framing.md` E-06 bleibt als historischer Beschluss unverändert stehen — spätere Festlegungen leben laut eigener Regel des Dokuments als S-Zeilen im SRD; nur dessen Begründung ist durch U-22 teilweise überholt | ✅ in diesem Dokument selbst korrigiert |
+| AW-8 | `join_code` nur mit Rotation, kein Ablauf, keine Nutzungsgrenze | 04-Domaenenmodell.md (B-4 im Sprint-Log) | §7.16 (O16) — Ablauf und Nutzungsgrenze als Pflicht ergänzt, Rotation bleibt (G-A5 unverändert gültig) | ✅ nachgezogen in `04-Domaenenmodell.md` V0.4 |
+| AW-9 | Kurzfristige Absage einer einzelnen Person zu einem Termin nicht modelliert | 04-Domaenenmodell.md (B-3 im Sprint-Log) | §7 (C8/O11) setzt das Feld voraus — Domänenmodell-Sitzung muss es ergänzen | ✅ nachgezogen in `04-Domaenenmodell.md` V0.4 |
+| AW-10 | Anwesenheit „von der moderierenden Person nach dem Termin gesetzt" | 04-Domaenenmodell.md `AppointmentAttendance.attended` | §7.11/§7.10 (O10/O11) — Richtung umgekehrt: `attended` startet `true`, Moderation korrigiert nur Ausnahmen | ✅ nachgezogen in `04-Domaenenmodell.md` V0.4 |
+| AW-11 | Verwaltung mit vollem Zugriff auf Runden, Bewerbungen, Termine, Notizen | 03-PRD.md §4.0.1 (Rechtematrix) | §4.3 — Verwaltung ohne `ResidentProfile` erreicht keine Castings, zwei benannte Ausnahmen | ✅ nachgezogen in `03-PRD.md` V0.6 |
+| AW-12 | „rein deskriptiv, nie empfehlend" als UI-Textregel unter Berufung auf P-5 | — (frühere Planformulierung) | §7 (Organisation-Einleitung) — Grenze liegt bei Prozess vs. Person, nicht bei beschreibend vs. werbend | ✅ in diesem Dokument selbst korrigiert |
+| AW-13 | Bildschirmliste in 03-PRD.md §4.1.13 nennt „Persönliche Einstellungen" und „Passwort/Passkey" als getrennte Ziele | 03-PRD.md §4.1.13 | §7 (E1) — ein Bildschirm mit Abschnitten | ✅ nachgezogen in `03-PRD.md` V0.6 |
 
-> **Stand 2026-09-08 — sieben dieser Abweichungen sind in den Quelldokumenten angekommen** und
-> stehen hier nur noch als Nachweis, nicht als offene Forderung:
->
-> | # | Erledigt in |
-> |---|---|
-> | AW-1 (fünf Tabs) | `03-PRD.md` V0.6 §4.1.0 — zwei Tabs plus Kopfzeile (U-2) |
-> | AW-2 („Rundenphase" als Zustand) | `03-PRD.md` V0.6 §4.1.4/§4.1.6/§4.2.4 — Terminologie auf `Vote.stage` |
-> | AW-3 (`phase_hint` ohne Formel) | `04-Domaenenmodell.md` V0.4 §8.6 — Pseudocode ergänzt |
-> | AW-4 (Install-Hinweis in der Aufgabensortierung) | `04-Domaenenmodell.md` V0.4 §8.7 — CTA-Sortierung schließt das Band aus |
-> | AW-5 (Feinschliff-Bildschirm) | `03-PRD.md` V0.6 §4.1.5 — zweiter Durchlauf im Kartenmuster (S-47) |
-> | AW-9 (Einzelabsage nicht modelliert) | `04-Domaenenmodell.md` V0.4 — `AppointmentAttendance` samt Selbstabsage (U-23, S-51) |
-> | AW-10 (Anwesenheit nachträglich gesetzt) | `04-Domaenenmodell.md` V0.4 — `attended` startet `true` (U-23, S-51) |
->
-> **Noch offen bzw. bewusst stehengelassen:** AW-6, AW-7 (E-06 bleibt historischer Beschluss),
-> AW-8, AW-11, AW-12, AW-13.
+> **Stand 2026-09-09 — alle dreizehn Abweichungen sind abgearbeitet.** Die Statusspalte oben
+> hält das fest. Eine frühere Fassung dieses Hinweises führte sechs davon noch als offen bzw.
+> bewusst stehengelassen (AW-6, AW-7, AW-8, AW-11, AW-12, AW-13) — das war veraltet.
 
 Nummern S-47 bis S-51 (SRD, vergeben laut `Session-Sprint-Log.md` §1) werden in diesem Dokument
 zitiert, nicht neu definiert: **S-47** zweiter Durchlauf (§9) · **S-48** Aufgabenmodell mit
@@ -1447,14 +1439,18 @@ Casting-Zugriff (§4.3) · **S-51** Anwesenheit angenommen plus Absage einzelner
 
 ## §14 — Offene Punkte
 
+> **Der Status offener Punkte steht ausschließlich im Register in `review-log.md`.** Dieser
+> Abschnitt führt die Frage und ihre Begründung; ob sie offen ist, entscheidet das Register.
+> Geschlossene Zeilen bleiben durchgestrichen stehen — die Begründung ist der wertvollere Teil.
+
 | # | Punkt | Vorschlag | Betrifft |
 |---|---|---|---|
-| O-A | Passwort-Rücksetzung für Bewohnende ohne E-Mail | Durch den Haushalts-`Account`, mit sichtbarem `ActivityEvent` und Beendigung bestehender Sitzungen | E1, 04-Domaenenmodell.md |
-| O-B | Standardwerte Einladungslink | Ablauf 7 Tage · Nutzungsgrenze = fehlende Bewohnende, beides in `HouseholdSettings` änderbar | O16 |
-| O-C | Dauer der „angemeldet bleiben"-Sitzung | Vorschlag 90 Tage mit gleitender Verlängerung; endet bei Passwortwechsel und bei `moved_out` | A3, A4, 04-Domaenenmodell.md (`Session`) |
-| O-D | Womit meldet sich ein Resident-Account ohne E-Mail an? `Account.email` ist bereits nullable, die Anmeldekennung ist nirgends bestimmt | Vorschlag: Haushalt + Anzeigename + Passwort, Eindeutigkeit `(household_id, display_name)` | A2, 04-Domaenenmodell.md |
-| O-E | Wer setzt und verlängert `phase_deadline_at`, gibt es eine Voreinstellung? | Die moderierende Person, ohne Voreinstellung | O15 |
-| O-F *(neu)* | Kurzfristige Absage einer einzelnen Person (AW-9) — welches Feld trägt das? | Vorschlag an die Domänenmodell-Sitzung: eine `AppointmentAttendance`-eigene Markierung statt einer Änderung an `Appointment.status`, damit die Notiz-Erinnerung (S-46) korrekt zwischen „war nicht da" und „war da, hat aber nicht geschrieben" unterscheidet | C8, O11, 04-Domaenenmodell.md |
+| ~~O-A~~ | ~~Passwort-Rücksetzung für Bewohnende ohne E-Mail~~ | Durch den Haushalts-`Account`, mit sichtbarem `ActivityEvent` und Beendigung bestehender Sitzungen | **Geklärt:** `04-Domaenenmodell.md` §10.2 (O-16) — Passwort-Reset über den Haushalts-`Account` |
+| ~~O-B~~ | ~~Standardwerte Einladungslink~~ | Ablauf 7 Tage · Nutzungsgrenze = fehlende Bewohnende, beides in `HouseholdSettings` änderbar | **Geklärt:** `04-Domaenenmodell.md` §10.2 (O-15) — Ablauf 7 Tage, Nutzungsgrenze = fehlende Bewohnende |
+| ~~O-C~~ | ~~Dauer der „angemeldet bleiben"-Sitzung~~ | Vorschlag 90 Tage mit gleitender Verlängerung; endet bei Passwortwechsel und bei `moved_out` | **Geklärt:** `04-Domaenenmodell.md` §10.2 (O-13) — 90 Tage, gleitend |
+| ~~O-D~~ | ~~Womit meldet sich ein Resident-Account ohne E-Mail an? `Account.email` ist bereits nullable, die Anmeldekennung ist nirgends bestimmt~~ | Vorschlag: Haushalt + Anzeigename + Passwort, Eindeutigkeit `(household_id, display_name)` | **Geklärt:** `04-Domaenenmodell.md` §10.2 (O-12) — Haushalt + Anzeigename + Passwort |
+| ~~O-E~~ | ~~Wer setzt und verlängert `phase_deadline_at`, gibt es eine Voreinstellung?~~ | Die moderierende Person, ohne Voreinstellung | **Geklärt:** `04-Domaenenmodell.md` §10.2 (O-14) — die moderierende Person, ohne Voreinstellung |
+| ~~O-F~~ *(neu)* | ~~Kurzfristige Absage einer einzelnen Person (AW-9) — welches Feld trägt das?~~ | Vorschlag an die Domänenmodell-Sitzung: eine `AppointmentAttendance`-eigene Markierung statt einer Änderung an `Appointment.status`, damit die Notiz-Erinnerung (S-46) korrekt zwischen „war nicht da" und „war da, hat aber nicht geschrieben" unterscheidet | **Geklärt:** `04-Domaenenmodell.md` §10.2 (O-7) — eigene Markierung an `AppointmentAttendance`; schließt S-51, folgt U-23 |
 
 ---
 

@@ -54,7 +54,22 @@ else
     while IFS= read -r id; do
       [ -n "$id" ] || continue
       grep -qE "\b$id\b" "$RVL" || missing="$missing $id($(basename "$src"))"
-    done < <(grep -oE '^\| \*\*(O-[0-9A-F]+|P-O-[0-9]+|AW-[0-9]+)\*\*' "$src" 2>/dev/null |
+    # What counts as an OPEN row.
+    #
+    # The documents express closure in three different, all legitimate ways, and
+    # the check has to honour each rather than force one convention onto them:
+    #   ~~O-5~~            struck through          (02-SRD, 03-PRD, 04 §10.3)
+    #   | AW-1 | … | ✅ |  a status column          (07-Screen-Inventar §13)
+    #   "Geklärt" / "entschieden" in the row       (04 §10.1 and §10.2 are
+    #                                               headed as decided lists)
+    # They also disagree on bolding: 02-SRD writes "| **O-07** |",
+    # 04-Domaenenmodell writes "| O-1 |". Match both.
+    #
+    # So: a row is open only if its ID is unstruck AND the row carries no
+    # closure marker.
+    done < <(grep -E '^\| \*{0,2}(O-[0-9A-F]+|P-O-[0-9]+|AW-[0-9]+)\*{0,2} \|' "$src" 2>/dev/null |
+               grep -vE '✅|Geklärt|geklärt|entschieden|Entschieden|geschlossen' |
+               grep -oE '^\| \*{0,2}(O-[0-9A-F]+|P-O-[0-9]+|AW-[0-9]+)' |
                grep -oE '(O-[0-9A-F]+|P-O-[0-9]+|AW-[0-9]+)' | tr -d '\r' | sort -u)
   done
   if [ -n "$missing" ]; then
