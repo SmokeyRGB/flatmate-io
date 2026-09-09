@@ -42,7 +42,7 @@ Die Anforderungskette für Flatmate.io ist dicht (`01-Problem-Framing` → `02-S
 beschreibt aber nirgends, wie sich das als Oberfläche anfühlt. Drei Befunde erklären, warum das
 mehr als ein fehlendes Artefakt ist:
 
-1. **Der Rundenkopf hat einen Handlungsaufruf, die Realität hat mehrere.** [03-PRD.md:325](03-PRD.md:325)
+1. **Der Rundenkopf hat einen Handlungsaufruf, die Realität hat mehrere.** `03-PRD.md` §4.1.2
    definiert „4 offene Bewerbungen warten auf dich". Aber Stimmen laufen **pro Bewerbung**, nicht
    pro Runde ([`Vote.stage`](04-Domaenenmodell.md:674)). Ein Bewohner kann gleichzeitig offen
    haben: Stimmen der ersten Runde · Stimmen der zweiten · Verfügbarkeit · Slot-Reaktionen ·
@@ -114,7 +114,7 @@ danach, in der festen Reihenfolge T-1 · T-2 · T-3 · T-4/T-5 · T-6.
    vorbei, das Veto ist gesperrt, der Einzug hat stattgefunden.
 2. **Andere hängen an mir.** Solange eine Person nicht handelt, kommt die Gruppe nicht weiter.
    Ohne Verfügbarkeit lässt sich kein Termin rechnen. Ohne Notiz können Abwesende bei der Zusage
-   gar nicht mitentscheiden — Schritt 16 der Belegkette ([03-PRD.md §4.0.2](03-PRD.md:218)), als
+   gar nicht mitentscheiden — Schritt 16 der Belegkette (`03-PRD.md` §4.0.2), als
    zentraler Schmerzpunkt markiert.
 
 **Die App nennt den Grund.** Neben jeder Aufgabe steht, warum sie dran ist: „Termin morgen 17:00"
@@ -136,7 +136,7 @@ leere Fläche. T-6 erscheint nie neben T-5, weil es dessen Folgeschritt ist.
 Rechten, nie in die persönliche Liste gemischt: „3 Dinge brauchen deine Moderation →" (U-5). Führt
 direkt in die Organisationsfläche (§4.2), nicht in eine Übersicht.
 
-**Schließt P-O-05** ([03-PRD.md:1254](03-PRD.md:1254)): Der Durchlauf arbeitet auf der Menge, die
+**Schließt P-O-05** (`03-PRD.md` §8): Der Durchlauf arbeitet auf der Menge, die
 beim Öffnen feststand; T-5 rechnet beim nächsten Öffnen neu.
 
 ---
@@ -322,7 +322,7 @@ Lücke, kein Hinweis, keine Zählung, aus der man zurückrechnen könnte.
 **Genau eine benannte Ausnahme:** die Detailseite der *eigenen* Bewerbung (§7.13). Dorthin darf
 man, weil das Sachprofil sichtbar bleibt (Name, Kontakt, Termin, Zimmer, Einzugsdatum) — und nur
 dort wäre die Leere sonst als Ladefehler lesbar. Dort steht der Satz aus
-[03-PRD.md:503](03-PRD.md:503).
+`03-PRD.md` §4.2.5.
 
 Es bleiben **vier** Zustände: **Laden · Leer · Fehler · Keine Berechtigung.**
 Standardverhalten zentral:
@@ -785,7 +785,7 @@ Details zu `budget` und der Ablaufsequenz: §9.
 **Kernelemente**
 
 - Sachprofil: Name, Kontakt, Termin, Zimmer, Einzugsdatum
-- **Keine** Stimmen, Notizen oder Score — mit dem Satz aus [03-PRD.md:503](03-PRD.md:503), damit
+- **Keine** Stimmen, Notizen oder Score — mit dem Satz aus `03-PRD.md` §4.2.5, damit
   die Leere nicht als Ladefehler gelesen wird
 
 ---
@@ -1299,7 +1299,7 @@ Prozess vs. Person, nicht bei „beschreibend vs. empfehlend".
 
 ## §9 — Der zweite Durchlauf statt eines Feinschliff-Screens
 
-Statt eines eigenen Vergleichsbildschirms (bisher [03-PRD.md §4.1.5](03-PRD.md:452), „Unbedingt"-
+Statt eines eigenen Vergleichsbildschirms (bisher `03-PRD.md` §4.1.5, „Unbedingt"-
 Kandidaten **nebeneinander, direkt herabstufbar") ein zweiter kurzer Durchlauf über die eigenen
 „Unbedingt"-Karten, im selben Muster wie das Screening (C1/C2).
 
@@ -1407,7 +1407,7 @@ Kette, die diesem Inventar widerspricht oder die es voraussetzt.
 
 | # | Abweichung | Betroffenes Dokument | Auflösung hier |
 |---|---|---|---|
-| AW-1 | Fünf Tabs (Runde · Bewerbungen · Termine · Feed · Ich) | [03-PRD.md §4.1.0](03-PRD.md:281) | §4.1 — zwei Tabs + Kopfzeile |
+| AW-1 | Fünf Tabs (Runde · Bewerbungen · Termine · Feed · Ich) | `03-PRD.md` §4.1.0 | §4.1 — zwei Tabs + Kopfzeile |
 | AW-2 | „Rundenphase" als Begriff, den es als Zustand nicht gibt | 03-PRD.md §4.1.4/§4.1.6/§4.2.4 | §3.1 — Terminologie auf `stage` (`invite`/`offer`) korrigiert |
 | AW-3 | `phase_deadline_at` beruft sich auf eine Rundenphase ohne Berechnungsregel | 04-Domaenenmodell.md (B-1 im Sprint-Log) | §3.1 liefert die fehlende Formel — **Korrektur am Domänenmodell**, nicht nur am Inventar |
 | AW-4 | PWA-Install-Hinweis „weiter oben einsortiert, aus demselben Grund wie eine näher rückende Rundenfrist" | 04-Domaenenmodell.md (B-2 im Sprint-Log) | §2.3/§7.6 — eigenes Band unter dem CTA, nie Teil der Aufgabensortierung. **Bestätigter Fehler im Domänenmodell**, dort zu korrigieren |

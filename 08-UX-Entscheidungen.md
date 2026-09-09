@@ -12,8 +12,9 @@
 > dieser 144 Verweise nach einer Übergabe nicht mehr auflösbar. Dieses Dokument beendet das:
 > die U-Nummern haben hier ihren einen verbindlichen Ort.
 
-> **Herkunft.** Übernommen am 2026-09-09 aus dem vom Nutzer genehmigten Plan
-> `ich-habe-zahlreiche-anforderungen-quiet-dusk.md` (Stand V5), Abschnitt „Entschieden".
+> **Herkunft.** Übernommen am 2026-09-09 aus dem vom Nutzer genehmigten UX/UI-Plan vom
+> 2026-09-02 (Stand V5), Abschnitt „Entschieden". Der Plan liegt außerhalb dieses
+> Repositoriums und ist deshalb hier absichtlich nicht als Dateiverweis notiert.
 > Der Wortlaut ist **unverändert**; ergänzt sind ausschließlich die Spalte „Bemerkung" und
 > die Abschnitte darunter. Der Plan selbst wird nicht mit diesem Dokument synchronisiert —
 > er ist die eingefrorene Quelle, dieses Dokument die gepflegte Fassung.

@@ -517,7 +517,7 @@ Vergebbare Werte in `permissions` (Vorschlag, erweiterbar):
 #### `ApplicationInviteToken` — der Link „diese Bewerbung wird jetzt Bewohner:in"
 
 **Neu in diesem Update.** Der Mechanismus stand bisher nur als Vorschlag in
-`Product-Audit-Hypotheses.md:537–591` (S-42). Er erweitert diesen Vorschlag um die dort offen
+`Product-Audit-Hypotheses.md` §H-F5 (S-42). Er erweitert diesen Vorschlag um die dort offen
 gelassene Frage, was passiert, wenn eine **bereits registrierte** Person auf den Link klickt —
 siehe Kasten.
 

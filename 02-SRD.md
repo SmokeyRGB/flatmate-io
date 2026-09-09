@@ -334,9 +334,9 @@ zurückführen lassen muss. Die Phasenzuordnung steht in §5.4.
 **Aktiviert** — das Vorhaben ist mehrphasig, und der Schnitt ist verhandelt.
 
 **Was sich mit V0.6 geändert hat, und warum.** Bis V0.5 war **v1 = S-01 bis S-51**, also
-praktisch das ganze Produkt in einer Phase. `review-log.md:53` führt dazu eine offene 🔴:
+praktisch das ganze Produkt in einer Phase. `review-log.md` §Multi-Rollen-Review führt dazu eine offene 🔴:
 *„Keine Aufwandsschätzung, nirgends. Der v1-Scope wurde festgelegt, ohne dass die verfügbare
-Zeit je zur Sprache kam"* — und `review-log.md:316` nennt als nächste Handlung **vor der ersten
+Zeit je zur Sprache kam"* — und `review-log.md` §Retrospektive nennt als nächste Handlung **vor der ersten
 Zeile Code** die *„Aufwandsgegenprobe des v1-Scope"*. Die folgende Unterteilung **ist** diese
 Gegenprobe. Keine `S`-Zeile wird umnummeriert; **v1 bleibt als Ziel wörtlich bestehen** und ist
 jetzt der Meilenstein am Ende von **v0.2** statt eine Arbeitsphase.

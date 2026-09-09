@@ -34,9 +34,9 @@ Seven rules. Each exists because that specific failure has already happened at l
 
 | Rule | What it checks | Why |
 |---|---|---|
-| **1** | Every markdown link `[text](file.md)` resolves to a file that exists | Two file moves on 2026-09-09 broke ~33 references at once and nobody noticed |
+| **1** | Every markdown link — the `[text](…)` form — resolves to a file that exists | Two file moves on 2026-09-09 broke ~33 references at once and nobody noticed |
 | **2** | Every filename in backticks — `` `02-SRD.md` `` — exists somewhere in the project | This is the repo's normal way of citing a document. It is resolved *by filename only*, which is exactly why moving a group of files together is safe: the citation keeps working. Rule 2 is what proves that |
-| **3** | A reference with a line number (`03-PRD.md:325`) is only allowed into the three **frozen** files | A line number into a living document is a time bomb. Insert one paragraph above it and it points at the wrong sentence — with no error, ever. When this rule was first run it found **15** such references, and **five of them were already wrong** |
+| **3** | A reference carrying a line number is only allowed into the three **frozen** files | A line number into a living document is a time bomb. Insert one paragraph above it and it points at the wrong sentence — with no error, ever. When this rule was first run it found **15** such references, and **five were already wrong**: one cited „§4.1.5" while its line number had drifted into §4.1.3, and one cited an open point that had moved 339 lines away. The rule caught its own reason for existing |
 | **4** | The three frozen files have not been edited (checked by hash) | Splitting a big document leaves two copies that both look authoritative. The hash is what stops someone editing the wrong one. Changing a frozen file on purpose means updating its hash in the same commit — which makes the intent visible in review instead of invisible |
 | **5** | Every `ADR-NNN` mentioned anywhere has exactly one record file | Catches an ADR written into a spec with no record behind it, and a record accidentally split in two |
 | **6** | Every `U-n` and `S-nn` used anywhere is actually defined where the ID register says | The `U-` decisions were cited 144 times while living in a file outside the repo. This rule makes that impossible to repeat |
@@ -95,7 +95,7 @@ MIT · ISC · BSD-2-Clause · BSD-3-Clause · Apache-2.0 · 0BSD · Unlicense ·
 Blocked without an explicit written decision: `GPL-*`, `AGPL-*`, `LGPL-*`, `SSPL`, `BUSL`,
 `CC-BY-NC-*`, and anything reported as `UNKNOWN`.
 
-**One thing that turned out to be a non-issue.** `GUARDRAILS.md:788` worried whether the solver's
+**One thing that turned out to be a non-issue.** `GUARDRAILS.md` **G-H2** worried whether the solver's
 Apache-2.0 dependencies are compatible with the project's own licensing. They are, and the reason
 is architectural: ADR-005 runs the solver (`ortools`) as a **separate program**, talking to it
 over standard input and output. Nothing links it into our code, so no derivative work is created
