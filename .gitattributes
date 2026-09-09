@@ -1,0 +1,8 @@
+# Shell scripts must keep LF endings. With core.autocrlf=true on Windows a
+# fresh clone would otherwise give them CRLF, and bash then reads the trailing
+# \r as part of each command — every line fails with "command not found".
+*.sh text eol=lf
+
+# The specification documents are edited on Windows; leave their endings to git's
+# normal handling so diffs stay clean.
+*.md text
