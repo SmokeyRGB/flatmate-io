@@ -27,10 +27,11 @@
 > folgt zusätzlich der Übersetzungstabelle in §8.6 (U-24) — kein Fachwort aus dem Modell erscheint
 > dort ungeklärt.
 
-> **Herkunft.** Dieses Dokument setzt den vom Nutzer genehmigten Plan
-> `ich-habe-zahlreiche-anforderungen-quiet-dusk.md` (Stand V5, Entscheidungen U-1 bis U-26) um.
-> Es ist Teil eines Sprints mit drei parallelen Nachzug-Dokumenten (`02-SRD.md`, `03-PRD.md`,
-> `04-Domaenenmodell.md`); Koordination und Arbeitsteilung stehen in `Session-Sprint-Log.md`.
+> **Herkunft.** Dieses Dokument setzt die Entscheidungen **U-1 bis U-26** um. Sie stehen in
+> `08-UX-Entscheidungen.md`; ihre eingefrorene Quelle ist der vom Nutzer genehmigte UX/UI-Plan
+> vom 2026-09-02 (Stand V5), der außerhalb dieses Repositoriums liegt. Es ist Teil eines Sprints
+> mit drei parallelen Nachzug-Dokumenten (`02-SRD.md`, `03-PRD.md`, `04-Domaenenmodell.md`);
+> Koordination und Arbeitsteilung stehen in `Session-Sprint-Log.md`.
 
 ---
 
