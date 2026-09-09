@@ -1,9 +1,11 @@
 # Flatmate.io — Spezifikation
 
 > **Status:** V1.0 · 2026-09-09 · Samuel Zink (@SmokeyRGB)
-> **Was das hier ist:** die Übergabegrenze. **Dieser Ordner, vollständig kopiert, ist alles, was
-> eine Implementierung braucht** — und nichts darüber hinaus. `tools/check-refs.sh` Regel 7
-> erzwingt das: kein Verweis aus `docs/` darf aus `docs/` hinausführen.
+> **Was das hier ist:** die Übergabegrenze. **`docs/` und `tools/` zusammen kopiert sind alles,
+> was eine Implementierung braucht** — und nichts darüber hinaus. `tools/` gehört dazu, weil
+> dieser Ordner die beiden Prüfskripte an 18 Stellen zitiert; ohne sie sind die Zusicherungen
+> hier Behauptungen. Regel 7 von `tools/check-refs.sh` erzwingt den Rest: kein Verweis aus
+> `docs/` führt nach `coursework/`, `archive/`, `research/` oder `process/`.
 > **Sprachregelung:** Begründungsdokumente deutsch, implementierungsnahe Dokumente englisch
 > (ADR-012 samt benannter Ausnahme).
 
