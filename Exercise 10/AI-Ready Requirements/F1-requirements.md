@@ -1,9 +1,9 @@
 # F1 — Open a casting round · requirements
 
 > **Feature:** [F1 — Open a casting round for the rooms you are actually casting for](../MVP%20Backlog%20Features/F1-open-a-casting-round.md)
-> **Band:** `v0.1` · **Scope lines:** S-01, S-02, S-04, S-06, S-07, S-35, S-50
-> **Screens:** A1 Household registration · O1 Organisation dashboard ⚡ · O2 Create round · O14 Rooms · O20 Household settings
-> **Status:** V1.0 · 2026-09-08
+> **Band:** `v0.1` · **Scope lines:** S-01, S-02, S-04, S-05, S-06, S-07, S-35, S-50
+> **Screens:** A1 Household registration · O1 Organisation dashboard ⚡ · O2 Create round · O14 Rooms · O16 Members · O20 Household settings
+> **Status:** V1.1 · 2026-09-09
 >
 > **This document is `requirements.md` only — what must be built, not how.** Architecture,
 > schema shape and implementation order are out of scope for this exercise (`design.md` /
@@ -42,6 +42,8 @@ roles · parallel rounds offered in the UI · anything about applications, votes
 | **US-1.8** | As a resident, I want to see who is taking part in this round, so that "5 of 7" means something. |
 | **US-1.9** | As a moderator, I want the voting rules frozen when the round opens, so that the result cannot be recomputed under different rules. |
 | **US-1.10** | As a moderator, I want changes to the voting procedure blocked while a round is open, so that no result is disputable afterwards. |
+| **US-1.11** | As administration, I want one list of who belongs to the household with their status, so that the record stays accurate. |
+| **US-1.12** | As a moderator, I want to read that list without being able to change it, so that responsibility stays with administration. |
 
 ---
 
@@ -57,6 +59,15 @@ roles · parallel rounds offered in the UI · anything about applications, votes
 - **FR-1.6** The system shall allow an account with a resident profile to switch between the administration context and the resident context, and shall always show which context is active.
 - **FR-1.7** The household account, when acting without a resident profile, shall not be able to cast a vote.
 - **FR-1.8** Membership shall carry voting eligibility and a role as **independent** attributes, plus individually grantable permissions (create applicant, change status, close round, confirm appointments).
+
+### Resident list (administration)
+
+- **FR-1.25** The household resident list shall show, per member: display name, join date, contact detail if present, and status.
+- **FR-1.26** The resident list shall offer the actions: remove member, set `moved_out`, reactivate, and share or rotate the join code.
+- **FR-1.27** The resident list and its actions shall be **fully available to administration**, **read-only to a profile with moderator rights**, and **not reachable at all — by any route —** by a profile without moderator rights.
+- **FR-1.28** The resident list shall be a screen distinct from the round participant list (FR-1.19); neither shall link to the other's data.
+- **FR-1.29** When administration is the only member of the household, the resident-list screen shall lead with the join-code action instead of displaying an empty list.
+- **FR-1.30** Every removal, `moved_out` and reactivation on the resident list shall be recorded as an append-only audit entry naming both the account and the acting profile.
 
 ### Rooms
 
@@ -147,6 +158,18 @@ Given I am a resident in an open round, when I open the participant list, then I
 **AC-1.19 — State changes are attributable**
 Given any casting-round or room state change, when I inspect the audit record, then it names both the account and the acting profile.
 
+**AC-1.20 — Moderator access to the resident list is read-only**
+Given a profile with moderator rights, when it opens the resident list, then the list is shown and no action controls appear.
+
+**AC-1.21 — No route reaches the resident list without moderator rights**
+Given a profile without moderator rights, when it requests the resident list by any route, then the request is refused.
+
+**AC-1.22 — The empty state leads with the join code**
+Given a household where administration is the only member, when administration opens the resident list, then the join-code action is shown and no empty list is displayed.
+
+**AC-1.23 — Removal is attributable**
+Given a member is removed from the resident list, when I inspect the audit record, then it names both the account and the acting profile.
+
 ---
 
 ## 5. Constraints
@@ -160,6 +183,7 @@ Given any casting-round or room state change, when I inspect the audit record, t
 - **C-1.7** The audit log is append-only. Entries are never updated or deleted; personal payload is redacted at end of retention. Source: S-27, `ADR-003`.
 - **C-1.8** Documents are written in German, identifiers in English. Source: `ADR-012`. (These exercise deliverables are English by the Exercise 10 precedent.)
 - **C-1.9** The application never sends messages to applicants. Nothing in this feature may introduce outbound applicant contact. Source: S-16 out-of-scope list.
+- **C-1.10** With the resident-visible list and its removal right gone (**U-22**, superseding **U-16**), only **two** of the four original structural duplicate-protection mechanisms survive: the join entry in the `ActivityEvent` feed, and the resident count in the quorum denominator. The join-link protections (**S-49**, owned by F2) are therefore a **precondition** of S-05, not an enhancement. Source: `02-SRD.md` §5.3 (S-05, S-49); `07-Screen-Inventar.md` O16.
 
 ---
 
@@ -177,6 +201,7 @@ Given any casting-round or room state change, when I inspect the audit record, t
 | **EC-1.8** | A resident is made ineligible to vote mid-round | Their round-participation entry records it; already-cast votes are unaffected by this feature (F5 governs their arithmetic) |
 | **EC-1.9** | Two moderators open the same `draft` round simultaneously | Exactly one opening takes effect; exactly one set of snapshot entries and frozen rules exists |
 | **EC-1.10** | Household registers with an address already used by another household | Permitted. Households are not deduplicated by email |
+| **EC-1.11** | A moderator attempts to set `moved_out` on the household account's own resident profile (FR-1.5), where it is the last such profile | Refused. FR-1.27 already limits a moderator to read-only on the resident list; this names the case by which that boundary keeps EC-1.7's fallback — administration creating itself a resident profile — from being needed in the first place |
 
 ---
 
