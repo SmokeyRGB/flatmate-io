@@ -81,8 +81,10 @@ else
   bad "roadmap does not declare §5.4 as governing" "add the sentence 03-PRD.md §7 already carries"
 fi
 for s in S-39 S-44; do
-  if [ -f "$PRD" ] && sed -n '/^### 7.1/,/^### 7.2/p' "$PRD" | grep -q "$s"; then
-    bad "$s still appears in $PRD §7.1" "§5.4 places it in v0.2"
+  # Only the table's data rows count. Prose explaining that these two were once
+  # listed here wrongly is the record of the fix, not the defect.
+  if [ -f "$PRD" ] && sed -n '/^### 7.1/,/^### 7.2/p' "$PRD" | grep '^|' | grep -q "$s"; then
+    bad "$s still appears in a $PRD §7.1 table row" "§5.4 places it in v0.2"
   fi
 done
 

@@ -1510,13 +1510,19 @@ ausdrücklich kein Interesse an der Indexierung von Bewerberdaten. Zwei Anforder
 
 Übernommen aus `02-SRD.md` §5.4 — **hier nicht neu geschnitten.** Bei Abweichung gilt §5.4.
 
-| Stufe | Inhalt | Vorführbar als |
-|-------|--------|----------------|
-| **v0.1 — Vertikaler Schnitt** | Fundament (S-31, S-36, S-15, S-37) · Identität und Zugang (S-01 bis S-05, S-49, S-50) · Runde und Zimmer (S-06, S-07, S-44) · Erfassung **nur über das Formular** (S-08 Formularhälfte, S-38, S-39) · Screening und Stimme (S-09, S-10) · Rangliste (S-12, S-13, S-14) · Aufgaben-Dashboard (S-48) · Hilfsmittel und Protokoll (S-16, S-27 als Log, S-35) | Ein Durchlauf **Bewerbung → Screening → Stimme → Rangliste** auf synthetischen Daten, ohne Terminfindung und ohne Zusage |
-| **v0.2 — Vollständige Runde** = **v1** | S-08 (Parser) · S-11/S-47 · S-17 (manuell) · S-18 · S-21, S-51 · S-22, S-46 · S-23, S-24 · S-25, S-42 · S-28, S-29 · S-30, S-45 · S-32 · S-40 · S-41 (Datenmodell) · **Gate vor echten Bewerberdaten:** S-33, S-34, Klick-AVV, Art.-13-Seite (`draft → published`), Unterauftragsverarbeiter | Eine vollständige Runde von der ersten `Application` bis `moved_in` in einem echten Haushalt |
-| **v1.1** | **S-19/S-20** (Solver samt Erklärbarkeit) · **S-26** (Kalenderansicht) · bewerberseitige Token-Seite für Verfügbarkeiten (Datenmodell liegt in v0.2 — SRD O-08) · Oberfläche für `subject_statement` (S-41) · Punkte-Budget als Option · Textbausteine · **S-43** einmalige Spenden-E-Mail nach der 3.–4. abgeschlossenen `CastingRound` (löst O-05) | „Der Komfort kommt nach" — jedes Feature ist eine Bequemlichkeit über einem vollständigen manuellen Pfad (P-1). Ausnahme mit eigener Begründung: `subject_statement` ist kein Komfort, sondern ein Betroffenenrecht, dessen Datenmodell deshalb bereits in v0.2 steht |
-| **v1.2** | Nutzerinitiierte Browser-Extension für Portal-Import | „Erfassungsarbeit sinkt, ohne API und ohne Scraping" |
-| **v2** | Kalender-Sync · KI-Parsing (nur Extraktion, P-5) · Vermieter-Persona **nach** AGG- und AI-Act-Prüfung · Freemium | Produktoption |
+> **Dieser Abschnitt führt bewusst keine `S`-Zeilen.** Der Umfang je Stufe steht
+> **ausschließlich** in `02-SRD.md` §5.4. Die frühere Spalte „Inhalt" war eine zweite Kopie
+> des Schnitts und ist genau dort verrutscht: sie führte S-44 und S-39 in v0.1, obwohl §5.4
+> beide in v0.2 setzt, und ließ die Handlöschung aus S-33 ganz aus. Was hier bleibt, ist die
+> **Vorführbarkeit** — die gehört ins PRD und steht in §5.4 nicht.
+
+| Stufe | Vorführbar als |
+|-------|----------------|
+| **v0.1 — Vertikaler Schnitt** | Ein Durchlauf **Bewerbung → Screening → Stimme → Rangliste** auf synthetischen Daten, ohne Terminfindung und ohne Zusage |
+| **v0.2 — Vollständige Runde** = **v1** | Eine vollständige Runde von der ersten `Application` bis `moved_in` in einem echten Haushalt |
+| **v1.1** | „Der Komfort kommt nach" — jedes Feature ist eine Bequemlichkeit über einem vollständigen manuellen Pfad (P-1). Ausnahme mit eigener Begründung: `subject_statement` ist kein Komfort, sondern ein Betroffenenrecht, dessen Datenmodell deshalb bereits in v0.2 steht |
+| **v1.2** | „Erfassungsarbeit sinkt, ohne API und ohne Scraping" |
+| **v2** | Produktoption |
 
 ### 7.2 Abhängigkeiten und Reihenfolge innerhalb von v1
 
