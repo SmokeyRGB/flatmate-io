@@ -2,8 +2,8 @@
 
 ### Verbindliche Regeln für AI-Agenten, die dieses Projekt implementieren
 
-> **Version:** V0.6
-> **Datum:** 2026-08-19
+> **Version:** V0.8
+> **Datum:** 2026-09-09
 > **Autor:** Samuel Zink (@SmokeyRGB)
 > **Vorgänger:** `00-Session-Brief.md` (verbindliche Quelle) · `05-ADRs.md` · `06-Compliance-Anhang.md`
 > **Nachfolger:** `review-log.md`
@@ -71,6 +71,7 @@ ist selbst eine Änderung, die menschliche Freigabe braucht (**G-G3**).
 | [**G-K**](#g-k--solver-determinismus) | Solver-Determinismus | G-K1 – G-K4 |
 | [**G-L**](#g-l--die-ki-grenze-p-5) | Die KI-Grenze (P-5) | G-L1 – G-L4 |
 | [**G-M**](#g-m--scope-disziplin) | Scope-Disziplin | G-M1 – G-M3 |
+| [**G-N**](#g-n--dokumentationsintegrität) | Dokumentationsintegrität | G-N1 – G-N6 |
 
 ---
 
@@ -785,9 +786,22 @@ auf den Anwendungscode sind ohne ausdrückliche Entscheidung ausgeschlossen.
 **Durchsetzung.** 🟢 Lizenz-Check im CI gegen eine Zulassungsliste.
 *Werkzeugvorschlag: `license-checker` oder Äquivalent.*
 
-> ⚠️ TBD — zu ergänzen: Die Zulassungsliste ist festzulegen. Zu klären ist insbesondere, ob die
-> Apache-2.0-Abhängigkeiten des Solver-Pfads (ADR-005) und die eigene Lizenzierung von Flatmate.io
-> zusammenpassen.
+**(a) Die Zulassungsliste.** Das Repository bleibt vorerst privat, die eigene Lizenzierung von
+Flatmate.io ist deshalb bewusst zurückgestellt; die Zulassungsliste ist **rein permissiv**:
+
+```
+MIT · ISC · BSD-2-Clause · BSD-3-Clause · Apache-2.0 · 0BSD · Unlicense · CC0-1.0 · Python-2.0
+```
+
+Ohne ausdrückliche schriftliche Entscheidung gesperrt: `GPL-*`, `AGPL-*`, `LGPL-*`, `SSPL`,
+`BUSL`, `CC-BY-NC-*`, sowie alles, was als `UNKNOWN` gemeldet wird.
+
+**(b) Die Apache-2.0-Frage ist kein Problem — und hier ist, warum.** ADR-005 führt `ortools` als
+**eigenständigen Prozess über stdio**. Nichts davon wird in den eigenen Code verlinkt, es entsteht
+also kein abgeleitetes Werk — und Apache-2.0 ist ohnehin permissiv. Die einzige Pflicht ist das
+Mitführen der NOTICE-Datei. Diese Klausel schließt **ohne** anwaltliche Prüfung; eine spätere Wahl
+von **AGPL** für eine gehostete Anwendung wäre eine Geschäftsmodell-Entscheidung, keine
+Lizenzdetailfrage.
 
 ### G-H3 — Lockfile-Pflicht
 
@@ -1111,6 +1125,100 @@ bleibt die Regel Prosa, bis der Ablauftest sie mit abdeckt.
 
 ---
 
+## G-N · Dokumentationsintegrität
+
+> Dieses Projekt hat den Befund, der diese Klasse begründet, bereits selbst geliefert.
+> `review-log.md` hält fest, dass eine Versionszeile — die beim Fortschreiben eines
+> Kettendokuments hätte mitwandern müssen — **dreimal hintereinander stehenblieb**: in `01`, in
+> `03`, und beim dritten Mal in `review-log.md` selbst, also in dem Dokument, das den Fehler
+> beschreibt. Und dieses Dokument trug bis zu dieser Fassung dieselbe Lücke an seinem eigenen
+> Kopf — V0.6 über einem Changelog, dessen letzte Zeile längst auf V0.7 stand, hier korrigiert
+> (siehe Änderungshistorie). Die Schlussfolgerung von damals gilt unverändert: **ein Versprechen
+> ohne Mechanismus hält nicht.**
+>
+> Jede Regel dieser Klasse schließt eine Fehlerklasse, die dieses Projekt bereits produziert hat —
+> nicht eine hypothetische. Das ist derselbe Maßstab, den dieses Dokument bereits an ADR-010
+> anlegt: Ein personenbezogenes Feld ohne Eintrag in `data-inventory.yml` bricht den Build, weil
+> eine Deklaration, die niemand prüft, verfällt (G-F1). G-N überträgt dieses Prinzip von den
+> Datenfeldern auf die Dokumente, die dieses Projekt trägt.
+
+### G-N1 — Die Versionszeile stimmt mit dem letzten inhaltlichen Commit überein
+
+**Regel.** Die Versionszeile eines Kettendokuments (`Version:`/`Datum:` im Kopf) stimmt mit
+seinem letzten inhaltlichen Commit überein.
+
+**Begründung.** Ein Kopf, der einen älteren Stand behauptet als der Körper, meldet niemandem,
+dass weitergeschrieben wurde — die Änderung existiert, aber unsichtbar für jeden, der nur den
+Kopf liest, und genau der Kopf ist es, der in jedem Verweis zitiert wird.
+
+**Durchsetzung.** 🟢 CI vergleicht `Version:`/`Datum:` im Kopf gegen `git log` des Dateipfads;
+eine Abweichung bricht den Lauf. Der Vergleich läuft gegen den **letzten inhaltlichen Commit**,
+nicht gegen einen beliebigen — eine reine Umbenennung oder eine Whitespace-Änderung darf den
+Check nicht auslösen. **Bereits fünfmal aufgetreten** — `01`, `03`, `review-log.md` selbst,
+`GUARDRAILS.md` (V0.6-Kopf über V0.7-Changelog, mit dieser Fassung korrigiert), `02-SRD.md`
+(V0.5-Kopf über V0.6-Körper).
+
+### G-N2 — Jede zitierte Scope-Zeile existiert, und jede Anforderung beruft sich auf eine
+
+**Regel.** Jede Scope-Zeile, auf die sich eine Anforderung beruft, existiert — und jede
+Anforderung in einem Requirements-Paket beruft sich auf mindestens eine existierende Scope-Zeile.
+
+**Begründung.** Dies ist **G-M2, umgedreht:** „kein Feature ohne SRD-Zeile" ist als
+Codeeigenschaft nicht prüfbar, als Dokumenteigenschaft schon.
+
+**Durchsetzung.** 🟢 Grep über `S-\d+` in allen Dokumenten gegen die in `02-SRD.md` §5.3
+vergebenen Nummern, plus Rückrichtung über die `FR-`/`AC-`-Einträge der Requirements-Pakete.
+
+### G-N3 — Kein Commit gegen Anwendungscode auf einem anfechtbaren v0.1-ADR
+
+**Regel.** Kein Commit gegen Anwendungscode, solange ein v0.1-tragender ADR auf `Vorschlag —
+anfechtbar` steht.
+
+**Begründung.** Verhindert, dass gebauter Code auf einem noch anfechtbaren Record steht — ein
+späterer Widerspruch würde sonst nicht eine Zeile Dokumentation kosten, sondern bereits
+geschriebenen Code entwerten.
+
+**Durchsetzung.** 🟢 Die sieben Statuszeilen in `05-ADRs.md` sind parsebar; CI liest sie und
+bricht ab, solange eine der sieben v0.1-tragenden auf `Vorschlag — anfechtbar` steht.
+
+### G-N4 — Jeder Unterabschnitt von PRD §4/§6 trägt genau eine Band-Zeile
+
+**Regel.** Jeder Unterabschnitt von `03-PRD.md` §4 und §6 trägt **genau eine** `Band:`-Zeile mit
+einem von vier gültigen Werten (`v0.1`, `v0.2`, `v1.1`, `v2`).
+
+**Begründung.** Ohne diese Marker musste der Phasenschnitt bei jedem Lesen aus dem Gegenstand
+neu erschlossen werden — daher die drei Fehler in §7.1.
+
+**Durchsetzung.** 🟢 Zeilenzählung: Zahl der `###`/`####`-Überschriften in §4/§6 gleich Zahl der
+`> **Band:**`-Zeilen, plus Wertprüfung gegen die vier gültigen Token.
+
+### G-N5 — Der Status eines offenen Punkts steht ausschließlich im Register
+
+**Regel.** Der Status eines offenen Punkts steht ausschließlich im Register in `review-log.md`;
+ein Fachdokument trägt die Frage, nie den Status.
+
+**Begründung.** Ein Status, der in mehreren Dokumenten getrennt gepflegt wird, driftet in allen
+auseinander — dasselbe Muster, das dieses Projekt beim Klassen-Notationsabgleich zwischen `04`
+und `06` bereits einmal beobachtet hat.
+
+**Durchsetzung.** 🟢 Für jede ID `O-\d+`, `P-O-\d+`, `O-[A-F]`, `AW-\d+`, `Q-\d+`: sie erscheint
+entweder durchgestrichen **oder** unausgezeichnet, nie beides; eine durchgestrichene Zeile trägt
+Datum und Quelldatei; eine in mehreren Dateien geführte ID hat außer in einer überall eine
+Verweiszeile. **Hätte jeden Fund des Registers erkannt.**
+
+### G-N6 — Jeder Bildschirm führt die vier Pflichtzustände
+
+**Regel.** Jeder Bildschirm in `07-Screen-Inventar.md` führt die vier Pflichtzustände.
+
+**Begründung.** Ein Bildschirm ohne Leer-, Lade- oder Fehlerzustand ist keine Auslassung, die im
+Betrieb auffällt, sondern eine, die erst dort sichtbar wird, wo ein Nutzer sie trifft — und das
+Screen-Inventar ist die einzige Stelle, an der das vor der Umsetzung prüfbar ist.
+
+**Durchsetzung.** 🟢 Abschnittsweise Prüfung je Bildschirm-ID gegen die vier in §6 benannten
+Zustände.
+
+---
+
 ## Zusammenfassung: Durchsetzungsstand
 
 > **Zweck dieser Tabelle.** Sie macht sichtbar, wo dieses Dokument tatsächlich schützt und wo es nur
@@ -1141,8 +1249,8 @@ bleibt die Regel Prosa, bis der Ablauftest sie mit abdeckt.
 | G-C8 `SET LOCAL` nur in Transaktion | 🟢 | einzige Hilfsfunktion, Lint, CI-Check, Pool-Test G-D10 |
 | G-C9 Datenschutzseite nie ohne Freigabe erreichbar | 🟢 | `PublishedPrivacyNotice`-Typ + Policy-Test je Route |
 | G-D Geschützte Tests (Existenz, Marker, `skip`) | 🟢 | Manifest-Check + CODEOWNERS |
-| G-D Geschützte Tests (inhaltliche Abschwächung) | 🔴 | **keiner** — nur Freigabepflicht und Review |
-| G-D1 Grenze: nur verknüpfte Bewerbungen | 🔴 | **keiner** — prozessual, im Dokument benannt (Q-14) |
+| G-D Geschützte Tests (inhaltliche Abschwächung) | 🟡 | Assertion-Zahl-Trendsperre (`test/guarded.manifest.json`) — erkennt Löschen/Abschwächen-durch-Entfernen, keine Semantik |
+| G-D1 Grenze: nur verknüpfte Bewerbungen | 🟡 | War falsch eingeordnet: `03-PRD.md` §4.1.7 verlangt die Rückfrage bereits als eigenen Testfall; rechtlich offen bleibt nur Q-14 |
 | G-D7 Kein Freitext/Wert in `ActivityEvent.payload` | 🟢 | Positivliste erlaubter Payload-Schlüssel je `event_type` |
 | G-D8 Payload-Redaktion zum Fristende | 🟢 | geschützter Test |
 | G-D9 `became_resident_id` nie `null` | 🟢 | geschützter Test über den Rückwärtsübergang |
@@ -1158,7 +1266,7 @@ bleibt die Regel Prosa, bis der Ablauftest sie mit abdeckt.
 | G-F1 Undeklarierte Spalte bricht Build | 🟢 | ADR-010-Gate (Entscheidung erzwungen, nicht Richtigkeit 🟡) |
 | G-F2 Freitext erbt strengste Regeln | 🟢 | Generierung statt Pflege |
 | G-F3 Keine Art.-9-Strukturfelder | 🟡 | Feldnamen-Sperrliste; Umbenennungen entkommen 🔴 |
-| G-G1 Tests nie schwächen | 🔴 | **keiner im allgemeinen Fall** — nur Signale und Review |
+| G-G1 Tests nie schwächen | 🟡 | dieselbe Trendsperre wie G-D, repoweit statt auf das geschützte Manifest beschränkt |
 | G-G2 Kein `skip`/`only` | 🟢 | Lint + Diff-Check |
 | G-G3 CI-Checks nicht entschärfen | 🟢 | CODEOWNERS auf Konfigurationsdateien |
 | G-G4 Coverage nur nach oben | 🟢 | geschützte Konfiguration + Diff-Check |
@@ -1185,30 +1293,37 @@ bleibt die Regel Prosa, bis der Ablauftest sie mit abdeckt.
 | G-L3 Extraktion nur gegen festes Schema | 🟢 | Schema-Validierung der Antwort |
 | G-L4 Parser-Vorschläge bestätigungspflichtig | 🟢 | `Suggestion`-Typ statt Domänenobjekt |
 | G-M1 Keine fremden Refactorings | 🟡 | Kontext-Diff-Meldung + Review |
-| G-M2 Kein Feature ohne SRD-Zeile | 🔴 | **keiner** — nur kleiner Diff und Review |
+| G-M2 Kein Feature ohne SRD-Zeile | 🟡 | aufgegangen in **G-N2** — Scope ist als Dokumenteigenschaft prüfbar, als Codeeigenschaft nicht |
 | G-M3 Kein Link-Zwang für Bewerbende | 🟢/🔴 | Ablauftest ohne Bewerber-Interaktion; neue Features Prosa |
 
-**Bilanz.** Von 68 aufgeführten Positionen sind **51 vollständig automatisierbar**, **5
-teilautomatisiert**, **7 gemischt** (automatisierter Kern, prosaischer Rest) und **5 rein
+**Bilanz.** Von 74 aufgeführten Positionen sind **57 vollständig automatisierbar**, **9
+teilautomatisiert**, **7 gemischt** (automatisierter Kern, prosaischer Rest) und **1 rein
 prosaisch**.
 
-Die fünf rein prosaischen Positionen sind:
+Vier der ehemals fünf rein prosaischen Positionen sind mit dieser Fassung auf 🟡 hochgestuft:
+**G-D** und **G-G1** über eine Assertion-Zahl-Trendsperre (`test/guarded.manifest.json` bzw.
+repoweit), **G-D1-Grenze** durch eine Korrektur der Einordnung (`03-PRD.md` §4.1.7 verlangt die
+Rückfrage bereits als eigenen Testfall — rechtlich offen bleibt nur Q-14), und **G-M2** durch
+Aufgehen in **G-N2**. **Ehrlich zu Ende gedacht:** Das Trendsperren-Gate von G-D und G-G1 erkennt
+**Löschen und Abschwächen-durch-Entfernen**, keine inhaltliche Semantik — die Hochstufung ist
+real, aber partiell.
+
+Die eine verbleibende rein prosaische Position ist:
 
 | Position | Warum kein Mechanismus | Was stattdessen trägt |
 |---|---|---|
 | **G-A4** Kein Secret in einen Prompt | Der Vorgang findet außerhalb des Repositories statt | Agenten erhalten keinen Zugriff auf Produktions-Secrets |
-| **G-D** inhaltliche Abschwächung geschützter Tests | „Assertion aufgeweicht" ist maschinell nicht von „Assertion korrigiert" unterscheidbar | CODEOWNERS-Freigabe auf allen geschützten Testpfaden |
-| **G-D1-Grenze** unverknüpfte Wiederbewerbungen | Die Verknüpfung zweier Bewerbungen zu einer Person ist eine menschliche Feststellung, kein Datenzustand | Vorschlag-und-Bestätigen beim Setzen von `became_resident_id`; offene Frage Q-14 |
-| **G-G1** Tests nie schwächen, um CI grün zu bekommen | dasselbe Problem wie bei G-D, im allgemeinen Fall | kleiner Diff, Trendbericht über Assertion-Zahlen, Review |
-| **G-M2** Kein Feature ohne SRD-Zeile | Scope ist keine Codeeigenschaft | Rückführbarkeitsprüfung im Review (Verifikationspunkt 3 des Briefs) |
 
 Hinzu kommen die prosaischen Anteile der gemischten Positionen: die *Notwendigkeit* eines Pakets
 (G-H1), die *Semantik* einer verifizierten API (G-J1), erfundene **nicht** personenbezogene Felder
 (G-J4) und neue Features gegenüber P-1 (G-M3).
 
 Diese Stellen sind zugleich diejenigen, deren Verletzung am schwersten zu bemerken ist — sie
-erzeugen keinen roten Lauf, sondern einen grünen. **Das ist die ehrliche Grenze dieses Dokuments**
-und der Grund, warum es die Klassenkennzeichnung überhaupt führt.
+erzeugen keinen roten Lauf, sondern einen grünen. Das gilt unverändert für den prosaischen Rest
+der vier eben von 🔴 auf 🟡 hochgestuften Positionen (G-D, G-G1, G-D1-Grenze, G-M2): Das
+Trendsperren-Gate fängt das Entfernen ab, nicht die Abschwächung durch feinere Mittel. **Das ist
+die ehrliche Grenze dieses Dokuments** und der Grund, warum es die Klassenkennzeichnung überhaupt
+führt.
 
 ---
 
@@ -1230,9 +1345,59 @@ zuerst kommen, und teuer, wenn sie nachgezogen werden:
 8. Import-Boundary-Lint mit den sechs Bounded Contexts (G-I1)
 9. Lockfile-Installation, Lizenz-Check, Versions-Check (G-H2 bis G-H4)
 
-> ⚠️ TBD — zu ergänzen: Konkrete Werkzeugauswahl (Test-Runner, Lint-Plugin für Modulgrenzen,
-> Secret-Scanner, Lizenz-Checker) und die Lizenz-Zulassungsliste aus G-H2. Beides gehört in den
-> Repo-Aufsetz-Schritt, nicht in dieses Dokument.
+**Werkzeugwahl.** Entschieden, nicht mehr offen:
+
+| Werkzeug | Aufgabe | Regel und Begründung |
+|---|---|---|
+| **Vitest** | Testlauf | Passt zum Stack aus ADR-006 und kann **G-C7**s beide Hälften — Policy-Schicht **und** rohes SQL — in einer Suite fahren |
+| **dependency-cruiser** | prüft, welches Modul welches importieren darf | ADR-001s sechs Bounded Contexts sind Importgrenzen, „durchgesetzt per Lint, nicht per Absprache" (**G-I1**). Alle sechs stehen in **einer** Konfigurationsdatei, mit `--validate` für CI. Die ESLint-Variante verteilte dieselbe Regel über Ordner-Overrides, wo sie leicht versehentlich aufgeweicht wird |
+| **gitleaks** | sucht Secrets in Code **und Historie** | **G-A1** verlangt die Prüfung als Pre-Commit-Hook **und** als CI-Job. Eine eigenständige Binärdatei kann beides; ein Test-Runner-Plugin nur das Zweite |
+| **license-checker-rseidelsohn** | listet Abhängigkeitslizenzen, bricht bei nicht zugelassenen ab | **G-H2** braucht *deny by default*: nur Lizenzen auf einer ausdrücklichen Allowlist passieren, alles Unbekannte fällt durch. Die meisten Alternativen arbeiten umgekehrt und lassen Unbekanntes durch |
+
+Die Begründung je Werkzeug steht zusätzlich in Alltagssprache in `tools/README.md`.
+
+---
+
+## Teststrategie
+
+> `review-log.md` §Multi-Rollen-Review vermerkt die Lücke: Die geschützten Tests (G-D) decken die
+> Invarianten ab, aber nirgends steht, was **sonst** getestet wird und auf welcher Ebene. Dieses
+> Kapitel schließt das — ohne Abdeckungsziele oder Prozentzahlen zu erfinden, die noch niemand
+> gemessen hat.
+
+| Ebene | Was dorthin gehört | Was ausdrücklich nicht |
+|---|---|---|
+| **Unit** | Reine Funktionen ohne Datenbank, Netz oder Zeitabhängigkeit — Voting-Mathematik, Rangberechnung, Zustandsmaschine, Termin-Kostenmodell, Zeitfenster-Parser (G-G5) | Keine Policy-Entscheidungen, kein RLS — der Domänenkern kennt beides nicht |
+| **Integration** | Repository-Schicht gegen eine echte Datenbank: jede neue Query gegen eine personenbezogene Tabelle mit den drei Fällen aus G-C3 (falscher Haushalt, keine Rundenteilnahme, eigenes Profil) | Kein Ersatz für die geschützten Tests — eine Coverage-Schwelle allein stellt nicht sicher, dass die *richtigen* Fälle geprüft werden (G-C3) |
+| **Policy + rohes SQL** | Die drei Sichtbarkeitsinvarianten V-1 bis V-3, **je zweimal** — über die Policy-Schicht und als rohes SQL unter der Anwendungsrolle (G-C7) — sowie die Pool-Wiederverwendung über zwei Haushalte (G-C8/G-D10) | Kein Test, der nur den Policy-Pfad prüft und den RLS-Pfad für „automatisch mitgetestet" hält |
+| **End-to-End** | Ein vollständiger Casting-Ablauf ohne jede Interaktion einer bewerbenden Person, bis `moved_in` (G-M3); der Offline-Stimmpuffer über TTL, Profilwechsel und Idempotenz (G-B7/G-D11) | Keine Solver-Determinismus-Prüfung hier — die läuft isoliert gegen den Adapter (G-K1), nicht über die ganze Anwendung |
+
+**Grundlage.** Dieses Kapitel ordnet nur zu, was an Mechanismen bereits feststeht:
+`test/guarded.manifest.json` (G-D), der RLS-Positiv-Test (G-C2) und der Pool-Wiederverwendungstest
+(G-C8/G-D10). Eine Abdeckungszahl wird erst eingetragen, wenn sie gemessen ist, nicht vorher
+(vgl. `02-SRD.md` O-06).
+
+---
+
+## Implementierungspflichten
+
+> Diese Tabelle führt Auflagen, die aus der Planungsphase in die Umsetzung getragen werden — sie
+> sind weder offene Spezifikationslücken noch Guardrail-Regeln, sondern Termine mit einer Quelle.
+
+| Auflage | Fällig | Quelle |
+|---|---|---|
+| Grenzwerte des Solvers auf der Zielhardware messen und in ADR-005 eintragen | v1.1, vor S-19 | `02-SRD.md` O-06 |
+| Einreichungsweg für `Application.subject_statement` festlegen | v1.1, mit der Oberfläche | `04-Domaenenmodell.md` O-10 |
+| Verpackung des Python-Kindprozesses skizzieren | v1.1 | `review-log.md` §Multi-Rollen-Review |
+| **Keine zweite echte Runde auf echten Daten**, bevor der S-40-Prompt implementiert und durch den in `03-PRD.md` §4.1.7 verlangten eigenen Testfall gedeckt ist | vor der zweiten echten Runde | `04-Domaenenmodell.md` O-1, G-D1-Grenze, `06-Compliance-Anhang.md` Q-14 |
+| Backup: RPO 24 h · RTO 8 h · **Aufbewahrung höchstens 30 Tage** · jeder Restore lässt den Löschlauf durchlaufen, **bevor** die Anwendung Verkehr annimmt | Repo-Aufsetzen | `review-log.md` §Multi-Rollen-Review |
+
+**Zur Backup-Zeile.** Diese ist die, die still beißt: **S-33 erlaubt, die Aufbewahrungsfrist auf
+30 Tage zu verkürzen** — ein länger gehaltenes Backup überlebt damit die kürzeste zulässige
+Frist, und ein Restore holt dann Bewerberdaten zurück, die rechtmäßig gelöscht wurden. **Beide
+Hälften sind nötig; die Deckelung allein genügt nicht** — ohne den erzwungenen Löschlauf nach
+jedem Restore bringt ein Wiederherstellen genau das zurück, was die 30-Tage-Grenze verhindern
+sollte.
 
 ---
 
@@ -1247,3 +1412,4 @@ zuerst kommen, und teuer, wenn sie nachgezogen werden:
 > | V0.6 | 2026-08-19 | Präzisierung ohne neue Regeln — **Bilanz unverändert bei 66 Positionen und 68 Regeln**. Zusicherung 6 von G-B7 auf **Art. 5 Abs. 1 lit. d** und **Art. 16** zurückgeführt. Neuer Merksatz **„Wiederkehrende Fehlerstelle: der Profilwechsel"** unter G-C7: Er ist keine Abmeldung, und an ihm sind zweimal unabhängig Annahmen gebrochen (V-1 hängt deshalb am `Account`, der Stimmpuffer wird deshalb auch beim Wechsel geleert). Als 🔴 gekennzeichnet — eine Prüffrage, kein Mechanismus. |
 > | V0.5 | 2026-08-19 | **G-B7** ergänzt: der Offline-Stimmpuffer als einzige, benannte Ausnahme von G-B6 — zulässig, weil er eine noch nicht abgeschlossene Transaktion hält, aber nur solange „kann den Versand nicht überleben" erzwungen ist. Sechs Zusicherungen, davon zwei über den Auftrag hinaus ergänzt: Leeren beim **Profilwechsel** (nicht nur bei Abmeldung) und **idempotente Wiedereinspielung**. **G-D11** als geschützter Test für die drei still scheiternden Zusicherungen. Bilanz auf 66 Positionen, 68 Regeln. |
 > | V0.7 | 2026-08-31 | Produkt-Audit-Konsistenzabgleich. **G-D12** ergänzt (Invite-Token aus SRD S-42/`ApplicationInviteToken` schlägt bei bereits bestehendem `ResidentProfile` fehl statt zu überschreiben — Anschluss an G-D9/I-3) und **G-D13** (Notiz-Erinnerungs-Reminder aus S-46/`AppointmentAttendance` respektiert Selbst-Redaktion — Anschluss an G-D1/G-C6/G-D5, liest nur das `note_written`-Flag, nie `CastingNote.body`). Bilanz auf 68 Positionen, 70 Regeln. |
+> | V0.8 | 2026-09-09 | **Korrigiert:** Der Kopf dieses Dokuments stand auf V0.6, während die Änderungshistorie längst V0.7 auswies — derselbe Fehler, den diese Fassung neu benennt, jetzt auch am eigenen Kopf. **Neue Klasse G-N · Dokumentationsintegrität** ergänzt (G-N1–G-N6, alle 🟢): Versionszeile gegen den letzten inhaltlichen Commit, Scope-Rückführbarkeit beidseitig, kein Commit gegen einen anfechtbaren v0.1-ADR, Band-Marker je PRD-Unterabschnitt, Status offener Punkte ausschließlich im Register, vier Pflichtzustände je Bildschirm. **Vier der fünf rein prosaischen Positionen auf 🟡 hochgestuft** — G-D und G-G1 über eine Assertion-Zahl-Trendsperre (erkennt Löschen/Abschwächen-durch-Entfernen, keine Semantik), G-D1-Grenze durch eine Korrektur der Einordnung (`03-PRD.md` §4.1.7 verlangt die Rückfrage bereits als eigenen Testfall), G-M2 durch Aufgehen in G-N2; nur **G-A4** bleibt rein prosaisch. Bilanz auf **74 Positionen, 57 🟢 / 9 🟡 / 7 gemischt / 1 🔴**. **G-H2 geschlossen:** permissive Lizenz-Allowlist festgelegt, Apache-2.0-Frage des Solver-Pfads (ADR-005) als Nicht-Problem begründet (separater Prozess über stdio, keine Verlinkung, NOTICE-Pflicht bleibt). **Werkzeugwahl für das Minimal-Gate entschieden** (Vitest · dependency-cruiser · gitleaks · license-checker-rseidelsohn), ersetzt die bisherige TBD-Zeile; Begründung je Werkzeug zusätzlich in `tools/README.md`. Neue Abschnitte **Teststrategie** und **Implementierungspflichten** ergänzt. |
