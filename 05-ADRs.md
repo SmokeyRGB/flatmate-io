@@ -2,7 +2,10 @@
 
 ### ADR-001 bis ADR-012 · Entscheidungen, Optionen, Konsequenzen
 
-> ⚠️ **Sieben dieser Records tragen v0.1 — und stehen alle noch auf `Vorschlag — anfechtbar`.**
+> ✅ **Sieben dieser Records tragen v0.1 — und sind am 2026-09-09 bestätigt worden.**
+> Sie stehen auf `Bestätigt — verbindlich für v0.1`; jeder trägt am Ende einen
+> Bestätigungsvermerk mit seiner Aufgabebedingung und der Angabe, **was ein späterer
+> Widerspruch kostet**.
 >
 > **ADR-001** (modularer Monolith) · **ADR-002** (explizite Zustandsmaschine) · **ADR-004**
 > (Autorisierung doppelt: Policy **und** RLS) · **ADR-006** (Stack; Postgres ist von ADR-004
@@ -12,13 +15,24 @@
 >
 > `02-SRD.md` §5.4 legt S-15, S-31, S-36 und S-37 in **v0.1**, gerade weil sie sich nicht
 > nachrüsten lassen. Damit fällt der Widerspruch dieses Dokuments zusammen: wird einer der sieben
-> Records später gekippt, ist nicht ein Absatz zu ändern, sondern gebauter Code. **Vor der ersten
-> Zeile Code sind sie zu bestätigen oder ihr Widerspruch ist hier zu vermerken.** Diese Notiz
-> ersetzt keine Entscheidung — sie benennt nur, dass eine aussteht. Die übrigen fünf Records
+> Records später gekippt, ist nicht ein Absatz zu ändern, sondern gebauter Code. **Genau deshalb
+> war vor der ersten Zeile Code zu bestätigen oder zu widersprechen — das ist mit dem
+> Bestätigungsvermerk je Record geschehen.** Die übrigen fünf Records
 > (ADR-003, -005, -007, -009, -011) dürfen ohne Weiteres offen bleiben; ADR-005 (Solver) ist mit
 > S-19/S-20 ohnehin nach v1.1 gewandert.
 
-> **Version:** V0.5 — *Änderung ggü. V0.4: **ADR-011** — die Zusicherungen des Stimmen-Puffers von
+> **Version:** V0.6 — *Änderung ggü. V0.5: **Dritter Status eingeführt** —
+> `Bestätigt — verbindlich für v0.1` zwischen `Vorschlag — anfechtbar` und `Angenommen`. Die sieben
+> v0.1-tragenden Records (ADR-001, -002, -004, -006, -008, -010, -012) sind bestätigt und tragen je
+> einen Bestätigungsvermerk mit Aufgabebedingung und der Angabe, **was ein späterer Widerspruch
+> kostet**. **ADR-006** um die Zwangsbedingung aus ADR-005 ergänzt: die Hostingumgebung muss einen
+> lokalen Python-Kindprozess ausführen können — sonst ist der Solver in v1.1 verloren, ohne dass es
+> auffällt. **ADR-005** um „Offene Messung" (Grenzwerte auf der Zielhardware, vor S-19) und
+> „Bewusst offen gehalten" (der Solver-Port darf eine Gewichtung je Bewerbung nicht ausschließen,
+> `04-Domaenenmodell.md` O-8) erweitert; sein Status bleibt `Vorschlag`. Die beiden Kästen im Kopf
+> behaupteten weiterhin, **jeder** Record stehe auf `Vorschlag` — nachgezogen.*
+>
+> *Ggü. V0.4: **ADR-011** — die Zusicherungen des Stimmen-Puffers von
 > vier auf **sechs** ergänzt (Leeren beim **Profilwechsel**, **idempotente** Wiedereinspielung), damit
 > der Record deckungsgleich mit G-B7 und G-D11 in `GUARDRAILS.md` ist. Ohne die beiden würde der ADR
 > vier Zusicherungen dokumentieren, während die CI sechs erzwingt.*
@@ -47,11 +61,17 @@
 
 ---
 
-> # ⚠️ Jeder Record trägt `Status: Vorschlag — anfechtbar`.
+> # ⚠️ Fünf Records tragen `Status: Vorschlag — anfechtbar`, sieben `Bestätigt — verbindlich für v0.1`.
+>
+> **Stand 2026-09-09.** Bis dahin galt der Satz „jeder Record trägt `Vorschlag — anfechtbar`"
+> ausnahmslos; er stimmt jetzt nur noch für ADR-003, -005, -007, -009 und -011. Die sieben
+> v0.1-tragenden Records sind bestätigt — siehe Kasten oben und den Bestätigungsvermerk am Ende
+> jedes Records. **`Angenommen` ist keiner**: dieser Status bleibt Records vorbehalten, die im
+> Code umgesetzt **und** überprüft sind.
 >
 > Dieses Dokument ist **kein Beschlussprotokoll.** Es ist der erste Einstiegspunkt für die
-> Projektplanung und definiert **keine finalen Constraints** — dafür ist es zu früh. Kein Record hier
-> ist „accepted" im klassischen ADR-Sinn; keiner ist ohne Widerspruch umzusetzen.
+> Projektplanung. Für die fünf offenen Records definiert es **keine finalen Constraints** — dafür
+> ist es zu früh; keiner von ihnen ist ohne Widerspruch umzusetzen.
 >
 > Der Wert liegt darin, dass das Besprochene **mit seiner Begründung** festgehalten ist. Deshalb ist
 > jeder Record so geschrieben, dass er angegriffen werden kann: die verworfenen Optionen stehen mit
@@ -165,7 +185,14 @@ Ranking, Termin-Kostenmodell, Zeitfenster-Parser) — siehe `04-Domaenenmodell.m
 > nie Nutzen — konkret: wenn über Monate jede Funktion drei Kontexte anfasst. Dann sind die Grenzen
 > falsch gezogen, nicht das Prinzip.
 
-**Status: Vorschlag — anfechtbar**
+**Status: Bestätigt — verbindlich für v0.1**
+
+> **Bestätigt am 2026-09-09** (Samuel Zink) — verbindlich für v0.1.
+> · **Aufgabebedingung:** Das gibt man auf, wenn sich zeigt, dass die Kontextgrenzen im Alltag nur
+> Reibung erzeugen und nie Nutzen — konkret: wenn über Monate jede Funktion drei Kontexte anfasst.
+> · **Was ein späterer Widerspruch kostet:** Jede Importgrenze neu ziehen — sechs Kontextordner, die
+> dependency-cruiser-Konfiguration und jeder Aufruf, der heute eine Grenze respektiert
+> · Status wechselt auf `Angenommen`, sobald im Code umgesetzt und überprüft.
 
 ---
 
@@ -242,7 +269,14 @@ Vier Regeln gelten für jeden Übergang:
 > anders). Dann wird die Übergangstabelle zu **Konfiguration** statt Code — ein deutlich größerer
 > Umbau, aber derselbe Grundgedanke.
 
-**Status: Vorschlag — anfechtbar**
+**Status: Bestätigt — verbindlich für v0.1**
+
+> **Bestätigt am 2026-09-09** (Samuel Zink) — verbindlich für v0.1.
+> · **Aufgabebedingung:** Das gibt man auf, wenn sich die Prozessphasen als haushaltsspezifisch
+> erweisen (jede WG castet anders).
+> · **Was ein späterer Widerspruch kostet:** Eine Migration von Boolean-Flags zu Zuständen, auf einem
+> Datenbestand, der die Zustände schon führt
+> · Status wechselt auf `Angenommen`, sobald im Code umgesetzt und überprüft.
 
 ---
 
@@ -456,7 +490,16 @@ optional sind:
 > ist: RLS nachträglich einzuführen bedeutet, jede bestehende Abfrage neu zu prüfen. Wenn er fallen
 > soll, dann jetzt und nicht später. Das sagt umgekehrt: er sollte jetzt hart angegriffen werden.
 
-**Status: Vorschlag — anfechtbar**
+**Status: Bestätigt — verbindlich für v0.1**
+
+> **Bestätigt am 2026-09-09** (Samuel Zink) — verbindlich für v0.1.
+> · **Aufgabebedingung:** Das gibt man auf, wenn — eigentlich nicht. Dies ist der Record, dessen
+> Umkehrung am teuersten ist: RLS nachträglich einzuführen bedeutet, jede bestehende Abfrage neu zu
+> prüfen.
+> · **Was ein späterer Widerspruch kostet:** **Jede Abfrage im System.** Autorisierung nachträglich
+> einzuziehen heißt, jede bestehende Abfrage anzufassen — und genau das ist der Weg, auf dem eine
+> vergessene Bedingung zum Datenleck wird
+> · Status wechselt auf `Angenommen`, sobald im Code umgesetzt und überprüft.
 
 ---
 
@@ -561,6 +604,16 @@ auch dann, wenn der Solver ausfällt.
   Speicherbegrenzung, sauberes Verhalten bei ungültigem JSON. Das ist keine Zeile Code, sondern ein
   kleiner Baustein mit eigenen Tests.
 
+> **Offene Messung.** Die Grenzwerte des Solvers — Bewerbende × Slots × Bewohnende, ab denen die
+> Rechenzeit unzumutbar wird — sind auf der Zielhardware zu messen und **hier** einzutragen,
+> bevor S-19 ausgeliefert wird. Bisher als offener Punkt geführt (`02-SRD.md` O-06,
+> `03-PRD.md` P-O-06); der Solver liegt in v1.1, die Messung damit ebenfalls.
+
+> **Bewusst offen gehalten.** Der Solver-Port darf eine zusätzliche Gewichtung je Bewerbung
+> nicht ausschließen — etwa eine Priorisierung der Terminfindung nach dem Abstimmungsergebnis
+> (`04-Domaenenmodell.md` O-8). Ob das den Ablauf verkompliziert und was es die Laufzeit kostet,
+> ist offen; die Schnittstelle soll die Frage nicht vorentscheiden.
+
 > **Das gibt man auf, wenn** entweder die Imagegröße im gewählten Hosting zum Problem wird (dann
 > Netzwerkdienst statt Kindprozess — der Port macht es billig) oder sich zeigt, dass Haushalte den
 > Vorschlagsknopf nie benutzen, weil sie ihre Termine ohnehin von Hand legen. Im zweiten Fall wäre
@@ -643,12 +696,25 @@ einzeln verhandelbar, ohne diese mitzuverhandeln:
   Verifikation gegen die installierte Version".
 - **Ein Image mit Node *und* Python** ist größer, langsamer gebaut und hat zwei
   Sicherheitsaktualisierungsketten.
+- **Zwangsbedingung aus ADR-005.** Die Hostingumgebung muss einen lokalen Python-Kindprozess mit
+  Zeitlimit und fixem Seed ausführen können. Eine Umgebung ohne langlebige Prozesse ist damit
+  ausgeschlossen — auch wenn der Solver erst in v1.1 gebaut wird. Wer diese Bedingung beim
+  Aufsetzen übergeht, verliert ADR-005, ohne es zu bemerken.
 
 > **Das gibt man auf, wenn** die Betriebskosten das Spendenmodell übersteigen (dann: Solver als
 > separater, bedarfsgestarteter Dienst und die App serverless — aber erst, wenn ADR-005 entsprechend
 > angepasst ist) oder wenn self-hosted Auth mehr Zeit kostet als die gesamte Casting-Pipeline.
 
-**Status: Vorschlag — anfechtbar**
+**Status: Bestätigt — verbindlich für v0.1**
+
+> **Bestätigt am 2026-09-09** (Samuel Zink) — verbindlich für v0.1.
+> · **Aufgabebedingung:** Das gibt man auf, wenn die Betriebskosten das Spendenmodell übersteigen
+> (dann: Solver als separater, bedarfsgestarteter Dienst und die App serverless — aber erst, wenn
+> ADR-005 entsprechend angepasst ist) oder wenn self-hosted Auth mehr Zeit kostet als die gesamte
+> Casting-Pipeline.
+> · **Was ein späterer Widerspruch kostet:** Praktisch die gesamte Codebasis. Dies ist der teuerste
+> Record dieser Liste, und der einzige, dessen Widerspruch zugleich ADR-005 mitnimmt
+> · Status wechselt auf `Angenommen`, sobald im Code umgesetzt und überprüft.
 
 ---
 
@@ -873,7 +939,15 @@ denn seine Aufgabe ist, dass sieben Menschen eine gemeinsame Entscheidung akzept
 > aus v1.1 als Standard) oder wenn der Feinschliff-Screen systematisch abgebrochen wird (dann Budget
 > zur reinen Anzeige ohne Aufforderung).
 
-**Status: Vorschlag — anfechtbar**
+**Status: Bestätigt — verbindlich für v0.1**
+
+> **Bestätigt am 2026-09-09** (Samuel Zink) — verbindlich für v0.1.
+> · **Aufgabebedingung:** Das gibt man auf, wenn Haushalte in der Praxis über Gleichstände klagen
+> (dann Punkte-Variante aus v1.1 als Standard) oder wenn der Feinschliff-Screen systematisch
+> abgebrochen wird (dann Budget zur reinen Anzeige ohne Aufforderung).
+> · **Was ein späterer Widerspruch kostet:** Das `Vote`-Schema, die Score-Funktion, die Rangliste —
+> und jede bereits abgegebene Stimme wird uninterpretierbar, weil ihre Skala sich geändert hat
+> · Status wechselt auf `Angenommen`, sobald im Code umgesetzt und überprüft.
 
 ---
 
@@ -1056,7 +1130,14 @@ Listen, die auseinanderlaufen.
 > den Build grün zu bekommen. Dann ist sie ein Ritual, und ein Ritual ist schlechter als keine Regel,
 > weil es Sicherheit vortäuscht.
 
-**Status: Vorschlag — anfechtbar**
+**Status: Bestätigt — verbindlich für v0.1**
+
+> **Bestätigt am 2026-09-09** (Samuel Zink) — verbindlich für v0.1.
+> · **Aufgabebedingung:** Das gibt man auf, wenn sich zeigt, dass die Datei nur noch mechanisch mit
+> `⚙️` gefüllt wird, um den Build grün zu bekommen.
+> · **Was ein späterer Widerspruch kostet:** Ein Schema, das längst nicht deklarierte Spalten
+> enthält. `04-Domaenenmodell.md` §9 ist genau daran dreimal verrutscht
+> · Status wechselt auf `Angenommen`, sobald im Code umgesetzt und überprüft.
 
 ---
 
@@ -1291,7 +1372,14 @@ Enum-Werte, Funktionen, Tabellen, Commit-Nachrichten, Codekommentare **englisch*
 > **Das gibt man auf, wenn** das Projekt Beitragende gewinnt, die kein Deutsch lesen. Dann werden die
 > Dokumente zweisprachig — der Code ist es bereits.
 
-**Status: Vorschlag — anfechtbar**
+**Status: Bestätigt — verbindlich für v0.1**
+
+> **Bestätigt am 2026-09-09** (Samuel Zink) — verbindlich für v0.1.
+> · **Aufgabebedingung:** Das gibt man auf, wenn das Projekt Beitragende gewinnt, die kein Deutsch
+> lesen.
+> · **Was ein späterer Widerspruch kostet:** Entweder jeden Bezeichner umbenennen oder jedes Dokument
+> neu übersetzen
+> · Status wechselt auf `Angenommen`, sobald im Code umgesetzt und überprüft.
 
 ---
 
@@ -1323,10 +1411,20 @@ Drei Regeln für die Aufteilung, damit dabei nichts verlorengeht:
 
 1. **Nummern bleiben.** ADR-005 bleibt `0005-…`, dauerhaft. Verweise aus `03-PRD.md`,
    `04-Domaenenmodell.md`, `06-Compliance-Anhang.md` und `GUARDRAILS.md` treffen sonst ins Leere.
-2. **Der Status wird pro Datei gepflegt** und wechselt von `Vorschlag — anfechtbar` erst dann auf
-   `Angenommen`, wenn der Record im Code umgesetzt **und** überprüft ist. Ein widerlegter Record wird
-   **nicht gelöscht**, sondern auf `Verworfen — ersetzt durch ADR-0xx` gesetzt: die Begründung, warum
-   etwas *nicht* gemacht wurde, ist der wertvollste Teil eines ADR-Bestands.
+2. **Der Status wird pro Datei gepflegt** und durchläuft drei Stufen, nicht zwei:
+
+   ```
+   Vorschlag — anfechtbar  →  Bestätigt — verbindlich für v0.1  →  Angenommen
+         (Planung)             (vor der ersten Zeile Code)         (umgesetzt UND überprüft)
+   ```
+
+   `Bestätigt — verbindlich für v0.1` heißt: der Autor hat den Record erneut gelesen, akzeptiert
+   seine Konsequenzen so, wie sie dastehen, und verpflichtet sich, ihn nicht ohne einen ersetzenden
+   ADR anzufechten. Das ist **keine** Aussage über den Code — sie behauptet nicht, dass der Record
+   umgesetzt oder überprüft ist. Erst wenn beides zutrifft, wechselt der Status auf `Angenommen`.
+   Ein widerlegter Record wird **nicht gelöscht**, sondern auf `Verworfen — ersetzt durch ADR-0xx`
+   gesetzt: die Begründung, warum etwas *nicht* gemacht wurde, ist der wertvollste Teil eines
+   ADR-Bestands.
 3. **Diese Datei bleibt bestehen**, als Momentaufnahme des Planungsstands vom 2026-08-19, und wird
    nicht mit den Einzeldateien synchronisiert.
 
