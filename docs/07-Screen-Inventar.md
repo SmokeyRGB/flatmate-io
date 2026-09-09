@@ -1474,5 +1474,5 @@ mit dem Vermerk, dass die 🔴-Lücke (Feinschliff) durch Wegfall der Interaktio
 nicht durch ihre Spezifikation (§9). Diese beiden letzten Schritte liegen bei der Koordinationssitzung.
 
 Ein klickbares Low-Fi-Mockup der vier Kernbildschirme (B1, C1, D1, O1) — nach dem Vorbild
-[Ideas/Notella/04-Screen-Inventar.md, Abschnitt „Für das Mockup ausgewählte Bildschirme"](../Notella/04-Screen-Inventar.md:671)
+dem Screen-Inventar des Schwesterprojekts Notella, Abschnitt „Für das Mockup ausgewählte Bildschirme" (liegt außerhalb dieses Ordners und ist deshalb nicht verlinkt)
 — ist ein möglicher, aber nicht beauftragter weiterer Schritt.

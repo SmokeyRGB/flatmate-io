@@ -1,6 +1,6 @@
 # F1 — Open a casting round · requirements
 
-> **Feature:** [F1 — Open a casting round for the rooms you are actually casting for](../MVP%20Backlog%20Features/F1-open-a-casting-round.md)
+> **Feature:** [F1 — Open a casting round for the rooms you are actually casting for](../features/F1-open-a-casting-round.md)
 > **Band:** `v0.1` · **Scope lines:** S-01, S-02, S-04, S-05, S-06, S-07, S-35, S-50
 > **Screens:** A1 Household registration · O1 Organisation dashboard ⚡ · O2 Create round · O14 Rooms · O16 Members · O20 Household settings
 > **Status:** V1.1 · 2026-09-09

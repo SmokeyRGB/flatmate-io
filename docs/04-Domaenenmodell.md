@@ -11,7 +11,7 @@
 > **Push → E-Mail → In-App** gedreht (§2.5). **Feldsumme dadurch bereits auf 59 gestiegen** (11 ⚫ ·
 > 15 🔴 · 33 🟠) — §9 war seither nicht mehr vollständig, siehe Korrekturkasten dort.
 >
-> **Satz 2 — Nachzug aus dem UX/UI-Plan** (`Ideas/Flatmate.io/07-Screen-Inventar.md`, U-1…U-26):
+> **Satz 2 — Nachzug aus dem UX/UI-Plan** (`07-Screen-Inventar.md`, U-1…U-26):
 > `phase_hint`-Berechnungsregel als Pseudocode ergänzt (§8.6, vorher nur „Begründung unten" ohne
 > Formel); Geltungsbereich von `phase_deadline_at` ausgeschrieben (§2.2) — **jetzt blockierend**,
 > weil das Feld sich auf eine Phase bezog, die nirgends berechnet war; CTA-Sortierung als eigene

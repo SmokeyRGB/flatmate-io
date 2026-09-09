@@ -1,6 +1,6 @@
 # F0 — The substrate · requirements
 
-> **Feature:** [Feature 0 — the substrate, which is not optional](../MVP%20Backlog%20Features/README.md#feature-0--the-substrate-which-is-not-optional)
+> **Feature:** [Feature 0 — the substrate, which is not optional](../README.md#feature-0--the-substrate-which-is-not-optional)
 > **Band:** `v0.1` · **Scope lines:** S-15, S-27, S-36, S-37
 > **Screens:** none — this packet is substrate, not a user-facing feature (see §2)
 > **Status:** V1.0 · 2026-09-09

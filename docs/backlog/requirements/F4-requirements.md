@@ -1,6 +1,6 @@
 # F4 — Screen the applications card by card · requirements
 
-> **Feature:** [F4 — Screen the applications card by card, four ratings](../MVP%20Backlog%20Features/F4-screen-and-vote.md)
+> **Feature:** [F4 — Screen the applications card by card, four ratings](../features/F4-screen-and-vote.md)
 > **Band:** `v0.1` · **Scope lines:** S-09, S-10
 > **Screens:** C1 Screening pass ⚡ — the most frequent action in the product
 > **Status:** V1.0 · 2026-09-08

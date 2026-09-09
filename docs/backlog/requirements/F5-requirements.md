@@ -1,6 +1,6 @@
 # F5 — A ranking you can check, hidden until you have voted · requirements
 
-> **Feature:** [F5 — A ranking you can check, hidden until you have voted](../MVP%20Backlog%20Features/F5-ranking-hidden-until-you-vote.md)
+> **Feature:** [F5 — A ranking you can check, hidden until you have voted](../features/F5-ranking-hidden-until-you-vote.md)
 > **Band:** `v0.1` · **Scope lines:** S-12, S-13, S-14, S-16, S-31
 > **Screens:** D1 Ranking — "waiting for votes" ⚡ · D2 Candidate detail · D3 My own application
 > **Status:** V1.0 · 2026-09-08

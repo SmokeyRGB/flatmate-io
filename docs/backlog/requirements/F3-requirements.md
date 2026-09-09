@@ -1,6 +1,6 @@
 # F3 — Capture an application · requirements
 
-> **Feature:** [F3 — Capture an application, on the record](../MVP%20Backlog%20Features/F3-capture-an-application.md)
+> **Feature:** [F3 — Capture an application, on the record](../features/F3-capture-an-application.md)
 > **Band:** `v0.1` · **Scope lines:** S-08 (form half only), S-38, manual-delete half of S-33
 > **Screens:** O3 Capture application · O4 Pipeline
 > **Status:** V1.0 · 2026-09-08

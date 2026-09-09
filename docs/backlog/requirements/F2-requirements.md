@@ -1,6 +1,6 @@
 # F2 — Join in two fields · requirements
 
-> **Feature:** [F2 — Join in two fields, and land on the one thing to do next](../MVP%20Backlog%20Features/F2-join-in-two-fields.md)
+> **Feature:** [F2 — Join in two fields, and land on the one thing to do next](../features/F2-join-in-two-fields.md)
 > **Band:** `v0.1` · **Scope lines:** S-03, S-49, S-48
 > **Screens:** A3 Join by code ⚡ · B1 Start ⚡ · O16 Members (where the link is shared)
 > **Status:** V1.0 · 2026-09-08
