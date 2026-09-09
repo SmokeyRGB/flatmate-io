@@ -124,8 +124,10 @@ if [ -f "$PRD" ]; then
   else
     bad "$bands of $heads subsections carry a band marker" "Phase 2g adds the missing $((heads-bands))"
   fi
+  # A container heading has no content of its own, so it carries "gemischt" and
+  # points at its subsections instead of naming a band. That is a valid marker.
   badtok=$(printf '%s\n' "$body" | grep -E '^> \*\*Band:\*\*' |
-             grep -vE '`(v0\.1|v0\.2|v1\.1|v2)`' | head -3)
+             grep -vE '`(v0\.1|v0\.2|v1\.1|v2)`|gemischt' | head -3)
   [ -n "$badtok" ] && bad "band marker with an invalid token" "$badtok"
 fi
 

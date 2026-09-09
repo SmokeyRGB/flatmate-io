@@ -95,12 +95,16 @@ Risiken: `01-Problem-Framing.md` und `02-SRD.md`. Rechtliche Analyse:
 
 ### 4.0.1 Nutzergruppen und Differenzierung
 
+> **Band:** `v0.1`
+
 **Aktivierte optionale Sektion** — die fünf Gruppen unterscheiden sich nicht in Rangstufen,
 sondern in *Art* des Zugriffs. Sie entstehen aus **orthogonalen `Membership`-Attributen**
 (`is_resident`, `role`) plus einzeln vergebbaren Berechtigungen, nicht aus einer Hierarchie
 (E-04, S-04).
 
 #### Abgrenzung der Gruppen
+
+> **Band:** `v0.1`
 
 | Gruppe | Technische Bestimmung | Kann abstimmen? | Kernaufgabe | Anteil / Anzahl |
 |--------|----------------------|:---------------:|-------------|-----------------|
@@ -119,6 +123,8 @@ sondern in *Art* des Zugriffs. Sie entstehen aus **orthogonalen `Membership`-Att
 
 #### Differenzierung nach Dimension
 
+> **Band:** `v0.1`
+
 | Dimension | Haushalts-Account | Moderator | Bewohnender | Ehemaliger | Bewerbender ohne Konto |
 |-----------|-------------------|-----------|-------------|-----------|------------------------|
 | Startbildschirm | **Organisation → Haushalt** (Zimmer, Mitglieder, Aufbewahrung — kein Zugriff auf Runden, S-50/U-20) | **Start** (Aufgabenliste, wie Bewohnender), mit **Moderations-Brücke** am Fuß zur Organisationsfläche (U-5) | **Start** — Aufgabenliste, sortiert nach Zeitdruck (U-1, U-9, Screen-Inventar §2) | — (kein Zugang) | keiner (nur ggf. Token-Seite) |
@@ -135,6 +141,8 @@ sondern in *Art* des Zugriffs. Sie entstehen aus **orthogonalen `Membership`-Att
 | Erscheint im `ActivityEvent`-Feed als Urheber | **„Verwaltung"** (ehrlich, kein Personenname) | Personenname | Personenname | „ehemaliges Mitglied" | Kandidatenname im Sachbezug |
 
 #### Rechtematrix
+
+> **Band:** `v0.1` — später: Terminbestätigung, Notiz, Veto (`v0.2`)
 
 > **Geändert ggü. V0.5 (S-50/U-20 — größter Einzeleingriff dieser Version).** Ein
 > Haushalts-Account ohne aktives `ResidentProfile` erreicht **keine** Castings mehr — keine
@@ -181,6 +189,8 @@ sondern in *Art* des Zugriffs. Sie entstehen aus **orthogonalen `Membership`-Att
 
 #### Wechsel- und Herabstufungslogik
 
+> **Band:** `v0.1` — später: `moved_out`-Rechteentzug S-32 (`v0.2`)
+
 > **Umbenannt ggü. V0.5: „Kontextwechsel" → „Identitätswechsel".** Das Wort „Kontext" hatte
 > nahegelegt, `Session.acting_profile_id = null` verleihe der Verwaltung erweiterte Rechte.
 > Das ist falsch und wird als **geschützter Test** festgehalten (U-21, Screen-Inventar §4):
@@ -224,11 +234,15 @@ sondern in *Art* des Zugriffs. Sie entstehen aus **orthogonalen `Membership`-Att
 
 ### 4.0.2 Nutzerflüsse (Cross-Page)
 
+> **Band:** gemischt — siehe Unterabschnitte
+
 **Aktivierte optionale Sektion** — der Prozess ist der Kern des Produkts. Die Nummerierung
 in der Spalte „Ist-Schritt" verweist auf die 13 Ist-Prozessschritte aus
 `01-Problem-Framing.md`; damit ist jeder Schritt der Belegkette nachweislich abgedeckt.
 
 #### Hauptfluss — von der Anzeige bis zum Einzug
+
+> **Band:** `v0.1` — später: ab `invited` (`v0.2`)
 
 | # | Bildschirm | Nutzerhandlung | Ergebnis | Ist-Schritt | Verzweigung |
 |---|-----------|----------------|----------|:-----------:|-------------|
@@ -258,6 +272,8 @@ in der Spalte „Ist-Schritt" verweist auf die 13 Ist-Prozessschritte aus
 
 #### Datenübergabe zwischen Bildschirmen
 
+> **Band:** `v0.1` — später: Schrittpaare der Terminfindung und der Zusage (`v0.2`)
+
 - Start / Organisation → alle Unterseiten: `casting_round_id` plus der aufgelöste
   Sichtbarkeitskontext (aktives Profil, `RoundParticipation`, Selbst-Redaktionsmenge). **Der
   Sichtbarkeitskontext wird serverseitig aufgelöst und nie clientseitig gefiltert** (S-36)
@@ -275,6 +291,8 @@ in der Spalte „Ist-Schritt" verweist auf die 13 Ist-Prozessschritte aus
   Feed-Eintrag gar nicht — nicht ein Sprung in einen Fehlerzustand
 
 #### Nebenflüsse
+
+> **Band:** `v0.2`
 
 | Fluss | Auslöser | Ablauf |
 |-------|----------|--------|
@@ -299,7 +317,11 @@ in der Spalte „Ist-Schritt" verweist auf die 13 Ist-Prozessschritte aus
 
 ### 4.1 Frontend-Anforderungen
 
+> **Band:** gemischt — siehe Unterabschnitte
+
 #### 4.1.0 Navigations- und Layoutmodell
+
+> **Band:** `v0.1`
 
 **Mobile-first ist hier eine Aufteilung, keine Bildschirmbreite.** Die Stimmabgabe findet
 auf dem Telefon statt; die Moderation überwiegend am größeren Gerät. Daraus folgt eine
@@ -342,6 +364,8 @@ Es gibt nichts, das eine Sitzung *zusätzlich* freischaltet.
 - [ ] Ohne Netzverbindung zeigt die gestartete App **keine** zuvor geladenen Bewerber- oder Beratungsdaten, sondern den Offline-Zustand (§6.2)
 
 #### 4.1.1 Beitritt und erste Stimme
+
+> **Band:** `v0.1`
 
 Der kürzeste Weg der Anwendung (S-03, SRD §10). Ein Bildschirm, **zwei Pflichtfelder: Name
 und Passwort. E-Mail ist optional.** Der Beitrittscode gilt für den **ganzen Haushalt**,
@@ -399,6 +423,8 @@ Kontrollkästchen **„Auf diesem Gerät angemeldet bleiben"**, vorbelegt an.
 
 #### 4.1.2 Start — ersetzt „Rundenkopf" (Startbildschirm für Bewohnende)
 
+> **Band:** `v0.1` — später: PWA-Band S-45, Beteiligungszähler S-29 (`v0.2`)
+
 > **Grundlegend neu gefasst ggü. V0.5 (U-1, U-9).** Der bisherige „Rundenkopf" hatte **genau
 > einen** Handlungsaufruf vorgesehen — die Realität hat mehrere: Stimmen laufen pro
 > `Application`, nicht pro Runde, und ein Bewohner kann gleichzeitig offen haben: Stimmen der
@@ -440,6 +466,8 @@ zuerst?**
 - [ ] Das PWA-Install-Band steht **nie** auf dem CTA-Platz und **nie** über einer Aufgabe mit gesetzter Frist — auch dann nicht, wenn die Frist heute abläuft und die App nicht installiert ist
 
 #### 4.1.3 Bewerbung erfassen — Formular und Einfügen
+
+> **Band:** `v0.1` — später: Paste-Parser-Hälfte von S-08 samt S-39 (`v0.2`)
 
 Zwei Wege, **ein** Ergebnis: ein `Application`-Objekt, unabhängig vom Eingangskanal
 (P-1, S-08, ADR-009).
@@ -519,6 +547,8 @@ gespeichert und nicht protokolliert.
 
 #### 4.1.4 Screening-Durchlauf — der wichtigste Bildschirm
 
+> **Band:** `v0.1`
+
 Eine Karte, eine Frage, vier Antworten (S-09, S-10). Dies ist der Bildschirm, an dem die
 Kernmetrik entschieden wird.
 
@@ -554,6 +584,8 @@ nicht* und *Finde gut*"). Das ist P-3, nicht Transparenz-Kosmetik.
 - [ ] Nach der letzten Karte folgt entweder der zweite Durchlauf (§4.1.5) oder die Rangliste — nie ein leerer Bildschirm
 
 #### 4.1.5 Zweiter Durchlauf — ersetzt den eigenen Feinschliff-Screen (S-47)
+
+> **Band:** `v0.2`
 
 > **Grundlegend geändert ggü. V0.5 (K-1/U-10).** Der bisher als eigener Bildschirm geplante
 > Feinschliff mit den Unbedingt-Kandidaten in einer gemeinsamen Vergleichsansicht entfällt als
@@ -614,6 +646,8 @@ budget = max(1, ceil(offene Zimmer × 1,5))
 
 #### 4.1.6 Rangliste und Kandidaten-Einzelansicht
 
+> **Band:** `v0.1`
+
 **Rangliste:** `Application`s der Runde mit Score (Mittelwert auf 0–100), sortierbar. Unter
 der Rangliste ein **eigener, sichtbar getrennter Abschnitt „Warten auf Stimmen (3 von 7)"**
 für Kandidaten unter Quorum (E-10, S-13). Diese erscheinen **nicht** in der Rangliste und
@@ -648,6 +682,8 @@ Einzelansicht **nur** das Sachprofil, mit einem ehrlichen Hinweis:
 - [ ] Der Stimmungsbalken hat eine textliche Entsprechung, die von einem Screenreader vollständig erfasst wird
 
 #### 4.1.7 Pipeline (Statusverwaltung)
+
+> **Band:** `v0.1` — später: S-40, S-42 (`v0.2`)
 
 Alle `Application`s der Runde nach Zustand gruppiert, mit Anzahl je Spalte. Zustandswechsel
 sind eine sichtbare Handlung auf dem Objekt, kein Ziehen als einziger Weg.
@@ -726,6 +762,8 @@ Identitäten sind ausdrücklich keine Lösungswege dieses Fehlerfalls.
 
 #### 4.1.8 Verfügbarkeitsraster und Terminfindung
 
+> **Band:** `v0.2` — später: Solver S-19, S-20 (`v1.1`)
+
 **Raster:** Wochenraster mit Zeitspalten. Bewohnende tragen `AvailabilityWindow` als „kann /
 kann nicht" ein; das Raster zeigt eine **Heatmap** („4/7 können"). Zusätzlich der
 **Freitext→Zeitfenster-Parser** („Di 16–19", „dienstags ab 16", „nur abends", „am 3.9.
@@ -781,6 +819,8 @@ Person bestätigt den `Appointment`.
 
 #### 4.1.9 Casting-Notizen
 
+> **Band:** `v0.2`
+
 Adressiert Schritt 8 der Belegkette — der zentrale Schmerzpunkt. **Strukturierte Prompts
 statt leerem Kasten** (S-22, Inhaltsregeln in §4.6). Sichtbar über dem Eingabebereich:
 
@@ -808,6 +848,8 @@ konkreten Fälligkeitsgrund „seit gestern fällig" statt eines allgemeinen Hin
 - [ ] Die Aufgabe „Notiz schreiben" erscheint auf dem Start-Bildschirm ausschließlich für Profile mit `AppointmentAttendance.attended = true` zu dieser `Application` und ohne bereits geschriebene `CastingNote` (§4.6.4)
 
 #### 4.1.10 Runde 2 und Veto
+
+> **Band:** `v0.2`
 
 Zweite Abstimmung über gecastete Bewerbende (`interviewed`), **gleiche vierstufige Skala**.
 Zusätzlich das `Veto` (E-11, S-24):
@@ -840,6 +882,8 @@ Zusätzlich das `Veto` (E-11, S-24):
 - [ ] Ein `Veto` zu einer `Application` mit `became_resident_id == aktives Profil` wird für dieses Profil nicht ausgeliefert — auch nicht als bloße Existenzangabe („1 Veto vorhanden")
 
 #### 4.1.11 Kalender
+
+> **Band:** `v1.1`
 
 `Appointment`s und Einzugstermine der Runde in Monats- und Listenansicht. Sprung auf die
 zugehörige `Application` bzw. das `Room`.
@@ -879,6 +923,8 @@ Sie speist außerdem T-1 (Casting-Notiz) und die Erinnerung aus §4.1.9/§4.6.4:
 - [ ] Die Anwesenheitskorrektur ist für die Moderation jederzeit erreichbar, aber an keiner Stelle als Pflichtschritt vor der Notiz-Erinnerung oder dem Rundenfortschritt vorausgesetzt
 
 #### 4.1.12 Aktivitäts-Feed und Benachrichtigungszentrum
+
+> **Band:** `v0.2`
 
 Der Feed ist die Antwort auf „was ist passiert, während ich weg war" und speist die
 `Notification`s (E-21, E-22, S-27, S-28).
@@ -921,6 +967,8 @@ den Zeitpunkt der Push-Berechtigungsanfrage und §6.2 für das Rückfallverhalte
 - [ ] Für ein Profil ohne aktive `PushSubscription` und ohne hinterlegte E-Mail ist jedes zustellbare Ereignis über das Start-Dashboard erreichbar, ohne dass eine externe Erinnerung vorausgesetzt wird
 
 #### 4.1.13 Weitere Bildschirme (v1)
+
+> **Band:** `v0.1` — später: Aufbewahrungs- und Datenauskunft-Ansichten (`v0.2`)
 
 > **Bildschirmliste gestrafft ggü. V0.5 (K-10, K-19/U-22).** Zwei Verdichtungen: **„Persönliche
 > Einstellungen" und „Passwort/Passkey" werden zu einem** Bildschirm „Einstellungen" mit
@@ -972,6 +1020,8 @@ gehört an die Stelle, an der das Fehlen der Installation gerade spürbar wird.
 
 #### 4.1.14 Plattformunterschiede
 
+> **Band:** `v0.1` — später: Raster, Vorschlag, Notizen (`v0.2`/`v1.1`)
+
 > **Angeglichen ans neue Rahmenwerk (geändert ggü. V0.5, U-2/§4.1.0).** Die Navigationszeile
 > ist auf **2 Tabs + Kopfzeile** verkürzt; „Pipeline" liegt jetzt als Abschnitt „Bewerbungen"
 > in der Organisationsfläche, nicht mehr als eigenständiger Navigationspunkt.
@@ -993,6 +1043,8 @@ gehört an die Stelle, an der das Fehlen der Installation gerade spürbar wird.
 ---
 
 #### 4.1.15 Drei neue Bildschirme aus dem Spec-Update (neu ggü. V0.5)
+
+> **Band:** `v0.2`
 
 Drei Bildschirme, die das Spec-Update vom 02.09. nötig gemacht hat und die in V0.5 noch
 fehlten. Die fachliche Regel steht jeweils bereits an anderer Stelle — hier folgt die
@@ -1030,10 +1082,14 @@ aber **nie** auf dem primären-CTA-Platz und **nie** über einer Aufgabe mit ges
 
 ### 4.2 Daten- und Geschäftslogik
 
+> **Band:** gemischt — siehe Unterabschnitte
+
 > Verbindliche Quelle für Felder, Typen und Kardinalitäten ist `04-Domaenenmodell.md`. Die
 > hier festgelegten **Regeln** sind fachlich verbindlich; die Feldnamen sind Vorschläge.
 
 #### 4.2.1 Zustandsmaschine `Application`
+
+> **Band:** `v0.1`
 
 ```text
  new ──▶ screened ──▶ invited ──▶ scheduled ──▶ interviewed ──▶ offer_made ──▶ moved_in
@@ -1056,6 +1112,8 @@ aber **nie** auf dem primären-CTA-Platz und **nie** über einer Aufgabe mit ges
 
 #### 4.2.2 `CastingRound` und `RoundParticipation`
 
+> **Band:** `v0.1`
+
 | Regel | Festlegung |
 |-------|------------|
 | Teilnehmer-Snapshot | Beim Übergang `draft → open` werden die aktiven Bewohnenden als `RoundParticipation` festgeschrieben. Danach **explizit** hinzufügbar und entfernbar (E-13) |
@@ -1066,6 +1124,8 @@ aber **nie** auf dem primären-CTA-Platz und **nie** über einer Aufgabe mit ges
 | Verfahrenssperre | Änderungen am Abstimmungsverfahren (Stufenwerte, Feinschliff-Schwelle, Quorum-Regel, Veto-Einstellungen) sind bei einer offenen Runde **blockiert**; erfolgt eine Änderung dennoch über einen Verwaltungsweg, wird sie als `ActivityEvent` **laut protokolliert** und in der Runde sichtbar vermerkt (E-25, S-35) |
 
 #### 4.2.3 Abstimmung und Score
+
+> **Band:** `v0.1`
 
 | Regel | Festlegung |
 |-------|------------|
@@ -1080,6 +1140,8 @@ aber **nie** auf dem primären-CTA-Platz und **nie** über einer Aufgabe mit ges
 
 #### 4.2.4 Quorum (Entscheidung zu SRD O-01)
 
+> **Band:** `v0.1`
+
 | Regel | Festlegung |
 |-------|------------|
 | Nenner | Anzahl der `RoundParticipation`-Teilnehmenden mit `is_resident = true` und **ohne** `moved_out` |
@@ -1090,6 +1152,8 @@ aber **nie** auf dem primären-CTA-Platz und **nie** über einer Aufgabe mit ges
 | Änderung während laufender Runde | Blockiert (§4.2.2, Verfahrenssperre) |
 
 #### 4.2.5 Sichtbarkeit — die Invariante
+
+> **Band:** `v0.1`
 
 > **Niemand darf Beratungsinhalte über sich selbst lesen — dauerhaft, unabhängig vom
 > Rundenstatus.** (E-12, S-31)
@@ -1110,6 +1174,8 @@ aber **nie** auf dem primären-CTA-Platz und **nie** über einer Aufgabe mit ges
 
 #### 4.2.6 Aufbewahrung und Löschung
 
+> **Band:** `v0.1` — später: Automatik samt 14-Tage-Vorwarnung (`v0.2`)
+
 | Regel | Festlegung |
 |-------|------------|
 | Rechtsgrundlage | Art. 5 Abs. 1 lit. e + Art. 17 Abs. 1 lit. a DSGVO (Speicherbegrenzung) — **nicht** Art. 15. Frist am AGG-abgeleiteten 6-Monats-Richtwert orientiert (E-18) |
@@ -1126,6 +1192,8 @@ aber **nie** auf dem primären-CTA-Platz und **nie** über einer Aufgabe mit ges
 
 #### 4.2.7 Weitere Datenregeln
 
+> **Band:** `v0.1` — später: `ResidentProfile`-Löschung S-32 (`v0.2`)
+
 | Regel | Festlegung |
 |-------|------------|
 | Ereignisurheberschaft | Jeder `ActivityEvent` speichert **`Account` und handelndes Profil** (E-21). Anzeige: Profilname, oder ehrlich „Verwaltung" |
@@ -1138,6 +1206,8 @@ aber **nie** auf dem primären-CTA-Platz und **nie** über einer Aufgabe mit ges
 ---
 
 ### 4.3 Organisation → Haushalt — Einstellungen und Compliance-Werkzeuge
+
+> **Band:** `v0.1` — später: Terminvorgaben, Benachrichtigungen, Veto-Einstellungen, Aufbewahrungsautomatik, `subject_statement` (`v0.2`/`v1.1`)
 
 > **Umbenannt ggü. V0.5:** Diese Fläche heißt jetzt **Organisation → Haushalt** und ist nur für
 > ein Konto ohne `ResidentProfile` auf genau die hier gelisteten Bereiche beschränkt — der
@@ -1182,6 +1252,8 @@ aber **nie** auf dem primären-CTA-Platz und **nie** über einer Aufgabe mit ges
 
 ### 4.4 Backend- und Schnittstellenbedarf
 
+> **Band:** gemischt — die Liste umfasst alle Stufen; maßgeblich ist `02-SRD.md` §5.4
+
 **Fachliche Ebene:**
 
 - Authentifizierung: Registrierung (Haushalt), Beitritt per Code, Anmeldung, Passwort
@@ -1223,12 +1295,16 @@ aber **nie** auf dem primären-CTA-Platz und **nie** über einer Aufgabe mit ges
 
 ### 4.6 Inhaltsregeln für Freitext und Notizen
 
+> **Band:** gemischt — siehe Unterabschnitte
+
 **Aktivierte optionale Sektion.** Dieser Abschnitt ist die produktseitige Antwort auf den
 ersten Risikoposten aus `02-SRD.md` §7: *Flatmate.io erzeugt eine Auskunftspflicht, die der
 WhatsApp-Status-quo nicht hatte.* Er ist keine Formatvorgabe, sondern eine
 Risikominderung — und zugleich das, was die Notizen für Abwesende überhaupt brauchbar macht.
 
 #### 4.6.1 Grundregeln
+
+> **Band:** `v0.1` — später: C-1, C-2 (Notiz-Prompts) und C-7, C-9 (Gate) (`v0.2`)
 
 | # | Regel | Warum |
 |---|-------|-------|
@@ -1244,6 +1320,8 @@ Risikominderung — und zugleich das, was die Notizen für Abwesende überhaupt 
 | **C-10** *(neu, K-12/K-14/K-16)* | **Oberflächentexte dürfen werbend über den Prozess sprechen, nie wertend über die Person.** Die Grenze liegt nicht bei „nüchtern vs. lebendig", sondern zwischen **Prozess** und **Person**. Erlaubt: „Alle haben abgestimmt — ihr könnt jetzt entscheiden, wen ihr einladet" · „Die Castings sind gelaufen. Jetzt geht's um die Zusage" · „Lea hat die meisten Punkte bekommen". **Nie:** „3 vielversprechende Kandidaten" · „Lea passt gut zu euch" · „Wir empfehlen Lea". Jede Aussage über mehrere Kandidaten muss sich einer **tatsächlich existierenden** Schwelle zuordnen lassen (`quorum_share`, Favoriten-Budget, Veto-Budget, Rundenfrist) — keine erfundene „Eignungsschwelle" — und per Tippen nachrechenbar sein (P-3) | **P-5 verbietet dies nicht**, wie in V0.5 fälschlich angenommen: P-5 untersagt, dass **KI** Bewertungen, Rankings oder Empfehlungen über Personen erzeugt. Die Anwendung rankt zulässig — Score und Rangliste sind menschliche Stimmen nach offengelegten Regeln (E-07, S-12) —, und ein von Hand geschriebener Oberflächensatz ist ohnehin keine KI-Ausgabe. Vollständig hergeleitet in `07-Screen-Inventar.md` §7–8 |
 
 #### 4.6.2 Notiz-Prompts für `CastingNote` (Vorschlag)
+
+> **Band:** `v0.2`
 
 Gerichtet an Abwesende — das ist der Zweck (Schritt 8 der Belegkette):
 
@@ -1261,6 +1339,8 @@ Eindrucksebene wäre die rechtlich heikelste und produktseitig unnötigste Verdo
 
 #### 4.6.3 Freitext an der `Application`
 
+> **Band:** `v0.1`
+
 | Feld | Regel |
 |------|-------|
 | Bewerbungsnachricht | Beliebiger Text, wie eingegangen. **Nicht** in Kategorien zerlegt |
@@ -1269,6 +1349,8 @@ Eindrucksebene wäre die rechtlich heikelste und produktseitig unnötigste Verdo
 | `subject_statement` | Gegendarstellung der betroffenen Person am Datensatz (S-41). **Datenmodell in v1, Oberfläche in v1.1.** Sachlich die richtige Antwort auf Art. 16, weil sich eine subjektive Beurteilung nicht *berichtigen* lässt, man ihr aber eine Stellungnahme beistellen kann. Erscheint in der Datenauskunft (C-7); ändert oder löscht **keine** fremden `Vote`s, `Veto`s oder `CastingNote`s. **Aufbewahrung: siehe C-9 — kein eigener Zeitgeber, atomare Löschung** |
 
 #### 4.6.4 Erinnerung ans Notizenschreiben (S-46)
+
+> **Band:** `v0.2`
 
 Nach dem `Application`-Übergang `scheduled → interviewed` (Schritt 15 in §4.0.2) versendet
 die Anwendung automatisch eine Erinnerungs-Notification (`casting.note_reminder_due`, S-46)
@@ -1364,6 +1446,8 @@ dient genau einer Kennzahl aus `02-SRD.md` §6.
 
 ### 6.1 Leistung
 
+> **Band:** `v0.1` — später: Feasibility-Prüfung (`v0.2`), Solver-Zeitbudget (`v1.1`)
+
 - Start-Bildschirm interaktiv in **< 1,5 s** bei 60 `Application`s in der Runde
 - Kartenwechsel im Screening-Durchlauf **< 150 ms** — der Durchlauf muss sich wie Blättern
   anfühlen, nicht wie Laden; die nächste Karte wird vorgeladen
@@ -1382,6 +1466,8 @@ dient genau einer Kennzahl aus `02-SRD.md` §6.
 
 ### 6.2 Ausfallsicherheit und Rückfallverhalten
 
+> **Band:** `v0.2` — nur die Zeile „Policy-Prüfung nicht auflösbar" (S-36) liegt in `v0.1`
+
 | Ausfall | Verhalten |
 |---------|-----------|
 | **Solver nicht verfügbar** (Prozessstart fehlgeschlagen, kein Ergebnis) | Raster, Heatmap, Feasibility-Prüfung und manuelles Legen bleiben **voll nutzbar**. Nur „Vorschlag berechnen" ist deaktiviert, mit Begründung und Wiederholung. Die Terminfindung darf nie am Solver hängen (SRD §7) |
@@ -1397,6 +1483,8 @@ dient genau einer Kennzahl aus `02-SRD.md` §6.
 
 ### 6.3 Barrierefreiheit
 
+> **Band:** `v0.1` — später: Heatmap-Zahlenwerte, zweiter Durchlauf und Runde 2 per Tastatur (`v0.2`)
+
 - Die vier Abstimmungsstufen nie allein über Farbe: Symbol **und** Text, in jeder Ansicht
 - Der gestapelte 4-Farben-Stimmungsbalken hat eine vollständige textliche Entsprechung
   („2× Unbedingt, 3× Finde gut, 1× Eher nicht, 0× Nein") und ist für Screenreader erfasst
@@ -1409,6 +1497,8 @@ dient genau einer Kennzahl aus `02-SRD.md` §6.
 
 ### 6.4 SEO
 
+> **Band:** `v0.1` — später: Ausschluss der Token-Seite (`v1.1`)
+
 **Weitgehend irrelevant und bewusst nicht künstlich gefüllt.** Die Anwendung liegt
 vollständig hinter der Anmeldung; es gibt keine öffentlich indexierbare Inhaltsseite und
 ausdrücklich kein Interesse an der Indexierung von Bewerberdaten. Zwei Anforderungen bleiben:
@@ -1420,6 +1510,8 @@ ausdrücklich kein Interesse an der Indexierung von Bewerberdaten. Zwei Anforder
   Datenschutzanforderung
 
 ### 6.5 Sicherheit und Datenschutz
+
+> **Band:** `v0.1` — später: Gerätespeicher und Sendepuffer S-30 (`v0.2`)
 
 - **Autorisierung ausschließlich serverseitig und zweifach:** zentrale Policy-Objekte plus
   Row-Level-Security in der Datenhaltung. Jede Abfrage prüft `Household`-Zugehörigkeit,
