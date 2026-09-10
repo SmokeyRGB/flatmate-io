@@ -33,3 +33,21 @@ These are not requirements. Nothing in this folder is buildable, and nothing her
 reviewed against the domain model, the screen inventory or `GUARDRAILS.md`. `docs/COVERAGE.md` is
 the `v0.1` counterpart to this index, and unlike these stubs, it **is** checked — by
 `tools/done-check.sh` section 6 and by `GUARDRAILS.md` G-N2.
+
+---
+
+## `Band:` is a product stage, not a sprint
+
+Every stub here carries a **`Band:`** field — `v0.2`, sometimes `v1.1`. That is a **release
+band** from `../../02-SRD.md` §5.4: it says *which product stage this goal belongs to*. It is
+**not** a sprint number and does not say when anyone will work on it.
+
+The two are offset, and this is where the arithmetic goes wrong:
+
+- `sprint-v0.1` (finished 2026-09-09) was the **planning** sprint for band `v0.1`. No code.
+- Band `v0.1` — the vertical slice application → screening → vote → result — is **not built yet**.
+- So the next sprint continues on band **`v0.1`**. Band `v0.2` starts once `v0.1` stands.
+
+A stub reading `Band: v0.2` therefore means *"this belongs to the product stage after the
+vertical slice"* — not *"this is next up"*. The full explanation is in `../../README.md` §3,
+under **Sprintnummer ≠ Bandnummer**.

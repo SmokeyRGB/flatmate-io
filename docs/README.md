@@ -98,13 +98,39 @@ stand im Kopf von `05-ADRs.md`, das eingefroren ist. Hier ist sie, wortgleich ü
 Ein widerlegter Record wird nicht gelöscht, sondern auf `Verworfen — ersetzt durch …` gesetzt.
 Diese Regel stammt aus `05-ADRs.md` und gilt für **alle** Familien oben.
 
-### ⚠️ Drei Stolperstellen im Nummernraum
+### ⚠️ Vier Stolperstellen im Nummernraum
 
 | Verwechslungsgefahr | Auflösung |
 |---|---|
 | `O-06` (SRD) vs. `O-6` (Domänenmodell) | **Zwei verschiedene Nummernräume.** SRD zählt null-gefüllt `O-01`…`O-08`, das Domänenmodell `O-1`…`O-16`. Acht IDs unterscheiden sich nur durch eine Null. Ein Verweis **nennt immer die Datei mit** |
 | `EP-D` (Epic) vs. `D1`–`D4` (Bildschirme) | Verschiedene, **nicht deckungsgleiche** Mengen. Epic D ist die Terminfindung, Bildschirmgruppe D ist der Casting-Tab. Deshalb heißen die Epics `EP-A`…`EP-E` |
 | `C-1` (Inhaltsregel) vs. `C1` (Bildschirm) | Unterscheiden sich nur durch einen Bindestrich. Inhaltsregeln stehen in `03-PRD.md` §4.6.1, Bildschirme in `screens/C-beteiligung.md` |
+| **`sprint-v0.2` vs. Band `v0.2`** | **Zwei verschiedene Dinge mit derselben Zahl** — und sie sind gegeneinander verschoben. Siehe den Kasten darunter |
+
+
+> ### ⚠️ Sprintnummer ≠ Bandnummer
+>
+> **Band `v0.1`, `v0.2`, `v1.1`, `v2`** sind **Produktstufen**. Sie sagen, *was gebaut wird*, und
+> stehen ausschließlich in `02-SRD.md` §5.4. Band `v0.2` heißt dort „Vollständige Runde" und ist
+> gleichzeitig **v1** — die vollständige Runde von der ersten `Application` bis `moved_in`.
+>
+> **`sprint-v0.1`, `sprint-v0.2`** sind **Arbeitssprints** auf diesem Repository — Branch-Namen.
+> Sie sagen, *wann gearbeitet wurde*, nicht was entsteht.
+>
+> **Die beiden laufen nicht parallel:**
+>
+> | | was es ist | was darin passiert ist |
+> |---|---|---|
+> | **`sprint-v0.1`** | Arbeitssprint, abgeschlossen 2026-09-09 | **Planung** für Band `v0.1`: offene Punkte geschlossen, Abdeckung belegt, Baum für die Übergabe umgebaut. **Es wurde kein Code gebaut.** |
+> | **Band `v0.1`** | Produktstufe | der vertikale Schnitt Bewerbung → Screening → Stimme → Ergebnis. **Noch nicht gebaut.** |
+>
+> **Daraus folgt der Punkt, an dem man sich verrechnet:** `sprint-v0.2` ist **nicht** „Band `v0.2`
+> bauen". Der nächste Sprint arbeitet an Band **`v0.1`** weiter — Prototypen, dann Umsetzung. Band
+> `v0.2` kommt erst, wenn Band `v0.1` steht.
+>
+> **Die Stubs in `backlog/stubs/` tragen `Band:`-Angaben, keine Sprintnummern.** `Band: v0.2` in
+> einem Stub heißt: *dieses Ziel gehört in die Produktstufe v0.2* — nicht *das wird im nächsten
+> Sprint gemacht*. Kein Stub nennt einen Sprint.
 
 ---
 
