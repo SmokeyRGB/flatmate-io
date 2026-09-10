@@ -3,7 +3,7 @@
 > **Status:** V1.0 · 2026-09-09 · Samuel Zink (@SmokeyRGB)
 > **Was das hier ist:** die Übergabegrenze. **`docs/` und `tools/` zusammen kopiert sind alles,
 > was eine Implementierung braucht** — und nichts darüber hinaus. `tools/` gehört dazu, weil
-> dieser Ordner die beiden Prüfskripte an 18 Stellen zitiert; ohne sie sind die Zusicherungen
+> dieser Ordner die beiden Prüfskripte durchgehend zitiert; ohne sie sind die Zusicherungen
 > hier Behauptungen. Regel 7 von `tools/check-refs.sh` erzwingt den Rest: kein Verweis aus
 > `docs/` führt nach `coursework/`, `archive/`, `research/` oder `process/`.
 > **Sprachregelung:** Begründungsdokumente deutsch, implementierungsnahe Dokumente englisch
@@ -70,15 +70,29 @@ Zitat, keine Definition.
 |---|---|---|
 | `S-01` … `S-51` | Scope-Zeilen | `02-SRD.md` §5.3 · Stufenzuordnung in §5.4 |
 | `E-01` … `E-27` | Belegkette, Ist-Prozess | `01-Problem-Framing.md` |
-| `P-1` … `P-5` | Prinzipien | `02-SRD.md` |
+| `P-1` … `P-5` | Prinzipien | **§3.1 dieses Dokuments** (siehe unten) |
 | `ADR-001` … `ADR-012` | Architekturentscheidungen | `adr/00NN-*.md` · `05-ADRs.md` ist eingefroren |
 | `V-1` … `V-4` | Invarianten | `domain/invarianten.md` |
 | `G-A` … `G-N` | Guardrails | `GUARDRAILS.md` |
 | `U-1` … `U-26` | UX-Entscheidungen | `08-UX-Entscheidungen.md` |
 | `O-*` · `P-O-*` · `Q-*` · `AW-*` | offene Punkte | Frage im Fachdokument, **Status nur** in `review-log.md` §Register |
 | `A1`–`A4` `B1`–`B4` `C1`–`C8` `D1`–`D4` `E1` `O1`–`O20` | 41 Bildschirme | `screens/` · `07-Screen-Inventar.md` ist eingefroren |
-| `FR-n.m` `AC-n.m` `C-n.m` `EC-n.m` | Anforderungen je Paket | `backlog/requirements/Fn-requirements.md` |
+| `FR-n.m` `AC-n.m` `C-n.m` `EC-n.m` | Anforderungen je Paket | `backlog/requirements/` — je Paket eine Datei `F0` … `F5` |
 | `H-D*` `H-F*` `H-V*` | Produkthypothesen | `HYPOTHESES.md` |
+
+### 3.1 Die fünf Prinzipien P-1 … P-5
+
+Sie werden in der ganzen Kette namentlich zitiert — von `GUARDRAILS.md`, den ADRs, dem PRD und den
+Paketen — hatten nach der Aufteilung aber **keinen lebenden Ort** mehr: die einzige Definitions­tabelle
+stand im Kopf von `05-ADRs.md`, das eingefroren ist. Hier ist sie, wortgleich übernommen:
+
+| | Prinzip |
+|---|---|
+| **P-1** | **Kanalneutralität** — jede Information, die über einen Link hereinkommen kann, muss auch von Hand einpflegbar sein; kein Feature setzt einen Link voraus |
+| **P-2** | **Geräteneutralität** — kein Bewohnender darf durch sein Gerät ausgeschlossen werden |
+| **P-3** | **Legitimität vor Optimalität** — Ranglisten und Terminvorschläge müssen erklärbar sein; keine versteckten Formeln, keine nichtdeterministischen Verfahren |
+| **P-4** | **Reversibilität** — jeder Pipeline-Zustand ist rückwärts erreichbar und auditiert |
+| **P-5** | **Keine KI in wohnungsbezogenen Entscheidungen** — zulässig ist ausschließlich strukturierende Textverarbeitung |
 
 **Nummern bleiben.** Eine Nummer wird **nie** neu vergeben — auch nicht nach einem Widerruf.
 Ein widerlegter Record wird nicht gelöscht, sondern auf `Verworfen — ersetzt durch …` gesetzt.

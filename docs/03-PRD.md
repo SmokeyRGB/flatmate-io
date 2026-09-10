@@ -1680,7 +1680,7 @@ nicht weil sie optional wäre.
 
 ## 8. Offene Punkte
 
-> **Der Status offener Punkte steht ausschließlich im Register in `review-log.md`.** Dieser
+> **Ob ein Punkt offen ist, entscheidet das Register in `review-log.md` — und nur dort.** Dieser
 > Abschnitt führt die Frage und ihre Begründung; ob sie offen ist, entscheidet das Register.
 > Geschlossene Zeilen bleiben durchgestrichen stehen — die Begründung ist der wertvollere Teil.
 

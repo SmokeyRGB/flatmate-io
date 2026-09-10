@@ -1194,8 +1194,20 @@ neu erschlossen werden — daher die drei Fehler in §7.1.
 
 ### G-N5 — Der Status eines offenen Punkts steht ausschließlich im Register
 
-**Regel.** Der Status eines offenen Punkts steht ausschließlich im Register in `review-log.md`;
-ein Fachdokument trägt die Frage, nie den Status.
+**Regel.** Ob ein Punkt **offen** ist, entscheidet ausschließlich das Register in
+`review-log.md`. Ein Fachdokument darf keine **offene** Zeile führen, die dem Register unbekannt
+ist.
+
+**Was diese Regel ausdrücklich *nicht* verlangt.** Eine **geschlossene** Zeile behält ihren
+Auflösungstext im Fachdokument — durchgestrichen, mit „**Geklärt:** … Maßgeblich: …". Das ist
+Regel 1 und 3 der Register-Konvention und beabsichtigt: die Begründung, warum etwas so
+entschieden wurde, gehört dorthin, wo die Frage gestellt wurde. Wer diese Texte entfernt, um
+„Status nur im Register" wörtlich zu nehmen, zerstört den wertvolleren Teil.
+
+**Grenze der Durchsetzung.** `tools/done-check.sh` prüft die eine Richtung, die maschinell
+prüfbar ist: **jede unausgezeichnete offene Zeile muss im Register stehen.** Es prüft **nicht**,
+ob eine als geschlossen markierte Zeile zu Recht so markiert ist — dafür müsste es den
+Auflösungstext verstehen. Diese Hälfte bleibt Review-Arbeit.
 
 **Begründung.** Ein Status, der in mehreren Dokumenten getrennt gepflegt wird, driftet in allen
 auseinander — dasselbe Muster, das dieses Projekt beim Klassen-Notationsabgleich zwischen `04`

@@ -572,7 +572,7 @@ Vollständig in `03-PRD.md` §4.1 und §6. Die Prinzipien, aus denen sich dort a
 
 ## 11. Offene Punkte nach diesem SRD
 
-> **Der Status offener Punkte steht ausschließlich im Register in `review-log.md`.** Dieser
+> **Ob ein Punkt offen ist, entscheidet das Register in `review-log.md` — und nur dort.** Dieser
 > Abschnitt führt die Frage und ihre Begründung; ob sie offen ist, entscheidet das Register.
 > Geschlossene Zeilen bleiben durchgestrichen stehen — die Begründung ist der wertvollere Teil.
 

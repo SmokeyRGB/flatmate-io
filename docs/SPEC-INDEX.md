@@ -43,17 +43,18 @@ Diese Tabelle macht aus „irgendwo steht es" ein „hier gilt es".
 | **Anmeldung und Sitzung** | **`adr/0007-*.md`** (Passwort primär, Passkey optional) | `domain/identity.md` · `04-Domaenenmodell.md` §10.2 (O-12, O-13, O-16) · `F2-requirements.md` |
 | **Einladungslink** (`join_code`) | **`02-SRD.md` §5.3** bei **S-49** — Ablauf, Nutzungsgrenze, Warnhinweis | `domain/identity.md` · `04-Domaenenmodell.md` §10.2 (O-15) · `08-UX-Entscheidungen.md` U-12 · `F2-requirements.md` |
 | **Zwei Listen, zwei Rechtelagen** | **`08-UX-Entscheidungen.md` U-22** | `02-SRD.md` §5.3 bei S-05 · `screens/O-organisation.md` (O16) · `F1-requirements.md` FR-1.19, FR-1.25–1.30 |
-| **Benachrichtigungen und Kanäle** | **`adr/0009-*.md`** (Kanalneutralität als Architekturregel) | `03-PRD.md` §4.1.12 · `domain/notifications.md`. **Liegt in v0.2** |
-| **Append-only-Protokoll** | **`adr/0003-*.md`** | `domain/audit.md` · `GUARDRAILS.md` G-D7, G-D8 · `F0-requirements.md` FR-0.13–0.15, AC-0.11 |
+| **Benachrichtigungen und Kanäle** | **`adr/0009-*.md`** (Kanalneutralität als Architekturregel) | `03-PRD.md` §4.1.12 · `domain/audit-und-notifications.md`. **Liegt in v0.2** |
+| **Append-only-Protokoll** | **`adr/0003-*.md`** | `domain/audit-und-notifications.md` · `GUARDRAILS.md` G-D7, G-D8 · `F0-requirements.md` FR-0.13–0.15, AC-0.11 |
 | **Datenbestandsverzeichnis als CI-Gate** | **`adr/0010-*.md`** | `domain/personenbezogene-felder.md` §9 · `GUARDRAILS.md` G-F · `F0-requirements.md` FR-0.5–0.8 |
 | **Datenschutzklassen** 🔴🟠⚫⚙️ | **`domain/README.md`** §0.3 | `domain/personenbezogene-felder.md` §9 · `06-Compliance-Anhang.md` §6 |
 | **Kontextgrenzen** (sechs Bounded Contexts) | **`domain/kontextgrenzen.md`** §4 | `adr/0001-*.md` · `GUARDRAILS.md` G-I · `tools/README.md` (dependency-cruiser) |
 | **Inhaltsregeln für Freitext** `C-1`…`C-10` | **`03-PRD.md` §4.6.1** | `08-UX-Entscheidungen.md` U-17 · `06-Compliance-Anhang.md` §8 |
 | **PWA statt native App** | **`adr/0011-*.md`** | `GUARDRAILS.md` G-B6, G-B7 (Stimmpuffer) · `03-PRD.md` §6.2. **Liegt in v0.2** |
-| **Sprache** (Dokumente deutsch, Bezeichner englisch) | **`adr/0012-*.md`** — samt benannter Ausnahme für `backlog/` | `screens/rahmenwerk.md` §8.6 (UI-Vokabular, U-24) |
+| **Sprache** (Dokumente deutsch, Bezeichner englisch) | **`adr/0012-*.md`** — samt benannter Ausnahme für `backlog/` | UI-Vokabular nach U-24: ⚠️ **die Übersetzungstabelle fehlt** — zweimal als „§8.6" zitiert, nie geschrieben. Offener Punkt **O-G** im Register |
 | **Backup und Wiederherstellung** | **`GUARDRAILS.md` §Implementierungspflichten** | — (vorher **nirgends**; siehe unten) |
 | **Rollen und Verantwortlichkeit (DSGVO)** | **`06-Compliance-Anhang.md` §1** | `02-SRD.md` · `Q-1`…`Q-4`, launch-blockierend |
-| **Status offener Punkte** | **`review-log.md` §Offene-Punkte-Register** | die Fachdokumente tragen die **Frage**, nie den Status (G-N5) |
+| **Status offener Punkte** | **`review-log.md` §Offene-Punkte-Register** — es entscheidet, **ob** ein Punkt offen ist | Eine **geschlossene** Zeile behält ihren Auflösungstext im Fachdokument, durchgestrichen — das ist beabsichtigt (G-N5 samt seiner Durchsetzungsgrenze) |
+| **Prinzipien** `P-1`…`P-5` | **`README.md` §3.1** — nach der Aufteilung war die Tabelle nur noch im eingefrorenen `05-ADRs.md` | überall namentlich zitiert: `GUARDRAILS.md`, `adr/`, `03-PRD.md`, `backlog/` |
 | **Werkzeugwahl** | **`tools/README.md`** samt Begründung je Werkzeug | `GUARDRAILS.md` §Minimal-Gate · `MINIMAL-GATE.md` |
 
 ---

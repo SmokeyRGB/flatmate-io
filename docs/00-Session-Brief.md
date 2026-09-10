@@ -443,7 +443,7 @@ werden — damit bleibt jedes Dokument in der Hand seines Chats.
 Es entsteht in dieser Phase **kein Code** — die Verifikation ist dokumentarisch. `review-log.md`
 und die Querprüfung erfolgen **in dieser Session**, die Fachdokumente in den drei Sub-Chats:
 
-1. **Completeness-Scoring** nach `references/questioning-guide.md` (Ampel je Pflichtfeld) vor dem
+1. **Completeness-Scoring** nach dem Fragenkatalog des `requirement-writer`-Skills (Ampel je Pflichtfeld; die Datei liegt im Skill, nicht in diesem Repository) vor dem
    Generieren. Stand nach fünf Runden: alle Pflichtfelder von Problem Framing, SRD und PRD auf 🟢.
 2. **Multi-Rollen-Review** nach Generierung — Produkt (Problem klar? Metriken messbar? Scope
    scharf?), Design (Szenarien konkret? Leer-, Lade- und Fehlerzustände?), Engineering

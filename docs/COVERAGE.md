@@ -57,7 +57,7 @@ Order follows `02-SRD.md` §5.4's v0.1 row exactly, group by group.
 | **S-16** | Copy-paste text on marking a candidate `invited`, as an aid for the household — never sent by the app | F5 | FR-5.24–FR-5.28; AC-5.21–AC-5.23 | ✅ |
 | **S-27** (append-only log only) | `ActivityEvent` feed, append-only, every event naming the account **and** the acting profile | F0 | FR-0.13–FR-0.15; AC-0.11 | ✅¹ |
 | **S-35** | Rule lock: changing the voting procedure while a round is open is blocked and logged | F1 | FR-1.21, FR-1.22; AC-1.13–AC-1.15 | ✅ |
-| **S-33** (manual deletion only) | Manual deletion of a single `Application`, or of a whole round, available at any time | F3 | FR-3.17–FR-3.20; AC-3.15–AC-3.18 | ✅ |
+| **S-33** (manual deletion only) | Manual deletion of a **single** `Application`, available at any time. Deleting a whole round is **not** in v0.1 — `02-SRD.md` §5.4 carves out only "die Handlöschung", and no packet specifies it | F3 | FR-3.17–FR-3.20; AC-3.15–AC-3.18 | ✅ |
 
 **¹ S-15 and S-27 — gap found here, then closed in the packet.** `F0-requirements.md` §4 states
 that its nine `AC-0.x` entries are, in order, the nine items of `GUARDRAILS.md`'s "Minimal-Gate
@@ -96,15 +96,17 @@ means nobody later writes a second, partial copy of the self-redaction rule insi
 
 | Scope line | Was | Should be | Where it was wrong | Verified |
 |---|---|---|---|---|
-| `S-39` | v0.1 | **v0.2** | MVP README's F3 row and `03-PRD.md` §7.1 — belongs to the paste parser, not the form | ⚠️ **Partly.** `02-SRD.md` §5.4 and `03-PRD.md` §7.1 are already correct (§7.1 now carries no scope column at all and explains the old mistake in prose), and `F3-requirements.md`'s header no longer lists S-39. But `Exercise 10/MVP Backlog Features/README.md`'s F3 row **still lists `S-39`** — that fix has not landed there yet. |
+| `S-39` | v0.1 | **v0.2** | the MVP index's F3 row and `03-PRD.md` §7.1 — S-39 belongs to the paste parser, not the form | ✅ Fixed. `02-SRD.md` §5.4, `03-PRD.md` §7.1 (which now carries no scope column at all) and `backlog/requirements/F3-requirements.md` are all correct, and `backlog/README.md`'s F3 row now reads "S-08 (form half), S-38, S-33 (manual-delete half)" — S-39 is gone from it and the manual-delete half it had omitted is present. `backlog/stubs/EP-B-2-paste-parser.md` carries S-39 in v0.2. |
 | `S-44` | v0.1 | **v0.2** | `03-PRD.md` §7.1 — §5.4 has a dedicated paragraph explaining why it is v0.2 | ✅ Fixed. `03-PRD.md` §7.1 carries no scope column any more; no current v0.1 listing anywhere names S-44. |
 | `S-33` | wholly v0.2 | **split** | `03-PRD.md` §7.1 omitted the manual-delete half from v0.1 | ✅ Fixed. `02-SRD.md` §5.4 already places the manual-delete half in v0.1, and `F3-requirements.md` builds it (FR-3.17–FR-3.20). |
 | `S-50` | F2 | **F1** | MVP README's row; the F1 packet claims it, the F2 packet dropped it | ✅ Fixed. `F1-requirements.md`'s header lists S-50; `F2-requirements.md`'s does not. The MVP README's rows agree. |
-| `S-10` | v0.2 (board) | **v0.1** | the board roadmap's lane; §5.4 says revisability is fully in v0.1 | ✅ Fixed. `Exercise 10/Feature-Themes-and-Roadmap.md`'s "change my vote while the round is still open" story sits under the `### v0.1 – Now` heading, not `### v0.2 – Next`. |
+| `S-10` | v0.2 (board) | **v0.1** | the board roadmap's lane; §5.4 says revisability is fully in v0.1 | ✅ Fixed. `backlog/roadmap.md`'s "change my vote while the round is still open" story sits under the `### v0.1 – Now` heading, not `### v0.2 – Next`. |
+| `S-38` | v1.x (board) | **v0.1** | `backlog/roadmap.md`'s v1.x lane carried "be told about the one-month notice duty when the data came from a third party". That story is S-38, which §5.4 places in v0.1 — and `F3-requirements.md` already builds it: `US-3.5` is the story verbatim, implemented by `FR-3.11`, `FR-3.12`, `AC-3.8` and `AC-3.9` | ✅ Fixed. Moved into the v0.1 lane; lane row total unchanged at 94. Found during final verification, after the other five — the sixth drift, and the second one pointing the *wrong way* (a built feature listed as not yet built) |
 
-Four of five corrections are confirmed in the files. The `S-39` row is the one exception: the
-MVP README has not been updated to match `02-SRD.md`, `03-PRD.md` and `F3-requirements.md`. That
-is a finding to hand to whoever owns the README next, not something fixed here.
+All six corrections are confirmed in the files. The `S-39` row was the last to close: the MVP
+index still listed it under F3 after `02-SRD.md`, `03-PRD.md` and the F3 packet had already been
+corrected, which is exactly the shape of drift this table exists to catch — a fix applied to
+three of four places looks finished from any one of them.
 
 ## 5. What is deliberately not in v0.1
 

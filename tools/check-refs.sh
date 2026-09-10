@@ -114,6 +114,32 @@ for src in "${mdfiles[@]}"; do
     [ "${seen[$key]}" = ok ] || note r2 "DANGLING NAME  \`$n\` cited in $src — no such file"
   done < <(grep -oE '`[A-Za-z0-9._ -]+\.md`' "$src" 2>/dev/null | tr -d '`\r')
 done
+
+# Same rule, for citations written as a PATH rather than a bare filename —
+# `domain/invarianten.md`, `../05-ADRs.md`, `backlog/requirements/F0-...md`.
+# The pattern above has no "/" in its character class, so every one of these
+# escaped the check. That blind spot let two dead citations through review:
+# SPEC-INDEX.md named `domain/notifications.md` and `domain/audit.md`, neither
+# of which the split ever produced (they became audit-und-notifications.md).
+# Resolved by basename, like the bare form, so a folder move stays cheap.
+for src in "${mdfiles[@]}"; do
+  case "$src" in */_logs/*|archive/*|./archive/*|*/.old/*) continue ;; esac
+  while IFS= read -r p; do
+    [ -n "$p" ] || continue
+    n=$(basename "$p")
+    printf '%s' "$n" | grep -qE "$GENERIC_NAMES" && continue
+    key="path:$n"
+    if [ -z "${seen[$key]+x}" ]; then
+      if find . -name "$n" -not -path './.git/*' -print -quit | grep -q .; then
+        seen[$key]=ok
+      else
+        seen[$key]=bad
+      fi
+    fi
+    [ "${seen[$key]}" = ok ] || note r2 "DANGLING PATH  \`$p\` cited in $src — no such file"
+  done < <(grep -oE '`\.{0,2}/?[A-Za-z0-9._-]+/[A-Za-z0-9._/-]+\.md`' "$src" 2>/dev/null |
+             tr -d '`\r')
+done
 fi
 
 # ---------------------------------------------------------------------------

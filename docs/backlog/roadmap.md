@@ -198,6 +198,7 @@ has only the one row that is really S-31, the visibility invariant.
 | EP-B | **Know where the data came from** *(feature)* |
 | EP-B | record whether the details came from the applicant or from someone else |
 | EP-B | delete a single application without touching the rest of the round |
+| EP-B | be told about the one-month notice duty when the data came from a third party |
 | EP-C | **Card by card, four ratings, two minutes** *(feature)* |
 | EP-C | go through the open applications card by card in one sitting |
 | EP-C | pick one of four ratings (No, Rather not, Like, Must have) |
@@ -275,7 +276,6 @@ has only the one row that is really S-31, the visibility invariant.
 | Epic | Story |
 |---|---|
 | EP-B | link a person's earlier application to their new one |
-| EP-B | be told about the one-month notice duty when the data came from a third party |
 | EP-B | produce a data export for one applicant when they ask what we hold |
 | EP-D | provide applicants with a link to enter their availability for a casting |
 | EP-E | be told honestly that an anonymous veto in a WG of five is not anonymous |
