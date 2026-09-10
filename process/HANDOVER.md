@@ -109,14 +109,66 @@ Regel. **Zwei Ausnahmen**, beide dokumentiert:
 
 ---
 
-## 6. Der erste Schritt danach
+## 6. Was als Nächstes kommt — und in welcher Reihenfolge
 
-Nicht Code. **`docs/MINIMAL-GATE.md`** — die neun Gates, von denen vier nachträglich eingezogen
-jede bestehende Abfrage anfassen. Drei tragen den Zusatz „vor der ersten Tabelle" bzw. „vor der
-ersten Policy", und das ist wörtlich gemeint.
+**Drei Stufen, und die Reihenfolge ist nicht beliebig.** Dieser Sprint hat zwei Dinge
+ausdrücklich aufgeschoben, und beide sitzen nicht in derselben Stufe.
+
+### Stufe 1 — `plan-sprint-v0.2`: bis zu einem prototypenreifen Umriss
+
+**Was dieser Sprint schon geliefert hat und *nicht* erneut geplant werden muss:** Band `v0.1` ist
+spezifiziert. `F0`–`F5` tragen Anforderungen, Akzeptanzkriterien, Constraints und Randfälle; alle
+25 Scope-Zeilen sind belegt (`docs/COVERAGE.md`); die sieben tragenden ADRs sind bestätigt; die
+Guardrails haben ihre Durchsetzungsmechanismen.
+
+**Was noch fehlt, und zwar genau für einen Prototypen** — beide Punkte betreffen *sichtbaren
+Text*, und ein Prototyp, der den UX-Fluss prüfen soll, braucht seine Wörter:
+
+| Punkt | Was fehlt | Warum vor dem Prototypen |
+|---|---|---|
+| **O-G** | die UI-Vokabular-Übersetzungstabelle (U-24: kein Modellbegriff erscheint ungeklärt) | Zweimal als „§8.6" zitiert, nie geschrieben. Ohne sie stehen Modellbegriffe wie „Quorum" ungeklärt auf dem Bildschirm |
+| **P-O-04** | Wortlaut der Hinweistexte (Selbst-Redaktion, Anonymität, „Verwaltung", Copy-Paste-Datenschutzhinweis) | Sammelarbeit — rund 80 % existieren wörtlich in der Kette. Ein Prototyp mit Platzhaltertexten prüft den Fluss, aber nicht die Verständlichkeit |
+
+Dazu kommt eine Entscheidung, die dieser Sprint bewusst nicht getroffen hat: **welche
+Bildschirme in welcher Treue prototypisiert werden.** Die vier Kernbildschirme (**B1, C1, D1,
+O1**) sind die naheliegenden Kandidaten — `docs/screens/README.md` markiert sie, und alle vier
+liegen im v0.1-Schnitt.
+
+> **Eine Abgrenzung, die leicht verrutscht.** `design.md` und `tasks.md` — Schemaform und
+> Umsetzungsreihenfolge — sind von den Paketen ausdrücklich ausgeschlossen („out of scope for
+> this exercise"). Sie gehören **nicht** in Stufe 1: ein Prototyp zum Prüfen des UX-Flusses
+> braucht keine Schemaentscheidung. Sie gehören an den Anfang von Stufe 3. Wer sie in Stufe 1
+> zieht, plant Schema gegen einen Fluss, der noch nicht bestätigt ist.
+
+### Stufe 2 — Prototypen
+
+Prüfen den UX-Fluss von Band `v0.1`. Sie sind außerdem der **neue Ort der Datenerhebung**: die
+Sperre über Solver, Kalender, Veto, Benachrichtigungen und PWA hängt seit dem 2026-09-09 an
+ihnen (`docs/HYPOTHESES.md`), und die vorausschauende Hälfte von **O-07** ebenso, weil die
+Concierge-Runde voraussichtlich entfällt. Die rückblickende Hälfte von O-07 ist davon unabhängig
+und **heute schon erhebbar**.
+
+### Stufe 3 — Umsetzung
+
+**Beginnt nicht mit Code.** Mit **`docs/MINIMAL-GATE.md`** — die neun Gates, von denen vier
+nachträglich eingezogen jede bestehende Abfrage anfassen. Drei tragen den Zusatz „vor der ersten
+Tabelle" bzw. „vor der ersten Policy", und das ist wörtlich gemeint.
 
 Das sechste Gate ist das, an dem sich entscheidet, ob die Autorisierung echt ist: die
-Sichtbarkeitsinvariante wird **zweimal** geprüft — durch die Policy-Schicht und als rohes SQL, das
-sie umgeht. `GUARDRAILS.md` G-C7 über das Auslassen der zweiten Prüfung:
+Sichtbarkeitsinvariante wird **zweimal** geprüft — durch die Policy-Schicht und als rohes SQL,
+das sie umgeht. `GUARDRAILS.md` G-C7 über das Auslassen der zweiten Prüfung:
 
 > *„sonst ist ADR-004 eine Illusion"*
+
+---
+
+## 7. Wo der Plan für `plan-sprint-v0.2` steht
+
+**Nicht hier.** Dieses Dokument beschreibt einen *Zustand* — was übergeben wird, was geprüft
+ist, was geparkt bleibt. Ein Sprintplan ist ein *Vorhaben* und ändert sich, während er
+abgearbeitet wird. Beides in eine Datei zu legen heißt, dass die eine Hälfte veraltet, während
+die andere stimmt — und das ist genau die Fehlerklasse, gegen die dieser Sprint sechs
+Band-Drifts und vier Statuskopien aufgeräumt hat.
+
+Stufe 1 oben nennt **Ziel und Eingaben**. Der ausgearbeitete Plan gehört in ein eigenes
+Dokument des nächsten Sprints; dieser Abschnitt verweist dann darauf.
