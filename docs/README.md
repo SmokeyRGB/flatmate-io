@@ -119,8 +119,10 @@ Dateien. Eine Zeilennummer in eine *lebende* Datei zeigt nach dem nächsten eing
 den falschen Satz — lautlos. In eine eingefrorene Datei zeigt sie dauerhaft richtig.
 
 Deshalb: `tools/check-refs.sh` Regel 3 erlaubt `:LINE`-Verweise **ausschließlich** hierher, Regel
-4 prüft die drei Dateien per Hash. Eine gewollte Änderung heißt, den Hash im selben Commit
-mitzuführen — das macht die Absicht im Review sichtbar statt unsichtbar.
+4 prüft die drei Dateien per Hash — über ihren **Inhalt**, mit vorher entfernten
+Wagenrückläufen, damit derselbe Hash auf einem Windows-Checkout (CRLF) und auf Linux/CI (LF)
+gilt. Eine gewollte Änderung heißt, den Hash im selben Commit mitzuführen — das macht die
+Absicht im Review sichtbar statt unsichtbar.
 
 ---
 

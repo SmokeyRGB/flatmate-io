@@ -98,3 +98,31 @@ einzeln ausgeführt, wo sie inhaltlich vom Standard abweichen.
 > `04-Domaenenmodell.md` §8.6 ist `phase_hint`, also etwas anderes. Geführt als offener Punkt
 > **O-G** im Register in `../review-log.md`. Die Tabelle wurde hier **nicht erfunden** — sie ist
 > Spezifikationsarbeit, nicht Umbauarbeit.
+
+---
+
+## Kopf der Quelldatei — hier übernommen
+
+Diese vier Angaben standen nur im Kopf der eingefrorenen Sammeldatei und fehlten in diesem
+Ordner:
+
+> **Stand:** V0.1 · 2026-09-02 · Samuel Zink (@SmokeyRGB)
+
+> **Zweck.** `../review-log.md` benennt drei Design-Lücken: kein Screen-Inventar, der
+> Feinschliff-Bildschirm ohne Gestaltungsspezifikation, das Onboarding beim Erstbeitritt nicht
+> beschrieben. Diese Schicht schließt alle drei — die mittlere, indem sie die Interaktion
+> **beseitigt** statt sie zu gestalten (§9). Sie ist die fehlende Schicht zwischen der
+> Anforderungskette und einer Umsetzung: wie sich das Modell als Oberfläche anfühlt.
+
+> **Schema-Autorität.** Alle Feld-, Zustands- und Entitätsnamen sind aus `../domain/` zitiert,
+> nie neu erfunden. Weicht ein Name hier ab, gilt `../domain/` — diese Dateien sind dann zu
+> korrigieren, außer die Abweichung ist in
+> `abweichungen-und-offene-punkte.md` §13 ausdrücklich als **Korrektur am Domänenmodell**
+> markiert.
+
+> **Sprachregelung.** Dokument deutsch, alle Bezeichner englisch (ADR-012). UI-Label für
+> `Household` ist in v1 durchgängig **„WG"** (E-02). Sichtbarer Text auf den Bildschirmen folgt
+> zusätzlich der UI-Vokabular-Übersetzung nach U-24 — **die als Tabelle noch fehlt, siehe die
+> Notiz zu O-G weiter oben.**
+
+> **Herkunft.** Setzt die Entscheidungen **U-1 bis U-26** aus `../08-UX-Entscheidungen.md` um.

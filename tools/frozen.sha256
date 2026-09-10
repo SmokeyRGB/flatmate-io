@@ -1,3 +1,7 @@
-75cb6984faa1df5a76cb07d9bfa924c2b51bca73151b91fc10cff46f6a7023a8 *docs/04-Domaenenmodell.md
-fbfaefbe59d308ca64909f18546d30c93f5419141b8e1ff42409f8575b8ddc3d *docs/05-ADRs.md
-01f8ec5c0e1c41f73d9875b51e25108c25daa0457fc91e4fab6a114db21eede4 *docs/07-Screen-Inventar.md
+# Content hashes of the three frozen collectors, line-ending independent.
+# Computed as:  tr -d '\r' < FILE | sha256sum
+# Verified by tools/check-refs.sh rule 4 the same way, so it holds on Windows
+# (CRLF checkout) and on Linux/CI (LF checkout) alike.
+a41a2af235c811edc0f68fa5866f4ecf5f716da085859be98cc09a5a2a5907c0  docs/04-Domaenenmodell.md
+eae56b2fde9bebcb7af8e100f61859e9e53011bcbd7aa820d74bd38e97c6685a  docs/05-ADRs.md
+121b54ff6854e3db2c36e9843566d430fb2bdef2bc7bfcbb4efd5e58a8bcd2cc  docs/07-Screen-Inventar.md

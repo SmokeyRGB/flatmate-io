@@ -3,6 +3,23 @@
 
 # Domänenmodell — Lesehinweise, Landkarte, Aufteilung
 
+> # ⚠️ Status: unverbindlich, anfechtbar — keine finalen Constraints
+>
+> **Aus dem Kopf der eingefrorenen Sammeldatei übernommen, weil er sonst in diesem Ordner
+> fehlte.** Dieses Dokument ist **kein Schema-Beschluss und kein Migrationsplan.** Jede Entität,
+> jedes Feld, jeder Zustand und jede Formel darf beim ersten Kontakt mit dem Code umgeworfen
+> werden. Jede Entscheidung ist deshalb **mit ihrer Begründung** notiert — nicht „so wird es
+> gemacht", sondern „so schlagen wir es vor, **weil** …, und das gibt man auf, **wenn** …". Wer
+> eine Zeile ändern will, braucht nur das Weil zu widerlegen.
+>
+> **Zwei Ausnahmen von der Unverbindlichkeit**, weil andere Dokumente parallel darauf verweisen:
+> die **Entitätsnamen** (§2) und die **Nummerierung der Sichtbarkeitsregeln** (§5) sind
+> Bezeichner-Kontrakt. Wer sie ändert, muss `../03-PRD.md`, `../adr/`, `../06-Compliance-Anhang.md`
+> und `../GUARDRAILS.md` mitziehen.
+
+> **Stand:** V0.4 · 2026-09-02 · Samuel Zink (@SmokeyRGB) — Versionsgeschichte im Kopf von
+> `../04-Domaenenmodell.md`.
+
 ## 0. Lesehinweise
 
 ### 0.1 Sprachregelung

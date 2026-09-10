@@ -139,9 +139,26 @@ fi
 if run 4; then
 head_ 4 "frozen collectors unchanged"
 if [ -f tools/frozen.sha256 ]; then
+  # Hash the CONTENT, not the bytes on disk: strip CR before hashing.
+  #
+  # `sha256sum -c` would compare raw bytes, and these files are `*.md text` in
+  # .gitattributes — so git stores LF and checks out CRLF on Windows, LF on
+  # Linux. A byte hash therefore only ever matches on the platform that
+  # generated it, and rule 4 would be permanently red in CI. Since the point is
+  # to detect an *edit*, normalising line endings first is both correct and
+  # portable.
   while IFS= read -r line; do
-    note r4 "FROZEN CHANGED $line"
-  done < <(sha256sum -c tools/frozen.sha256 2>&1 | grep -v ': OK$' | tr -d '\r')
+    case "$line" in ''|'#'*) continue ;; esac
+    want=${line%% *}
+    path=${line##* }
+    path=${path#\*}                       # sha256sum writes "hash *path"
+    if [ ! -f "$path" ]; then
+      note r4 "FROZEN MISSING  $path"
+      continue
+    fi
+    have=$(tr -d '\r' < "$path" | sha256sum | cut -d' ' -f1)
+    [ "$want" = "$have" ] || note r4 "FROZEN CHANGED  $path"
+  done < <(tr -d '\r' < tools/frozen.sha256)
 else
   [ "$QUIET" = 1 ] || echo "  (skipped: tools/frozen.sha256 does not exist yet)"
 fi

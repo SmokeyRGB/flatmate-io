@@ -80,5 +80,5 @@ Aus `../05-ADRs.md` übernommen und hier gültig:
 Durchgesetzt statt versprochen: `tools/check-refs.sh` Regel 5 prüft, dass jede zitierte
 `ADR-NNN` auf **genau eine** Datei hier auflöst — eine in einer Spezifikation zitierte Nummer
 ohne Record dahinter fällt damit auf, und ebenso ein Record, der versehentlich in zwei Dateien
-zerfällt. Regel 4 prüft die Sammeldatei per Hash. **G-N3** in `../GUARDRAILS.md` verbietet
+zerfällt. Regel 4 prüft die Sammeldatei per Inhalts-Hash (zeilenendungsunabhängig). **G-N3** in `../GUARDRAILS.md` verbietet
 Commits gegen Anwendungscode, solange ein v0.1-tragender Record auf `Vorschlag` steht.
