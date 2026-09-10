@@ -105,7 +105,7 @@ Diese Regel stammt aus `05-ADRs.md` und gilt für **alle** Familien oben.
 | `O-06` (SRD) vs. `O-6` (Domänenmodell) | **Zwei verschiedene Nummernräume.** SRD zählt null-gefüllt `O-01`…`O-08`, das Domänenmodell `O-1`…`O-16`. Acht IDs unterscheiden sich nur durch eine Null. Ein Verweis **nennt immer die Datei mit** |
 | `EP-D` (Epic) vs. `D1`–`D4` (Bildschirme) | Verschiedene, **nicht deckungsgleiche** Mengen. Epic D ist die Terminfindung, Bildschirmgruppe D ist der Casting-Tab. Deshalb heißen die Epics `EP-A`…`EP-E` |
 | `C-1` (Inhaltsregel) vs. `C1` (Bildschirm) | Unterscheiden sich nur durch einen Bindestrich. Inhaltsregeln stehen in `03-PRD.md` §4.6.1, Bildschirme in `screens/C-beteiligung.md` |
-| **`sprint-v0.2` vs. Band `v0.2`** | **Zwei verschiedene Dinge mit derselben Zahl** — und sie sind gegeneinander verschoben. Siehe den Kasten darunter |
+| **`plan-sprint-v0.2` vs. Band `v0.2`** | **Zwei verschiedene Dinge mit derselben Zahl** — und sie sind gegeneinander verschoben. Siehe den Kasten darunter |
 
 
 > ### ⚠️ Sprintnummer ≠ Bandnummer
@@ -114,17 +114,17 @@ Diese Regel stammt aus `05-ADRs.md` und gilt für **alle** Familien oben.
 > stehen ausschließlich in `02-SRD.md` §5.4. Band `v0.2` heißt dort „Vollständige Runde" und ist
 > gleichzeitig **v1** — die vollständige Runde von der ersten `Application` bis `moved_in`.
 >
-> **`sprint-v0.1`, `sprint-v0.2`** sind **Arbeitssprints** auf diesem Repository — Branch-Namen.
+> **`plan-sprint-v0.1`, `plan-sprint-v0.2`** sind **Arbeitssprints** auf diesem Repository — Branch-Namen.
 > Sie sagen, *wann gearbeitet wurde*, nicht was entsteht.
 >
 > **Die beiden laufen nicht parallel:**
 >
 > | | was es ist | was darin passiert ist |
 > |---|---|---|
-> | **`sprint-v0.1`** | Arbeitssprint, abgeschlossen 2026-09-09 | **Planung** für Band `v0.1`: offene Punkte geschlossen, Abdeckung belegt, Baum für die Übergabe umgebaut. **Es wurde kein Code gebaut.** |
+> | **`plan-sprint-v0.1`** | Arbeitssprint, abgeschlossen 2026-09-09 | **Planung** für Band `v0.1`: offene Punkte geschlossen, Abdeckung belegt, Baum für die Übergabe umgebaut. **Es wurde kein Code gebaut.** |
 > | **Band `v0.1`** | Produktstufe | der vertikale Schnitt Bewerbung → Screening → Stimme → Ergebnis. **Noch nicht gebaut.** |
 >
-> **Daraus folgt der Punkt, an dem man sich verrechnet:** `sprint-v0.2` ist **nicht** „Band `v0.2`
+> **Daraus folgt der Punkt, an dem man sich verrechnet:** `plan-sprint-v0.2` ist **nicht** „Band `v0.2`
 > bauen". Der nächste Sprint arbeitet an Band **`v0.1`** weiter — Prototypen, dann Umsetzung. Band
 > `v0.2` kommt erst, wenn Band `v0.1` steht.
 >
@@ -209,7 +209,7 @@ vier liegen im Schnitt.
 
 ```bash
 bash tools/check-refs.sh     # sind die Querverweise noch heil?  (7 Regeln)
-bash tools/done-check.sh     # ist sprint-v0.1 fertig?           (6 Abschnitte)
+bash tools/done-check.sh     # ist plan-sprint-v0.1 fertig?           (6 Abschnitte)
 ```
 
 Beide erklären sich selbst; `tools/README.md` sagt in einfacher Sprache, warum jede Regel

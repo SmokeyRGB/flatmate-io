@@ -92,7 +92,7 @@ scope line, already carried as a constraint in `F1-requirements.md`" (it is, in 
 owns it with functional requirements; F1 only cites it as a constraint). Recording the split here
 means nobody later writes a second, partial copy of the self-redaction rule inside `F0`.
 
-## 4. Band corrections applied in sprint-v0.1
+## 4. Band corrections applied in plan-sprint-v0.1
 
 | Scope line | Was | Should be | Where it was wrong | Verified |
 |---|---|---|---|---|

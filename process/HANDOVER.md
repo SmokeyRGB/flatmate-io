@@ -1,7 +1,7 @@
-# Handover — sprint-v0.1
+# Handover — plan-sprint-v0.1
 
 > **Status:** V1.0 · 2026-09-09 · Samuel Zink (@SmokeyRGB)
-> **Branch:** `dev/flatmate-sprint-v0.1` → `main`
+> **Branch:** `dev/flatmate-plan-sprint-v0.1` → `main`
 > **Was übergeben wird:** `docs/` **und** `tools/`, zusammen kopiert.
 > **Was nicht mitgeht:** `coursework/`, `archive/`, `research/`, `process/`.
 

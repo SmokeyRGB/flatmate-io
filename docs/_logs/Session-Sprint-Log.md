@@ -1,7 +1,7 @@
 # Session-Sprint-Log — UX-Schicht Flatmate.io
 
 > **Sprint:** Screen-Inventar + Nachzug der Kette
-> **Start:** 2026-09-02 · **Branch:** `dev/flatmate-sprint-v0.1`
+> **Start:** 2026-09-02 · **Branch:** `dev/flatmate-plan-sprint-v0.1`
 > **Koordination:** Sitzung „Flatmate.io UX/UI-Plan"
 > **Plan:** `~/.claude/plans/ich-habe-zahlreiche-anforderungen-quiet-dusk.md` (V5)
 

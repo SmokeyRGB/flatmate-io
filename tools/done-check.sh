@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# done-check.sh — is sprint-v0.1 finished?
+# done-check.sh — is plan-sprint-v0.1 finished?
 #
 # check-refs.sh asks "is the tree consistent?". This asks "is the work done?".
 # Six conditions that must all hold before this branch merges into main.
@@ -33,7 +33,7 @@ COV=$(f COVERAGE.md)
 ROADMAP=$(ls docs/backlog/roadmap.md "Exercise 10/Feature-Themes-and-Roadmap.md" 2>/dev/null | head -1)
 MVPRM=$(ls docs/backlog/README.md "Exercise 10/MVP Backlog Features/README.md" 2>/dev/null | head -1)
 
-echo "sprint-v0.1 completeness gate"
+echo "plan-sprint-v0.1 completeness gate"
 echo
 
 # ---------------------------------------------------------------------------
@@ -240,5 +240,5 @@ fi
 
 echo
 echo "── $pass passed, $failn failed"
-[ "$failn" -eq 0 ] || echo "   sprint-v0.1 is NOT ready to merge"
+[ "$failn" -eq 0 ] || echo "   plan-sprint-v0.1 is NOT ready to merge"
 exit $(( failn > 0 ))

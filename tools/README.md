@@ -59,7 +59,7 @@ table instead.
 
 ---
 
-## `done-check.sh` — is sprint-v0.1 actually finished?
+## `done-check.sh` — is plan-sprint-v0.1 actually finished?
 
 ```bash
 bash tools/done-check.sh
