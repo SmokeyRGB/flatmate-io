@@ -13,9 +13,17 @@
 
 ## 1. Wo fange ich an?
 
-**Nicht bei `03-PRD.md`.** Das PRD hat 1700 Zeilen; der Ordner insgesamt liegt bei ~270 000
-Token und passt in kein Kontextfenster. Wer eine Aufgabe umsetzt, liest **nicht die Kette,
-sondern das Paket für seinen Schnitt.**
+**Nicht bei `03-PRD.md`.** Das PRD hat 1742 Zeilen; der Ordner insgesamt liegt bei rund
+**544 000 Token** und passt in kein Kontextfenster — nicht einmal in mehrere.
+
+> **Warum der Ordner nach der Aufteilung *größer* ist, nicht kleiner.** Neben jeder aufgeteilten
+> Datei bleibt die **eingefrorene Sammeldatei** stehen (`04`, `05`, `07` — zusammen 5 309 Zeilen).
+> Die Gesamtgröße war nie das Problem. Das Problem war, **wie viel man laden muss, um eine
+> Aufgabe zu erledigen** — und das ist von ~2 300 Zeilen auf ~460 gefallen. Ein typischer
+> Arbeitssatz (ein Paket · seine Kontextdatei · `MINIMAL-GATE.md` · `SPEC-INDEX.md`) sind
+> **799 Zeilen**.
+
+Wer eine Aufgabe umsetzt, liest deshalb **nicht die Kette, sondern das Paket für seinen Schnitt.**
 
 | Ich will … | Ich lese |
 |---|---|
@@ -113,10 +121,22 @@ Diese Regel stammt aus `05-ADRs.md` und gilt für **alle** Familien oben.
 
 ### ❄️ Die drei eingefrorenen Sammeldateien
 
-`04`, `05` und `07` sind Momentaufnahmen und werden **nicht** mehr geändert. Der Grund ist nicht
-Ordnungsliebe: rund 100 Verweise im Repo tragen eine **Zeilennummer**, davon 19 in diese drei
-Dateien. Eine Zeilennummer in eine *lebende* Datei zeigt nach dem nächsten eingefügten Absatz auf
-den falschen Satz — lautlos. In eine eingefrorene Datei zeigt sie dauerhaft richtig.
+`04`, `05` und `07` sind Momentaufnahmen und werden **nicht** mehr geändert. Drei Gründe, in
+dieser Reihenfolge:
+
+1. **Herkunftsnachweis.** Jede aufgeteilte Datei nennt im Kopf ihre Quelle — „`../04-Domaenenmodell.md`
+   §5, eingefroren". Wäre die Quelle veränderlich, wäre der Nachweis wertlos.
+2. **Versionsgeschichte.** Die Änderungshistorie von V0.1 bis V0.4 bzw. V0.8 steht nur in den
+   Sammeldateien. Sie ist nirgends sonst hin übernommen, und sie erklärt, *warum* eine Fassung so
+   aussieht.
+3. **Zitierbare Zeilennummern.** Aktuell tragen noch **zwei** Verweise im Ordner eine
+   Zeilennummer, beide in `04-Domaenenmodell.md`. Vor diesem Sprint waren es fünfzehn — und
+   **fünf davon zeigten schon auf die falsche Stelle**, weil die Zeile weggewandert war, an der
+   sie hingen. Eine Zeilennummer in eine *lebende* Datei zeigt nach dem nächsten eingefügten
+   Absatz auf den falschen Satz, lautlos. In eine eingefrorene zeigt sie dauerhaft richtig.
+
+Der dritte Grund ist heute der kleinste — aber die **Regel** dahinter ist der eigentliche Nutzen:
+Regel 3 verhindert, dass **neue** Zeilennummern-Verweise in lebende Dokumente entstehen.
 
 Deshalb: `tools/check-refs.sh` Regel 3 erlaubt `:LINE`-Verweise **ausschließlich** hierher, Regel
 4 prüft die drei Dateien per Hash — über ihren **Inhalt**, mit vorher entfernten

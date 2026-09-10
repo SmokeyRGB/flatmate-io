@@ -24,7 +24,10 @@ allein geprüft. Nichts verweist hinaus.
 
 **Ehrlich zuerst: `docs/` ist jetzt größer, nicht kleiner.** Rund 543 000 Token statt 267 000,
 weil neben jeder aufgeteilten Datei die **eingefrorene Sammeldatei** stehen bleibt — 5 309 Zeilen,
-die niemand liest, aber ~100 Verweise mit Zeilennummer zitieren.
+die niemand liest, aber die den Herkunftsnachweis jeder aufgeteilten Datei tragen und die
+Versionsgeschichte halten, die nirgends sonst steht. (Zeilennummern-Verweise sind heute nur noch
+**zwei** — vor dem Sprint fünfzehn, davon fünf schon falsch. Der Nutzen liegt inzwischen weniger
+in den zwei Verweisen als in Regel 3, die **neue** verhindert.)
 
 Die Gesamtgröße war nie das Problem. Das Problem war, **wie viel man laden muss, um eine Aufgabe
 zu erledigen.** Und das hat sich geändert:
