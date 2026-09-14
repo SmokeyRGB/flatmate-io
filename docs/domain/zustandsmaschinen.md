@@ -152,16 +152,16 @@ Sechs Zustände.
 
 | Von | Nach | Wer darf | Was protokolliert / bewirkt wird |
 |---|---|---|---|
-| — | `planned` | `manage_settings` | `room.created`; Zimmer erfasst, aber noch nicht Teil einer Runde |
-| `planned` | `open` | `manage_settings` | `room.opened`; zählt ab jetzt in `open_rooms` und damit ins **Favoriten-Budget** (§8.2) |
+| — | `planned` | `manage_rooms` | `room.created`; Zimmer erfasst, aber noch nicht Teil einer Runde |
+| `planned` | `open` | `manage_rooms` | `room.opened`; zählt ab jetzt in `open_rooms` und damit ins **Favoriten-Budget** (§8.2) |
 | `open` | `promised` | `change_application_state` (Folge von `offer_made`) | `room.promised`; setzt `promised_to_application_id` |
 | `promised` | `occupied` | `change_application_state` (Folge von `moved_in`) | `room.occupied`; setzt `current_resident_profile_id` |
 | `promised` | `open` | `change_application_state` | Folge von `declined_by_applicant` oder `offer_made → interviewed`; leert `promised_to_application_id` |
 | `occupied` | `promised` | `change_application_state` | Folge von `moved_in → offer_made` |
 | `occupied` | `open` | `manage_members` | Auszug der bewohnenden Person; setzt `available_from` |
-| `open` | `on_hold` | `manage_settings` | `room.on_hold`; „wir wissen noch nicht, ob das Zimmer frei wird" — zählt **nicht** ins Budget |
-| `on_hold` | `open` / `not_available` | `manage_settings` | |
-| `open`, `on_hold` | `not_available` | `manage_settings` | `room.withdrawn`; das Zimmer fällt aus der laufenden Runde, **die Runde läuft weiter** — der Fall, für den `Room` überhaupt eine eigene Entität ist |
+| `open` | `on_hold` | `manage_rooms` | `room.on_hold`; „wir wissen noch nicht, ob das Zimmer frei wird" — zählt **nicht** ins Budget |
+| `on_hold` | `open` / `not_available` | `manage_rooms` | |
+| `open`, `on_hold` | `not_available` | `manage_rooms` | `room.withdrawn`; das Zimmer fällt aus der laufenden Runde, **die Runde läuft weiter** — der Fall, für den `Room` überhaupt eine eigene Entität ist |
 
 **Kopplungsinvarianten zwischen den Maschinen:**
 

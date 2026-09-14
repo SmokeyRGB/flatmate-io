@@ -124,7 +124,7 @@ gewählt haben.** Entsprechend die strengste Datenhaltung.
 | `retention_until` | `date` | ⚙️ | Default `created_at + 180 Tage`, siehe §7 |
 | `subject_access_exported_at` | `timestamptz?` | 🔴 | wann eine Datenauskunft erzeugt wurde — Nachweis der Unterstützungspflicht |
 | `created_by_account_id` | `uuid` | ⚙️ | |
-| `created_by_profile_id` | `uuid?` | ⚙️ | **Seit S-50/U-20 gibt es keinen Pfad mehr, der dieses Feld auf `null` setzt:** `Application` anlegen setzt `create_application` voraus, und das hat nur, wer ein `ResidentProfile` besetzt. Die Nullbarkeit stammt aus der Zeit, als die Verwaltung Bewerbungen anlegen durfte — ob die Spalte deshalb `NOT NULL` wird oder `null` künftig „vom System erzeugt" heißt, ist offen (`offene-punkte.md` **O-17**) |
+| `created_by_profile_id` | `uuid` | ⚙️ | **`NOT NULL` seit O-17.** `Application` anlegen setzt `create_application` voraus, und das hat nur, wer ein `ResidentProfile` besetzt — seit S-50/U-20 gibt es keinen Pfad mehr, der hier `null` erzeugen könnte. Kommt später ein Systempfad (Import, Formulareingang), bekommt er eine **benannte** Quelle; „kein Wert" und „vom System" dürfen nicht gleich aussehen |
 | `created_at` · `deleted_at` | `timestamptz` · `timestamptz?` | ⚙️ | |
 
 > **`source` und `collected_from` sind zwei Achsen, nicht eine — und ein Feld hätte gebrochen.**

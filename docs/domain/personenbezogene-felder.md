@@ -77,7 +77,7 @@ Nutzende löschen selbst.
 | `AppointmentAttendance` | `resident_profile_id`, `attended` | **neu, bisher fehlend.** `attended` seit V0.4 umgedreht (U-23): entsteht mit `true`, von der betroffenen Person selbst und von der Moderation änderbar (§2.2) |
 | `AvailabilityWindow` | `resident_profile_id` | Verfügbarkeit ist ein Verhaltensdatum |
 | `Appointment` | `expected_attendee_profile_ids` | wer teilnehmen wollte |
-| `AvailabilityToken` | `created_by_profile_id` | **neu in V0.2**; `null` = von einem Haushalts-Account erzeugt |
+| `AvailabilityToken` | `created_by_profile_id` | **neu in V0.2**; seit **O-17** `NOT NULL` — Terminfindung setzt ein `ResidentProfile` voraus |
 | `PushSubscription` | `account_id`, `endpoint`, `keys` | **neu, bisher fehlend** — geräte- und accountbezogen wie `PasskeyCredential` (§2.5) |
 | `ActivityEvent` | `actor_account_id`, `actor_profile_id` | Handelnde; `null` = von einem Haushalts-Account gehandelt |
 

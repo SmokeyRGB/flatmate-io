@@ -375,8 +375,23 @@ die sie nicht passen — der Vermieter-Fall (Objekt ohne eigenes Bewohner-Profil
 
 Vergebbare Werte in `permissions` (Vorschlag, erweiterbar):
 `create_application` · `change_application_state` · `close_round` · `confirm_appointment` ·
-`manage_settings` · `manage_members` · `extend_retention` · `delete_data` ·
+`manage_rooms` · `manage_settings` · `manage_members` · `extend_retention` · `delete_data` ·
 `export_subject_access`.
+
+> **`manage_rooms` ist neu (P-O-10, 2026-09-14)** und trägt die **Verfügbarkeit** eines Zimmers:
+> anlegen, `planned → open`, `on_hold`, `not_available` (`zustandsmaschinen.md` §3.3). Vorbelegt bei
+> `household_admin` **und** `moderator`.
+>
+> **Warum ein eigenes Recht und nicht `manage_settings`:** Die Verfügbarkeit eines Zimmers ist eine
+> Entscheidung der **laufenden Runde** — die moderierende Person merkt als Erste, dass ein Zimmer
+> doch nicht frei wird —, und sie wirkt unmittelbar auf das Favoriten-Budget, das nur `open`-Zimmer
+> zählt (`rechenmodelle.md` §8.2). `manage_settings` bündelt dagegen Verfahrensregeln und die
+> Freigabe der Datenschutzseite. Hinge die Verfügbarkeit daran, müsste eine moderierende Person ohne
+> dieses Recht mitten in der Runde die Verwaltung holen, um ein Zimmer auf `on_hold` zu setzen.
+>
+> **Nicht** von `manage_rooms` gedeckt: `promised` und `occupied` samt Rückwegen — die sind Folge
+> einer Bewerbung und hängen an `change_application_state` — sowie `occupied → open` beim Auszug,
+> das an `manage_members` hängt.
 
 > **`role` und `permissions` sind 🟠, nicht ⚙️** — entschieden in der Querprüfung gegen
 > `06-Compliance-Anhang.md` (O-9 Grenzfall 1), **gegen** den ursprünglichen Vorschlag dieses
