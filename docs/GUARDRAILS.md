@@ -61,7 +61,7 @@ ist selbst eine Änderung, die menschliche Freigabe braucht (**G-G3**).
 | [**G-A**](#g-a--secrets-und-zugangsdaten) | Secrets und Zugangsdaten | G-A1 – G-A5 |
 | [**G-B**](#g-b--personenbezogene-daten) | Personenbezogene Daten | G-B1 – G-B7 |
 | [**G-C**](#g-c--autorisierung-und-sichtbarkeit) | Autorisierung und Sichtbarkeit | G-C1 – G-C9 |
-| [**G-D**](#g-d--geschützte-tests) | Geschützte Tests | G-D1 – G-D14 |
+| [**G-D**](#g-d--geschützte-tests) | Geschützte Tests | G-D1 – G-D15 |
 | [**G-E**](#g-e--datenbank-und-migrationen) | Datenbank und Migrationen | G-E1 – G-E5 |
 | [**G-F**](#g-f--datenbestandsverzeichnis) | Datenbestandsverzeichnis | G-F1 – G-F3 |
 | [**G-G**](#g-g--test--und-ci-disziplin) | Test- und CI-Disziplin | G-G1 – G-G5 |
@@ -548,6 +548,7 @@ und ein Mensch, der den Diff liest. **Diese Lücke wird hier offen benannt, nich
 | **G-D12** | **Invite-Token-Einlösung schlägt bei bestehendem `ResidentProfile` fehl, statt zu überschreiben** | Für eine `Session`, deren `Account` im Ziel-`Household` bereits ein `ResidentProfile` hat, liefert das Einlösen eines gültigen `ApplicationInviteToken` (nicht `expires_at`, nicht `used_at`, nicht `revoked_at`) einen erklärten Fehler ("Du bist bereits als Bewohner:in registriert") statt eines Ergebnisses. Kein Merge, keine Überschreibung, kein stiller No-op; `became_resident_id` der betroffenen `Application` bleibt unverändert. Ergänzt G-D9 um den *Prozess*-Fall — G-D9 sichert den *Datenzustand* (nie `null`), G-D12 sichert den *Weg dorthin* (kein zweiter Durchlauf, der ihn überschreibt). |
 | **G-D13** | **Der Notiz-Erinnerungs-Reminder respektiert Selbst-Redaktion** | Für ein `Appointment`, dessen `Application` für die Empfängerin/den Empfänger selbst-redigiert ist (V-1, G-D1), wird `casting.note_reminder_due` weder erzeugt noch zugestellt — unabhängig vom Stand des `AppointmentAttendance.note_written`-Flags. Der Reminder liest zur Entscheidung ausschließlich dieses Flag, nie `CastingNote.body` (G-B5 bleibt insoweit unverändert in Kraft). |
 | **G-D14** | **Eine Sitzung, eine Identität — und der Haushalts-Account besetzt nie ein Profil** | Zwei Prüfungen, beide aus ADR-013. **(a)** Eine `Session`, deren `account_id` auf eine `Membership` mit `is_resident = false` zeigt, hat `acting_profile_id = null` — beim Anlegen **und** über ihre ganze Lebensdauer. **(b)** Es existiert kein Schreibpfad, der `Session.acting_profile_id` nach dem Anlegen der Sitzung ändert; der Test führt den Versuch aus und erwartet Ablehnung. Ohne (b) kehrt der abgeschaffte Wechsel durch eine einzige Zeile im Anmeldepfad zurück, ohne dass es auffällt. |
+| **G-D15** | **Der Haushalts-Account sieht die Runde, aber keine Zahl aus Bewerbungen** | Aus ADR-014. Für eine `Session` mit `app_profile_id() IS NULL` liefern alle Lesepfade auf `CastingRound` **Identität und Lebenszyklus** (Existenz, `title`, `status`, `room_ids`, Zeitstempel, Aufbewahrungsfelder) und **keinen** aus `Application` abgeleiteten Wert — weder Zeilen noch **Aggregate**: Bewerbungszahl, abgegebene Stimmen, Beteiligung, Quorum-Anzeige, Score, Rangliste, Stimmungsbild. Über die Policy-Schicht **und** direkt gegen die Datenbank unter der Anwendungsrolle. **Der Test muss die Zahl ausdrücklich prüfen, nicht nur die Zeile:** `redaction_subjects()` ist für einen Haushalts-Account leer, V-1 greift dort nicht, und das Passwort ist bewusst geteilt (ADR-007) — eine einzige Kennzahl reicht, um V-1 über diesen Zugang auszuhebeln. |
 
 > **G-D1 ist die wichtigste Zeile dieses Dokuments.** Sie ist die eine testbare Regel, die im Brief
 > ausdrücklich an die Stelle einer Statusabfrage gesetzt wurde, „die man an fünf Stellen vergessen
@@ -1282,6 +1283,7 @@ Zustände.
 | G-D12 Invite-Token: Fehler statt Überschreibung bei bestehendem Profil | 🟢 | geschützter Test über den Einlösepfad (Anschluss an G-D9/I-3) |
 | G-D13 Notiz-Reminder respektiert Selbst-Redaktion | 🟢 | geschützter Test, prüft nur `AppointmentAttendance.note_written` (Anschluss an G-D1/G-C6/G-D5) |
 | G-D14 Eine Sitzung, eine Identität; Haushalts-Account ohne Profil | 🟢 | zwei geschützte Tests (ADR-013): `acting_profile_id = null` über die Lebensdauer, kein Schreibpfad nach dem Anlegen |
+| G-D15 Rundensicht ohne Bewerbungszahlen | 🟢 | geschützter Test (ADR-014), Policy-Schicht **und** rohes SQL; prüft ausdrücklich Aggregate, nicht nur Zeilen |
 | G-E1 Destruktives DDL | 🟢 | Migrations-Muster-Check + CODEOWNERS |
 | G-E2 Migrationen reversibel | 🟢 | up/down/up im CI |
 | G-E3 Nur Migrationen | 🟢 | Drift-Erkennung |

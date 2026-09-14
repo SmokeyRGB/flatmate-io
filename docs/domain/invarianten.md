@@ -135,21 +135,22 @@ Regelfall **kein** eigenes `ResidentProfile` — er legt Profile an, besetzt sie
 `redaction_subjects` für ihn meist leer ist. Das ist kein Leck, sondern dieselbe Aussage wie die
 Klarstellung in §2.1: die Trennung ist Klarheit, keine Härtung.
 
-> ⚠️ **Offener Widerspruch, älter als ADR-013 — geführt als `02-SRD.md` O-09.** Der zweite Zweig von
-> `can_see_round` gibt dem Haushalts-Account Sicht auf die Runden des Haushalts; **S-50**/**U-20**
-> sagen, `CastingRound` setze ein `ResidentProfile` voraus.
+> **Was der Haushalts-Account innerhalb einer sichtbaren Runde nicht sieht (ADR-014).** Das Prädikat
+> oben war nie falsch — ihm fehlte die zweite Hälfte der Aussage. Sie lautet:
 >
-> **Das Prädikat ist dabei näher an der Wahrheit als die Scope-Zeile:** Bildschirm **O17
-> Aufbewahrung** verwaltet Fristen abgeschlossener Runden ausdrücklich ohne `ResidentProfile`,
-> **S-35** verlangt, dass die Verwaltung eine laufende Runde erkennen kann, und `not_available`
-> heißt „fällt aus der laufenden Runde". Drei beschlossene Verwaltungsrechte setzen Rundensicht
-> also bereits voraus.
+> **Sichtbar** ist die Runde in Identität und Lebenszyklus: Existenz, `title`, `status`, `room_ids`,
+> `opened_at`, `closed_at`, `phase_deadline_at` und die Aufbewahrungsfelder. Das ist die Grundlage
+> für Bildschirm **O17**, für die Durchsetzung von **S-35** („nicht während laufender Runde") und
+> für `Room → not_available`.
 >
-> Aufzulösen ist die **Grenze**, nicht die Sichtbarkeit als Ganzes: Rundenidentität und
-> Lebenszyklus sichtbar, alles aus `Application` Abgeleitete **einschließlich Zählern** unsichtbar —
-> denn `redaction_subjects()` ist für einen Haushalts-Account leer (ADR-013), V-1 greift dort nicht,
-> und Aggregate sind nach §5.1 V-1-geschützt. Weil V-2 ein geschützter Test ist (G-C7 fährt ihn
-> doppelt) und S-50 eine bestätigte Scope-Zeile, wird hier **nichts nebenbei** geändert.
+> **Unsichtbar** bleibt alles, was aus `Application` abgeleitet ist — **ausdrücklich einschließlich
+> Zahlen**: Bewerbungszahl, abgegebene Stimmen, Beteiligung, Quorum-Anzeige, Score, Rangliste,
+> Stimmungsbild. Der Grund steht in §5.1: Aggregate sind V-1-geschützt, „ein Aggregat über zwei
+> Stimmen ist keine Anonymisierung". Und für einen Haushalts-Account ist `redaction_subjects()`
+> **leer** (ADR-013), V-1 greift dort also nicht von selbst — die Grenze muss die Arbeit tun.
+>
+> Erzwungen durch den geschützten Test **G-D15**. Die wahrscheinlichste Verletzung ist gut gemeint:
+> eine Bewerbungszahl neben dem Rundentitel, damit die Liste nützlicher wird.
 
 **Neu eintretende Profile** werden per `RoundParticipation` mit `source = added_manually`
 hinzugefügt und sehen die Runde **inklusive Historie zu anderen Kandidaten**. Das ist gewollt: ohne

@@ -33,6 +33,7 @@ Diese Tabelle macht aus „irgendwo steht es" ein „hier gilt es".
 |---|---|---|
 | **Was in v0.1 liegt** | **`02-SRD.md` §5.4** — die einzige Stelle, an der eine `S`-Zeile einer Stufe zugeordnet wird | `03-PRD.md` §4/§6 `Band:`-Zeilen (Feingranularität) · `03-PRD.md` §7.1 (nur Vorführbarkeit) · `backlog/roadmap.md` · `backlog/README.md` · `COVERAGE.md` |
 | **Sichtbarkeitsinvariante** (niemand liest, was über ihn geschrieben wurde) | **`domain/invarianten.md`** — `V-1`…`V-4` als Prädikate, samt RLS-Policies | `03-PRD.md` §4.2.5 · `screens/rahmenwerk.md` §11 · `GUARDRAILS.md` G-C, G-D · `backlog/requirements/F5-requirements.md` |
+| **Was der Haushalts-Account vom Casting sieht** | **`adr/0014-*.md`** — Runde in Identität und Lebenszyklus ja, alles aus `Application` Abgeleitete nein, auch keine Zahlen | `02-SRD.md` §5.3 (S-50) · `domain/invarianten.md` §5.2 · `GUARDRAILS.md` G-D15 · `screens/O-organisation.md` (O17) |
 | **Autorisierung** (doppelt: Policy-Objekte **und** RLS) | **`adr/0004-*.md`** | `domain/invarianten.md` §5.5 · `GUARDRAILS.md` G-C · `backlog/requirements/F0-requirements.md` FR-0.1–0.4 |
 | **Zustandsmaschine `Application`** (elf Zustände) | **`03-PRD.md` §4.2.1** — die Übergangstabelle | `domain/casting.md` §3 · `adr/0002-*.md` · `F0-requirements.md` FR-0.9–0.12, AC-0.10 |
 | **Aufbewahrung und Löschung** | **`06-Compliance-Anhang.md` §5** — Fristen und Rechtsgrundlage | `03-PRD.md` §4.2.6 · `domain/aufbewahrung.md` §7 · `GUARDRAILS.md` G-E · `adr/0003-*.md` (Tombstones) |

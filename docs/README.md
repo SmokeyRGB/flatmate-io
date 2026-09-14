@@ -51,7 +51,7 @@ tatsächlich verhalten — nicht, was einzelne Köpfe über sich behaupten.
 | **3** | `03-PRD.md` | Nutzerflüsse, Akzeptanzkriterien, Score- und Quorum-Rechnung. Jeder Unterabschnitt von §4/§6 trägt eine `Band:`-Zeile |
 | **4** | `06-Compliance-Anhang.md` | Bindend für alles, was personenbezogene Daten berührt |
 | **5** | `07-Screen-Inventar.md` · `08-UX-Entscheidungen.md` | Die UI-Schicht. **Sie darf `02`, `03` und `04` korrigieren** — das ist U-7, und die drei werden dann nachgezogen, nicht umgekehrt |
-| **6** | `domain/` · `adr/` | Schema und Architektur. Acht ADRs sind `Bestätigt — verbindlich für v0.1`; fünf stehen weiter auf `Vorschlag — anfechtbar` und sind verhandelbar |
+| **6** | `domain/` · `adr/` | Schema und Architektur. Neun ADRs sind `Bestätigt — verbindlich für v0.1`; fünf stehen weiter auf `Vorschlag — anfechtbar` und sind verhandelbar |
 | **7** | `00-Session-Brief.md` | **Nur historisch.** Verliert gegen jedes spätere Dokument — die Kette hat ihn beim Verfügbarkeits-Link ausdrücklich überstimmt (`02-SRD.md` §11 O-08) |
 
 > **Warum der Session-Brief zuletzt steht.** Sechs Dokumentenköpfe nannten ihn bis 2026-09-09
@@ -71,7 +71,7 @@ Zitat, keine Definition.
 | `S-01` … `S-51` | Scope-Zeilen | `02-SRD.md` §5.3 · Stufenzuordnung in §5.4 |
 | `E-01` … `E-27` | Belegkette, Ist-Prozess | `01-Problem-Framing.md` |
 | `P-1` … `P-5` | Prinzipien | **§3.1 dieses Dokuments** (siehe unten) |
-| `ADR-001` … `ADR-013` | Architekturentscheidungen | `adr/00NN-*.md` · `05-ADRs.md` ist eingefroren (deckt nur bis `ADR-012`) |
+| `ADR-001` … `ADR-014` | Architekturentscheidungen | `adr/00NN-*.md` · `05-ADRs.md` ist eingefroren (deckt nur bis `ADR-012`) |
 | `V-1` … `V-4` | Invarianten | `domain/invarianten.md` |
 | `G-A` … `G-N` | Guardrails | `GUARDRAILS.md` |
 | `U-1` … `U-26` | UX-Entscheidungen | `08-UX-Entscheidungen.md` |

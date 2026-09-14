@@ -29,7 +29,7 @@ Das ist wörtlich gemeint.
 | **3** | CODEOWNERS auf Konfiguration, Workflows, `GUARDRAILS.md`, `data-inventory.yml`, `test/guarded.manifest.json`, Migrationsverzeichnis, Solver-Adapter | G-G3, G-D, G-E1, G-K1 | CODEOWNERS |
 | **4** | `data-inventory.yml` mit Schema-Abgleich als Pflicht-Gate — **vor der ersten Tabelle** | G-F1 | eigener CI-Schritt (ADR-010) |
 | **5** | RLS-Positiv-Test über **alle** Tabellen mit `household_id` — **vor der ersten Tabelle** | G-C2, G-C5 | **Vitest** |
-| **6** | `test/guarded.manifest.json` mit den vierzehn G-D-Invarianten, zunächst als scheiternde Tests — die **Sichtbarkeitsinvarianten je zweimal**: gegen die Policy-Schicht **und** als rohes SQL | **G-C7** | **Vitest** |
+| **6** | `test/guarded.manifest.json` mit den fünfzehn G-D-Invarianten, zunächst als scheiternde Tests — die **Sichtbarkeitsinvarianten je zweimal**: gegen die Policy-Schicht **und** als rohes SQL | **G-C7** | **Vitest** |
 | **7** | Sitzungskontext ausschließlich über **eine** Transaktions-Hilfsfunktion; `SET` ohne `LOCAL` per Lint gesperrt — **vor der ersten Policy** | G-C8 | ESLint-Regel · Vitest (G-D10) |
 | **8** | Import-Boundary-Lint mit den sechs Bounded Contexts | G-I1 | **dependency-cruiser** (`--validate`) |
 | **9** | Lockfile-Installation, Lizenz-Check, Versions-Check | G-H2 bis G-H4 | **license-checker-rseidelsohn** mit Allowlist |

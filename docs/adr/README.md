@@ -7,7 +7,7 @@
 
 ---
 
-## Die dreizehn Records
+## Die vierzehn Records
 
 | # | Entscheidung | Status |
 |---|---|---|
@@ -24,8 +24,9 @@
 | [0011](0011-pwa-statt-native-app.md) | PWA statt native App | 🔶 Vorschlag |
 | [0012](0012-deutsch-dokumente-englisch-code.md) | Deutsch in Dokumenten, Englisch im Code | ✅ Bestätigt |
 | [0013](0013-zwei-account-typen-feste-identitaet.md) | Zwei Account-Typen, eine feste Identität je Sitzung — der Wechsel verlangt Abmelden und neue Anmeldung | ✅ Bestätigt |
+| [0014](0014-haushalts-account-sieht-runden-ohne-bewerbungsdaten.md) | Der Haushalts-Account sieht Runden in Identität und Lebenszyklus, aber nichts aus `Application` — auch keine Zahlen | ✅ Bestätigt |
 
-**8 bestätigt · 5 Vorschlag · 0 angenommen.**
+**9 bestätigt · 5 Vorschlag · 0 angenommen.**
 
 ---
 
@@ -58,12 +59,15 @@ Codebasis"*. Eine Bestätigung, die diesen Preis nicht nennt, ist eine Formalie.
 Die fünf übrigen dürfen offen bleiben — sie tragen v0.1 nicht. ADR-005 (Solver) ist mit
 S-19/S-20 ohnehin nach v1.1 gewandert.
 
-**ADR-013 ist bestätigt, ohne einer der sieben zu sein.** Die sieben sind eine feste Menge: die
-Records, die v0.1 *tragen*. ADR-013 trägt v0.1 nicht, er **ändert** es — er fasst **S-02** neu und
-nimmt dem Modell einen Vorgang, den bisher zwei Einzelhärtungen bewachten. Als `Vorschlag` wäre er
-wertlos: dann stünde **S-02** in zwei Lesarten nebeneinander, und die Dateien in `../domain/` und
+**ADR-013 und ADR-014 sind bestätigt, ohne zu den sieben zu gehören.** Die sieben sind eine feste
+Menge: die Records, die v0.1 *tragen*. Diese beiden tragen v0.1 nicht, sie **ändern** es — ADR-013
+fasst **S-02** neu, ADR-014 präzisiert **S-50**. Als `Vorschlag` wären beide wertlos: dann stünde
+eine bestätigte Scope-Zeile in zwei Lesarten nebeneinander, und die Dateien in `../domain/` und
 `../screens/` müssten beide gleichzeitig beschreiben. Ein Record, aus dem Streichungen in elf
 Dateien folgen, ist entweder verbindlich oder er wird nicht geschrieben.
+
+Beide tragen ihren Preis deshalb **in der Kostenzeile**, nicht in einer Umkehrbarkeitsspalte — siehe
+die Anmerkung zu Aufteilungsregel 3 unten.
 
 ### ⚠️ ADR-006 trägt eine Zwangsbedingung aus ADR-005
 
