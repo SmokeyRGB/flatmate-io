@@ -39,7 +39,7 @@ Prozess vs. Person, nicht bei „beschreibend vs. empfehlend".
 | | |
 |---|---|
 | **Zweck** | Einstieg in die Organisationsfläche — Aufgabenliste nach denselben drei Regeln oben |
-| **Zugang** | Avatar-Menü „In Moderation wechseln" oder CTA aus einer Benachrichtigung |
+| **Zugang** | Avatar-Menü „Organisation" oder CTA aus einer Benachrichtigung — Navigation, **kein** Identitätswechsel (ADR-013) |
 
 **Kernelemente**
 

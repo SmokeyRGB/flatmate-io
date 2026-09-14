@@ -16,7 +16,12 @@
 
 - E-Mail + Passwort, mit Hinweis, dass die Adresse künftig gemeinsam mit weiteren Verwaltenden
   genutzt werden kann
-- Anlegt: `Household` + `Account` (`role = household_admin`)
+- Anlegt: `Household` + `Account` (`role = household_admin`, `is_resident = false`)
+
+> **Dieser Account verwaltet, er wohnt nicht (ADR-013).** Er stimmt nicht ab und besetzt nie ein
+> `ResidentProfile`. Wer selbst mitwohnt, legt sich zusätzlich ein Bewohner-Profil an und meldet
+> sich dafür getrennt an (A2). Das ist ein eigener Schritt und sollte im Anschluss an die
+> Registrierung angeboten werden, damit er nicht übersehen wird.
 
 **Abweichende Zustände**
 
@@ -36,9 +41,14 @@
 **Kernelemente**
 
 - Für Haushalts-Accounts: E-Mail + Passwort
-- Für Resident-Accounts ohne E-Mail: Haushalt + Anzeigename + Passwort (O-D, Vorschlag) — Feld
+- Für Resident-Accounts ohne E-Mail: Haushalt + Anzeigename + Passwort (O-12, entschieden) — Feld
   „Haushalt" vorbelegt, wenn das Gerät „angemeldet bleiben" hält
-- Passkey als Alternative, wenn zuvor eingerichtet
+- Passkey als Alternative, wenn zuvor eingerichtet — setzt eine hinterlegte und bestätigte
+  `Account.email` voraus (ADR-006, `../domain/identity.md`)
+
+> **Die Anmeldung entscheidet die Identität der ganzen Sitzung (ADR-013).** Es gibt keinen Wechsel
+> zwischen Haushalt und Bewohner-Profil innerhalb einer Sitzung; wer die Seite wechseln will, meldet
+> sich ab und neu an. Die Oberfläche benennt das so, statt es als Moduswechsel darzustellen.
 
 ---
 

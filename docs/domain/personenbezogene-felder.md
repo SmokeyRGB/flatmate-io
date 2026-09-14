@@ -63,12 +63,11 @@ Nutzende löschen selbst.
 | Entität | Feld | Bemerkung |
 |---|---|---|
 | `Account` | `email` | Login-Identität; beim Haushalts-Account bewusst eine **gemeinsam genutzte** Adresse |
-| `Account` | `password_hash` | Argon2id |
-| `Account` | `email_verified_at` | Voraussetzung für Versand |
+| `Account` | `email_verified_at` | Voraussetzung für Versand — und **die alleinige Autorität dafür**; das Bestätigt-Kennzeichen des Anmeldeanbieters ist es nicht (§2.1) |
 | `Account` | `last_seen_at` | speist „was ist passiert, während ich weg war" |
 | `Household` | `contact_email` | **neu in V0.3** — nach außen genannte Kontaktangabe für Art. 13 Abs. 1 lit. a. **Nicht** `Account.email`; **keine Postanschrift** (`06` §4.6) |
 | `Household` | `privacy_notice_published_by_account_id` | **neu in V0.3** — wer die Datenschutzseite des Haushalts veröffentlicht hat. Die übrigen drei `privacy_notice_*`-Felder sind ⚙️ |
-| `Session` | `token_hash`, `account_id`, `acting_profile_id`, `user_agent` | § 25 Abs. 2 Nr. 2 TDDDG einwilligungsfrei. `acting_profile_id` ist die technische Heimat des Profilwechsels (V0.2) und, seit U-21, der geschützte Test gegen Rechteausweitung |
+| `Session` | `token_hash`, `account_id`, `acting_profile_id`, `user_agent` | § 25 Abs. 2 Nr. 2 TDDDG einwilligungsfrei. `acting_profile_id` trägt die handelnde Identität, steht seit **ADR-013** mit der Anmeldung fest und ist danach unveränderlich; seit U-21 zugleich der geschützte Test gegen Rechteausweitung |
 | `PasskeyCredential` | `account_id`, `credential_id`, `public_key`, `label`, `created_at`, `last_used_at` | **neu in V0.2** — optionaler Aufsatz (ADR-007), löschbar ohne Zugangsverlust |
 | `Membership` | `role`, `permissions` | **in V0.2 von ⚙️ auf 🟠 umklassifiziert** — „X ist Moderator" ist eine Information über eine identifizierte Person (Art. 4 Nr. 1). Keine automatische Frist, aber **auf Auskunftsverlangen offenzulegen** |
 | `ResidentProfile` | `display_name` | Anzeigename im Feed, **seit O-12 zusätzlich Anmeldekennung** — eindeutig pro Haushalt (§2.1) |
@@ -78,11 +77,16 @@ Nutzende löschen selbst.
 | `AppointmentAttendance` | `resident_profile_id`, `attended` | **neu, bisher fehlend.** `attended` seit V0.4 umgedreht (U-23): entsteht mit `true`, von der betroffenen Person selbst und von der Moderation änderbar (§2.2) |
 | `AvailabilityWindow` | `resident_profile_id` | Verfügbarkeit ist ein Verhaltensdatum |
 | `Appointment` | `expected_attendee_profile_ids` | wer teilnehmen wollte |
-| `AvailabilityToken` | `created_by_profile_id` | **neu in V0.2**; `null` = im Verwaltungskontext erzeugt |
+| `AvailabilityToken` | `created_by_profile_id` | **neu in V0.2**; `null` = von einem Haushalts-Account erzeugt |
 | `PushSubscription` | `account_id`, `endpoint`, `keys` | **neu, bisher fehlend** — geräte- und accountbezogen wie `PasskeyCredential` (§2.5) |
-| `ActivityEvent` | `actor_account_id`, `actor_profile_id` | Handelnde; `null` = im Verwaltungskontext gehandelt |
+| `ActivityEvent` | `actor_account_id`, `actor_profile_id` | Handelnde; `null` = von einem Haushalts-Account gehandelt |
 
-**Summe: 59 Felder** (11 ⚫ · 15 🔴 · 33 🟠) in **19 der 23 Entitäten.**
+**Summe: 58 Felder** (11 ⚫ · 15 🔴 · 32 🟠) in **19 der 23 Entitäten.**
+
+> **Geändert 2026-09-11 (ADR-006):** `Account.password_hash` ist entfallen — Anmeldedaten liegen bei
+> **Supabase Auth** und damit nicht mehr im eigenen Bestand. Die Summe sinkt dadurch von 59 auf 58
+> und die 🟠-Zahl von 33 auf 32. Was nicht gespeichert wird, braucht keine Inventarzeile; die
+> Verarbeitung wandert dafür in die Unterauftragsverarbeiter-Kette (`../06-Compliance-Anhang.md`).
 
 Ohne Inventarzeile: `HouseholdSettings`, `CastingRound`, `RoundParticipation`, `Slot` — sie enthalten
 Konfiguration, Zeitraster und Verknüpfungen, aber keine Aussage über eine Person. **`Household` ist in

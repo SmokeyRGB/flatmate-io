@@ -160,7 +160,8 @@ sondern in *Art* des Zugriffs. Sie entstehen aus **orthogonalen `Membership`-Att
 | Aktion | Haushalts-Account | Moderator | Bewohnender | Ehemaliger |
 |--------|:-----------------:|:---------:|:-----------:|:----------:|
 | `Household` anlegen / Einstellungen ändern | ✅ | ⬜ nur mit Berechtigung | ❌ | ❌ |
-| `Room` anlegen / Status ändern | ✅ | ✅ | ❌ | ❌ |
+| `Room` anlegen · Verfügbarkeit ändern (`planned` · `open` · `on_hold` · `not_available`) | ✅ | ✅ | ❌ | ❌ |
+| `Room`-Status als **Folge einer Bewerbung** (`promised`, `occupied` und ihre Rückwege) | **❌** (S-50/U-20) | ✅ | ❌ | ❌ |
 | Beitrittscode erzeugen / widerrufen | ✅ | ✅ | ❌ | ❌ |
 | `ResidentProfile` anlegen (aus Verwaltungskontext) | ✅ | ❌ | ❌ | ❌ |
 | Moderator ernennen / Berechtigung vergeben | ✅ | ❌ | ❌ | ❌ |
@@ -191,33 +192,36 @@ sondern in *Art* des Zugriffs. Sie entstehen aus **orthogonalen `Membership`-Att
 
 > **Band:** `v0.1` — später: `moved_out`-Rechteentzug S-32 (`v0.2`)
 
-> **Umbenannt ggü. V0.5: „Kontextwechsel" → „Identitätswechsel".** Das Wort „Kontext" hatte
-> nahegelegt, `Session.acting_profile_id = null` verleihe der Verwaltung erweiterte Rechte.
-> Das ist falsch und wird als **geschützter Test** festgehalten (U-21, Screen-Inventar §4):
+> **Geändert ggü. V0.6 (ADR-013): es gibt keinen Wechsel innerhalb einer Sitzung mehr.** Ein Account
+> bedient genau eine Identität — Haushalt **oder** Bewohner-Profil —, sie steht mit der Anmeldung
+> fest, und der Weg dazwischen führt über Abmelden und neue Anmeldung. Der frühere Menüpunkt
+> „In Moderation wechseln" entfällt als Wechsel; was bleibt, ist ein Navigationspunkt auf die
+> Organisationsfläche für Konten, deren Rechte dort etwas hergeben (U-4/K-6, Screen-Inventar §4).
+>
+> **Unverändert gilt U-21**, und es bleibt ein **geschützter Test**:
 > **Rechte kommen ausschließlich aus `Membership.role`/`Membership.permissions`.**
-> `acting_profile_id = null` bedeutet ausschließlich „kein Bewohnerprofil in dieser Sitzung
-> aktiv" — nicht mehr. Ein Konto mit `role = member` bekommt durch `null` nichts dazu; es
-> verliert nur seine Stimmidentität. Welche Abschnitte der Organisationsfläche sichtbar sind,
-> entscheidet **allein** `role`/`permissions`, nie `acting_profile_id`. Der Wechsel selbst
-> läuft über das **Avatar-Menü** („In Moderation wechseln"), nicht über ein eigenes
-> Navigationselement (U-4/K-6, Screen-Inventar §4).
+> `acting_profile_id = null` bedeutet ausschließlich „diese Sitzung gehört zu einem
+> Haushalts-Account" — nicht mehr. Ein Konto mit `role = member` bekommt durch `null` nichts dazu.
+> Welche Abschnitte der Organisationsfläche sichtbar sind, entscheidet **allein**
+> `role`/`permissions`, nie `acting_profile_id`.
 
 | Übergang | Auslöser | Verhalten |
 |----------|----------|-----------|
-| Verwaltung → Bewohner (S-02) | Identitätswechsel im Avatar-Menü, sofern ein `ResidentProfile` existiert | Sichtbarer Indikator, welche Identität aktiv ist. `ActivityEvent`s tragen **beide** Angaben: `Account` und handelndes Profil (E-21) |
-| Verwaltung → Moderator ohne Bewohnerprofil | Haushalts-Account ernennt ein `ResidentProfile` zum Moderator und wechselt nicht in dieses Profil | Zulässiger Dauerzustand. Die Verwaltung bleibt ohne eigenes `ResidentProfile` **stimmrechtslos und ohne Casting-Zugriff** (S-50/U-20) |
+| Verwaltung → Bewohner (S-02) | **Abmelden und als Resident-Account neu anmelden** (ADR-013) — der Haushalts-Account legt das `ResidentProfile` an, besetzt es aber nie | Die angemeldete Identität wird benannt und ändert sich innerhalb der Sitzung nicht. `ActivityEvent`s tragen **beide** Angaben: `Account` und handelndes Profil (E-21) |
+| Verwaltung → Moderator ohne Bewohnerprofil | Haushalts-Account ernennt ein `ResidentProfile` zum Moderator; er kann ohnehin nicht in dieses Profil wechseln (ADR-013) | **Der Regelfall, nicht mehr nur ein zulässiger Dauerzustand.** Die Verwaltung bleibt ohne eigenes `ResidentProfile` **stimmrechtslos und ohne Casting-Zugriff** (S-50/U-20) |
 | Bewohnender → Moderator | Ernennung durch Haushalts-Account | Stimmrecht bleibt erhalten (orthogonale Attribute, E-04) |
 | Bewohnender → ehemaliger Bewohnender | Setzen auf `moved_out` | **Sofortiger** Zugriffsentzug auf alle `CastingRound`s. `Vote`s bleiben und **zählen weiter im Score** — auch in einer währenddessen offenen Runde —, werden als „ehemaliges Mitglied" markiert; die Person fällt aus **Zähler und Nenner** der Beteiligungs- und Quorum-Anzeige (E-14, S-32, §4.2.3) |
 | Ehemaliger → Bewohnender (Rückkehr) | Reaktivierung durch Haushalts-Account oder Moderator | Zugriff kehrt zurück. Alte `Vote`s bleiben unverändert zugeordnet. `RoundParticipation` muss **explizit** neu vergeben werden (E-13) |
 | Bewerbender → Bewohnender | `Application.status = moved_in`, automatischer `ApplicationInviteToken` (S-42), Anlage eines `ResidentProfile` beim Einlösen | **`Application.became_resident_id` wird gesetzt** → Selbst-Redaktion greift ab diesem Moment **dauerhaft** (E-12, S-31). Bevorzugter Weg über den Einladungslink; manuelle Zuordnung (§4.1.7) bleibt für alle übrigen Fälle |
-| Moderator scheidet aus **(geändert ggü. V0.5, S-50/U-20)** | `moved_out` des einzigen Moderators | Der Haushalts-Account bleibt handlungsfähig, aber **nicht mehr unmittelbar** — er hat selbst keinen Casting-Zugriff mehr. Der Weg führt über einen **Zwischenschritt**: die Verwaltung legt sich **selbst ein `ResidentProfile` an** und ernennt sich oder eine andere Person zum Moderator (beides bleibt Verwaltungsrecht, §4.0.1). Ergebnis: ein **benannter** Handelnder statt eines anonymen „Verwaltung"-Zugriffs. Warnung im Feed und an den Haushalts-Account, solange kein Moderator mit `ResidentProfile` existiert |
+| Moderator scheidet aus **(geändert ggü. V0.5, S-50/U-20; präzisiert durch ADR-013)** | `moved_out` des einzigen Moderators | Der Haushalts-Account bleibt handlungsfähig, aber **nicht mehr unmittelbar** — er hat selbst keinen Casting-Zugriff. Der Weg führt über einen **Zwischenschritt**: die Verwaltung **legt ein `ResidentProfile` an** und ernennt es zum Moderator (beides bleibt Verwaltungsrecht, §4.0.1). Seit ADR-013 **besetzt sie dieses Profil nicht selbst** — wer es benutzt, meldet sich mit eigenen Zugangsdaten an. Ergebnis: ein **benannter** Handelnder statt eines anonymen „Verwaltung"-Zugriffs. Warnung im Feed und an den Haushalts-Account, solange kein Moderator mit `ResidentProfile` existiert |
 
 **Akzeptanzkriterien §4.0.1**
 
-- [ ] Ein `Account` ohne aktives `ResidentProfile` hat auf jedem Bildschirm mit Abstimmungselementen keine Stimmabgabe-Steuerung — auch nicht deaktiviert, sondern mit Erklärungstext („Die Verwaltung stimmt nicht ab. Wechsle in dein Bewohner-Profil.")
+- [ ] Ein `Account` ohne `ResidentProfile` hat auf jedem Bildschirm mit Abstimmungselementen keine Stimmabgabe-Steuerung — auch nicht deaktiviert, sondern mit Erklärungstext („Die Verwaltung stimmt nicht ab. Melde dich mit deinem Bewohner-Profil an.")
 - [ ] Ein `ActivityEvent`, das ohne aktives `ResidentProfile` ausgelöst wurde, zeigt im Feed „Verwaltung" als Urheber und keinen Personennamen
 - [ ] Ein `ActivityEvent`, das mit aktivem `ResidentProfile` ausgelöst wurde, zeigt den Namen dieses `ResidentProfile`
-- [ ] **Geändert ggü. V0.5:** Ein Hinweis auf die aktive Identität ist nur für Sitzungen erforderlich, die zwischen mehreren Identitäten wechseln können — nicht mehr als Kriterium „auf jedem Bildschirm für alle" (§4.1.0)
+- [ ] **Geändert ggü. V0.6 (ADR-013):** Die angemeldete Identität ist im Avatar-Menü ablesbar und ändert sich innerhalb der Sitzung nicht. Ein Wechsel-Indikator „auf jedem Bildschirm" entfällt damit endgültig (§4.1.0) — es gibt nichts mehr, das sich unter der Sitzung ändern könnte
+- [ ] **Geschützter Test (G-D14, ADR-013):** Eine `Session`, deren `Account` eine `Membership` mit `is_resident = false` hat, trägt `acting_profile_id = null` über ihre ganze Lebensdauer; ein nachträglicher Schreibzugriff auf dieses Feld wird abgelehnt
 - [ ] **Geschützter Test (U-21):** Ein Konto ohne `household_admin` sieht den Organisationsabschnitt „Haushalt" auch dann nicht, wenn `Session.acting_profile_id` `null` ist — sichtbare Abschnitte richten sich ausschließlich nach `Membership.role`/`Membership.permissions`
 - [ ] **S-50/U-20, geschützter Test:** Für ein Konto ohne `ResidentProfile` liefert jede Runden-, Bewerbungs-, Termin- und Notizansicht keinen Inhalt — Ausnahmen sind ausschließlich die Aufbewahrungsansicht und der Datenauskunft-Export (ohne Einsicht)
 - [ ] Wird ein `Membership` auf `moved_out` gesetzt, liefert der nächste Abruf jeder Runden-, Bewerbungs-, Stimmen- und Notizansicht für dieses Profil keinen Inhalt — nicht ein ausgeblendetes Element, sondern keine Daten
@@ -338,27 +342,29 @@ Zweiteilung, die im Layout sichtbar wird:
 > (Screen-Inventar §4):
 >
 > - **Untere Leiste:** *Start* · *Casting* — genau zwei Elemente
-> - **Kopfzeile:** *Glocke* (Benachrichtigungszentrum) · *Avatar* (Identitätswechsel,
->   Einstellungen, Zugang zur Organisationsfläche über „In Moderation wechseln") — **kein**
+> - **Kopfzeile:** *Glocke* (Benachrichtigungszentrum) · *Avatar* (angemeldete Identität,
+>   Einstellungen, Abmelden, Zugang zur Organisationsfläche über „Organisation") — **kein**
 >   eigenes Moderations-Icon (K-6). Wer Rechte hat, erreicht die Organisationsfläche über das
 >   Avatar-Menü oder direkt über einen CTA aus einer Benachrichtigung bzw. der
->   Moderations-Brücke im Dashboard (§4.1.2)
+>   Moderations-Brücke im Dashboard (§4.1.2). Seit **ADR-013** ist dieser Menüpunkt reine
+>   Navigation, **kein** Identitätswechsel
 > - **Organisation** ist eine eigene Fläche ohne eigenen Tab-Platz — sie ersetzt die getrennten
 >   Bildschirme „Pipeline" und „Haushalts-Einstellungen" durch eine gemeinsame,
 >   abschnittsbasierte Fläche (§4.0.1)
 
 **Rahmenwerk:** die untere Navigation *Start · Casting* auf dem Telefon, eine seitliche
-Navigation mit denselben zwei Punkten plus Organisationseinstieg ab Tablet. Die **aktive
-Identität** (Verwaltung / welches `ResidentProfile`) ist über den Avatar erkennbar. **Welche
-Bereiche sichtbar sind, richtet sich ausschließlich nach `role`/`permissions` — nie danach,
-ob `acting_profile_id` `null` ist** (U-21, geschützter Test, §4.0.1) — deshalb ist ein aktiver
-„Kontext"-Indikator hier **nicht** mehr als eigenes Kriterium erforderlich, anders als in V0.5:
-Es gibt nichts, das eine Sitzung *zusätzlich* freischaltet.
+Navigation mit denselben zwei Punkten plus Organisationseinstieg ab Tablet. Die **angemeldete
+Identität** (Verwaltung / welches `ResidentProfile`) ist über den Avatar erkennbar und ändert sich
+seit **ADR-013** innerhalb der Sitzung nicht mehr. **Welche Bereiche sichtbar sind, richtet sich
+ausschließlich nach `role`/`permissions` — nie danach, ob `acting_profile_id` `null` ist**
+(U-21, geschützter Test, §4.0.1) — deshalb ist ein aktiver „Kontext"-Indikator hier **nicht** mehr
+als eigenes Kriterium erforderlich, anders als in V0.5: Es gibt nichts, das eine Sitzung
+*zusätzlich* freischaltet, und nichts, das sich unter ihr ändern könnte.
 
 **Akzeptanzkriterien §4.1.0**
 
 - [ ] Jeder Beteiligungs-Bildschirm ist bei 375 px Breite ohne horizontales Scrollen vollständig bedienbar
-- [ ] **Geändert ggü. V0.5 (Screen-Inventar §4):** Ein Hinweis auf die aktive Identität ist nur für Sitzungen erforderlich, die zwischen mehreren Identitäten wechseln können (Haushalts-Account mit eigenem `ResidentProfile`, Person mit mehreren Profilen) — nicht auf jedem Bildschirm für alle. Für die übrigen ~90 % der Sitzungen ist kein Dauerindikator gefordert
+- [ ] **Geändert ggü. V0.6 (ADR-013):** Die angemeldete Identität ist im Avatar-Menü ablesbar; ein Dauerindikator „auf jedem Bildschirm" ist nicht gefordert. Seit ADR-013 gibt es keine wechselfähige Sitzung mehr, auf die eine Ausnahme zugeschnitten werden müsste — die Identität steht mit der Anmeldung fest
 - [ ] Kein Beteiligungs-Bildschirm setzt Hover-Interaktion voraus
 - [ ] Die Anwendung ist als PWA installierbar und startet ohne Netzverbindung mindestens mit einem erklärenden Zustand statt einer Browser-Fehlerseite (ADR-011)
 - [ ] Ohne Netzverbindung zeigt die gestartete App **keine** zuvor geladenen Bewerber- oder Beratungsdaten, sondern den Offline-Zustand (§6.2)
@@ -1695,6 +1701,7 @@ nicht weil sie optional wäre.
 | ~~P-O-05~~ | ~~Verhalten des Screening-Durchlaufs, wenn während des Durchlaufs neue `Application`s eintreffen~~ | — | **Geschlossen (Screen-Inventar §2, S-48):** Der Durchlauf arbeitet auf der beim Start festgehaltenen Menge; neu eintreffende Bewerbungen erscheinen erst beim nächsten Öffnen als neue Aufgabe (T-5) auf dem Start-Bildschirm (§4.1.2) — nicht mehr „Rundenkopf" |
 | ~~P-O-06~~ | ~~Grenzwerte des Solvers — ab welcher Problemgröße greift das 10-s-Budget regelmäßig? (auch SRD O-06)~~ | — | → **`02-SRD.md` O-06.** Dort als Implementierungspflicht geführt, fällig in v1.1 vor S-19. |
 | ~~P-O-07~~ | ~~Wird die bewerberseitige Token-Seite für Verfügbarkeiten aus v1.1 nach v1 vorgezogen? (= SRD O-08)~~ | — | → **`02-SRD.md` O-08.** Dort entschieden: bleibt v1.1. |
+| **P-O-10** | **Welches Recht trägt die Zimmer-Verfügbarkeit?** Die Rechtematrix oben gibt dem Moderator `Room` ✅ **ohne** Bedingung; `zustandsmaschinen.md` §3.3 hängt dieselben Übergänge (`planned`, `open`, `on_hold`, `not_available`) an `manage_settings`, und dieselbe Matrix gibt dem Moderator `manage_settings` nur **⬜ mit Berechtigung** | Beides zugleich geht nicht. Gilt §3.3, braucht ein Moderator ohne `manage_settings` für jedes `on_hold` die Verwaltung — **mitten in der Runde**, und das Favoriten-Budget hängt daran (`rechenmodelle.md` §8.2 zählt nur `open`) | **Tendenz: die Matrix hat recht, §3.3 hat den falschen Torwächter.** `on_hold` und `not_available` sind Entscheidungen der laufenden Runde — die moderierende Person merkt als Erste, dass ein Zimmer doch nicht frei wird. Ein Einstellungsrecht ist dafür das falsche Tor. Auflösung entweder über ein eigenes Recht (`manage_rooms`) oder indem §3.3 die Rolle statt der Berechtigung nennt. Gefunden beim Nachziehen von ADR-013 |
 | ~~P-O-08~~ *(neu, aus dem UX-Nachzug)* | ~~Dauer der „auf diesem Gerät angemeldet bleiben"-Sitzung (§4.1.1)~~ | — | **Geklärt:** 90 Tage, gleitend verlängert; endet bei Passwortwechsel und bei `moved_out`. Maßgeblich: `04-Domaenenmodell.md` §10.2 (O-13). **War am Entstehungstag dieser Zeile bereits beantwortet** — der Grund, aus dem es das Register jetzt gibt. |
 | ~~P-O-09~~ *(neu, aus dem UX-Nachzug)* | ~~Wer setzt und verlängert `CastingRound.phase_deadline_at` (S-44), und gibt es eine Voreinstellung?~~ | — | **Geklärt:** Die moderierende Person setzt und verlängert `phase_deadline_at`; keine Voreinstellung. Maßgeblich: `04-Domaenenmodell.md` §10.2 (O-14). Ebenfalls am Entstehungstag beantwortet. |
 

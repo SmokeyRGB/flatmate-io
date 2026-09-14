@@ -66,16 +66,23 @@ Fehlermodus wird von der Schicht abgefangen, die man nicht vergessen kann.
 Sitzungskontext pro Request über `SET LOCAL app.account_id / app.profile_id / app.household_id`;
 Policy-Skizzen in `04-Domaenenmodell.md` §5.5.
 
-**Woher der Kontext kommt** (ergänzt in V0.2, seit `Session` modelliert ist): `app.account_id` und
-`app.profile_id` werden aus `Session.account_id` und `Session.acting_profile_id` gefüllt.
-`acting_profile_id = null` bedeutet Verwaltungskontext. Daraus folgen zwei Prüfungen, die nicht
-optional sind:
+**Woher der Kontext kommt** (ergänzt in V0.2, seit `Session` modelliert ist; **präzisiert
+2026-09-11 durch ADR-013**): `app.account_id` und `app.profile_id` werden aus `Session.account_id`
+und `Session.acting_profile_id` gefüllt. `acting_profile_id = null` bedeutet: Sitzung eines
+Haushalts-Accounts. Daraus folgen zwei Prüfungen, die nicht optional sind:
 
-1. `Session.acting_profile_id` darf **nur** auf ein Profil zeigen, für das eine gültige `Membership`
-   **desselben Accounts** existiert. Ohne diese Prüfung ist der Profilwechsel eine Rechteausweitung.
-2. Der Wechsel des aktiven Profils ist **kein** Weg an V-1 vorbei, weil `app_redaction_subjects()`
-   alle Profile des **Accounts** sammelt — unabhängig davon, welches gerade gesetzt ist. Genau das ist
-   der Grund, warum die Selbst-Redaktion am Account hängt und nicht am Profil.
+1. `Session.acting_profile_id` wird **bei der Anmeldung genau einmal** gesetzt und darf **nur** auf
+   ein Profil zeigen, für das eine gültige `Membership` **desselben Accounts** existiert. Seit
+   ADR-013 gibt es danach keinen Schreibpfad mehr auf dieses Feld; die Prüfung wandert damit von
+   „bei jedem Wechsel" zu „bei der Anmeldung, und dort ohne Ausnahme". Ein nachträgliches
+   `UPDATE sessions SET acting_profile_id = …` ist ein Fehler, kein Feature (geschützter Test
+   **G-D14**).
+2. Die Selbst-Redaktion hängt am **Account**, nicht am Sitzungsfeld: `app_redaction_subjects()`
+   leitet sich aus `app_account_id()` und `memberships` ab und liest `app.profile_id` **nicht**.
+   Genau deshalb greift V-1 als einzige der vier Invarianten auch dann noch, wenn der
+   Sitzungskontext fehlt oder falsch gesetzt ist — der Fehlerfall aus **G-C8**. Die frühere
+   Begründung („sonst wäre der Profilwechsel der Umweg") ist mit ADR-013 entfallen; die Verankerung
+   bleibt, weil sie diesen zweiten Grund trägt.
 
 ### Konsequenzen
 

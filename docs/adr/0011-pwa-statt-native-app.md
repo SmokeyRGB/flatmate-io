@@ -127,13 +127,19 @@ fängt die Lücke auf, die vor der Installation entsteht, statt sie offenzulasse
 > | 2 | **Keine Anzeigedaten im Puffer** — ausschließlich `application_id`, Wert, Rundenstufe | Sobald Name, Bewerbungstext oder Score mitwandern, ist der Puffer eine Datenkopie und die Ausnahme trägt nicht mehr |
 > | 3 | **Verwerfen statt Wiederholen** bei serverseitiger Ablehnung | Eine abgelehnte Stimme (Runde geschlossen, Teilnahme entzogen, Regel-Sperre) darf nicht in einer Wiederholungsschleife auf dem Gerät weiterleben. Die Person bekommt eine Meldung, nicht der Puffer einen zweiten Versuch |
 > | 4 | **Leeren bei Abmeldung und bei Sitzungsentzug** | `Session.revoked_at` und „überall abmelden" müssen das Gerät wirklich leeren — sonst ist der Entzug nur serverseitig wirksam |
-> | 5 | **Leeren auch beim Profilwechsel** — nicht nur bei der Abmeldung | Der Wechsel zwischen Verwaltungs- und Bewohnerkontext ist **keine** Abmeldung: die `Session` bleibt, nur `acting_profile_id` ändert sich. Ein Puffer, der das überlebt, lässt Profil B die Stimmen von Profil A versenden. **Derselbe Fehlertyp, gegen den V-1 am Account und nicht am aktiven Profil hängt** — nur eine Schicht tiefer |
+> | 5 | **Verwerfen bei fremder Identität** — ein Eintrag, dessen `resident_profile_id` nicht zur angemeldeten Sitzung gehört, wird beim Start verworfen | **Geändert 2026-09-11 durch ADR-013.** Einen Identitätswechsel innerhalb einer Sitzung gibt es nicht mehr — das Gerät bleibt aber geteilt. Eine Abmeldung, die nie sauber durchlief (Absturz, geschlossener Tab, abgelaufene Sitzung), hinterlässt einen Puffer, an dem sich als Nächstes eine andere Person anmeldet. Zusicherung 4 deckt den geordneten Fall, Zusicherung 5 den ungeordneten — **und nur der ungeordnete ist der wahrscheinliche**. Derselbe Fehlertyp, dessentwegen V-1 am Account und nicht am Sitzungsfeld hängt — nur eine Schicht tiefer |
 > | 6 | **Idempotente Wiedereinspielung** über einen Schlüssel `(application_id, profile_id, stage)`, nicht Anfügen | Ein Duplikat verschiebt Score **und** Quorum-Nenner. Das ist kein Zählfehler, sondern ein **falsches Datum über eine Person** — und es taucht in einer Auskunft nach Art. 15 genauso auf wie ein richtiges |
 >
 > **Der Profilwechsel ist damit zweimal die Stelle gewesen, an der eine Annahme bricht** — bei V-1
-> (§5.1 im Domänenmodell) und hier. Das ist kein Zufall: es ist der einzige Vorgang im Produkt, der
-> die handelnde Identität ändert, ohne die Sitzung zu beenden. Jede Regel, die „pro angemeldeter
-> Person" gedacht ist, gehört gegen ihn geprüft.
+> (§5.1 im Domänenmodell) und hier. Das war kein Zufall: er war der einzige Vorgang im Produkt, der
+> die handelnde Identität ändert, ohne die Sitzung zu beenden.
+>
+> **Ergänzt 2026-09-11 (ADR-013):** Genau diese Bilanz hat den Vorgang abgeschafft — serverseitig
+> gibt es ihn nicht mehr. Die Unschärfe ist damit vollständig auf den **Client** verlagert, und das
+> ist keine Entwarnung: Ein Browser-Speicher kennt keine Sitzung, sondern nur einen Ursprung. Er
+> überlebt die Abmeldung, den Absturz und den Personenwechsel am selben Tisch gleichermaßen. Jede
+> Regel, die „pro angemeldeter Person" gedacht ist, gehört deshalb gegen das **geteilte Gerät**
+> geprüft — nicht mehr gegen den Kontextwechsel.
 >
 > **Warum das überhaupt aufgeschrieben wird, statt es dem Implementieren zu überlassen:** eine
 > unbenannte Ausnahme wird entweder **gar nicht** gebaut — dann verliert das Produkt Stimmen und

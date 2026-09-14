@@ -58,12 +58,13 @@ in the UI — technically permitted, deliberately not surfaced.
 
 ### Activity 2 — Become a resident yourself
 
-**Steps:** create own `ResidentProfile` → switch identity → act as a resident
+**Steps:** create a `ResidentProfile` → sign out → sign in as that resident (ADR-013)
 
 - As the household account, I want to **create a `ResidentProfile` for myself**, so that I can
   take part in the casting and not only administer it.
-- As the household account, I want to **switch between administration and my resident identity**,
-  so that it is always clear which hat I am wearing when I act.
+- As someone who both administers and lives here, I want **administration and my resident identity
+  to be separate sign-ins**, so that it is never ambiguous which hat I am wearing when I act
+  (ADR-013).
 - As a household, I want to **understand that the admin account cannot vote**, so that I do not
   wait for a vote that will never arrive.
 
@@ -128,4 +129,4 @@ hierarchy.
 |------|-------------|----------|
 | The snapshot is taken lazily instead of at open | Someone joining mid-round silently changes the denominator, and the ranking moves with no visible cause — **P-3** violated | Write `RoundParticipation` rows in the same transaction as the `draft → open` transition |
 | `settings_snapshot` is read through to live settings | Changing a weight retroactively rewrites every score | Copy the values, do not reference them. Cover it with a protected test |
-| Admin-only account is used to run the whole casting | S-50 blocks it, and the household concludes the product is broken | Make the "create yourself a resident profile" step part of the registration flow, not a setting buried in administration |
+| Admin-only account is used to run the whole casting | S-50 blocks it, and the household concludes the product is broken | Make the "create yourself a resident profile" step part of the registration flow, not a setting buried in administration — and say there that it is a **separate sign-in** (ADR-013) |

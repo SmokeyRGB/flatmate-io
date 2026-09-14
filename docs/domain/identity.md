@@ -1,26 +1,60 @@
 > **Quelle:** `../04-Domaenenmodell.md` §2.1 (Stand V0.4, eingefroren 2026-09-09)
 > **Kontext:** `identity`
 > **Schema-Autorität:** Diese Datei. Weicht ein Bezeichner anderswo ab, gilt der hier.
+> **Abweichung von der Quelle:** Seit 2026-09-11 weicht diese Datei in der Sache von der
+> eingefrorenen Fassung ab — **ADR-013** (eine feste Identität je Sitzung) und **ADR-006**
+> (Supabase Auth). Die Sammeldatei beschreibt weiter den Wechsel innerhalb einer Sitzung und ein
+> eigenes `password_hash`-Feld; beides gilt nicht mehr. Maßgeblich ist diese Datei.
 
 ### 2.1 Kontext `identity`
 
 #### `Account` — der Zugang
 
-Ein Login. **Nicht** identisch mit „Person" und nicht identisch mit „bewohnender Person": ein
-Account kann sowohl den Verwaltungskontext des Haushalts als auch ein Bewohner-Profil bedienen und
-zwischen beiden wechseln.
+Ein Login. **Nicht** identisch mit „Person" und nicht identisch mit „bewohnender Person": eine
+Person kann mehrere Accounts führen, und der Haushalts-Account gehört keiner einzelnen Person.
+
+**Ein Account bedient genau eine Identität** (ADR-013): entweder den Haushalt
+(`Membership.is_resident = false`, stimmt nicht ab) oder ein Bewohner-Profil. Welche, entscheidet
+sich bei der Anmeldung und gilt für die ganze Sitzung. Wer die Identität wechseln will, meldet sich
+ab und neu an — es gibt keinen Wechsel innerhalb einer Sitzung.
 
 | Feld | Typ | Klasse | Erläuterung |
 |---|---|:--:|---|
 | `id` | `uuid` | ⚙️ | |
 | `email` | `text?` | 🟠 | **Pflicht beim Haushalts-Admin-Account** (der erste, bei der Registrierung angelegte Account, `Membership.is_resident = false`) — eindeutig, dort als **gemeinsam genutzte Adresse** empfohlen (Hinweis im Registrierungsformular), damit das Eigentum am Zugang beim Auszug nicht mitwandert. **Nullable bei Resident-Accounts** (`Membership.is_resident = true`, angelegt beim Beitritt per Code): nicht mehr Pflichtfeld im Beitrittsformular, nach dem Onboarding optional nachpflegbar — Voraussetzung dafür, dass `web_push` als bevorzugter Kanal tragfähig ist (§2.5). Nicht zu verwechseln mit `Household.contact_email` oben, das davon unberührt bleibt |
-| `password_hash` | `text` | 🟠 | Argon2id. Passwort ist die **primäre und universelle** Methode (P-2, ADR-007) |
-| `email_verified_at` | `timestamptz?` | 🟠 | Verifikation ist **nachgelagert** und blockiert die erste Abstimmung nicht — aber Voraussetzung für jeden Benachrichtigungsversand und für Mailinhalte mit Beratungsbezug |
+| `email_verified_at` | `timestamptz?` | 🟠 | Verifikation ist **nachgelagert** und blockiert die erste Abstimmung nicht — aber Voraussetzung für jeden Benachrichtigungsversand und für Mailinhalte mit Beratungsbezug. **Die alleinige Autorität für die Zustellung**, siehe Kasten „Anmeldung beim Anbieter" |
 | `passkey_enabled` | `bool` | ⚙️ | optionaler Komfort-Aufsatz, jederzeit abschaltbar (ADR-007) |
 | `locale` | `text` | ⚙️ | v1 nur `de` |
 | `last_seen_at` | `timestamptz?` | 🟠 | speist „was ist passiert, während ich weg war" |
 | `created_at` | `timestamptz` | ⚙️ | |
 | `deleted_at` | `timestamptz?` | ⚙️ | Soft-Delete; harte Löschung über das Löschkonzept |
+
+> **Anmeldung beim Anbieter — warum hier kein `password_hash` mehr steht (ADR-006).**
+> Anmeldedaten liegen seit ADR-006 bei **Supabase Auth**: Passwort-Hash, Zurücksetzen,
+> Ratenbegrenzung, Brute-Force-Schutz und die Ausgabe der Anmelde-Token. Das Feld `password_hash`
+> entfällt damit aus diesem Modell — was man nicht speichert, kann man nicht verlieren. Der
+> Sitzungs- und Profilkontext bleibt vollständig hier (`Session`, unten): ADR-004 wird davon nicht
+> berührt.
+>
+> **Ein Resident-Account hat keine E-Mail, der Anbieter verlangt aber eine eindeutige Kennung.**
+> Jeder Resident-Account wird deshalb intern auf eine **abgeleitete, nicht zustellbare Adresse**
+> abgebildet. Drei Regeln, und jede trägt:
+>
+> 1. **Abgeleitet aus der Profil-`uuid`, nie aus dem `display_name`.** Der Anzeigename ist nur unter
+>    `status != moved_out` eindeutig — nach einem Auszug wird er wieder vergeben, und die
+>    Nutzertabelle des Anbieters kennt `moved_out` nicht. Eine aus dem Namen gebildete Adresse würde
+>    mit der des ausgezogenen Profils kollidieren. Sie trüge außerdem einen Personennamen in die
+>    Tabelle eines Auftragsverarbeiters, ohne dass das irgendetwas brächte.
+> 2. **Diese Adresse gilt beim Anbieter als bestätigt und ist niemals zustellbar.** „Bestätigt" ist
+>    dort eine technische Vorbedingung für den Anmeldeweg, keine Aussage über ein Postfach.
+> 3. **`Account.email_verified_at` bleibt `null` und bleibt die alleinige Autorität für den
+>    Benachrichtigungsversand.** Die beiden Kennzeichen laufen bewusst auseinander. Wer die
+>    Zustellung an das Kennzeichen des Anbieters hängt, verschickt Mail an eine Adresse, die es
+>    nicht gibt.
+>
+> Trägt eine Person später eine **echte** `email` nach, steht sie neben der abgeleiteten Kennung —
+> und erst dann greifen Selbst-Wiederherstellung (Kasten unten) und Passkey (§2.1,
+> `PasskeyCredential`).
 
 > **Womit meldet sich ein Resident-Account ohne E-Mail an — entschieden (O-D → O-12, §10.2).**
 > `email` ist nullable, aber eine Anmeldekennung fehlte bis hierher. **`(Household, `display_name`) +
@@ -73,22 +107,35 @@ dem Auth-Modul zu überlassen.
 | `id` | `uuid` | ⚙️ | |
 | `token_hash` | `text` | 🟠 | **nur der Hash.** Ein Session-Token im Klartext in der Datenbank ist ein Passwortäquivalent |
 | `account_id` | `uuid` | 🟠 | |
-| `acting_profile_id` | `uuid?` | 🟠 | **hier lebt der Profilwechsel** — und **hier lebt die handelnde Identität** eines Requests: jede Policy-Prüfung liest dieses Feld, nie ein anderes. `null` = Verwaltungskontext, gesetzt = Bewohnerkontext |
+| `acting_profile_id` | `uuid?` | 🟠 | **hier lebt die handelnde Identität** eines Requests: jede Policy-Prüfung liest dieses Feld, nie ein anderes. `null` = Sitzung eines Haushalts-Accounts, gesetzt = Sitzung eines Resident-Accounts. **Wird bei der Anmeldung gesetzt und danach nie wieder beschrieben** (ADR-013) |
 | `remember_me` | `bool` | ⚙️ | Default `true` (K-9/S-03 — beim Erstbeitritt vorbelegt). Steuert nur die `expires_at`-Dauer, siehe unten |
 | `expires_at` | `timestamptz` | ⚙️ | **`remember_me = false`:** kurze Sitzung (Vorschlag 12 h). **`remember_me = true`:** lange Sitzung (Vorschlag **90 Tage**, gleitend verlängert bei Aktivität) — Auflösung O-13, damit „auf diesem Gerät angemeldet bleiben" (§10 des Plans) ein Feld hat, nicht nur eine Checkbox in der UI |
 | `user_agent` | `text?` | 🟠 | zur Wiedererkennung eigener Geräte in einer Sitzungsliste |
 | `created_at` | `timestamptz` | ⚙️ | |
 | `revoked_at` | `timestamptz?` | ⚙️ | **drei Auslöser, nicht einer:** „überall abmelden" nach einem Passwortwechsel (das gilt weiterhin) · Passwort-Reset durch die Verwaltung (§2.1, Kasten „Passwort-Reset") · `ResidentProfile.moved_out_on` wird gesetzt — eine ausgezogene Person behält sonst eine bereits lange Sitzung trotz V-3 |
 
-> **`acting_profile_id` ist die technische Heimat von V-1.** Der Sitzungskontext aus §5 — `account_id`
-> plus `profile_id` — wird aus dieser Zeile gefüllt und pro Request per `SET LOCAL` an Postgres
-> übergeben (ADR-004). Und weil die Selbst-Redaktion am **Account** hängt und nicht am aktiven Profil,
-> ist ein Wechsel von `acting_profile_id` **kein** Weg an V-1 vorbei: `redaction_subjects()` sammelt
-> alle Profile des Accounts, unabhängig davon, welches gerade gesetzt ist.
+> **`acting_profile_id` trägt die handelnde Identität — und ist seit ADR-013 innerhalb einer Sitzung
+> unveränderlich.** Der Sitzungskontext aus §5 — `account_id` plus `profile_id` — wird aus dieser
+> Zeile gefüllt und pro Request per `SET LOCAL` an Postgres übergeben (ADR-004). Das Feld wird bei
+> der Anmeldung gesetzt und danach nie wieder beschrieben: `null` in der Sitzung eines
+> Haushalts-Accounts, genau ein Profil in der Sitzung eines Resident-Accounts.
 >
-> Daraus folgt eine harte Regel für den Auth-Baustein: `acting_profile_id` darf nur auf ein Profil
-> zeigen, für das eine gültige `Membership` desselben Accounts existiert. Ohne diese Prüfung wäre der
-> Profilwechsel eine Rechteausweitung.
+> **V-1 hängt trotzdem am `Account` und nicht an diesem Feld** — und seit ADR-013 ist das der
+> wichtigere Satz, nicht der überflüssige. Die frühere Begründung („sonst wäre der Profilwechsel der
+> Umweg") ist entfallen; die Verankerung bleibt aus zwei anderen Gründen:
+>
+> 1. **Sie ist vom Sitzungskontext unabhängig.** `redaction_subjects()` wird aus `account_id` und
+>    `Membership` abgeleitet und liest `acting_profile_id` gar nicht. Eine Sitzung, deren Kontext
+>    fehlt oder falsch gesetzt ist, hebelt V-1 damit **nicht** aus — die einzige der vier
+>    Invarianten, für die das gilt. Genau das ist der Fehlerfall aus **G-C8**.
+> 2. **Ein Account trägt über die Zeit mehr als ein Profil.** Auszug und Wiedereinzug erzeugen ein
+>    `moved_out`-Profil neben einem aktuellen; die Beratung über die frühere Bewerbung bleibt
+>    redigiert.
+>
+> Daraus folgt eine harte Regel für den Auth-Baustein: `acting_profile_id` darf **nur beim Anlegen
+> der `Session`** gesetzt werden, und nur auf ein Profil, für das eine gültige `Membership`
+> desselben Accounts existiert. Ein Schreibpfad auf dieses Feld nach der Anmeldung ist ein Fehler,
+> kein Feature — er unterläuft ADR-013.
 >
 > **Und, weil die Verwechslung naheliegt (U-21): `acting_profile_id = null` verleiht nichts.** Eine
 > frühere Formulierung dieses Plans las sich so, als würde `null` Verwaltungsrechte *verleihen* — das
@@ -97,6 +144,10 @@ dem Auth-Modul zu überlassen.
 > (`household_admin`/`moderator`/`member`) und `Membership.permissions`, nie aus dem Sitzungsfeld.
 > Ein Konto mit `role = member` bekommt durch `acting_profile_id = null` nichts dazu — es verliert
 > nur seine Stimmidentität.
+>
+> Seit ADR-013 entsteht `acting_profile_id = null` nur noch in der Sitzung eines Haushalts-Accounts.
+> Die Regel bleibt trotzdem stehen: Sie macht eine Aussage über die **Quelle** der Rechte, nicht über
+> den Account-Typ.
 >
 > Für `GUARDRAILS.md` als geschützter Test, kein Kommentar: **„Welche Abschnitte der
 > Organisationsfläche ein Konto sieht, entscheidet ausschließlich `Membership.role`/`.permissions`.
@@ -107,6 +158,15 @@ dem Auth-Modul zu überlassen.
 
 **Neu in V0.2** — löst den offenen Punkt O-6 auf. ADR-007 hängt daran: Passkey ist ein **optionaler
 Aufsatz nach der Registrierung**, jederzeit abschaltbar, nie Voraussetzung (P-2).
+
+> **Ein Passkey setzt eine hinterlegte und bestätigte `email` voraus (ADR-006).** Supabase Auth gibt
+> eine Passkey-Anmeldung nur für Konten mit bestätigter E-Mail oder Telefonnummer aus; die
+> abgeleitete Kennung eines Resident-Accounts ohne eigene Adresse erfüllt das nicht. **Beide bleiben
+> optional, eines schaltet das andere frei** — und das passt zu dem Weg, den das Modell ohnehin
+> vorzeichnet: Eine eigene `email` nachzutragen beendet die Reset-Vollmacht der Verwaltung (O-16,
+> Kasten oben) **und** eröffnet den Passkey. Das ist ein Angebot, keine Hürde: Wer keine Adresse
+> hinterlegt, meldet sich weiter mit `(Household, display_name) + Passwort` an — P-2 bleibt
+> unberührt, weil das Passwort die universelle Methode bleibt.
 
 | Feld | Typ | Klasse | Erläuterung |
 |---|---|:--:|---|
@@ -149,13 +209,19 @@ Neutral gegenüber WG, Wohnprojekt, Haus und Vermieter-Objekt. UI-Label in v1 du
 
 > **Klarstellung, die im Modell sichtbar bleiben muss.** Jede bewohnende Person kann sich
 > theoretisch im Haushalts-Account anmelden, wenn E-Mail und Passwort bekannt sind. Die Trennung
-> zwischen Verwaltungs- und Bewohnerkontext dient **ausschließlich der Klarheit** — nur Bewohnende
+> zwischen Haushalts- und Resident-Account dient **ausschließlich der Klarheit** — nur Bewohnende
 > stimmen ab, um Verwirrung zu vermeiden. Sie ist **keine Härtung** und darf in keinem Dokument als
-> solche dargestellt werden.
+> solche dargestellt werden. Seit ADR-013 kostet dieser Weg eine Abmeldung und eine zweite
+> Anmeldung statt eines Menüeintrags: eine Hürde, keine Grenze.
 >
-> Konsequenz für §5.1, und sie ist nicht kosmetisch: die Selbst-Redaktion muss am **Account**
-> hängen, nicht nur am gerade aktiven Profil. Sonst wäre der Profilwechsel der einfachste Weg, die
-> Invariante zu umgehen.
+> Konsequenz für §5.1, und sie ist nicht kosmetisch: die Selbst-Redaktion hängt am **Account** und
+> nicht am Sitzungsfeld `acting_profile_id` — sie greift damit auch dann, wenn der Sitzungskontext
+> unvollständig oder falsch gefüllt wurde (**G-C8**). Was sie **nicht** leistet, steht offen in
+> ADR-013: Meldet sich dieselbe Person mit dem **zweiten** Account an — dem des Haushalts —, ist das
+> ein anderer `account_id` und damit eine andere `redaction_subjects()`-Menge. Praktisch ändert das
+> wenig, weil ein Haushalts-Account ohne eigenes `ResidentProfile` nach **S-50**/**U-20** ohnehin
+> keinen Zugriff auf Runden, Bewerbungen, Notizen und Termine hat; die einzige Ausnahme ist der
+> Datenauskunft-Export ohne Einsicht, und die bestand vorher genauso.
 
 > **`contact_email` ist nicht `Account.email` — auch wenn beide dieselbe Adresse enthalten.**
 >
@@ -275,10 +341,16 @@ Stimmen aber einer Person zurechenbar bleiben müssen.
 | `room_id` | `uuid?` | ⚙️ | aktuell bewohntes Zimmer |
 | `created_at` | `timestamptz` | ⚙️ | |
 
-**Warum `prepared` ein eigener Zustand ist:** Der Haushalts-Account kann ein Bewohner-Profil
-anlegen, es direkt zum Moderator ernennen und danach nie wieder in den Bewohnerkontext wechseln.
-Ohne `prepared` müsste man aus „Profil ohne verknüpften Account" implizit schließen — genau die Art
-impliziten Zustands, die ADR-002 abschaffen will.
+**Warum `prepared` ein eigener Zustand ist — und warum das seit ADR-013 wichtiger wird, nicht
+weniger wichtig:** Der Haushalts-Account **legt Bewohner-Profile an, besetzt sie aber nie.** Er kann
+ein Profil anlegen und direkt zum Moderator ernennen; wer es benutzt, meldet sich mit einem eigenen
+Resident-Account an. „Profil ohne verknüpften Account" ist damit nicht mehr der Randfall, sondern
+der **reguläre Zwischenzustand** jedes so angelegten Profils. Ohne `prepared` müsste man ihn
+implizit erschließen — genau die Art impliziten Zustands, die ADR-002 abschaffen will.
+
+Das ist zugleich der **Moderator-Wiederherstellungspfad**: Fällt der letzte Moderator aus, bleibt
+die Verwaltung handlungsfähig, indem sie ein Profil anlegt und einen Moderator ernennt — ohne selbst
+in dieses Profil zu schlüpfen.
 
 #### `Membership` — Zugang, Rolle, Rechte
 
@@ -292,7 +364,7 @@ die sie nicht passen — der Vermieter-Fall (Objekt ohne eigenes Bewohner-Profil
 | `id` | `uuid` | ⚙️ | |
 | `household_id` | `uuid` | ⚙️ | |
 | `account_id` | `uuid` | ⚙️ | |
-| `resident_profile_id` | `uuid?` | ⚙️ | gesetzt, wenn dieser Account als Bewohner-Profil handeln darf; `null` = reiner Verwaltungskontext |
+| `resident_profile_id` | `uuid?` | ⚙️ | gesetzt, wenn dieser Account als Bewohner-Profil handelt; `null` = Haushalts-Account. Seit ADR-013 entscheidet dieses Feld zugleich den Account-Typ — ein Account mit `is_resident = false` trägt hier dauerhaft `null` |
 | `is_resident` | `bool` | ⚙️ | **Stimmberechtigung.** Der Haushalts-Account hat `false` und **kann nicht abstimmen** |
 | `role` | `enum(household_admin, moderator, member)` | 🟠 | orthogonal zu `is_resident`. **In V0.2 von ⚙️ auf 🟠 umklassifiziert** — siehe Kasten |
 | `permissions` | `text[]` | 🟠 | **einzeln vergebbar**, Werte siehe unten. Ebenfalls 🟠 |

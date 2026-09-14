@@ -186,21 +186,27 @@ zwischen „was steht an" (Start, §2) und „wie steht die Bewerbungslage" (Cas
 
 **Zwei Wege in die Organisation** — kein eigenes Icon in der Kopfzeile (K-6):
 
-1. **Avatar-Menü** → „In Moderation wechseln"
+1. **Avatar-Menü** → „Organisation" — ein reiner Navigationspunkt, sichtbar nur für Konten, deren
+   `role`/`permissions` dort etwas hergeben. **Kein Identitätswechsel** (ADR-013): er führt auf eine
+   Fläche, er ändert nicht, wer handelt.
 2. **CTA aus der Benachrichtigung** bzw. aus der Moderations-Brücke im Dashboard (§2.3) — direkt
    auf die Handlung, nicht auf eine Übersicht
 
-### 4.2 Identitätswechsel und Rechte
+### 4.2 Eine Identität je Sitzung, und woher die Rechte kommen
 
-Der Identitätswechsel wohnt im selben Avatar-Menü. Eine frühere Formulierung — „ist
-`acting_profile_id` `null`, handelt man als Verwaltung" — war irreführend: Sie liest sich, als
-verliehe ein Null-Wert Rechte. Richtig ist:
+**Seit ADR-013 gibt es keinen Identitätswechsel innerhalb einer Sitzung.** Ein Account bedient genau
+eine Identität — Haushalt **oder** Bewohner-Profil —, sie steht mit der Anmeldung fest, und wer sie
+wechseln will, meldet sich ab und neu an. Das frühere Avatar-Menü „In Moderation wechseln" entfällt
+als **Wechsel**; was bleibt, ist die Navigation aus §4.1.
 
-- **`Session.acting_profile_id = null`** heißt **nur** „für diese Sitzung ist kein Bewohnerprofil
-  aktiv". Mehr nicht.
+Eine ältere Formulierung — „ist `acting_profile_id` `null`, handelt man als Verwaltung" — war
+irreführend: Sie liest sich, als verliehe ein Null-Wert Rechte. Richtig ist und bleibt:
+
+- **`Session.acting_profile_id = null`** heißt **nur** „diese Sitzung gehört zu einem
+  Haushalts-Account". Mehr nicht.
 - **Die Rechte kommen aus `Membership.role`** (`household_admin` · `moderator` · `member`) **und
   `Membership.permissions`** (`manage_settings`, `manage_members`, `close_round`, …). Ein Konto mit
-  `role = member` bekommt durch `null` **nichts** dazu — es verliert nur seine Stimmidentität.
+  `role = member` bekommt durch `null` **nichts** dazu — es hat nur keine Stimmidentität.
 
 **Regel fürs Inventar:** Welche Abschnitte der Organisationsfläche erscheinen, entscheidet
 **allein `role`/`permissions`** — nie, ob `acting_profile_id` gesetzt ist (U-21).
@@ -230,17 +236,20 @@ Jeder Export erzeugt einen `ActivityEvent`.
 
 **Was es kostet — eine Stelle, und die ist lösbar.** „Der Haushalt darf nicht handlungsunfähig
 werden", wenn der letzte Moderator auszieht, bleibt wahr — über einen Zwischenschritt: Die
-Verwaltung kann sich jederzeit selbst ein `ResidentProfile` anlegen und Moderatoren ernennen
-(§7.20, Abschnitt „Haushalt"). Der Weg ist einen Schritt länger und liefert am Ende einen
-benannten Handelnden.
+Verwaltung kann jederzeit ein `ResidentProfile` **anlegen** und Moderatoren ernennen (§7.20,
+Abschnitt „Haushalt"). Seit ADR-013 **besetzt sie dieses Profil nicht selbst**: wer es benutzt,
+meldet sich mit eigenen Zugangsdaten an. Der Weg ist einen Schritt länger und liefert am Ende einen
+benannten Handelnden — genau das Ziel dieses Abschnitts.
 
 > **Nicht als Härtung darstellen.** Die Trennung ist keine Sicherheitsgrenze — wer die
-> Haushaltszugangsdaten kennt, kann sich ein Profil anlegen und handeln. Was sich ändert, ist
+> Haushaltszugangsdaten kennt, meldet sich damit an und handelt. Seit ADR-013 kostet das eine
+> zweite Anmeldung statt eines Menüeintrags: eine Hürde, keine Grenze. Was sich ändert, ist
 > **Zurechenbarkeit**, nicht Zugriffsschutz: jede Casting-Handlung hat danach einen Namen.
 
-**Zur Selbst-Redaktion:** Sie hängt am `Account`, nicht am aktiven Profil
-(`redaction_subjects()` sammelt alle Profile des Accounts). Ein Identitätswechsel ist deshalb kein
-Weg an der Invariante vorbei.
+**Zur Selbst-Redaktion:** Sie hängt am `Account`, nicht am Sitzungsfeld `acting_profile_id`
+(`redaction_subjects()` sammelt alle Profile des Accounts). Sie greift deshalb auch dann, wenn der
+Sitzungskontext unvollständig gefüllt wurde — und ist damit die einzige der vier Invarianten, die
+ohne ihn auskommt.
 
 ### 4.4 Abschnitte der Organisationsfläche
 

@@ -17,7 +17,7 @@
 A household account exists, creates resident profiles, defines rooms, and opens a casting round
 that freezes both its voter list and its voting rules.
 
-**In scope:** household registration · resident profile creation and identity switching ·
+**In scope:** household registration · resident profile creation · one fixed identity per session (ADR-013) ·
 membership and permissions · rooms with their own state · casting round with room selection,
 voter snapshot and frozen rules · procedure lock while a round is open · the administration
 boundary.
@@ -35,7 +35,7 @@ roles · parallel rounds offered in the UI · anything about applications, votes
 | **US-1.1** | As a household, I want to register with an email and a password, so that one account owns the rooms and the join code. |
 | **US-1.2** | As a household, I want to be told that this email is shared with my flatmates, so that I do not use my private address unknowingly. |
 | **US-1.3** | As the household account, I want to create a resident profile for myself, so that I can take part in the casting and not only administer it. |
-| **US-1.4** | As the household account, I want to switch between administration and my resident identity, so that it is always clear which hat I am wearing. |
+| **US-1.4** | As someone who both administers the household and lives in it, I want administration and my resident identity to be separate sign-ins, so that it is never ambiguous which hat I am wearing. |
 | **US-1.5** | As a moderator, I want to add the rooms we are casting for, so that the round matches reality. |
 | **US-1.6** | As a moderator, I want each room to carry its own state, so that filling one room does not end the round for the others. |
 | **US-1.7** | As a moderator, I want to open a round for the rooms we are actually casting for, so that nobody votes on an unavailable room. |
@@ -55,9 +55,9 @@ roles · parallel rounds offered in the UI · anything about applications, votes
 - **FR-1.2** The registration screen shall display a notice that the email address will be shared with the household's residents, before submission.
 - **FR-1.3** The system shall allow the household account to create resident profiles. Each profile has a display name.
 - **FR-1.4** A resident profile's display name shall be unique within the household among profiles that are not `moved_out`.
-- **FR-1.5** The household account shall be able to create a resident profile **for itself** and act as that resident.
-- **FR-1.6** The system shall allow an account with a resident profile to switch between the administration context and the resident context, and shall always show which context is active.
-- **FR-1.7** The household account, when acting without a resident profile, shall not be able to cast a vote.
+- **FR-1.5** The household account shall be able to create a resident profile, including one intended for the person operating it. It shall **never occupy** that profile itself — whoever uses it signs in separately with `(household, display name) + password`. Source: ADR-013.
+- **FR-1.6** The acting identity of a session shall be fixed at sign-in and shall not be writable afterwards. Moving between administration and a resident identity shall require signing out and signing in again. The interface shall name the signed-in identity rather than offer a switch. Source: ADR-013.
+- **FR-1.7** The household account shall not be able to cast a vote.
 - **FR-1.8** Membership shall carry voting eligibility and a role as **independent** attributes, plus individually grantable permissions (create applicant, change status, close round, confirm appointments).
 
 ### Resident list (administration)
@@ -113,11 +113,11 @@ Given a household with an active profile named "Jonas", when a moderator creates
 **AC-1.4 — Duplicate of a moved-out name is allowed**
 Given a household whose only "Jonas" profile is `moved_out`, when a moderator creates a profile named "Jonas", then creation succeeds.
 
-**AC-1.5 — The administration context cannot vote**
-Given I am signed in and acting without a resident profile, when I attempt to cast a vote by any route, then the attempt is refused and no vote is recorded.
+**AC-1.5 — The household account cannot vote**
+Given I am signed in on a household account (no resident profile), when I attempt to cast a vote by any route, then the attempt is refused and no vote is recorded.
 
-**AC-1.6 — The active context is always visible**
-Given I have a resident profile, when I am in either context, then the interface states which context is active.
+**AC-1.6 — The signed-in identity is stated and cannot change without a new sign-in**
+Given I am signed in, when I open the avatar menu, then the interface states which identity I am signed in as; and there is no action anywhere in the product that changes the acting identity without ending the session. Source: ADR-013.
 
 **AC-1.7 — Filling one room leaves the round running**
 Given an open round covering rooms A, B and C, when room A becomes `occupied`, then the round remains `open` and rooms B and C keep their states.
@@ -177,7 +177,7 @@ Given a member is removed from the resident list, when I inspect the audit recor
 - **C-1.1** The frozen voting rules must be a **copy**, not a reference to live settings. Source: `04-Domaenenmodell.md` (`CastingRound.settings_snapshot`); consumed by F5's score function.
 - **C-1.2** Casting-round state is deliberately **thin** — the five states in FR-1.13 and no others. Process phases belong to the individual application, not the round. Adding round-level phase states contradicts `04-Domaenenmodell.md` §8.6, where the round's phase hint is derived and never stored.
 - **C-1.3** Voting eligibility and role are **orthogonal**. No hierarchy, no role templates, no permission presets. Source: S-04, E-04.
-- **C-1.4** The administration boundary (FR-1.23) is about **accountability, not access protection** — whoever knows the household credentials can create a profile and act. It must not be described anywhere as a security boundary. Source: S-50.
+- **C-1.4** The administration boundary (FR-1.23) is about **accountability, not access protection** — whoever knows the household credentials can sign in, create a profile and act. Under ADR-013 that path costs a separate sign-in rather than a menu entry: a hurdle, not a boundary. It must not be described anywhere as a security boundary. Source: S-50, ADR-013.
 - **C-1.5** Authorization must be enforced independently of the client, and verified both through the application's policy layer and through direct data access. Source: S-36, `ADR-004`, `GUARDRAILS.md` **G-C7** — *"sonst ist ADR-004 eine Illusion"*.
 - **C-1.6** Every personal-data field introduced here must be declared in `data-inventory.yml` with purpose, legal basis, retention and category, or the build fails. Source: S-37, `ADR-010`.
 - **C-1.7** The audit log is append-only. Entries are never updated or deleted; personal payload is redacted at end of retention. Source: S-27, `ADR-003`.
@@ -197,11 +197,11 @@ Given a member is removed from the resident list, when I inspect the audit recor
 | **EC-1.4** | Opening a round with exactly one eligible resident | Permitted. Quorum of `ceil(0.5 × 1)` = 1 is satisfiable |
 | **EC-1.5** | A second round is opened while one is already open | Permitted at the data level, **not offered in the UI**: one round is marked active, others are reachable only through a round list, and any round view shows exactly one round |
 | **EC-1.6** | A room is removed while a round covering it is open | Refused while the round is open; the room may be set `not_available` instead |
-| **EC-1.7** | The last moderator becomes unavailable | Administration may create itself a resident profile and appoint moderators — a named actor, never direct access to deliberation content |
+| **EC-1.7** | The last moderator becomes unavailable | Administration may **create** a resident profile and appoint it as moderator — it never occupies that profile itself (ADR-013); whoever uses it signs in separately. Result: a named actor, never direct access to deliberation content |
 | **EC-1.8** | A resident is made ineligible to vote mid-round | Their round-participation entry records it; already-cast votes are unaffected by this feature (F5 governs their arithmetic) |
 | **EC-1.9** | Two moderators open the same `draft` round simultaneously | Exactly one opening takes effect; exactly one set of snapshot entries and frozen rules exists |
 | **EC-1.10** | Household registers with an address already used by another household | Permitted. Households are not deduplicated by email |
-| **EC-1.11** | A moderator attempts to set `moved_out` on the household account's own resident profile (FR-1.5), where it is the last such profile | Refused. FR-1.27 already limits a moderator to read-only on the resident list; this names the case by which that boundary keeps EC-1.7's fallback — administration creating itself a resident profile — from being needed in the first place |
+| **EC-1.11** | A moderator attempts to set `moved_out` on the resident profile created via FR-1.5, where it is the last such profile | Refused. FR-1.27 already limits a moderator to read-only on the resident list; this names the case by which that boundary keeps EC-1.7's fallback — administration creating a resident profile — from being needed in the first place |
 
 ---
 
@@ -210,7 +210,7 @@ Given a member is removed from the resident list, when I inspect the audit recor
 ### Assumptions
 
 - **A-1.1** One household runs one casting round at a time. Parallel rounds exist for edge cases (the landlord persona, v2) and are deliberately not surfaced.
-- **A-1.2** The person registering the household also lives there, so FR-1.5 is the normal path rather than an exception.
+- **A-1.2** The person registering the household also lives there, so FR-1.5 is the normal path rather than an exception. Under ADR-013 that person therefore keeps **two** sign-ins — administration and their own resident identity. The two are used at different times: administration is setup-shaped and rare, voting is the daily loop, and S-50 denies the household account all casting access anyway.
 - **A-1.3** Room count is small — single digits — so no pagination, bulk import or hierarchy is needed.
 - **A-1.4** The slice runs on synthetic data, so no data-processing agreement, privacy-notice page or retention automation is required **for this feature to be built**. They gate the first real household (v0.2).
 
@@ -220,7 +220,7 @@ Given a member is removed from the resident list, when I inspect the audit recor
 |---|---|---|---|
 | **R-1.1** | Frozen rules implemented as a reference to live settings | Changing a weight silently rewrites every historical score; the ranking becomes indefensible and **P-3** breaks | C-1.1 plus a protected test that changes a weight after opening and asserts the round is unaffected |
 | **R-1.2** | The snapshot is written lazily rather than at open | The denominator drifts, the ranking moves with no visible cause | FR-1.16 atomicity, covered by AC-1.10 |
-| **R-1.3** | A household tries to run the whole casting from the admin account | S-50 blocks it and the product reads as broken | Make FR-1.5 part of the registration flow, not a setting buried in administration |
+| **R-1.3** | A household tries to run the whole casting from the admin account | S-50 blocks it and the product reads as broken | Make FR-1.5 part of the registration flow, not a setting buried in administration — and say plainly at that point that the resident identity is a **separate sign-in** (ADR-013), so the second credential is not a surprise later |
 | **R-1.4** | Round state accumulates process phases over time | Contradicts the derived phase hint and reintroduces the "Rundenphase" confusion the specs already removed | C-1.2, enforced at review |
 | **R-1.5** | The administration boundary is described as a security feature | Creates false confidence in a control that is explicitly not one | C-1.4 applies to interface copy and documentation alike |
 

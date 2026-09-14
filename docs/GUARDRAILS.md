@@ -37,7 +37,7 @@ Jede Regel hat eine **ID**, eine **Regel**, eine **Begründung** und einen
 | 🔴 **nur Prosa** | Keine maschinelle Durchsetzung möglich oder bekannt. Wirkt nur, wenn sie gelesen und befolgt wird. **Diese Regeln sind die Schwachstelle dieses Dokuments.** |
 
 **Werkzeugnamen sind Vorschläge**, sofern sie nicht aus einem ADR stammen. Der Stack liegt in
-ADR-006 (Next.js/TypeScript, Postgres, Drizzle, EU-Hosting, self-hosted Auth); konkrete Linter,
+ADR-006 (Next.js/TypeScript, Postgres, Drizzle, Supabase (EU) mit Supabase Auth); konkrete Linter,
 Scanner und Test-Runner sind beim Repo-Aufsetzen zu entscheiden. Ändert sich das Werkzeug, bleibt
 die Regel — es ist dann ein **anderer Mechanismus** einzutragen, nicht die Regel zu streichen.
 
@@ -61,7 +61,7 @@ ist selbst eine Änderung, die menschliche Freigabe braucht (**G-G3**).
 | [**G-A**](#g-a--secrets-und-zugangsdaten) | Secrets und Zugangsdaten | G-A1 – G-A5 |
 | [**G-B**](#g-b--personenbezogene-daten) | Personenbezogene Daten | G-B1 – G-B7 |
 | [**G-C**](#g-c--autorisierung-und-sichtbarkeit) | Autorisierung und Sichtbarkeit | G-C1 – G-C9 |
-| [**G-D**](#g-d--geschützte-tests) | Geschützte Tests | G-D1 – G-D13 |
+| [**G-D**](#g-d--geschützte-tests) | Geschützte Tests | G-D1 – G-D14 |
 | [**G-E**](#g-e--datenbank-und-migrationen) | Datenbank und Migrationen | G-E1 – G-E5 |
 | [**G-F**](#g-f--datenbestandsverzeichnis) | Datenbestandsverzeichnis | G-F1 – G-F3 |
 | [**G-G**](#g-g--test--und-ci-disziplin) | Test- und CI-Disziplin | G-G1 – G-G5 |
@@ -291,7 +291,7 @@ prüfbar:
 | 2 | **Nur `application_id`, Wert, Rundenstufe** — keine Anzeigedaten, kein Name, keine denormalisierte Karte |
 | 3 | **Verwerfen statt Wiederholen** bei serverseitiger Ablehnung; kein Bewerbername in der Fehlermeldung |
 | 4 | **Leeren bei Abmeldung und Sitzungsentzug** |
-| 5 | **Leeren beim Profilwechsel** — der Wechsel zwischen Verwaltungs- und Bewohnerkontext ist keine Abmeldung |
+| 5 | **Verwerfen bei fremder Identität** — ein Eintrag, dessen `resident_profile_id` nicht zur gerade angemeldeten Identität gehört, wird beim Start **verworfen statt versendet** (ADR-013) |
 | 6 | **Idempotente Wiedereinspielung** — Schlüssel (`application_id`, `resident_profile_id`, `round_number`), Überschreiben statt Anfügen |
 
 **Begründung.** Zusicherung 1 ist die tragende: Ohne harte Höchstlebensdauer hält ein Gerät, das
@@ -315,8 +315,9 @@ der Sendelogik — deshalb ist er die richtige Bauform.
   gespeichert. Deckt die Zusicherungen 2 und 3.
 - **Test auf die Höchstlebensdauer:** Ein Eintrag mit Zeitstempel älter als 7 Tage wird beim nächsten
   Start verworfen und nicht versendet. Deckt Zusicherung 1.
-- **Test auf Abmeldung und Profilwechsel:** Nach beiden Vorgängen ist der Puffer leer. Deckt die
-  Zusicherungen 4 und 5.
+- **Test auf Abmeldung und fremde Identität:** Nach der Abmeldung ist der Puffer leer; ein Eintrag,
+  dessen `resident_profile_id` nicht zur angemeldeten Sitzung gehört, wird beim nächsten Start
+  verworfen und nicht versendet. Deckt die Zusicherungen 4 und 5.
 - **Idempotenztest:** Dieselbe Nutzlast zweimal eingespielt erzeugt **einen** `Vote` und verändert
   den Quorum-Nenner nicht. Deckt Zusicherung 6.
 
@@ -432,21 +433,30 @@ Agent vergisst ein `WHERE household_id = …` — ist dann nicht abgedeckt.
 **Durchsetzung.** 🟢 Für jede der drei Invarianten stehen **zwei** Einträge in
 `test/guarded.manifest.json` (`…via_policy` und `…via_raw_sql`). Fehlt einer, bricht der Build.
 
-> ### Wiederkehrende Fehlerstelle: der Profilwechsel
+> ### Wiederkehrende Fehlerstelle: die Identität, die auf dem Gerät zurückbleibt
 >
-> Der Wechsel zwischen Verwaltungs- und Bewohnerkontext ist eine **ausdrücklich vorgesehene
-> Funktion und keine Abmeldung**. An genau dieser Stelle sind in der Dokumentationsphase **zweimal
-> unabhängig voneinander** Annahmen gebrochen:
+> **Seit ADR-013 gibt es keinen Wechsel der handelnden Identität innerhalb einer Sitzung mehr** —
+> ein Account, eine Identität, ein Wechsel nur über Abmelden und neue Anmeldung. Die Fehlerstelle
+> verschwindet damit **nicht**, sie wandert: vom Kontextwechsel zum **Gerät**. Das geteilte Tablet
+> in der Küche, der Laptop, an dem nacheinander zwei Bewohnende sitzen — die Sitzung endet, der
+> Zustand im Browser nicht.
 >
-> 1. Die Selbst-Redaktion (V-1) hängt deshalb am **`Account`**, nicht am aktiven Profil — sonst
->    ließe sie sich durch einen Kontextwechsel aushebeln.
-> 2. Der Offline-Stimmpuffer wird deshalb auch **beim Profilwechsel** geleert, nicht nur bei der
->    Abmeldung (G-B7, Zusicherung 5) — sonst hält der Kontext von Profil B die Stimmen von Profil A.
+> An dieser Stelle sind in der Dokumentationsphase **zweimal unabhängig voneinander** Annahmen
+> gebrochen. Beide Regeln gelten weiter, beide mit neuer Begründung:
 >
-> **Für jede neue zustandsbehaftete Komponente gilt daher die Prüffrage: Was passiert damit beim
-> Profilwechsel?** Sie ist nicht maschinell erzwingbar 🔴, aber sie ist billig zu stellen — und sie
-> hat bereits zwei reale Lecks gefunden, beide erst bei einer Querprüfung und keines durch einen
-> Mechanismus.
+> 1. Die Selbst-Redaktion (V-1) hängt am **`Account`** und nicht am Sitzungsfeld `app.profile_id` —
+>    sie ist damit die einzige der vier Invarianten, die auch dann noch greift, wenn der
+>    Sitzungskontext fehlt oder falsch gesetzt ist (G-C8). Dass ein Kontextwechsel sie aushebeln
+>    könnte, ist seit ADR-013 kein Argument mehr; die Verankerung bleibt trotzdem.
+> 2. Der Offline-Stimmpuffer wird nicht nur bei der Abmeldung geleert, sondern **verworfen, sobald
+>    er zu einer anderen Identität gehört als die gerade angemeldete** (G-B7, Zusicherung 5) — eine
+>    Abmeldung, die nie sauber durchlief (Absturz, geschlossener Tab, abgelaufene Sitzung), darf
+>    keine Stimmen an die nächste Person weiterreichen.
+>
+> **Für jede neue zustandsbehaftete Komponente gilt daher die Prüffrage: Wem gehören diese Daten —
+> und was passiert damit, wenn sich auf demselben Gerät als Nächstes jemand anderes anmeldet?** Sie
+> ist nicht maschinell erzwingbar 🔴, aber sie ist billig zu stellen — und sie hat bereits zwei reale
+> Lecks gefunden, beide erst bei einer Querprüfung und keines durch einen Mechanismus.
 
 ### G-C8 — `SET LOCAL` nur innerhalb einer Transaktion
 
@@ -534,9 +544,10 @@ und ein Mensch, der den Diff liest. **Diese Lücke wird hier offen benannt, nich
 | **G-D8** | **Payload-Redaktion zum Fristende** | Nach Ablauf der Aufbewahrungsfrist sind die personenbeziehbaren Payload-Felder `null`, **Struktur und Zeitstempel stehen weiter**, und die Rechenschaftskette ist noch lesbar (wer, wann, welche Art von Handlung). |
 | **G-D9** | **`became_resident_id` wird nie auf `null` gesetzt** | Der Rückwärtsübergang `moved_in → offer_made` (P-4) und jeder andere Pfad lassen das Feld unberührt. Der Test führt den Rückweg aus und prüft, dass V-1 danach **weiter greift**. |
 | **G-D10** | **Kein Kontext-Leck über den Verbindungspool** | Zwei Anfragen aus verschiedenen Haushalten laufen nacheinander über **dieselbe** physische Verbindung; die zweite sieht nichts von der ersten (G-C8). |
-| **G-D11** | **Der Offline-Stimmpuffer überlebt den Versand nicht** | Drei Prüfungen aus G-B7, jede scheitert sonst still: Ein Eintrag älter als **7 Tage** wird verworfen statt versendet; nach einem **Profilwechsel** ist der Puffer leer; dieselbe Nutzlast **zweimal** eingespielt erzeugt einen `Vote` und lässt den Quorum-Nenner unverändert. |
+| **G-D11** | **Der Offline-Stimmpuffer überlebt den Versand nicht** | Drei Prüfungen aus G-B7, jede scheitert sonst still: Ein Eintrag älter als **7 Tage** wird verworfen statt versendet; ein Eintrag, dessen `resident_profile_id` **nicht zur angemeldeten Identität gehört**, wird verworfen statt versendet (**ersetzt** seit ADR-013 die frühere Profilwechsel-Prüfung — Substitution, keine Streichung); dieselbe Nutzlast **zweimal** eingespielt erzeugt einen `Vote` und lässt den Quorum-Nenner unverändert. |
 | **G-D12** | **Invite-Token-Einlösung schlägt bei bestehendem `ResidentProfile` fehl, statt zu überschreiben** | Für eine `Session`, deren `Account` im Ziel-`Household` bereits ein `ResidentProfile` hat, liefert das Einlösen eines gültigen `ApplicationInviteToken` (nicht `expires_at`, nicht `used_at`, nicht `revoked_at`) einen erklärten Fehler ("Du bist bereits als Bewohner:in registriert") statt eines Ergebnisses. Kein Merge, keine Überschreibung, kein stiller No-op; `became_resident_id` der betroffenen `Application` bleibt unverändert. Ergänzt G-D9 um den *Prozess*-Fall — G-D9 sichert den *Datenzustand* (nie `null`), G-D12 sichert den *Weg dorthin* (kein zweiter Durchlauf, der ihn überschreibt). |
 | **G-D13** | **Der Notiz-Erinnerungs-Reminder respektiert Selbst-Redaktion** | Für ein `Appointment`, dessen `Application` für die Empfängerin/den Empfänger selbst-redigiert ist (V-1, G-D1), wird `casting.note_reminder_due` weder erzeugt noch zugestellt — unabhängig vom Stand des `AppointmentAttendance.note_written`-Flags. Der Reminder liest zur Entscheidung ausschließlich dieses Flag, nie `CastingNote.body` (G-B5 bleibt insoweit unverändert in Kraft). |
+| **G-D14** | **Eine Sitzung, eine Identität — und der Haushalts-Account besetzt nie ein Profil** | Zwei Prüfungen, beide aus ADR-013. **(a)** Eine `Session`, deren `account_id` auf eine `Membership` mit `is_resident = false` zeigt, hat `acting_profile_id = null` — beim Anlegen **und** über ihre ganze Lebensdauer. **(b)** Es existiert kein Schreibpfad, der `Session.acting_profile_id` nach dem Anlegen der Sitzung ändert; der Test führt den Versuch aus und erwartet Ablehnung. Ohne (b) kehrt der abgeschaffte Wechsel durch eine einzige Zeile im Anmeldepfad zurück, ohne dass es auffällt. |
 
 > **G-D1 ist die wichtigste Zeile dieses Dokuments.** Sie ist die eine testbare Regel, die im Brief
 > ausdrücklich an die Stelle einer Statusabfrage gesetzt wurde, „die man an fünf Stellen vergessen
@@ -1267,9 +1278,10 @@ Zustände.
 | G-D8 Payload-Redaktion zum Fristende | 🟢 | geschützter Test |
 | G-D9 `became_resident_id` nie `null` | 🟢 | geschützter Test über den Rückwärtsübergang |
 | G-D10 Kein Leck über den Verbindungspool | 🟢 | geschützter Test, zwei Haushalte über eine Verbindung |
-| G-D11 Stimmpuffer: TTL, Profilwechsel, Idempotenz | 🟢 | drei geschützte Tests (G-B7, Zusicherungen 1, 5, 6) |
+| G-D11 Stimmpuffer: TTL, fremde Identität, Idempotenz | 🟢 | drei geschützte Tests (G-B7, Zusicherungen 1, 5, 6) |
 | G-D12 Invite-Token: Fehler statt Überschreibung bei bestehendem Profil | 🟢 | geschützter Test über den Einlösepfad (Anschluss an G-D9/I-3) |
 | G-D13 Notiz-Reminder respektiert Selbst-Redaktion | 🟢 | geschützter Test, prüft nur `AppointmentAttendance.note_written` (Anschluss an G-D1/G-C6/G-D5) |
+| G-D14 Eine Sitzung, eine Identität; Haushalts-Account ohne Profil | 🟢 | zwei geschützte Tests (ADR-013): `acting_profile_id = null` über die Lebensdauer, kein Schreibpfad nach dem Anlegen |
 | G-E1 Destruktives DDL | 🟢 | Migrations-Muster-Check + CODEOWNERS |
 | G-E2 Migrationen reversibel | 🟢 | up/down/up im CI |
 | G-E3 Nur Migrationen | 🟢 | Drift-Erkennung |
@@ -1382,7 +1394,7 @@ Die Begründung je Werkzeug steht zusätzlich in Alltagssprache in `tools/README
 | **Unit** | Reine Funktionen ohne Datenbank, Netz oder Zeitabhängigkeit — Voting-Mathematik, Rangberechnung, Zustandsmaschine, Termin-Kostenmodell, Zeitfenster-Parser (G-G5) | Keine Policy-Entscheidungen, kein RLS — der Domänenkern kennt beides nicht |
 | **Integration** | Repository-Schicht gegen eine echte Datenbank: jede neue Query gegen eine personenbezogene Tabelle mit den drei Fällen aus G-C3 (falscher Haushalt, keine Rundenteilnahme, eigenes Profil) | Kein Ersatz für die geschützten Tests — eine Coverage-Schwelle allein stellt nicht sicher, dass die *richtigen* Fälle geprüft werden (G-C3) |
 | **Policy + rohes SQL** | Die drei Sichtbarkeitsinvarianten V-1 bis V-3, **je zweimal** — über die Policy-Schicht und als rohes SQL unter der Anwendungsrolle (G-C7) — sowie die Pool-Wiederverwendung über zwei Haushalte (G-C8/G-D10) | Kein Test, der nur den Policy-Pfad prüft und den RLS-Pfad für „automatisch mitgetestet" hält |
-| **End-to-End** | Ein vollständiger Casting-Ablauf ohne jede Interaktion einer bewerbenden Person, bis `moved_in` (G-M3); der Offline-Stimmpuffer über TTL, Profilwechsel und Idempotenz (G-B7/G-D11) | Keine Solver-Determinismus-Prüfung hier — die läuft isoliert gegen den Adapter (G-K1), nicht über die ganze Anwendung |
+| **End-to-End** | Ein vollständiger Casting-Ablauf ohne jede Interaktion einer bewerbenden Person, bis `moved_in` (G-M3); der Offline-Stimmpuffer über TTL, fremde Identität und Idempotenz (G-B7/G-D11) | Keine Solver-Determinismus-Prüfung hier — die läuft isoliert gegen den Adapter (G-K1), nicht über die ganze Anwendung |
 
 **Grundlage.** Dieses Kapitel ordnet nur zu, was an Mechanismen bereits feststeht:
 `test/guarded.manifest.json` (G-D), der RLS-Positiv-Test (G-C2) und der Pool-Wiederverwendungstest

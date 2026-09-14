@@ -38,7 +38,7 @@ Order follows `02-SRD.md` §5.4's v0.1 row exactly, group by group.
 | **S-15** | Full 11-state `Application` transition table; backward transitions permitted and audited | F0 | FR-0.9–FR-0.12; AC-0.10 | ✅¹ |
 | **S-37** | Machine-readable `data-inventory.yml`, enforced as a CI build gate | F0 | FR-0.5–FR-0.8; AC-0.4 | ✅ |
 | **S-01** | `Household` registration (email + password); the household account administers and never votes | F1 | FR-1.1, FR-1.2, FR-1.7; AC-1.1, AC-1.2, AC-1.5 | ✅ |
-| **S-02** | `ResidentProfile` creation and context switching between administration and resident | F1 | FR-1.3–FR-1.6; AC-1.3, AC-1.4, AC-1.6 | ✅ |
+| **S-02** | `ResidentProfile` creation; one fixed identity per session, separate sign-ins for administration and resident (ADR-013) | F1 | FR-1.3–FR-1.6; AC-1.3, AC-1.4, AC-1.6 | ✅ |
 | **S-03** | One join code/link for the whole household; one-step registration with only name + password required | F2 | FR-2.1, FR-2.9–FR-2.19; AC-2.1–AC-2.6, AC-2.17 | ✅ |
 | **S-04** | `Membership` with orthogonal `is_resident` / `role` plus individually grantable permissions | F1 | FR-1.8; AC-1.5, AC-1.20, AC-1.21 (create-applicant permission itself is exercised by AC-3.5 in F3) | ✅ |
 | **S-05** | Two lists with different rights: participant list (names only, all residents) and resident list (administration full, moderator read-only, others not at all); only two of the four original duplicate-protection mechanisms survive | F1 | **Half A:** FR-1.19, AC-1.18 · **Half B:** FR-1.25–FR-1.30, AC-1.20–AC-1.23 · dependency in **C-1.10** | ✅² |

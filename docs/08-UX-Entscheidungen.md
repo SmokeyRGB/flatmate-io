@@ -43,7 +43,7 @@ Entscheidung ausgelöst hat. Sie sind Teil des Originalwortlauts und bleiben ste
 | **U-2** | **2 Tabs + Kopfzeile mit zwei Elementen.** Untere Leiste: *Start · Casting*. Kopfzeile: Glocke · Avatar *(K-6)* | `03-PRD.md` §4.1.0 |
 | **U-3** | „Seit deinem letzten Besuch" zeigt **nur bewohnerrelevante Ergebnisse** (bestätigter Termin, „X zieht ein"), **nicht** das Aktivitätsprotokoll | S-27 |
 | **U-4** | Das vollständige `ActivityEvent`-Log liegt im **Activity Center** — Unterpunkt „Alle Aktivitäten" des Benachrichtigungszentrums | S-27; Oberfläche in v0.2 |
-| **U-5** | **Eigener Moderationsmodus**, Bewohner-Ansicht für alle identisch. Zugang über **Avatar-Menü** („In Moderation wechseln") oder **CTA aus der Benachrichtigung**. Anstehende Orga-Aufgaben erscheinen im Bewohner-Dashboard als **eine** Brückenzeile *(K-6)* | S-02 |
+| **U-5** | **Eigene Organisationsfläche**, Bewohner-Ansicht für alle identisch. Zugang über **Avatar-Menü** („Organisation") oder **CTA aus der Benachrichtigung** — seit **ADR-013** reine Navigation, kein Identitätswechsel. Anstehende Orga-Aufgaben erscheinen im Bewohner-Dashboard als **eine** Brückenzeile *(K-6)* | S-02 |
 | **U-6** | **Eine Fläche „Organisation"** — Moderation und Verwaltung verschmelzen. Abschnitte nach Rechten; die drei Account-exklusiven Dinge in einem Abschnitt „Haushalt" | `07-Screen-Inventar.md` §4 |
 | **U-7** | Screen-Inventar **darf korrigieren**; `02-SRD`, `03-PRD` und `04-Domaenenmodell` werden nachgezogen | Vorrangregel, siehe Kopf |
 | **U-8** | Deliverable: **nur** `07-Screen-Inventar.md` — kein Mockup | erledigt |

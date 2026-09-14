@@ -55,7 +55,7 @@ trennt beide Wege (A4 vs. O6), sonst wirkt O6 wie eine überflüssige Dopplung.
 |---|---|
 | Ohne E-Mail keine Wiederherstellung durch die Person selbst | Die Verwaltung kann das Passwort zurücksetzen (E1, Kasten) — ein bewusster, dokumentierter Tauschhandel |
 | Ohne E-Mail keine E-Mail-`Notification`, Push braucht erst eine Erlaubnis (S-28) | E-Mail wird später angeboten (E1), wo sie nützt — nie als Sperre |
-| `Account.email` sollte optional werden | Bereits erledigt: das Feld ist `text?` — Pflicht beim Haushalts-Admin-Account (A1), nullable bei Resident-Accounts. Offen bleibt die Anmeldekennung für Resident-Accounts ohne E-Mail (O-D, siehe A2) |
+| `Account.email` sollte optional werden | Bereits erledigt: das Feld ist `text?` — Pflicht beim Haushalts-Admin-Account (A1), nullable bei Resident-Accounts. Die Anmeldekennung ist ebenfalls geklärt: `(Household, display_name) + Passwort` (O-12, siehe A2 und Register unten) |
 
 **Sicherheit des Einladungslinks — jetzt tragend, nicht ergänzend.** „Sicherheit durch gezielte
 Einladung" macht den `join_code` zur **einzigen** Zugangskontrolle: keine E-Mail, keine

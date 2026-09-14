@@ -1,6 +1,8 @@
 > **Quelle:** `../04-Domaenenmodell.md` §5 (Stand V0.4, eingefroren 2026-09-09)
 > **Enthält:** V-1 … V-4 samt den RLS-Policies aus §5.5
 > **Schema-Autorität:** Diese Datei. Weicht ein Bezeichner anderswo ab, gilt der hier.
+> **Abweichung von der Quelle:** Seit 2026-09-11 gilt **ADR-013** — `profile_id` steht mit der
+> Anmeldung fest. Die Prädikate sind unverändert; Begründungen und Kommentare sind es nicht.
 
 ## 5. Sichtbarkeitsregeln als Prädikate
 
@@ -17,18 +19,26 @@ Sitzungskontext, den beide Seiten kennen:
 ```text
 Session = {
   account_id   : uuid          // immer gesetzt
-  profile_id   : uuid | null   // null = im Verwaltungskontext gehandelt
+  profile_id   : uuid | null   // null = Sitzung eines Haushalts-Accounts
   household_id : uuid          // aktiver Haushalt
 }
 ```
+
+> **`profile_id` wird bei der Anmeldung festgelegt und innerhalb der Sitzung nie wieder
+> geschrieben** (ADR-013). Die Fallunterscheidung `profile_id = null` trennt damit nicht mehr zwei
+> Kontexte **einer** Sitzung, sondern zwei **Account-Typen**: die Sitzung eines Haushalts-Accounts
+> trägt `null`, die Sitzung eines Resident-Accounts trägt genau ein Profil. Die Prädikate unten
+> bleiben deshalb Zeichen für Zeichen gültig — was entfällt, ist die Möglichkeit, dieselbe Sitzung
+> nacheinander durch **beide** Zweige zu schicken.
 
 ### 5.1 V-1 — Selbst-Redaktion (dauerhaft, unabhängig vom Rundenstatus)
 
 > **Niemand darf Beratungsinhalte über sich selbst lesen — dauerhaft, unabhängig vom Rundenstatus.**
 
 ```text
-// Alle Profile, die zum handelnden Account gehören. NICHT nur das aktive Profil —
-// sonst ist der Profilwechsel der Umweg um die Invariante (siehe Klarstellung in §2.1).
+// Alle Profile, die zum handelnden Account gehören. NICHT nur das Profil der Sitzung:
+// die Menge wird aus Account + Membership abgeleitet und hängt damit an keinem
+// Sitzungsfeld, das fehlen oder falsch gesetzt sein kann (ADR-013, G-C8).
 redaction_subjects(session) :=
     { m.resident_profile_id
       | m ∈ Membership,
@@ -67,7 +77,7 @@ Kasten, keine Notlüge über nicht vorhandene Daten — die Person weiß, dass a
 | Verworfene Variante | Warum sie leckt |
 |---|---|
 | „Abgeschlossene Bewerbungen sind für neue Mitglieder unsichtbar, offene sichtbar" (ursprüngliche Annahme) | Leckt bei **wiedereröffneten Runden** (`closed → open`) und bei **Wiederbewerbungen**. Der Status ist außerdem an fünf Stellen abfragbar und an vier davon vergessbar |
-| Prüfung nur gegen `session.profile_id` | Leckt über den **Profilwechsel** in den Verwaltungskontext |
+| Prüfung nur gegen `session.profile_id` | Leckt zweifach: über ein **früheres Profil desselben Accounts** (Auszug, Wiedereinzug, Wiederbewerbung) und über jeden Pfad, der `app.profile_id` **nicht oder falsch** setzt — der Fehlerfall aus **G-C8**. Die Verankerung am Account ist von beidem unabhängig |
 | Filterung in der Anwendungsschicht ohne DB-Fence | Leckt bei jedem vergessenen `WHERE` — der wahrscheinlichste AI-Fehlermodus (ADR-004) |
 | Nur einzelne Stimmen verbergen, Aggregate zeigen | Leckt bei kleinen Gremien fast vollständig: bei fünf Stimmen ist der Mittelwert nahezu invertierbar |
 
@@ -83,7 +93,7 @@ es nicht abschaltbar ist.
 can_see_round(session, round) :=
     round.household_id = session.household_id
   ∧ (
-      // Bewohnerkontext: nur eigene Runden
+      // Resident-Account: nur eigene Runden
       ( session.profile_id ≠ null
         ∧ ∃ p ∈ RoundParticipation :
               p.round_id = round.id
@@ -91,7 +101,8 @@ can_see_round(session, round) :=
             ∧ p.removed_at = null
             ∧ profile(p).status = 'active' )
       ∨
-      // Verwaltungskontext: sieht alle Runden des Haushalts, darf aber nicht abstimmen
+      // Haushalts-Account: sieht Runden des Haushalts, darf aber nicht abstimmen
+      // — eingeschränkt durch S-50/U-20, siehe Hinweis unter diesem Block
       ( session.profile_id = null
         ∧ ∃ m ∈ Membership :
               m.account_id = session.account_id
@@ -114,10 +125,31 @@ can_vote(session, round, stage) :=
   ∧ stage_open(round, stage)
 ```
 
-**Der Verwaltungskontext sieht Beratungsinhalte** — er muss, um moderieren zu können. Er stimmt
-aber nicht ab (`Membership.is_resident = false`), und V-1 greift auch für ihn über
-`redaction_subjects`. Das ist konsistent mit der Klarstellung in §2.1: die Trennung ist Klarheit,
-keine Härtung.
+Der Zusatz `session.profile_id ≠ null` in `can_vote` bleibt stehen, obwohl er seit ADR-013 bereits
+aus dem Account-Typ folgt. Eine Regel, die sich auf eine Eigenschaft des Account-Typs **verlässt**,
+statt sie zu prüfen, ist genau die implizite Ableitung, die ADR-002 abschafft.
+
+**Die Sitzung eines Haushalts-Accounts stimmt nicht ab** (`Membership.is_resident = false`), und
+V-1 greift auch für sie über `redaction_subjects`. Seit ADR-013 hat ein Haushalts-Account im
+Regelfall **kein** eigenes `ResidentProfile` — er legt Profile an, besetzt sie aber nie —, sodass
+`redaction_subjects` für ihn meist leer ist. Das ist kein Leck, sondern dieselbe Aussage wie die
+Klarstellung in §2.1: die Trennung ist Klarheit, keine Härtung.
+
+> ⚠️ **Offener Widerspruch, älter als ADR-013 — geführt als `02-SRD.md` O-09.** Der zweite Zweig von
+> `can_see_round` gibt dem Haushalts-Account Sicht auf die Runden des Haushalts; **S-50**/**U-20**
+> sagen, `CastingRound` setze ein `ResidentProfile` voraus.
+>
+> **Das Prädikat ist dabei näher an der Wahrheit als die Scope-Zeile:** Bildschirm **O17
+> Aufbewahrung** verwaltet Fristen abgeschlossener Runden ausdrücklich ohne `ResidentProfile`,
+> **S-35** verlangt, dass die Verwaltung eine laufende Runde erkennen kann, und `not_available`
+> heißt „fällt aus der laufenden Runde". Drei beschlossene Verwaltungsrechte setzen Rundensicht
+> also bereits voraus.
+>
+> Aufzulösen ist die **Grenze**, nicht die Sichtbarkeit als Ganzes: Rundenidentität und
+> Lebenszyklus sichtbar, alles aus `Application` Abgeleitete **einschließlich Zählern** unsichtbar —
+> denn `redaction_subjects()` ist für einen Haushalts-Account leer (ADR-013), V-1 greift dort nicht,
+> und Aggregate sind nach §5.1 V-1-geschützt. Weil V-2 ein geschützter Test ist (G-C7 fährt ihn
+> doppelt) und S-50 eine bestätigte Scope-Zeile, wird hier **nichts nebenbei** geändert.
 
 **Neu eintretende Profile** werden per `RoundParticipation` mit `source = added_manually`
 hinzugefügt und sehen die Runde **inklusive Historie zu anderen Kandidaten**. Das ist gewollt: ohne
@@ -239,7 +271,7 @@ das ist die Bedingung, unter der ADR-004 überhaupt trägt.
 -- Sitzungskontext, von der Anwendung pro Request gesetzt.
 -- SET LOCAL, damit er die Verbindung nicht überlebt (Connection Pooling!).
 -- SET LOCAL app.account_id   = '…';
--- SET LOCAL app.profile_id   = '…';   -- leer im Verwaltungskontext
+-- SET LOCAL app.profile_id   = '…';   -- leer in Sitzungen eines Haushalts-Accounts
 -- SET LOCAL app.household_id = '…';
 
 CREATE FUNCTION app_account_id() RETURNS uuid LANGUAGE sql STABLE AS
@@ -271,7 +303,7 @@ CREATE POLICY votes_self_redaction ON votes FOR SELECT USING (
 
 -- V-2 auf Stimmen: nur Runden, in denen das aktive Profil Teilnehmer ist.
 CREATE POLICY votes_round_participation ON votes FOR SELECT USING (
-  app_profile_id() IS NULL                       -- Verwaltungskontext: V-2 greift oben
+  app_profile_id() IS NULL                       -- Haushalts-Account: V-2 greift oben
   OR EXISTS (
     SELECT 1 FROM round_participations p
     JOIN resident_profiles rp ON rp.id = p.resident_profile_id
@@ -300,7 +332,7 @@ nicht gelöscht oder abgeschwächt werden):
 
 | Regel | Muss-Test |
 |---|---|
-| V-1 | Eingezogene Person sieht **keine** Stimme, kein Veto, keine Notiz, **kein Aggregat** und **keine Ranglistenzeile** zu ihrer eigenen Bewerbung — auch nicht im Verwaltungskontext desselben Accounts, auch nicht in einer wiedereröffneten Runde |
+| V-1 | Eingezogene Person sieht **keine** Stimme, kein Veto, keine Notiz, **kein Aggregat** und **keine Ranglistenzeile** zu ihrer eigenen Bewerbung — auch nicht über ein **früheres Profil desselben Accounts**, auch nicht in einer wiedereröffneten Runde, und auch dann nicht, wenn `app.profile_id` in der Sitzung **fehlt** |
 | V-2 | Profil ohne `RoundParticipation` sieht die Runde nicht; nachträglich hinzugefügtes Profil sieht sie inklusive Historie **anderer** Kandidaten |
 | V-3 | `moved_out` entzieht sofort; Stimme bleibt im Score, fällt aus Zähler und Nenner; abgeschlossene Runde ändert ihre Quote nicht mehr |
 | V-4 | Ergebnisse unsichtbar vor eigener Stimme, sichtbar danach, **wieder unsichtbar nach Zurückziehen**, pro `stage` getrennt; nicht stimmberechtigte Rollen sind ausgenommen |

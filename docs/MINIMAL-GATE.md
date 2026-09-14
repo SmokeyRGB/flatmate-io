@@ -29,7 +29,7 @@ Das ist wörtlich gemeint.
 | **3** | CODEOWNERS auf Konfiguration, Workflows, `GUARDRAILS.md`, `data-inventory.yml`, `test/guarded.manifest.json`, Migrationsverzeichnis, Solver-Adapter | G-G3, G-D, G-E1, G-K1 | CODEOWNERS |
 | **4** | `data-inventory.yml` mit Schema-Abgleich als Pflicht-Gate — **vor der ersten Tabelle** | G-F1 | eigener CI-Schritt (ADR-010) |
 | **5** | RLS-Positiv-Test über **alle** Tabellen mit `household_id` — **vor der ersten Tabelle** | G-C2, G-C5 | **Vitest** |
-| **6** | `test/guarded.manifest.json` mit den dreizehn G-D-Invarianten, zunächst als scheiternde Tests — die **Sichtbarkeitsinvarianten je zweimal**: gegen die Policy-Schicht **und** als rohes SQL | **G-C7** | **Vitest** |
+| **6** | `test/guarded.manifest.json` mit den vierzehn G-D-Invarianten, zunächst als scheiternde Tests — die **Sichtbarkeitsinvarianten je zweimal**: gegen die Policy-Schicht **und** als rohes SQL | **G-C7** | **Vitest** |
 | **7** | Sitzungskontext ausschließlich über **eine** Transaktions-Hilfsfunktion; `SET` ohne `LOCAL` per Lint gesperrt — **vor der ersten Policy** | G-C8 | ESLint-Regel · Vitest (G-D10) |
 | **8** | Import-Boundary-Lint mit den sechs Bounded Contexts | G-I1 | **dependency-cruiser** (`--validate`) |
 | **9** | Lockfile-Installation, Lizenz-Check, Versions-Check | G-H2 bis G-H4 | **license-checker-rseidelsohn** mit Allowlist |
@@ -59,15 +59,19 @@ Beide sind als Akzeptanzkriterien **AC-0.6** und **AC-0.7** im Paket
 
 ---
 
-## Wiederkehrende Fehlerstelle: der Profilwechsel
+## Wiederkehrende Fehlerstelle: die Identität, die auf dem Gerät zurückbleibt
 
 Aus `GUARDRAILS.md` unter G-C7, hier wiederholt, weil an dieser Stelle **zweimal unabhängig**
 Annahmen gebrochen sind:
 
-Der Profilwechsel ist **keine Abmeldung**. Deshalb hängt V-1 am `Account` und nicht am Profil,
-und deshalb wird der Stimmpuffer auch beim **Wechsel** geleert, nicht nur beim Abmelden.
+Seit **ADR-013** gibt es keinen Identitätswechsel innerhalb einer Sitzung mehr. Die Fehlerstelle
+wandert damit vom Kontextwechsel zum **geteilten Gerät**: Die Sitzung endet, der Zustand im Browser
+nicht. Deshalb hängt V-1 am `Account` und nicht am Sitzungsfeld — sie greift auch bei fehlendem
+Sitzungskontext (G-C8) —, und deshalb wird ein Stimmpuffer **verworfen, sobald er zu einer anderen
+Identität gehört als die gerade angemeldete**, nicht erst beim Abmelden.
 
-Diese Position ist 🔴 — eine Prüffrage, kein Mechanismus. Wer hier etwas baut, prüft sie von Hand.
+Diese Position ist 🔴 — eine Prüffrage, kein Mechanismus. Wer hier etwas baut, fragt von Hand: **Wem
+gehören diese Daten, und was passiert damit, wenn sich als Nächstes jemand anderes anmeldet?**
 
 ---
 
