@@ -95,12 +95,19 @@ Ergebnisse hängen an ihr.
 | Unterstützung bei Betroffenenrechten (Art. 28 Abs. 3 lit. e) | Flatmate.io | Feature **„Datenauskunft erzeugen"** pro `Application` ([§7.1](#71--art-15-auskunft)) |
 | Löschung nach Zweckerreichung (Art. 5 Abs. 1 lit. e) | `Household` weisungsbefugt, Flatmate.io vollzieht | Aufbewahrungsautomatik mit Vorwarnung ([§5](#5--speicherbegrenzung-und-löschkonzept)) |
 | Information der Bewerbenden (Art. 13) | **`Household`** | Copy-Paste-Textbaustein als *Hilfsmittel*, nicht als eigene Pflichterfüllung ([§4](#4--art-13-vs-art-14--korrigierte-abgrenzung)) |
-| Unterauftragsverarbeiter (Art. 28 Abs. 2 und 4) | Flatmate.io | Hosting und E-Mail-Versand; Liste in der AVV, EU-Verarbeitung nach ADR-006 |
+| Unterauftragsverarbeiter (Art. 28 Abs. 2 und 4) | Flatmate.io | **Supabase** (Datenbank-Hosting **und** Anmeldedienst, EU-Region — ADR-006) sowie ein Transaktions-E-Mail-Dienst; vollständige Liste in der AVV, EU-Verarbeitung nach ADR-006 |
 | Meldung von Verletzungen (Art. 33 Abs. 2) | Flatmate.io meldet **an den `Household`**, dieser an die Aufsichtsbehörde | Prozess in [§11.5](#115--organisatorische-maßnahmen) |
 
 > ⚠️ **TBD — und ab v0.2 ein Blocker, keine Fußnote.** Zu ergänzen ist die konkrete Liste der
-> Unterauftragsverarbeiter (Hosting-Anbieter, Transaktions-E-Mail-Dienst). ADR-006 legt EU-Hosting
-> fest, benennt aber keinen Anbieter, und hier wird bewusst keiner erfunden.
+> Unterauftragsverarbeiter. **Ein Anbieter steht seit ADR-006 fest: Supabase**, und zwar für zwei
+> Zwecke zugleich — Datenbank-Hosting und Anmeldedienst (Supabase Auth). Dass es **derselbe**
+> Anbieter für beides ist, war ein tragendes Argument der Entscheidung: Die AVV-Kette wird dadurch
+> nicht länger, sie bekommt einen Namen. **Offen bleibt** der Transaktions-E-Mail-Dienst.
+>
+> **Was hier weiterhin bewusst nicht erfunden wird**, sondern beim Anbieter zu erheben und dann
+> hier einzutragen ist: Firma und Sitz, der konkrete Verarbeitungsort samt EU-Nachweis, der Wortlaut
+> und Stand der eigenen AVV, die Unterauftragsverarbeiter **des Anbieters** und der verwendete
+> Passwort-Hash-Algorithmus (§11.2). Ein Anbietername ersetzt diese Angaben nicht.
 >
 > **Warum das terminiert ist:** Ohne diese Liste ist die AVV nach Art. 28 Abs. 2 und 4 unvollständig,
 > und damit hängt **Q-3** (Genügt ein Klick-AVV der Textform des Art. 28 Abs. 9?) an einem Dokument,
@@ -654,7 +661,7 @@ Deshalb sechs Zusicherungen. Die erste ist die, ohne die die Ausnahme zum Loch w
 | **2** | **Keine Anzeigedaten im Puffer** — nur `application_id`, Wert, Rundenstufe. Kein Name, kein Profiltext, keine denormalisierte Karte | Sobald der Puffer speichert, *wem* die Stimme galt, ist er eine Datenkopie und keine Transaktionsnutzlast mehr. |
 | **3** | **Verwerfen statt Wiederholen**, wenn der Server ablehnt, weil Bewerbung oder Runde inzwischen gelöscht sind — und **kein Bewerbername in der Fehlermeldung** | Folgt aus 2.: Die App kennt den Namen lokal gar nicht. Der Hinweis lautet „deine Stimme konnte nicht mehr gezählt werden", nicht wofür. |
 | **4** | **Leeren bei Abmeldung und bei Sitzungsentzug** | Die WG-Realität ist ein geteilter Laptop im Wohnzimmer. |
-| **5** | **Leeren auch beim Profilwechsel**, nicht nur bei der Abmeldung | *Ergänzung dieses Dokuments.* Der Wechsel zwischen Verwaltungs- und Bewohnerkontext ist eine ausdrücklich vorgesehene Funktion und **keine Abmeldung**. Ein Puffer, der nur beim Logout geleert wird, überlebt den Wechsel — und dann hält der Kontext von Profil B die Stimmen von Profil A. |
+| **5** | **Verwerfen bei fremder Identität**, nicht nur Leeren bei der Abmeldung | *Ergänzung dieses Dokuments; seit **ADR-013** mit neuer Begründung.* Einen Identitätswechsel innerhalb einer Sitzung gibt es nicht mehr — das Gerät bleibt aber geteilt. Eine Abmeldung, die nie sauber durchlief (Absturz, geschlossener Tab, abgelaufene Sitzung), hinterlässt einen Puffer, an dem sich als Nächstes eine andere Person anmeldet. Ein Eintrag, dessen `resident_profile_id` nicht zur angemeldeten Identität gehört, wird deshalb **verworfen statt versendet** — sonst versendet Profil B die Stimmen von Profil A. |
 | **6** | **Wiedereinspielung ist idempotent** — der Server schlüsselt auf (`application_id`, `resident_profile_id`, `round_number`) und überschreibt, statt anzufügen | *Ergänzung dieses Dokuments.* Eine doppelt eingespielte Stimme verschiebt Score **und** Quorum-Nenner. Beides sind auskunftspflichtige Beurteilungsdaten ([§3](#3--art-15-und-die-casting-notizen)) — ein Duplikat ist damit kein Zählfehler, sondern ein **falsches Datum über eine Person** und eine Verletzung von **Art. 5 Abs. 1 lit. d (Richtigkeit)**. Die betroffene Person bekäme die Doppelstimme in einer Auskunft nach Art. 15 zu sehen und hätte nach **Art. 16** einen Berichtigungsanspruch auf eine Stimme, die nie zweimal abgegeben wurde. |
 
 Durchgesetzt durch `GUARDRAILS.md` **G-B7**. Die TDDDG-Seite steht in
@@ -721,7 +728,7 @@ Zwei Anwendungsfälle, an denen die Abbildung schon gearbeitet hat:
 | `Account.id` | ID | Kontoführung, Zuordnung von Handlungen | 6b | F | bis Kontolöschung |
 | `Account.email` | KONTAKT | Anmeldung, Benachrichtigung, Passwort-Reset | 6b | F | Kontolöschung + 30 Tage (Missbrauchsklärung) |
 | `Account.email_verified_at` | META | Nachweis der Verifikation vor Benachrichtigungsversand | 6b, 6f | F | wie `Account.email` |
-| `Account.password_hash` | AUTH | Anmeldung (P-2: Passwort primär und universell) | 6b | F | bis Kontolöschung |
+| `Account.password_hash` | — | **entfallen seit ADR-006:** Anmeldedaten liegen bei Supabase Auth und damit nicht mehr im eigenen Bestand. Die Verarbeitung ist über die Unterauftragsverarbeiter-Kette erfasst (§4), nicht mehr über dieses Verzeichnis | — | — | — |
 | `Account.passkey_credential` | AUTH | optionaler Komfort-Aufsatz, jederzeit abschaltbar | 6b | F | bis Widerruf oder Kontolöschung |
 | `Account.created_at`, `Account.last_login_at` | VERHALTEN | Missbrauchserkennung, Support, Inaktivitätsbereinigung | 6f | F | bis Kontolöschung |
 | `Household.id` | ID | Mandantentrennung (jede Query, RLS-Schlüssel) | 6b | F | bis Löschung des Haushalts |
@@ -1245,7 +1252,7 @@ Umsetzung wird beim Repo-Aufsetzen konkretisiert und in `GUARDRAILS.md` maschine
 
 | Maßnahme | Umsetzung |
 |---|---|
-| Passwort-Hashing | speicherharter Algorithmus (Argon2id oder bcrypt), Parameter dokumentiert |
+| Passwort-Hashing | **beim Auftragsverarbeiter (Supabase Auth, ADR-006).** Verantwortung für Algorithmus und Parameter liegt dort; Flatmate.io speichert keinen eigenen Hash. Der tatsächlich verwendete speicherharte Algorithmus ist beim Anbieter zu erheben und **hier namentlich zu dokumentieren** — die Anforderung „speicherhart, Parameter dokumentiert" bleibt unverändert bestehen |
 | Passkeys | optional, jederzeit abschaltbar (P-2: Passwort bleibt universell) |
 | Session-Handling | HttpOnly, Secure, SameSite; serverseitige Invalidierung; Abmeldung fremder Geräte |
 | E-Mail-Verifikation | nachgelagert, blockiert die erste Abstimmung nicht — **aber keine sensiblen Inhalte per Mail vor Verifikation**, und Verifikation vor Benachrichtigungsversand |

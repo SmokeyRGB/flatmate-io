@@ -40,6 +40,27 @@ entzieht nie den Zugang.** `Account.passkey_enabled` ist eine Anzeige, keine Bed
 dieser Record vom „optionalen Aufsatz" in eine Abhängigkeit und verletzt P-2, also genau das, was er
 schützen soll.
 
+> **Geprüft am 2026-09-11 gegen Supabase Auth (ADR-006) — trägt, mit einer Bedingung.** Der Anbieter
+> unterstützt mehrere Credentials je Account, von der Person setzbare Bezeichnungen, einzelnes
+> Löschen, Einrichtung **nur aus einer bestehenden Sitzung** (also nie während der Registrierung)
+> und Passkey als **eigenständigen** Anmeldeweg statt als zweiten Faktor. Das deckt die
+> Anforderungen dieses Records.
+>
+> **Die Bedingung:** Eine Passkey-Anmeldung setzt dort ein Konto mit **bestätigter E-Mail oder
+> Telefonnummer** voraus. Die abgeleitete Kennung eines Resident-Accounts ohne eigene Adresse
+> erfüllt das nicht. Daraus folgt die Regel, die im Modell steht (`../domain/identity.md`, Kasten
+> beim `PasskeyCredential`): **ein Passkey setzt eine hinterlegte und bestätigte `Account.email`
+> voraus.** Beides bleibt optional, eines schaltet das andere frei — und es fällt mit dem Weg
+> zusammen, den O-16 ohnehin vorzeichnet: Wer eine eigene Adresse hinterlegt, beendet damit die
+> Reset-Vollmacht der Verwaltung **und** eröffnet den Passkey. P-2 bleibt unberührt, weil das
+> Passwort die universelle Methode bleibt.
+>
+> **Zwei Vorbehalte, die nicht der Anbieter auflöst, sondern wir:** Die Passkey-Schnittstelle ist
+> dort als **experimentell** gekennzeichnet und kann sich ohne Vorankündigung ändern — für einen
+> Record auf `Vorschlag` tragbar, vor einer Bestätigung erneut zu prüfen. Und die Regel „das Löschen
+> des letzten Passkeys entzieht nie den Zugang" ist **unsere** Anforderung, keine zugesicherte
+> Eigenschaft des Anbieters; sie gehört bei der Umsetzung eigens getestet.
+
 **E-Mail-Verifikation ist nachgelagert und blockiert die erste Abstimmung nicht.** Zwei Grenzen
 gelten trotzdem: keine Inhalte mit Beratungsbezug per Mail vor der Verifikation, und keine
 Benachrichtigungszustellung an unverifizierte Adressen.
@@ -73,13 +94,21 @@ nach **S-05**/**U-22** noch **zwei**:
 
 **Negativ**
 
-- **Passwörter bringen ihren ganzen Rattenschwanz mit:** Zurücksetzen per Mail, Ratenbegrenzung,
-  Argon2id-Parameter, Sitzungsinvalidierung, Brute-Force-Schutz. Selbst zu bauen und selbst zu
-  verantworten (ADR-006).
+- **Passwörter bringen ihren ganzen Rattenschwanz mit:** Zurücksetzen, Ratenbegrenzung,
+  Hash-Parameter, Sitzungsinvalidierung, Brute-Force-Schutz. **Geändert 2026-09-11 (ADR-006):**
+  Dieser Teil ist nicht mehr selbst zu bauen — er liegt bei Supabase Auth. Das war das tragende
+  Argument jener Entscheidung, und es entlastet genau diesen Punkt. **Nicht** entlastet ist das
+  Zurücksetzen für Resident-Accounts **ohne** eigene `email`: dafür gibt es keinen Weg über den
+  Anbieter, es bleibt der administrative Reset (O-16) — und ADR-013 lässt diesen Fall häufiger
+  eintreten, weil auch die organisierende Person ein zweites Konto führt.
 - **Der Haushalts-Account ist ein geteiltes Passwort.** Das ist bewusst so und ausdrücklich **keine
   Sicherheitsgrenze** — es muss in Dokumenten und UI so dargestellt werden und darf nirgends als
   Härtung erscheinen. Die praktische Folge steht in ADR-004: die Selbst-Redaktion hängt am
-  **Account** und nicht nur am aktiven Profil, weil der Profilwechsel sonst der Umweg wäre.
+  **Account** und nicht nur am aktiven Profil. Seit **ADR-013** ist der Haushalts-Account ein
+  **eigener Account mit eigener Anmeldung**, nicht ein zweiter Kontext eines Bewohner-Accounts; wer
+  sein Passwort kennt, meldet sich an. Die Verankerung am Account bleibt trotzdem — sie greift auch
+  bei fehlendem Sitzungskontext (G-C8) —, und ADR-013 benennt offen, dass sie über einen **zweiten**
+  Account derselben Person hinweg nicht greifen kann.
 - **Duplikate sind technisch möglich.** Wer mit zwei E-Mail-Adressen beitritt, stimmt zweimal ab. Der
   Schutz ist Sichtbarkeit, nicht Verhinderung. Das ist eine bewusst akzeptierte Restlücke, kein
   Versehen — und sie gehört in `02-SRD.md` §7 als Risiko, nicht in eine Fußnote.
