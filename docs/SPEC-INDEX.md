@@ -40,7 +40,7 @@ Diese Tabelle macht aus „irgendwo steht es" ein „hier gilt es".
 | **Quorum** | **`03-PRD.md` §4.2.4** — Schwelle `0.5`, Anzeige statt Sperre | `domain/rechenmodelle.md` · `02-SRD.md` §11 (O-01, geschlossen) · `F5-requirements.md` |
 | **Vierstufige Skala und Favoriten-Budget** | **`adr/0008-*.md`** | `03-PRD.md` §4.1.4 · `screens/C-beteiligung.md` (C1) · `F4-requirements.md` |
 | **Solver** (CP-SAT, Kindprozess) | **`adr/0005-*.md`** | `03-PRD.md` §4.1.8 · `domain/scheduling.md` · `02-SRD.md` §11 (O-06, Messung offen). **Liegt in v1.1** |
-| **Anmeldung und Sitzung** | **`adr/0007-*.md`** (Passwort primär, Passkey optional) | `domain/identity.md` · `04-Domaenenmodell.md` §10.2 (O-12, O-13, O-16) · `F2-requirements.md` |
+| **Anmeldung und Sitzung** | **`adr/0013-*.md`** (zwei Account-Typen, eine feste Identität je Sitzung) · **`adr/0007-*.md`** (Passwort primär, Passkey optional) | `domain/identity.md` · `04-Domaenenmodell.md` §10.2 (O-12, O-13, O-16) · `F2-requirements.md` |
 | **Einladungslink** (`join_code`) | **`02-SRD.md` §5.3** bei **S-49** — Ablauf, Nutzungsgrenze, Warnhinweis | `domain/identity.md` · `04-Domaenenmodell.md` §10.2 (O-15) · `08-UX-Entscheidungen.md` U-12 · `F2-requirements.md` |
 | **Zwei Listen, zwei Rechtelagen** | **`08-UX-Entscheidungen.md` U-22** | `02-SRD.md` §5.3 bei S-05 · `screens/O-organisation.md` (O16) · `F1-requirements.md` FR-1.19, FR-1.25–1.30 |
 | **Benachrichtigungen und Kanäle** | **`adr/0009-*.md`** (Kanalneutralität als Architekturregel) | `03-PRD.md` §4.1.12 · `domain/audit-und-notifications.md`. **Liegt in v0.2** |

@@ -7,7 +7,7 @@
 
 ---
 
-## Die zwölf Records
+## Die dreizehn Records
 
 | # | Entscheidung | Status |
 |---|---|---|
@@ -16,15 +16,16 @@
 | [0003](0003-append-only-ereignis-log.md) | Append-only Ereignis-Log, **kein** volles Event-Sourcing | 🔶 Vorschlag |
 | [0004](0004-autorisierung-policy-und-rls.md) | Autorisierung **zweifach**: Policy-Objekte **und** Postgres RLS | ✅ Bestätigt |
 | [0005](0005-solver-ortools-cp-sat-kindprozess.md) | Solver via `ortools` (CP-SAT) als lokaler Kindprozess | 🔶 Vorschlag |
-| [0006](0006-stack-nextjs-postgres-drizzle.md) | Stack: Next.js/TypeScript, Postgres, Drizzle, EU-Hosting, self-hosted Auth | ✅ Bestätigt |
+| [0006](0006-stack-nextjs-postgres-drizzle.md) | Stack: Next.js/TypeScript, Postgres, Drizzle, Supabase (EU) mit Supabase Auth | ✅ Bestätigt |
 | [0007](0007-passwort-primaer-passkey-optional.md) | Passwort primär, Passkey optional | 🔶 Vorschlag |
 | [0008](0008-vierstufige-skala-favoriten-budget.md) | Vierstufige Skala mit nachgelagertem Favoriten-Budget | ✅ Bestätigt |
 | [0009](0009-kanalneutralitaet.md) | Kanalneutralität als Architekturregel, nicht als Feature | 🔶 Vorschlag |
 | [0010](0010-datenbestandsverzeichnis-ci-gate.md) | Datenbestandsverzeichnis als CI-Gate | ✅ Bestätigt |
 | [0011](0011-pwa-statt-native-app.md) | PWA statt native App | 🔶 Vorschlag |
 | [0012](0012-deutsch-dokumente-englisch-code.md) | Deutsch in Dokumenten, Englisch im Code | ✅ Bestätigt |
+| [0013](0013-zwei-account-typen-feste-identitaet.md) | Zwei Account-Typen, eine feste Identität je Sitzung — der Wechsel verlangt Abmelden und neue Anmeldung | ✅ Bestätigt |
 
-**7 bestätigt · 5 Vorschlag · 0 angenommen.**
+**8 bestätigt · 5 Vorschlag · 0 angenommen.**
 
 ---
 
@@ -57,6 +58,13 @@ Codebasis"*. Eine Bestätigung, die diesen Preis nicht nennt, ist eine Formalie.
 Die fünf übrigen dürfen offen bleiben — sie tragen v0.1 nicht. ADR-005 (Solver) ist mit
 S-19/S-20 ohnehin nach v1.1 gewandert.
 
+**ADR-013 ist bestätigt, ohne einer der sieben zu sein.** Die sieben sind eine feste Menge: die
+Records, die v0.1 *tragen*. ADR-013 trägt v0.1 nicht, er **ändert** es — er fasst **S-02** neu und
+nimmt dem Modell einen Vorgang, den bisher zwei Einzelhärtungen bewachten. Als `Vorschlag` wäre er
+wertlos: dann stünde **S-02** in zwei Lesarten nebeneinander, und die Dateien in `../domain/` und
+`../screens/` müssten beide gleichzeitig beschreiben. Ein Record, aus dem Streichungen in elf
+Dateien folgen, ist entweder verbindlich oder er wird nicht geschrieben.
+
 ### ⚠️ ADR-006 trägt eine Zwangsbedingung aus ADR-005
 
 Die Hostingumgebung **muss** einen lokalen Python-Kindprozess mit Zeitlimit und fixem Seed
@@ -76,6 +84,13 @@ Aus `../05-ADRs.md` übernommen und hier gültig:
 2. **Der Status wird je Datei gepflegt** — nicht in der Sammeldatei.
 3. **`../05-ADRs.md` bleibt bestehen** als eingefrorene Momentaufnahme und wird **nicht** mit
    diesen Dateien synchronisiert.
+
+Eine Folge von Regel 3, die beim ersten neuen Record sichtbar wird: **die Spalte „Umkehrbarkeit"
+(🟢/🟡/🔴) steht nur in der eingefrorenen Sammeldatei und deckt ADR-001 bis ADR-012 ab.** Sie wird
+hier nicht nachgebaut — eine zweite gepflegte Kopie derselben Angabe ist genau die Drift, gegen die
+Regel 3 existiert. Ab ADR-013 trägt jeder Record seine Umkehrbarkeit dort, wo sie ohnehin genauer
+steht: in der **Aufgabebedingung** und in der **Kostenzeile** des Bestätigungsvermerks. Ein Symbol
+sagt „schwer"; die Kostenzeile sagt, *was* schwer ist.
 
 Durchgesetzt statt versprochen: `tools/check-refs.sh` Regel 5 prüft, dass jede zitierte
 `ADR-NNN` auf **genau eine** Datei hier auflöst — eine in einer Spezifikation zitierte Nummer
