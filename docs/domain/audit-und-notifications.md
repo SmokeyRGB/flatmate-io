@@ -18,7 +18,7 @@ Benachrichtigungs-Fan-out, „was ist passiert, während ich weg war", Undo und 
 | `event_type` | `text` | ⚙️ | z. B. `application.state_changed`, `vote.cast`, `settings.changed`, `retention.extended`, `casting.note_reminder_due` |
 | `subject_type` · `subject_id` | `text` · `uuid` | ⚙️ | worauf sich das Ereignis bezieht |
 | `actor_account_id` | `uuid?` | 🟠 | `null` bei Systemereignissen (Aufbewahrungsautomatik) |
-| `actor_profile_id` | `uuid?` | 🟠 | `null` = **im Verwaltungskontext gehandelt** → Feed sagt ehrlich „Verwaltung hat Lea eingeladen" statt einen Namen zu erfinden |
+| `actor_profile_id` | `uuid?` | 🟠 | `null` = **von einem Haushalts-Account gehandelt** → Feed sagt ehrlich „Verwaltung hat Zimmer 2 wieder freigegeben" statt einen Namen zu erfinden. **Nur Verwaltungsereignisse** können so entstehen — Zimmer, Einstellungen, Aufbewahrung, Beitrittscode, Mitgliederpflege, Datenauskunft-Export, administrativer Passwort-Reset. Kein `application.*`, `round.*`, `appointment.*` oder `vote.*`: dafür fehlt dem Haushalts-Account seit **S-50**/**U-20** der Zugriff |
 | `payload` | `jsonb` | 🔴 / ⚫ | siehe Kasten |
 | `occurred_at` | `timestamptz` | ⚙️ | |
 | `correlation_id` | `uuid?` | ⚙️ | bündelt Ereignisse einer Aktion (z. B. Solver-Lauf legt zwölf Termine) |

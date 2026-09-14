@@ -41,7 +41,7 @@ das Modell nirgends geführt hat.
 | `round_id` | `uuid` | ⚙️ | |
 | `expires_at` | `timestamptz` | ⚙️ | **kurze Lebensdauer** — Vorschlag 14 Tage |
 | `used_at` | `timestamptz?` | ⚙️ | erste Nutzung; der Token bleibt danach bis `expires_at` gültig, damit Korrekturen möglich sind |
-| `created_by_profile_id` | `uuid?` | 🟠 | `null` = im Verwaltungskontext erzeugt |
+| `created_by_profile_id` | `uuid?` | 🟠 | **Seit S-50/U-20 gibt es keinen Pfad mehr, der dieses Feld auf `null` setzt** — Terminfindung setzt ein `ResidentProfile` voraus. Dieselbe Altlast wie bei `Application.created_by_profile_id`, dieselbe offene Frage (`offene-punkte.md` **O-17**) |
 | `revoked_at` | `timestamptz?` | ⚙️ | |
 
 > **Das ist die zweite unauthentifizierte Fläche des Produkts** — die erste ist die Anmeldeseite. Sie
