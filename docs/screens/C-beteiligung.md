@@ -29,6 +29,17 @@ Querformat** — eine Handlung pro Bildschirm, keine horizontal scrollende Tabel
 |---|---|
 | Leer | „Nichts wartet auf dich" — keine offene Bewerbung |
 
+> **Entschieden (2026-09-15): Revidierbarkeit wird im Durchlauf nicht beworben.** Dass eine
+> Stimme änderbar ist, bleibt wahr (S-10, FR-4.13) und bleibt über die Kandidaten-Einzelansicht
+> (D2) auffindbar — aber C1 selbst zeigt dazu **keinen** Hinweistext, kein Badge, keine
+> Erwähnung. Grund: würde der Durchlauf aktiv damit werben, entstünde ein Anreiz, ihn nur
+> „durchzuklicken", um die Rangliste freizuschalten (Ergebnisse werden pro Kandidat sofort nach
+> der eigenen Stimme sichtbar, FR-5.19), und die eigene Stimme danach an die schon sichtbaren
+> Stimmen der Mitbewohnenden anzupassen — genau der Anker-Effekt, den verdeckte Ergebnisse
+> verhindern sollen (R-4.4). Diese Entscheidung schließt den bis 2026-09-15 offenen Punkt „soll
+> Revidierbarkeit während des Durchlaufs signalisiert werden" — die Antwort ist nein, nicht
+> „noch nicht entschieden".
+
 ---
 
 #### C2 · Zweiter Durchlauf
