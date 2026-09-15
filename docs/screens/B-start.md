@@ -28,6 +28,17 @@
 |---|---|
 | Leer (keine Aufgabe offen) | Rundenstand aus §3 füllt die Fläche — nie leer |
 
+> **Entschieden (2026-09-15): der Moment nach der letzten eigenen Stimme wird anerkannt, nicht
+> nur gemeldet.** Ist der Grund für den leeren Zustand, dass die Person gerade ihre letzte
+> offene Bewerbung dieser Runde bewertet hat, bekommt der Rundenstand aus §3 einen kurzen,
+> anerkennenden Satz voran — sinngemäß „Stark gemacht — du hast alle Bewerbungen bewertet!",
+> genauer Wortlaut offen (vgl. P-O-04). Andere leere Zustände (z. B. noch keine Bewerbung
+> eingegangen, oder Runde ohne offene Aufgabe für dieses Profil aus anderem Grund) bekommen
+> diesen Satz **nicht** — er gehört zum eigenen Abschluss des Durchlaufs, nicht zur
+> allgemeinen Leere. Grund für die Entscheidung: aus einem Usability-Test hervorgegangen, der
+> bemängelte, dass die reine Rundenstand-Meldung nach dem letzten Tap keine Rückmeldung über
+> die eigene Leistung gibt.
+
 ---
 
 #### B2 · Benachrichtigungszentrum
