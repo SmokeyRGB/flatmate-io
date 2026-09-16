@@ -45,8 +45,11 @@ export const application = pgTable(
     pgPolicy("application_household_isolation", {
       as: "permissive",
       for: "all",
-      using: sql`household_id = current_setting('app.household_id', true)::uuid`,
-      withCheck: sql`household_id = current_setting('app.household_id', true)::uuid`,
+      // Wrapped in (select ...): Supabase's RLS-performance guidance — otherwise Postgres
+      // re-evaluates current_setting() per row instead of once per query (confirmed via this
+      // project's own performance advisor after the first migration, 2026-09-16).
+      using: sql`household_id = (select current_setting('app.household_id', true)::uuid)`,
+      withCheck: sql`household_id = (select current_setting('app.household_id', true)::uuid)`,
     }),
   ],
 );

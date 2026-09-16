@@ -1,7 +1,10 @@
 import { sql } from "drizzle-orm";
 import { index, jsonb, pgPolicy, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
 
-const HOUSEHOLD_MATCH = sql`household_id = current_setting('app.household_id', true)::uuid`;
+// Wrapped in (select ...): Supabase's RLS-performance guidance — otherwise Postgres re-evaluates
+// current_setting() per row instead of once per query (confirmed via this project's own
+// performance advisor after the first migration, 2026-09-16).
+const HOUSEHOLD_MATCH = sql`household_id = (select current_setting('app.household_id', true)::uuid)`;
 
 export const activityEvent = pgTable(
   "activity_event",
