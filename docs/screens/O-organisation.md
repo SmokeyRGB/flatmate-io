@@ -371,8 +371,15 @@ Prozess vs. Person, nicht bei „beschreibend vs. empfehlend".
   1. Warnhinweis dort, wo der Link kopiert wird: „Teile diesen Link nur direkt mit deinen
      Mitbewohnenden — niemals öffentlich. Wer ihn hat, kann mitstimmen."
   2. Ablauf (`join_code_expires_at`, Vorschlag 7 Tage, mit einem Tippen verlängerbar)
-  3. Nutzungsgrenze (`join_code_max_uses`, vorbelegt mit der Zahl der noch fehlenden Bewohnenden)
+  3. Nutzungsgrenze (`join_code_max_uses`, vorbelegt mit **1** — Ausnahme: der Gründungs-Link
+     direkt nach `A1 Registrierung`, vorbelegt mit der Zahl der erwarteten Bewohnenden; O-15,
+     aktualisiert 2026-09-16)
 - Mitglied entfernen, `moved_out` setzen, reaktivieren
+- **Zweistufiges Entfernen (U-27, entschieden 2026-09-16):** „Ausgezogen" (`moved_out` setzen) ist
+  der reguläre Weg für tatsächliche Auszüge — Stimmen und Historie bleiben erhalten. „Entfernen"
+  ist endgültig, verlangt die **Eingabe des exakten Anzeigenamens** zur Bestätigung (kein einfacher
+  Klick) und ist ausdrücklich für **fälschlich oder böswillig über den Beitrittscode beigetretene
+  Personen** gedacht — nicht für Auszüge. Nur verfügbar mit `manage_members`
 
 **Abweichende Zustände**
 
