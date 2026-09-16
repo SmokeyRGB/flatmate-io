@@ -31,10 +31,13 @@ constitution (Principle IX), this is explicitly-open-tier, not confirmed: a reas
 counter-proposal is possible later, provided RLS-must-be-tested-twice (G-C7) survives under
 whatever runner is used.
 
-**Target Platform**: Serverless/edge Node.js runtime (Next.js), connecting to Postgres through
-Supabase's Supavisor pooler in **transaction mode** (port 6543) — see `research.md` for why this
-specific choice, verified against Supabase's own docs rather than assumed, and why it makes
-FR-0.3/FR-0.4's `SET LOCAL` discipline load-bearing rather than theoretical.
+**Target Platform**: Long-running Docker container (app + Python solver in one image), **not**
+serverless/edge — `docs/adr/0006-*.md` "Auslieferung" and "Kein Serverless folgt aus ADR-005"
+rule this out explicitly, because ADR-005's solver needs a runtime that can spawn child
+processes. Database connection: **direct connection (session mode)**, not a transaction-mode
+pooler — `docs/adr/0006-*.md` "Datenbankverbindung" names this as a non-negotiable consequence of
+ADR-004's `SET LOCAL` session context, not a preference. See `research.md` for why this still
+makes FR-0.3/FR-0.4's `SET LOCAL` discipline load-bearing even outside a serverless context.
 
 **Project Type**: Single Next.js app; internal modular monolith (ADR-001's six bounded contexts
 as internal module boundaries, not separate services/repos).
@@ -87,9 +90,11 @@ No violations to record in Complexity Tracking.
 **Post-design re-check** (after `research.md`/`data-model.md`/`quickstart.md`): still PASS on all
 principles above. `data-model.md` names only fields already quoted from `docs/domain/casting.md`
 and `docs/domain/audit-und-notifications.md` — no invented field (G-J4) — and does not reproduce
-the eleven state values, which stay maßgeblich-only in `docs/03-PRD.md` §4.2.1. `research.md`'s
-one new finding (Supavisor transaction mode disables prepared statements) is an implementation
-detail for `/speckit-tasks`, not a constitution or docs/ conflict.
+the eleven state values, which stay maßgeblich-only in `docs/03-PRD.md` §4.2.1. Corrected during
+this re-check: an earlier draft of this plan wrongly assumed a serverless/edge target platform
+and the Supavisor transaction-mode pooler; `docs/adr/0006-*.md` fixes both against that (no
+serverless, direct/session-mode connection) as confirmed-tier consequences of ADR-004/ADR-005 —
+now corrected above and in `research.md`.
 
 ## Project Structure
 

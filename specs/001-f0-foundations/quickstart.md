@@ -7,8 +7,8 @@ Proves the three FR groups in `spec.md` hold, once implemented. Not a build guid
 
 - Supabase project `flatmate-io` (`cjinhzzvjryojvhngjjn`, `eu-west-1`, Postgres 17) — already
   provisioned, currently empty. Migrations from this feature create its first tables.
-- `DATABASE_URL` pointed at the Supavisor **transaction-mode** pooler (port `6543`), per
-  `research.md` §1 — not the direct connection, not session mode.
+- `DATABASE_URL` pointed at the **direct connection** (port `5432`), per `research.md` §1 and
+  `docs/adr/0006-*.md` — never the transaction-mode pooler.
 - Test runner: Vitest (working assumption, `tools/README.md`; open to challenge per constitution
   Principle IX).
 

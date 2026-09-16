@@ -5,43 +5,51 @@ ADR-006/ADR-001 and this feature has no genuinely open technology choice. What f
 implementation-risk questions worth resolving with verified facts before design, not stack
 decisions.
 
-## 1. Connection pooling mode and its interaction with `SET LOCAL`
+## 1. Connection mode and its interaction with `SET LOCAL`
 
-**Decision**: Connect through Supabase's Supavisor pooler in **transaction mode** (port 6543),
-with prepared statements disabled on the Postgres client (`postgres(connectionString, { prepare: false })`
-for the `postgres-js` driver Drizzle uses).
+**Decision**: **Direct connection to Postgres** (port 5432, session-scoped) — not a
+Supavisor/PgBouncer transaction-mode pooler. This is a confirmed-tier consequence of two ADRs,
+not a choice this plan is free to make:
 
-**Rationale**: Verified directly against Supabase's own documentation (`search_docs`,
-2026-09-16), not assumed:
+- `docs/adr/0006-*.md` row "Datenbankverbindung" states it explicitly: *"Direkte Verbindung
+  (Session-Modus), nicht der Transaktions-Pooler. Der Sitzungskontext aus ADR-004 wird per `SET
+  LOCAL` gesetzt. Wer versehentlich über den Transaktions-Pooler verbindet, verschiebt die
+  Lebensdauer dieses Kontexts — und ein Sitzungskontext, der nicht zur Anweisung passt, ist ein
+  **stiller** RLS-Fehler, kein lauter."*
+- `docs/adr/0006-*.md`'s "Entscheidung" section: *"Kein Serverless folgt aus ADR-005 (ohne
+  Kindprozess kein lokaler Solver)."* — the app is a long-running Docker container (app + Python
+  solver in one image, per the "Auslieferung" row), not a serverless/edge deployment. An earlier
+  draft of this research file wrongly assumed a serverless target and picked the transaction-mode
+  pooler that goes with it; corrected here after checking ADR-006 directly instead of defaulting.
 
-- Supabase names transaction-mode Supavisor as the recommended choice for "serverless or edge
-  functions" — matches this project's target platform (Next.js on a serverless/edge runtime).
-- Supabase's own troubleshooting docs describe *exactly* the failure GUARDRAILS.md G-C8 warns
-  about, independently, as a real and documented behavior: *"If a client changes a session-level
-  setting, that setting 'sticks' to the backend connection. When that backend connection is
-  returned to the pool, the next client to use it inherits that exact state."* This is not a
-  hypothetical risk invented for this project — it is the documented default behavior of the
-  pooler this project will actually run on. It directly confirms why FR-0.3/FR-0.4 require the
-  session context to be set via `SET LOCAL` inside a transaction (transaction-scoped, discarded
-  automatically) and never via bare `SET` (connection-scoped, leaks to the next tenant).
-- New risk surfaced by this research, not previously named in `docs/`: **transaction-mode
-  Supavisor does not support prepared statements.** Drizzle's default Postgres driver
-  (`postgres-js`) uses prepared statements by default, which would produce runtime errors under
-  this pooling mode unless explicitly disabled. This is a real implementation detail that
-  `/speckit-tasks` needs a task for; it does not currently appear in `docs/GUARDRAILS.md` or the
-  F0 requirements packet, which predate a specific driver/pooling choice.
+**Rationale**: The Docker-container deployment matches Supabase's own stated use case for a
+direct connection — *"ideal for persistent servers, such as virtual machines (VMs) and
+long-lasting containers"* (verified via `search_docs`, 2026-09-16) — and direct/session-mode
+connections support prepared statements normally, so no driver workaround is needed (unlike
+transaction-mode pooling, which disables them).
+
+This does **not** make FR-0.3/FR-0.4's `SET LOCAL` discipline any less load-bearing. A
+long-running container still needs many concurrent requests to share a small number of physical
+Postgres connections for performance — that reuse happens one layer up, in the **app's own
+internal connection pool** (the Postgres client library's pool, e.g. `postgres-js`'s), not in a
+Supabase-side pooler. Supabase's own troubleshooting docs describe the identical failure mode in
+general terms, independent of which layer does the pooling: *"In a pooled environment, the
+connection doesn't go away. It goes back into the pool, settings and all, and the next client who
+gets it inherits whatever was left behind."* Two different households' requests can still land on
+the same physical connection sequentially through the app's own pool — which is exactly the
+scenario FR-0.3's single transaction helper and FR-0.4's `SET LOCAL`-only rule exist to make safe
+regardless of which pooling layer is doing the reuse.
 
 **Alternatives considered**:
-- *Direct connection (port 5432, no pooler)* — rejected: not viable for a serverless/edge
-  runtime, which opens and closes many short-lived connections; direct connections are meant for
-  persistent backends (VMs, long-running containers).
-- *Supavisor session mode (port 5432)* — rejected: designed for persistent clients on IPv4-only
-  networks; it doesn't recycle connections between unrelated requests the way transaction mode
-  does, so it doesn't match a serverless/edge deployment shape and would not exercise (or need)
-  the leak this project is specifically guarding against, making G-C8's own justification for the
-  transaction helper harder to verify under test.
-- *Dedicated PgBouncer pooler* — rejected for now: paid-tier only; a reasoned upgrade for later if
-  performance requires it, not a v0.1/F0 decision.
+- *Supavisor transaction-mode pooler* — rejected: directly ruled out by `docs/adr/0006-*.md`'s
+  "Datenbankverbindung" row, for exactly the `SET LOCAL` lifetime reason above.
+- *Supavisor session-mode pooler* — not rejected outright, but not the default: Supabase
+  recommends it as *"an alternative to a Direct Connection when connecting from an IPv4-only
+  network."* If the chosen hosting turns out to be IPv4-only and lacks the IPv4 add-on, this is
+  the documented fallback with the same session-scoped behavior as a direct connection — a
+  `/speckit-tasks` decision at deploy time, not a plan-level one.
+- *Dedicated PgBouncer pooler* — not applicable: transaction-mode only, so it inherits the same
+  rejection as the Supavisor transaction-mode pooler above.
 
 ## 2. Row-level security policy definition mechanism
 
