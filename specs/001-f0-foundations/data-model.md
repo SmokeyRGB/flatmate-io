@@ -26,6 +26,7 @@ Fields relevant to F0 (authorization + state integrity), quoted from the source 
 | `became_resident_id` | `uuid?` | Governs V-1 self-redaction; out of this slice's FR scope (F1) but the column exists from the first migration per FR-0.9 |
 | `created_by_account_id` | `uuid` | |
 | `created_by_profile_id` | `uuid` | `NOT NULL` |
+| `retention_until` | `date` | Default `created_at + 180 Tage` — `docs/domain/casting.md` §7 / line 124; anchor for the redaction path FR-0.13 requires |
 | `created_at` / `deleted_at` | `timestamptz` / `timestamptz?` | |
 
 Fields that exist on the full entity (`applicant_name`, `contact_email`, `message_raw`, etc.) are

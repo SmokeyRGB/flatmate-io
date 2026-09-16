@@ -107,9 +107,12 @@ the difference between "the log is not a workaround around V-1" being an asserti
 verified property.
 
 **Independent Test**: Can be fully tested by attempting an `UPDATE` or `DELETE` on an existing
-`ActivityEvent` through the application, a migration, and raw SQL — all three must fail — and by
+`ActivityEvent` through the application, a migration, and raw SQL — all three must fail — by
 running a retention-end redaction and confirming the event row survives with only its 🔴/⚫ payload
-fields set to `null`.
+fields set to `null` — and, since `ActivityEvent` carries `household_id` the same way `Application`
+does, by attempting to read another household's `ActivityEvent` rows through (a) the policy layer
+and (b) raw SQL bypassing it — both must return zero rows (FR-0.2/AC-0.6, found missing for this
+entity by `/speckit-analyze` and added 2026-09-16).
 
 **Acceptance Scenarios**:
 
@@ -122,6 +125,12 @@ fields set to `null`.
    referencing `ActivityEvent` rows survive with 🔴/⚫ payload fields set to `null`, while
    structure, timestamps, and the who/when/what-kind-of-action chain remain readable (FR-0.13,
    EC-0.6).
+4. **Given** two households A and B each with `ActivityEvent` rows, **When** a query for
+   household A's events omits any household-scoping condition, **Then** Postgres row-level
+   security still returns zero rows for household B's events, and the same invariant is verified
+   independently via the policy layer and via raw SQL (FR-0.2, AC-0.6) — the same double-enforcement
+   guarantee User Story 1 requires for `Application`, applied to the second table that carries
+   `household_id`.
 
 ### Edge Cases
 
