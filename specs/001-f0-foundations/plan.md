@@ -31,13 +31,18 @@ constitution (Principle IX), this is explicitly-open-tier, not confirmed: a reas
 counter-proposal is possible later, provided RLS-must-be-tested-twice (G-C7) survives under
 whatever runner is used.
 
-**Target Platform**: Long-running Docker container (app + Python solver in one image), **not**
-serverless/edge — `docs/adr/0006-*.md` "Auslieferung" and "Kein Serverless folgt aus ADR-005"
-rule this out explicitly, because ADR-005's solver needs a runtime that can spawn child
-processes. Database connection: **direct connection (session mode)**, not a transaction-mode
-pooler — `docs/adr/0006-*.md` "Datenbankverbindung" names this as a non-negotiable consequence of
-ADR-004's `SET LOCAL` session context, not a preference. See `research.md` for why this still
-makes FR-0.3/FR-0.4's `SET LOCAL` discipline load-bearing even outside a serverless context.
+**Target Platform**: Vercel, Serverless/Edge, EU region `fra1` — confirmed 2026-09-16
+(`docs/adr/0006-*.md`, "Änderung 2026-09-16"), superseding this plan's earlier container-based
+assumption now that ADR-005 moved the solver to its own service (AWS Lambda, `eu-central-1`),
+removing the coupling that previously ruled out serverless. Database connection: **Supabase's
+transaction-mode pooler**, also confirmed in that same amendment — not the direct/session-mode
+connection this plan assumed before the hosting decision was finalized. This reopens the
+connection-pooling risk this plan had twice already worked through (see `research.md` §1,
+now rewritten a third time to match): under a pooler, FR-0.3/FR-0.4's single-transaction-helper
+`SET LOCAL` discipline is the **only** defense against a cross-household context leak, not one of
+two. The guarded test **G-D10/AC-0.7** is the required, not optional, verification of this —
+`docs/review-log.md`'s "ADR-006 (2026-09-16)" entry tracks it as an open item until it's green
+under the pooler specifically, before the first policy is written (Minimal-Gate ordering, C-0.1).
 
 **Project Type**: Single Next.js app; internal modular monolith (ADR-001's six bounded contexts
 as internal module boundaries, not separate services/repos).
@@ -90,11 +95,16 @@ No violations to record in Complexity Tracking.
 **Post-design re-check** (after `research.md`/`data-model.md`/`quickstart.md`): still PASS on all
 principles above. `data-model.md` names only fields already quoted from `docs/domain/casting.md`
 and `docs/domain/audit-und-notifications.md` — no invented field (G-J4) — and does not reproduce
-the eleven state values, which stay maßgeblich-only in `docs/03-PRD.md` §4.2.1. Corrected during
-this re-check: an earlier draft of this plan wrongly assumed a serverless/edge target platform
-and the Supavisor transaction-mode pooler; `docs/adr/0006-*.md` fixes both against that (no
-serverless, direct/session-mode connection) as confirmed-tier consequences of ADR-004/ADR-005 —
-now corrected above and in `research.md`.
+the eleven state values, which stay maßgeblich-only in `docs/03-PRD.md` §4.2.1.
+
+**History of the Target Platform field, for anyone reading the git log and wondering why it moved
+three times:** first drafted wrongly assuming serverless/edge (not yet checked against ADR-006);
+corrected to a Docker container after actually reading ADR-006, which ruled out serverless because
+of ADR-005's local-child-process solver; corrected again, this time forward, after the project
+owner decided to move the solver to its own AWS Lambda service specifically so the app *could* go
+serverless on Vercel — an explicit human decision recorded in `docs/adr/0005-*.md` and
+`docs/adr/0006-*.md` (both amended 2026-09-16), not a plan-level assumption this time. The current
+Technical Context above reflects that decision.
 
 ## Project Structure
 

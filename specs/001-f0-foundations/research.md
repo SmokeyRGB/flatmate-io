@@ -7,49 +7,63 @@ decisions.
 
 ## 1. Connection mode and its interaction with `SET LOCAL`
 
-**Decision**: **Direct connection to Postgres** (port 5432, session-scoped) — not a
-Supavisor/PgBouncer transaction-mode pooler. This is a confirmed-tier consequence of two ADRs,
-not a choice this plan is free to make:
+**Decision**: **Supabase's Supavisor pooler in transaction mode** — confirmed 2026-09-16
+(`docs/adr/0006-*.md`, "Änderung 2026-09-16" and the "Datenbankverbindung" row), superseding two
+earlier drafts of this section. History, so the reasoning isn't lost: draft 1 wrongly assumed
+serverless without checking ADR-006 and picked transaction-mode pooling by default; draft 2
+corrected to a direct/session-mode connection after finding ADR-006 explicitly required it
+*for the container-based architecture that was confirmed at the time*; the project owner then
+made an explicit decision to move the solver to its own service (`docs/adr/0005-*.md`) specifically
+so the app could go serverless on Vercel, which reopens the connection-mode question for real —
+this section reflects that final, human-confirmed state, not another assumption.
 
-- `docs/adr/0006-*.md` row "Datenbankverbindung" states it explicitly: *"Direkte Verbindung
-  (Session-Modus), nicht der Transaktions-Pooler. Der Sitzungskontext aus ADR-004 wird per `SET
-  LOCAL` gesetzt. Wer versehentlich über den Transaktions-Pooler verbindet, verschiebt die
-  Lebensdauer dieses Kontexts — und ein Sitzungskontext, der nicht zur Anweisung passt, ist ein
-  **stiller** RLS-Fehler, kein lauter."*
-- `docs/adr/0006-*.md`'s "Entscheidung" section: *"Kein Serverless folgt aus ADR-005 (ohne
-  Kindprozess kein lokaler Solver)."* — the app is a long-running Docker container (app + Python
-  solver in one image, per the "Auslieferung" row), not a serverless/edge deployment. An earlier
-  draft of this research file wrongly assumed a serverless target and picked the transaction-mode
-  pooler that goes with it; corrected here after checking ADR-006 directly instead of defaulting.
+**Why transaction-mode pooling is required, not just permitted**: a serverless/edge runtime cannot
+hold a long-lived direct connection the way a container can — many concurrent function invocations
+need to share a small number of physical Postgres connections, and only a server-side pooler makes
+that safe against connection exhaustion. Supabase's own docs name transaction-mode Supavisor as
+the recommended choice for exactly this shape of workload (verified via `search_docs`, 2026-09-16).
 
-**Rationale**: The Docker-container deployment matches Supabase's own stated use case for a
-direct connection — *"ideal for persistent servers, such as virtual machines (VMs) and
-long-lasting containers"* (verified via `search_docs`, 2026-09-16) — and direct/session-mode
-connections support prepared statements normally, so no driver workaround is needed (unlike
-transaction-mode pooling, which disables them).
-
-This does **not** make FR-0.3/FR-0.4's `SET LOCAL` discipline any less load-bearing. A
-long-running container still needs many concurrent requests to share a small number of physical
-Postgres connections for performance — that reuse happens one layer up, in the **app's own
-internal connection pool** (the Postgres client library's pool, e.g. `postgres-js`'s), not in a
-Supabase-side pooler. Supabase's own troubleshooting docs describe the identical failure mode in
-general terms, independent of which layer does the pooling: *"In a pooled environment, the
+**The risk this reopens, stated plainly, not minimized**: Supabase's own troubleshooting docs
+describe the general failure mode of any pooled connection: *"In a pooled environment, the
 connection doesn't go away. It goes back into the pool, settings and all, and the next client who
-gets it inherits whatever was left behind."* Two different households' requests can still land on
-the same physical connection sequentially through the app's own pool — which is exactly the
-scenario FR-0.3's single transaction helper and FR-0.4's `SET LOCAL`-only rule exist to make safe
-regardless of which pooling layer is doing the reuse.
+gets it inherits whatever was left behind."* This is the exact mechanism `docs/GUARDRAILS.md` G-C8
+calls *"der subtilste Fehler in der gesamten Sicherheitsarchitektur."* Under the container
+architecture this plan assumed until 2026-09-16, this risk had a second line of defense (few,
+long-lived connections in the app's own pool, direct to Postgres). Under transaction-mode pooling,
+that second line is gone — **FR-0.3's single transaction helper and FR-0.4's `SET LOCAL`-only rule
+are now the sole defense**, not one of two, exactly as `docs/adr/0006-*.md`'s 2026-09-16 amendment
+states.
+
+**Why the sole defense can still hold, and what it depends on**: `SET LOCAL` is transaction-scoped
+by Postgres itself — it is discarded automatically at `COMMIT`/`ROLLBACK`, at the exact moment a
+transaction-mode pooler reclaims the connection for the next tenant. As long as every request
+executes its `SET LOCAL` and its dependent queries inside **one** database transaction, opened and
+closed by the **one** transaction helper FR-0.3 requires, the pooler's per-transaction connection
+assignment and `SET LOCAL`'s own scoping match up correctly. The risk `docs/adr/0006-*.md` names
+is about *accidentally* splitting the `SET LOCAL` and the query across two separate
+transactions/connection checkouts (an easy mistake with an ORM that isn't used carefully) — not a
+claim that the combination is unsafe when the discipline holds. This is **not yet an empirically
+verified claim** for this codebase — it is the reasoning behind why FR-0.3/FR-0.4 are written the
+way they are, and it is exactly what the guarded test **G-D10/AC-0.7** (two households, same
+physical connection, sequential requests, second sees nothing from the first) exists to prove
+before the first real policy is written, not assume.
+
+**New implementation detail surfaced by this decision**: transaction-mode Supavisor does not
+support prepared statements. Drizzle's default Postgres driver (`postgres-js`) uses them by
+default; this must be disabled (`postgres(connectionString, { prepare: false })`) or writes will
+fail unpredictably. This needs an explicit `/speckit-tasks` item — it is a real driver-configuration
+detail, not something GUARDRAILS or the F0 requirements packet could have named in advance, since
+they predate this specific hosting decision.
 
 **Alternatives considered**:
-- *Supavisor transaction-mode pooler* — rejected: directly ruled out by `docs/adr/0006-*.md`'s
-  "Datenbankverbindung" row, for exactly the `SET LOCAL` lifetime reason above.
-- *Supavisor session-mode pooler* — not rejected outright, but not the default: Supabase
-  recommends it as *"an alternative to a Direct Connection when connecting from an IPv4-only
-  network."* If the chosen hosting turns out to be IPv4-only and lacks the IPv4 add-on, this is
-  the documented fallback with the same session-scoped behavior as a direct connection — a
-  `/speckit-tasks` decision at deploy time, not a plan-level one.
-- *Dedicated PgBouncer pooler* — not applicable: transaction-mode only, so it inherits the same
-  rejection as the Supavisor transaction-mode pooler above.
+- *Direct connection (session mode)* — was the confirmed choice for the container architecture
+  (2026-09-16, earlier same day); superseded once the app moved to serverless, since a serverless
+  runtime cannot sustain a long-lived direct connection under concurrent invocations without
+  risking connection exhaustion.
+- *Supavisor session-mode pooler* — Supabase's documented fallback *"when connecting from an
+  IPv4-only network,"* not needed here since transaction mode is the documented fit for
+  serverless/edge specifically.
+- *Dedicated PgBouncer pooler* — paid-tier only; not relevant to a free-hosting decision.
 
 ## 2. Row-level security policy definition mechanism
 

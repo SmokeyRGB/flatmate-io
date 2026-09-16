@@ -7,8 +7,9 @@ Proves the three FR groups in `spec.md` hold, once implemented. Not a build guid
 
 - Supabase project `flatmate-io` (`cjinhzzvjryojvhngjjn`, `eu-west-1`, Postgres 17) — already
   provisioned, currently empty. Migrations from this feature create its first tables.
-- `DATABASE_URL` pointed at the **direct connection** (port `5432`), per `research.md` §1 and
-  `docs/adr/0006-*.md` — never the transaction-mode pooler.
+- `DATABASE_URL` pointed at **Supabase's transaction-mode pooler** (port `6543`), per `research.md`
+  §1 and `docs/adr/0006-*.md` (confirmed 2026-09-16, Vercel serverless hosting) — with prepared
+  statements disabled on the client (`{ prepare: false }` for `postgres-js`), or writes fail.
 - Test runner: Vitest (working assumption, `tools/README.md`; open to challenge per constitution
   Principle IX).
 
