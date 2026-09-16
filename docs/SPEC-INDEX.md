@@ -57,6 +57,7 @@ Diese Tabelle macht aus „irgendwo steht es" ein „hier gilt es".
 | **Status offener Punkte** | **`review-log.md` §Offene-Punkte-Register** — es entscheidet, **ob** ein Punkt offen ist | Eine **geschlossene** Zeile behält ihren Auflösungstext im Fachdokument, durchgestrichen — das ist beabsichtigt (G-N5 samt seiner Durchsetzungsgrenze) |
 | **Prinzipien** `P-1`…`P-5` | **`README.md` §3.1** — nach der Aufteilung war die Tabelle nur noch im eingefrorenen `05-ADRs.md` | überall namentlich zitiert: `GUARDRAILS.md`, `adr/`, `03-PRD.md`, `backlog/` |
 | **Werkzeugwahl** | **`tools/README.md`** samt Begründung je Werkzeug | `GUARDRAILS.md` §Minimal-Gate · `MINIMAL-GATE.md` |
+| **Visuelles Design** (Farben, Typografie, Abstände, Komponentenmuster) | **`09-Design-System.md`** | `prototype/` — der Lovable-Clickthrough, aus dem die Tokens abgeleitet sind; liegt außerhalb der Übergabegrenze (`README.md` §1) |
 
 ---
 
