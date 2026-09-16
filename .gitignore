@@ -18,7 +18,13 @@
 /Check-In-Presentation 07.09/
 /coursework/check-in-presentation-2026-09-07/
 /coursework/exercise-12/
+/docs/prompts/*
 ~$*
+
+# Environment files containing sensitive information.
+*.env
+
+
 
 # --- Deliberately NOT ignored anymore ----------------------------------------
 # `00-Session-Brief.md` and `Initial-Claude-Prompt.md` are now tracked. The
@@ -26,5 +32,3 @@
 # name a source of truth absent from the repo was the worst defect in the tree.
 # See docs/README.md for the precedence order it sits in.
 
-# Environment files containing sensitive information.
-*.env

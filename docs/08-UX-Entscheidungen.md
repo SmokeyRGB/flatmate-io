@@ -32,7 +32,7 @@
 
 ---
 
-## 1. Die Entscheidungen U-1 bis U-27
+## 1. Die Entscheidungen U-1 bis U-29
 
 Die Klammerverweise `(K-n)` benennen den Kommentar aus der Review-Runde, der die jeweilige
 Entscheidung ausgelöst hat. Sie sind Teil des Originalwortlauts und bleiben stehen.
@@ -66,6 +66,8 @@ Entscheidung ausgelöst hat. Sie sind Teil des Originalwortlauts und bleiben ste
 | **U-25** | Keine Aussage über eine **Eignung** von Kandidaten — nur über Schwellen, die es tatsächlich gibt | P-5 |
 | **U-26** | Der Passwort-Reset durch die Verwaltung ist ein **bewusster, dokumentierter Tauschhandel**, der endet, sobald ein Bewohner eine eigene E-Mail hinterlegt | O-16 |
 | **U-27** | **Zweistufiges Entfernen von Mitgliedern.** „Ausgezogen" (weich) erhält Stimmen und Historie und ist der reguläre Weg für tatsächliche Auszüge. „Entfernen" (hart, endgültig) verlangt die **Eingabe des exakten Anzeigenamens** zur Bestätigung und ist ausdrücklich **nicht** für Auszüge gedacht, sondern das Moderationswerkzeug gegen Personen, die über den Einladungslink **fälschlich oder in böser Absicht** beigetreten sind (Eindringlinge) — deren Stimmen/Bewerbungen sollen nicht in Score oder Protokoll verbleiben | screens `O-organisation.md` O16; entschieden 2026-09-16 |
+| **U-28** | **Teilnahme-Ausnahme in der Rangliste.** Die Rangliste (D1) darf, nachdem die betrachtende Person selbst abgestimmt hat, zeigen, wer von den Stimmberechtigten bereits abgestimmt hat (nicht was) — benannte Ausnahme von der „kein Pranger"-Regel, da Ergebnisse zu diesem Zeitpunkt ohnehin schon aufgedeckt sind (V-4). Zusätzlich: Haushaltseinstellung `reveal_vote_authorship` (Default aus) zeigt optional, wer wie gestimmt hat; Selbst-Redaktion und der Auskunftsexport-Anonymitätsschutz bleiben unverändert | `02-SRD.md` §10; screens `D-casting-tab.md` D1/D2; entschieden 2026-09-16, Prototype-User-Test |
+| **U-29** | **O4 Pipeline: Rundeninfo und Bewerbungsliste als ein Block.** Rundeninfo-Kopf und Bewerbungsliste werden visuell zusammengefasst dargestellt, nicht als zwei getrennte Cards — kein konkretes CSS vorgeschrieben, nur die Absicht | screens `O-organisation.md` O4; entschieden 2026-09-16, Prototype-User-Test |
 
 ---
 
@@ -93,8 +95,8 @@ ausführlich in `02-SRD.md` §5.3 bei S-05 und S-49.
 
 ## 3. Offene Punkte
 
-Keine. Alle 27 Entscheidungen sind entschieden — das war der Zweck des Abschnitts „Entschieden"
-im Plan (U-1…U-26) bzw. des Prototyp-Abgleichs vom 2026-09-16 (U-27). Zwei tragen einen Nachtrag:
+Keine. Alle 29 Entscheidungen sind entschieden — das war der Zweck des Abschnitts „Entschieden"
+im Plan (U-1…U-26) bzw. des Prototyp-Abgleichs vom 2026-09-16 (U-27 bis U-29). Zwei tragen einen Nachtrag:
 
 - **U-12** war im Plan als „weiterhin offen" markiert. Sie ist seither als **S-49** in den Scope
   aufgenommen und mit **O-15** vorbelegt (Ablauf 7 Tage, Nutzungsgrenze = Zahl fehlender

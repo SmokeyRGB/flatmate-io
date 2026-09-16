@@ -309,6 +309,7 @@ protokolliert wird (Regel-Sperre, §3.2).
 | `favorite_budget_enabled` | `bool` | ⚙️ | Default `true` |
 | `favorite_budget_factor` | `numeric` | ⚙️ | Default `1.5`; Budget `= ceil(open_rooms × factor)` |
 | `hide_results_until_voted` | `bool` | ⚙️ | Default `true` (Anker- und Bandwagon-Effekt, V-4) |
+| `reveal_vote_authorship` | `bool` | ⚙️ | **Neu (2026-09-16, Prototype-User-Test).** Default `false`. Wenn aktiv, zeigt die Kandidaten-Einzelansicht (D2) zusätzlich zur aggregierten Verteilung, welche Person wie gestimmt hat. Selbst-Redaktion (G-D1, deckt „alle Lesepfade auf Vote" ab) und der Auskunftsexport-Anonymitätsschutz (G-D6, betrifft nur den Export an Bewerbende) gelten unverändert und unabhängig von dieser Einstellung |
 | `quorum_share` | `numeric` | ⚙️ | **Default `0.5`** (entschieden, §8.3): mindestens die Hälfte der stimmberechtigten Teilnehmenden, bevor eine Bewerbung in der Rangliste erscheint |
 | **Veto** | | | |
 | `veto_budget_per_round` | `int` | ⚙️ | Default `1` |

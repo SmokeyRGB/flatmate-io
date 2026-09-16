@@ -108,6 +108,14 @@ Prozess vs. Person, nicht bei „beschreibend vs. empfehlend".
 
 - Bewerbungen gruppiert nach `Application.status`
 - Zugriff auf O5 je Bewerbung
+- **Layout (ergänzt 2026-09-16, Prototype-User-Test):** Rundeninfo-Kopf und Bewerbungsliste
+  werden als ein visuell zusammenhängender Block dargestellt, nicht als zwei getrennte Cards —
+  beides gehört zur selben Runde und soll auch so aussehen. Kein konkretes CSS vorgeschrieben,
+  nur die Absicht.
+- **Keine „Archivieren"-Handlung in v0.1:** Die Pipeline bietet pro Bewerbung nur „Löschen"
+  (manuell, S-33-Hälfte). Der `archived`-Zustand und seine 14-Tage-Vorwarnung gehören zur
+  Aufbewahrungsautomatik (O17/O18) und sind v0.2-Scope (S-33, siehe `backlog/roadmap.md`) — kein
+  „Archivieren"-Button auf dieser Fläche.
 
 **Abweichende Zustände**
 
@@ -127,7 +135,10 @@ Prozess vs. Person, nicht bei „beschreibend vs. empfehlend".
 **Kernelemente**
 
 - „Als eingeladen markieren" → `status: new → screened → invited`
-- **Copy-Paste-Text mit Datenschutzhinweis** wird erzeugt (S-16)
+- **Copy-Paste-Text mit Datenschutzhinweis** wird erzeugt (S-16) — **in derselben Handlung, nicht
+  optional und nicht nachgelagert:** ein Klick auf „Einladen"/„Als eingeladen markieren", der nur
+  den Status wechselt und keinen Text erzeugt, erfüllt diesen Screen nicht (im Prototyp
+  beobachteter Fehler, 2026-09-16)
 
 **Abweichende Zustände**
 
@@ -359,7 +370,7 @@ Prozess vs. Person, nicht bei „beschreibend vs. empfehlend".
 |---|---|---|
 | Zweck | Information — wer gehört zu dieser Runde | Verwaltung — wer gehört zum Haushalt |
 | Inhalt | nur Namen | Namen, Beitrittsdatum, Kontakt, Status |
-| Handlungen | keine | entfernen, `moved_out`, reaktivieren, Code |
+| Handlungen | keine | entfernen, `moved_out`, reaktivieren, Beitrittscode erzeugen/löschen |
 | Verwaltung | — | voll |
 | Moderator | ja | lesend |
 | Bewohnende | ja | **nein** |
@@ -367,6 +378,9 @@ Prozess vs. Person, nicht bei „beschreibend vs. empfehlend".
 **Kernelemente**
 
 - Mitgliederliste mit Rolle, Beitrittsdatum, verknüpften `ResidentProfile`s
+- **Kontakt ist eine Datenspalte, kein Button.** Die Mitgliederliste zeigt hinterlegte
+  Kontaktdaten an; es gibt keine eigene „Kontakt"-Handlung (im Prototyp beobachteter Fehler,
+  2026-09-16 — dort erschien pro Mitglied ein zusätzlicher „Kontakt"-Button ohne Spec-Basis)
 - **Beitrittscode teilen** — mit den drei Auflagen aus S-49:
   1. Warnhinweis dort, wo der Link kopiert wird: „Teile diesen Link nur direkt mit deinen
      Mitbewohnenden — niemals öffentlich. Wer ihn hat, kann mitstimmen."
@@ -374,6 +388,14 @@ Prozess vs. Person, nicht bei „beschreibend vs. empfehlend".
   3. Nutzungsgrenze (`join_code_max_uses`, vorbelegt mit **1** — Ausnahme: der Gründungs-Link
      direkt nach `A1 Registrierung`, vorbelegt mit der Zahl der erwarteten Bewohnenden; O-15,
      aktualisiert 2026-09-16)
+  4. Löschen des Codes heißt **„Löschen"**, nicht „Widerrufen" und nicht „Zurückziehen" (UI-Vokabular
+     `rahmenwerk.md` §8.6) — ein bereits verwendeter Link wird gelöscht, ohne dass das etwas an den
+     darüber bereits beigetretenen Mitgliedschaften ändert
+- **Offener Punkt:** das Datenmodell trägt aktuell nur einen einzelnen, rotierenden `join_code`
+  mit Zähler (`domain/identity.md`), keine Historie einzelner Ausstellungen. Eine Ansicht, die
+  mehrere vergangene Links samt „wer hat sich darüber registriert" zeigt, verlangt eine Erweiterung
+  dieses Modells — siehe `review-log.md` §Offene-Punkte-Register, nicht hier vorweggenommen, weil
+  sie das gefrorene `04-Domaenenmodell.md` beträfe
 - Mitglied entfernen, `moved_out` setzen, reaktivieren
 - **Zweistufiges Entfernen (U-27, entschieden 2026-09-16):** „Ausgezogen" (`moved_out` setzen) ist
   der reguläre Weg für tatsächliche Auszüge — Stimmen und Historie bleiben erhalten. „Entfernen"
@@ -464,7 +486,10 @@ Prozess vs. Person, nicht bei „beschreibend vs. empfehlend".
 - **`ResidentProfile` anlegen** — der Weg, über den die Verwaltung handlungsfähig bleibt, wenn der
   letzte Moderator auszieht (§4.3)
 - **Moderator ernennen** — Rollenwechsel innerhalb der `Membership`
-- **Abstimmungsverfahren** — Regel-Sperre während einer laufenden Runde (E-25)
+- **Abstimmungsverfahren** — Regel-Sperre während einer laufenden Runde (E-25). Umfasst u. a.
+  `hide_results_until_voted` und, neu (2026-09-16, Prototype-User-Test), `reveal_vote_authorship`
+  — Toggle „Stimmen-Urheberschaft in der Rangliste zeigen", Default aus, mit Hinweistext zum
+  Anker-/Bandwagon-Tradeoff (`domain/identity.md`)
 - **Datenschutzseite freigeben** — `PublishedPrivacyNotice` (G-C9); vor Freigabe über keinen
   Codepfad erreichbar
 

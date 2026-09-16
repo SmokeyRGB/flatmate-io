@@ -162,7 +162,7 @@ sondern in *Art* des Zugriffs. Sie entstehen aus **orthogonalen `Membership`-Att
 | `Household` anlegen / Einstellungen ändern | ✅ | ⬜ nur mit Berechtigung | ❌ | ❌ |
 | `Room` anlegen · Verfügbarkeit ändern (`planned` · `open` · `on_hold` · `not_available`) — `manage_rooms`, vorbelegt bei Verwaltung **und** Moderation (P-O-10) | ✅ | ✅ | ❌ | ❌ |
 | `Room`-Status als **Folge einer Bewerbung** (`promised`, `occupied` und ihre Rückwege) | **❌** (S-50/U-20) | ✅ | ❌ | ❌ |
-| Beitrittscode erzeugen / widerrufen | ✅ | ✅ | ❌ | ❌ |
+| Beitrittscode erzeugen / löschen | ✅ | ✅ | ❌ | ❌ |
 | `ResidentProfile` anlegen (aus Verwaltungskontext) | ✅ | ❌ | ❌ | ❌ |
 | Moderator ernennen / Berechtigung vergeben | ✅ | ❌ | ❌ | ❌ |
 | Mitglied entfernen / auf `moved_out` setzen | ✅ | ✅ | ❌ (**geändert, U-22** — bisher „✅, Duplikatsschutz S-05"; die Begründung von S-05/E-06 wird in `02-SRD.md` nachgezogen) | ❌ |
@@ -661,7 +661,10 @@ tragen keinen Rangplatz.
 
 **Einzelansicht (S-12):** Sachprofil, gestapelter **4-Farben-Stimmungsbild-Balken**
 (Verteilung der vier Stufen), Stimmenzahl, Notizen, Statushandlungen. Der Balken hat eine textliche
-Entsprechung („2× Unbedingt, 3× Finde gut, 1× Eher nicht").
+Entsprechung („2× Unbedingt, 3× Finde gut, 1× Eher nicht"). **Optional (Haushaltseinstellung
+`reveal_vote_authorship`, Default aus, ergänzt 2026-09-16 nach Prototype-User-Test):** zeigt
+zusätzlich zur Verteilung, welche Person wie gestimmt hat. Selbst-Redaktion (unten) hat davon
+unabhängig immer Vorrang.
 
 **Verdeckte Ergebnisse (Standard an, E-09):** Solange das aktive Profil im laufenden
 `Vote.stage` keine `Vote` zu dieser `Application` abgegeben hat, sind Score, Balken,
@@ -1264,7 +1267,7 @@ aber **nie** auf dem primären-CTA-Platz und **nie** über einer Aufgabe mit ges
 
 - Authentifizierung: Registrierung (Haushalt), Beitritt per Code, Anmeldung, Passwort
   zurücksetzen, Sitzung; Passkey als optionaler Zusatz; E-Mail-Verifikation nachgelagert
-- Beitrittscode: einer pro `Household`, erzeugbar und widerrufbar
+- Beitrittscode: einer pro `Household`, erzeugbar und löschbar
 - `Household`, `Room`, `Membership`, `ResidentProfile`: Verwaltung inklusive `moved_out`
   und Reaktivierung
 - `CastingRound`: anlegen, öffnen (mit `RoundParticipation`-Snapshot), schließen,

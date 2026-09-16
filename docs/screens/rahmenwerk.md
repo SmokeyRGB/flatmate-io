@@ -325,7 +325,7 @@ Ausgeblendetes existiert nicht, statt leer zu erscheinen.
 | **V-1 — Selbst-Redaktion** | Beratungsinhalte über die eigene Bewerbung sind für die betroffene Person dauerhaft unsichtbar, unabhängig vom Rundenstatus | D1 (Ausschluss aus Rangliste/„Warten auf Stimmen"), D2 (führt stattdessen auf D3), B3 (Feed-Eintrag erscheint nicht), C4 (eigene Notizen anderer bleiben unsichtbar) |
 | **V-2 — Rundensichtbarkeit** | Beratungsinhalte nur für Profile mit `RoundParticipation` an dieser Runde | C1–C4, D1, D2, O4, O5 |
 | **V-3 — Entzug bei `moved_out`** | Sofortiger Zugriffsentzug, Quorum-Nenner sinkt | alle Beteiligungs- und Casting-Tab-Bildschirme |
-| **V-4 — Ergebnisse verdeckt bis zur eigenen Stimme** | Score und Rangliste bleiben verdeckt, bis die Person selbst gestimmt hat | D1 |
+| **V-4 — Ergebnisse verdeckt bis zur eigenen Stimme** | Score und Rangliste bleiben verdeckt, bis die Person selbst gestimmt hat | D1, **D2** (`03-PRD.md` §4.1.6 verlangt dieselbe Maskierung dort; hier bis 2026-09-16 fälschlich nicht geführt) |
 
 Für jeden Bildschirm mit Beratungsinhalt in §7–§8 ist das über die Spalte „Abweichende Zustände"
 bzw. den Fließtext ausgeschrieben, wo eine Regel greift; die Standardregel gilt sonst stillschweigend.
@@ -348,8 +348,14 @@ bzw. den Fließtext ausgeschrieben, wo eine Regel greift; die Standardregel gilt
 | `moved_out` (weich) | „Ausgezogen" |
 | Hartes Entfernen (U-27) | „Entfernen" |
 | `join_code` | „Einladungslink" / „Beitrittscode" |
+| `join_code` ungültig machen (O16) | „Löschen" — **nicht** „Widerrufen" und **nicht** „Zurückziehen": ein bereits verwendeter Link wird gelöscht, nicht im Sinne eines Rückrufs der darüber beigetretenen Mitbewohner:innen behandelt. Wiederverwendung von „Löschen" für eine `Application` (§8.6-Eintrag unten) ist unproblematisch, da der Listen-Kontext eindeutig ist |
+| `Notification.type = new_application` | „Neue Bewerbung: {Name}" |
+| `Notification.type = vote_pending` | „{N} Bewerbungen warten auf deine Stimme" |
+| `Notification.type = appointment_confirmed` | „Termin bestätigt: {Datum, Uhrzeit}" |
+| `Notification.type = retention_warning` | „{Name} wird in 14 Tagen automatisch gelöscht, falls nichts geschieht" |
+| `reveal_vote_authorship` | Haushaltseinstellung „Stimmen-Urheberschaft in der Rangliste zeigen" (Default aus) |
 | Selbst-Redaktion (S-31) | „Bewertungen über deine eigene Bewerbung siehst du nicht — das ist eine feste Regel, kein Zufall." |
-| `former_resident` | „Ehemalige Bewohner:innen" — lesend, Stimme bleibt gespeichert, zählt nicht mehr zum Quorum |
+| `former_resident` | „Ehemalige Bewohner:innen" — Stimme bleibt gespeichert, zählt nicht mehr zum Quorum. **Kein Lesezugriff, kein Login (V-3)** — im Lovable-Prototyp fälschlich als weiterhin einloggbar/mitlesend umgesetzt; diese Tabelle übernimmt nur den Anzeigetext, nicht dieses Verhalten |
 
 > **Architekturhinweis (2026-09-16).** v0.1 liefert nur diese `de`-Tabelle, aber die Struktur soll
 > von Anfang an **eine Schlüssel→Text-Tabelle sein, kein Text inline im Code** — auch englischsprachige

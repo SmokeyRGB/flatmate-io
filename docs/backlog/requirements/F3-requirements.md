@@ -22,7 +22,11 @@ single application.
 of a raw message (S-39, moved to v0.2 — see §8) · portal API · scraping · attachments and file
 upload · AI parsing · **any AI judgement, summary, ranking or recommendation about an applicant**
 · retention automation and its warning · linking a person's earlier application (S-40, v0.2) ·
-subject-access export (S-34, v0.2 gate).
+subject-access export (S-34, v0.2 gate). **The pipeline UI shall not offer a manual "archive"
+action on an application** — the `archived` state and its 14-day warning belong to retention
+automation above and are v0.2 scope; v0.1's only status-ending action on an application is
+delete. *(Made explicit 2026-09-16, prototype user test — the prototype offered an "Archivieren"
+button per application in what is meant to be v0.1 scope.)*
 
 ---
 

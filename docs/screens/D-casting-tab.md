@@ -16,6 +16,12 @@
 
 - Sortierbare Rangliste mit Score (nach eigener Stimme sichtbar, Standard V-4)
 - Abschnitt „Warten auf Stimmen" getrennt von der Rangliste
+- **Teilnahme-Abschnitt (neu, 2026-09-16, Prototype-User-Test):** sobald die betrachtende Person
+  mindestens eine eigene Stimme in der laufenden Runde abgegeben hat, zeigt D1 zusätzlich, welche
+  stimmberechtigten `RoundParticipation`-Teilnehmenden bereits abgestimmt haben — nur Teilnahme,
+  nie der Inhalt der Stimme. Ausnahme von der „kein Pranger"-Regel aus `02-SRD.md` §10, dort mit
+  Begründung dokumentiert. B4 (Teilnehmendenliste) bleibt davon unberührt und zeigt weiterhin
+  keinen Abstimmungsstatus.
 - Zugriff auf D2, D3, D4
 - Einstieg in B4 über „5 von 7 haben abgestimmt"
 
@@ -24,7 +30,7 @@
 | Zustand | Verhalten |
 |---|---|
 | Leer | Noch keine Bewerbung in dieser Runde — Rundenstand aus §3 statt einer leeren Liste (analog B1) |
-| Eigene Stimme fehlt | Ergebnisse verdeckt mit Erklärung, Sprung in C1/C3 |
+| Eigene Stimme fehlt | Ergebnisse verdeckt mit Erklärung, Sprung in C1/C3. **Der Hinweis ist bildschirmweit an den Zustand gebunden, nicht an einzelne Kandidatenkarten:** solange irgendeine eigene Stimme in der Runde fehlt, erscheint er; sobald die letzte eigene Stimme abgegeben ist, verschwindet er vollständig — er darf nicht als statischer Untertitel unabhängig vom Abstimmungsfortschritt stehen bleiben (im Prototyp beobachteter Fehler, 2026-09-16) |
 
 ---
 
@@ -39,12 +45,18 @@
 
 - Lädt Stimmen, Notizen und Aggregat erneut mit Policy-Prüfung — übernimmt nichts ungeprüft aus D1
 - Zugriff auf C4 (Notiz schreiben/lesen)
+- Verteilung der vier Stufen als Aggregat (`03-PRD.md` §4.1.6). **Optional, Haushaltseinstellung
+  `reveal_vote_authorship` (Default aus, `domain/identity.md`):** zeigt zusätzlich zum Aggregat je
+  Stimme den Namen der abstimmenden Person. Selbst-Redaktion (G-D1) hat in jedem Fall Vorrang —
+  die Einstellung ändert nichts an den Leseregeln für die eigene, verknüpfte Bewerbung. Der
+  Auskunftsexport (G-D6) bleibt unabhängig von dieser Einstellung immer ohne Urheberschaft.
 
 **Abweichende Zustände**
 
 | Zustand | Verhalten |
 |---|---|
 | Selbst-Redaktion greift | Kann für die betroffene Person nicht auftreten — die eigene Bewerbung führt stattdessen auf D3 |
+| Eigene Stimme zu diesem Kandidaten fehlt (V-4) | Score, Balken, Stimmenzahl und Rangplatz verdeckt, mit Erklärung und direktem Weg zur Stimmabgabe (`03-PRD.md` §4.1.6). Bisher nur für D1 in der Zusammenfassungstabelle geführt — gilt identisch auch hier |
 
 ---
 
