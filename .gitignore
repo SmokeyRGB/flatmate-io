@@ -25,3 +25,6 @@
 # brief is the decision protocol the whole chain rests on; shipping specs that
 # name a source of truth absent from the repo was the worst defect in the tree.
 # See docs/README.md for the precedence order it sits in.
+
+# Environment files containing sensitive information.
+*.env
