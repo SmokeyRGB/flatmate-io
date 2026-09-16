@@ -42,6 +42,7 @@ elif [ -d docs ]; then
   [ -d coursework ] && SCOPE+=(coursework)
   [ -d research ]   && SCOPE+=(research)
   [ -d process ]    && SCOPE+=(process)
+  [ -d specs ]      && SCOPE+=(specs)
 else
   # Flat pre-restructure tree. "." already covers every subdirectory, so listing
   # them again would scan each file twice and double every finding.
