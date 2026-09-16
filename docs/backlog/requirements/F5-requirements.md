@@ -109,11 +109,14 @@ function quorum_reached(application, stage, round) -> bool
 - **FR-5.17** The withholding in FR-5.16 shall be applied before the data reaches the client, on every read path including aggregates and exports.
 - **FR-5.18** A candidate whose results are withheld shall still be listed, so that the resident knows the candidate exists.
 - **FR-5.19** Casting a vote on a candidate shall reveal that candidate's results to the voting resident immediately.
+- **FR-5.19a** The hidden-results explanation shall be bound to the resident's own voting progress in the round as a whole, not rendered as a static subtitle: it shall disappear entirely once the resident has cast every vote open to them in the round, not merely stop applying to individual already-voted candidates. *(Added 2026-09-16, prototype user test — the observed defect was this explanation persisting unconditionally after the resident had voted on every candidate.)*
+- **FR-5.19b** The ranking screen shall support a "who has voted" section, distinct from vote content, that is shown to a resident once they have cast at least one vote in the round's current stage: it names which eligible residents have voted, never what they voted. This is a documented, named exception to the no-participation-shaming principle (`02-SRD.md` §10), justified because results are already reciprocally revealed to that resident at that point (V-4). *(Added 2026-09-16, prototype user test.)* The existing participant list (screen B4) is unaffected and continues to show no voting status at all.
 
 ### 3.5 Candidate detail
 
 - **FR-5.20** The candidate detail view shall show how the four ratings split for that candidate, as counts per rating level.
 - **FR-5.21** The distribution shall be shown in addition to the score, not instead of it.
+- **FR-5.21a** The system shall support a household setting, `reveal_vote_authorship` (default off), that — when enabled — additionally shows, next to the distribution, the name of the resident behind each vote. Self-redaction (FR-5.29/5.30) always takes precedence and is never affected by this setting. The data-subject export's ban on vote authorship (`GUARDRAILS.md` G-D6) is a separate rule scoped to that export and is likewise unaffected. *(Added 2026-09-16, prototype user test.)*
 - **FR-5.22** The candidate detail view shall show the candidate's current state.
 - **FR-5.23** The system shall show every candidate's current state in one place.
 
@@ -193,8 +196,17 @@ Given I have voted on candidate A but not candidate B, when I open the ranking, 
 **AC-5.19 — Stage-scoped reveal**
 Given I voted on a candidate at the invite stage, when a later stage exists and I have not voted at it, then that later stage's results are withheld from me.
 
+**AC-5.19a — The hidden-results explanation clears fully, not per candidate**
+Given hidden results are enabled and I have just cast my last remaining vote in the round, when I open the ranking, then the screen-level hidden-results explanation is no longer shown anywhere on the screen — not merely absent from the candidate rows I have voted on.
+
+**AC-5.19b — Participation is visible once I have voted, content is not**
+Given I have cast at least one vote in the round's current stage, when I open the ranking, then I can see which eligible residents have voted, but not what any of them voted; given I have not yet cast any vote in the current stage, this section is not shown to me.
+
 **AC-5.20 — The distribution is shown alongside the score**
 Given a candidate at quorum whose results are visible to me, when I open the candidate detail, then the count of each of the four ratings is shown in addition to the score.
+
+**AC-5.21a — Vote authorship is opt-in and self-redaction still wins**
+Given `reveal_vote_authorship` is enabled for the household, when I open a candidate detail that is not my own linked application, then each vote's rating is shown next to the name of the resident who cast it; given the same setting and a candidate that is my own linked application, then no vote, distribution or authorship is shown to me regardless of the setting.
 
 **AC-5.21 — Invited yields the text**
 Given I hold the change-status permission, when I mark a candidate `invited`, then a copy-paste text containing the data-protection notice is provided.

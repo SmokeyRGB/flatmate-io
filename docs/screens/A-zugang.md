@@ -63,6 +63,9 @@
 **Kernelemente**
 
 - **Ein** Bildschirm, **zwei** Pflichtfelder: Name und Passwort. E-Mail entfällt vollständig (S-03)
+- Falls das Passwort-Feld eine Anforderung durchsetzt (Länge, Zeichenklassen), steht diese sichtbar
+  am Feld, bevor oder während getippt wird — nie eine stille Ablehnung ohne sichtbaren Grund
+  (FR-2.10a)
 - Kontrollkästchen „Auf diesem Gerät angemeldet bleiben", vorbelegt
 - Haushaltsname zur Bestätigung: „Du trittst *WG Hauptstraße 12* bei" — der Code selbst ist über
   den Link bereits gesetzt, wird nicht erneut abgefragt

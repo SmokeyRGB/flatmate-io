@@ -62,6 +62,7 @@ invite token (that is S-42, v0.2).
 
 - **FR-2.9** Opening a join link shall display the household's name before any input is requested.
 - **FR-2.10** The join form shall require exactly two fields: display name and password.
+- **FR-2.10a** Where the password field enforces any requirement (length, character classes), that requirement shall be visible in or beside the field before or while the resident types — never enforced silently with no visible reason for a rejection.
 - **FR-2.11** The join form shall offer an email field that is visibly optional and may be submitted empty.
 - **FR-2.12** The join form shall include a "stay signed in on this device" checkbox, pre-selected and clearable.
 - **FR-2.13** The system shall not display an app-install prompt or an email request in the join form, nor on any screen between joining and the resident's first vote.
@@ -141,6 +142,12 @@ Given any successful or failed join, when logs and request records are inspected
 
 **AC-2.19 — Joining is auditable**
 Given a successful join, when the audit record is inspected, then it names the new profile and the time of joining.
+
+**AC-2.20 — Password requirements are visible, not silently enforced**
+Given the join form enforces a password requirement, when I start typing a password, then the requirement is visible without needing to submit first and without needing to fail once to see it.
+
+**AC-2.21 — A moved-out account cannot authenticate**
+Given a resident profile with `moved_out_on` set, when that account attempts to sign in, then authentication is refused and any pre-existing session for that profile has already been revoked (V-3). This restates V-3 here as a redundant tripwire in the requirements package the login flow is actually built against, per the two-layer testing principle already applied to visibility invariants (G-C7).
 
 ---
 

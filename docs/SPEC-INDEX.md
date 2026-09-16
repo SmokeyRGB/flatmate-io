@@ -51,7 +51,7 @@ Diese Tabelle macht aus „irgendwo steht es" ein „hier gilt es".
 | **Kontextgrenzen** (sechs Bounded Contexts) | **`domain/kontextgrenzen.md`** §4 | `adr/0001-*.md` · `GUARDRAILS.md` G-I · `tools/README.md` (dependency-cruiser) |
 | **Inhaltsregeln für Freitext** `C-1`…`C-10` | **`03-PRD.md` §4.6.1** | `08-UX-Entscheidungen.md` U-17 · `06-Compliance-Anhang.md` §8 |
 | **PWA statt native App** | **`adr/0011-*.md`** | `GUARDRAILS.md` G-B6, G-B7 (Stimmpuffer) · `03-PRD.md` §6.2. **Liegt in v0.2** |
-| **Sprache** (Dokumente deutsch, Bezeichner englisch) | **`adr/0012-*.md`** — samt benannter Ausnahme für `backlog/` | UI-Vokabular nach U-24: ⚠️ **die Übersetzungstabelle fehlt** — zweimal als „§8.6" zitiert, nie geschrieben. Offener Punkt **O-G** im Register |
+| **Sprache** (Dokumente deutsch, Bezeichner englisch) | **`adr/0012-*.md`** — samt benannter Ausnahme für `backlog/` | UI-Vokabular nach U-24: **`screens/rahmenwerk.md` §8.6** — geschrieben 2026-09-16, Offener Punkt **O-G** geschlossen (siehe `review-log.md` §Offene-Punkte-Register für den aktuellen Stand). Die Tabelle wächst mit dem Implementierungsbedarf weiter, muss nicht erschöpfend sein |
 | **Backup und Wiederherstellung** | **`GUARDRAILS.md` §Implementierungspflichten** | — (vorher **nirgends**; siehe unten) |
 | **Rollen und Verantwortlichkeit (DSGVO)** | **`06-Compliance-Anhang.md` §1** | `02-SRD.md` · `Q-1`…`Q-4`, launch-blockierend |
 | **Status offener Punkte** | **`review-log.md` §Offene-Punkte-Register** — es entscheidet, **ob** ein Punkt offen ist | Eine **geschlossene** Zeile behält ihren Auflösungstext im Fachdokument, durchgestrichen — das ist beabsichtigt (G-N5 samt seiner Durchsetzungsgrenze) |

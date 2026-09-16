@@ -50,10 +50,16 @@
 
 **Kernelemente**
 
-- Liste einzelner `Notification`s, ungelesen hervorgehoben
+- Liste einzelner `Notification`s, ungelesen hervorgehoben — Text je `Notification.type` aus dem
+  UI-Vokabular (`rahmenwerk.md` §8.6), **nie** ein roher `ActivityEvent`-Zustandsübergang
+  („Wechselte von X zu Y"). Letzteres ist B3-Sprache, nicht B2-Sprache — beide Kategorien dürfen
+  sich nicht vermischen (im Prototyp beobachteter Fehler, 2026-09-16)
 - Unterpunkt „Alle Aktivitäten" → B3
 - Jede Notification führt direkt auf ihr Ziel (Bewerbung, Termin, Runde), nie auf eine
   Zwischenübersicht
+- Ein neu beigetretenes Profil startet mit **leerem** Ungelesen-Zustand — keine Hervorhebung und
+  kein Badge für `Notification`s, die vor dem eigenen Beitritt entstanden sind, analog zum
+  `RoundParticipation`-Snapshot-Prinzip (E-13)
 
 ---
 
