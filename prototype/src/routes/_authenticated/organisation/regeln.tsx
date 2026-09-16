@@ -138,21 +138,10 @@ function RulesPage() {
                 Unter dieser Zahl an Stimmen steht eine Bewerbung unter „Wartet noch auf Stimmen".
               </p>
             </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="fav">Favoriten-Budget (Faktor auf offene Zimmer)</Label>
-              <Input
-                id="fav"
-                type="number"
-                step="0.1"
-                min={1}
-                max={3}
-                value={form.favorite}
-                onChange={(e) => update({ favorite: Number(e.target.value) })}
-              />
-              <p className="text-xs text-muted-foreground">
-                Beispiel: 2 offene Zimmer × {form.favorite} = {Math.ceil(2 * form.favorite)} Favoriten pro Person.
-              </p>
-            </div>
+            {/* Favoriten-Budget hat vor dem v0.2-Feinschliff-Screen keine Wirkung — deshalb kein
+                Eingabefeld in v0.1 (roadmap.md, EP-C-Notiz 2026-09-16). form.favorite bleibt als
+                Pass-through erhalten, damit der bestehende Speicherwert unverändert mitgeschrieben
+                wird. */}
             <label className="flex items-center justify-between gap-3 rounded-xl border border-border p-3">
               <span className="text-sm">
                 Ergebnisse verdeckt halten

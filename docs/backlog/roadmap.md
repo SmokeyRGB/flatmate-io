@@ -230,6 +230,7 @@ has only the one row that is really S-31, the visibility invariant.
 | EP-B | get the form with my pasted text still in it, not an error, when the parser finds nothing |
 | EP-C | install the app on my phone when I choose to, not before |
 | EP-C | be shown a short second pass only when I have given more "must have" ratings than the round's favourite budget allows |
+| EP-C | *(note, 2026-09-16)* the favourite-budget **setting** ships together with this second-pass screen — it has no function without it and should not appear in the v0.1 Regeln screen on its own (confirmed during the prototype-vs-docs review; ADR-0008 still specifies the formula for whenever this lands) |
 | EP-C | rate my own shortlist with the same cards I already know |
 | EP-C | see how the score is worked out, not just the number |
 | EP-C | see when a vote came from someone who has since moved out |

@@ -32,7 +32,7 @@
 
 ---
 
-## 1. Die Entscheidungen U-1 bis U-26
+## 1. Die Entscheidungen U-1 bis U-27
 
 Die Klammerverweise `(K-n)` benennen den Kommentar aus der Review-Runde, der die jeweilige
 Entscheidung ausgelöst hat. Sie sind Teil des Originalwortlauts und bleiben stehen.
@@ -50,7 +50,7 @@ Entscheidung ausgelöst hat. Sie sind Teil des Originalwortlauts und bleiben ste
 | **U-9** | **Sortierung nach Zeitdruck**, nicht nach fester Rangliste *(K-3)* | S-48; Rechenmodell `04-Domaenenmodell.md` §8.7 |
 | **U-10** | **Kein Feinschliff-Bildschirm.** Zweiter Durchlauf im Kartenmuster *(K-1)* | S-47; v0.2 |
 | **U-11** | **Beitritt ohne E-Mail** — Name + Passwort. „Angemeldet bleiben" vorbelegt *(K-9)* — **inzwischen Spec: S-03** | S-03; Sitzungsdauer 90 Tage (O-13) |
-| **U-12** | **Einladungslink:** Warnhinweis beim Teilen, Ablauf, Nutzungsgrenze *(K-2)* — **weiterhin offen**, und dringlicher denn je | **geschlossen** als S-49; Vorbelegung O-15 |
+| **U-12** | **Einladungslink:** Warnhinweis beim Teilen, Ablauf, Nutzungsgrenze *(K-2)* — **weiterhin offen**, und dringlicher denn je | **geschlossen** als S-49; Vorbelegung O-15, **Nutzungsgrenze-Standard seit 2026-09-16 auf 1 (Einmal-Code) mit Gründungs-Link-Ausnahme aktualisiert** |
 | **U-13** | **Kein eigener Zustand für Redigiertes** — es existiert nicht, mit einer benannten Ausnahme *(K-7)* | V-1 |
 | **U-14** | **Organisationsaufwand senken ist ein Ziel, keine Nettigkeit** — mit Metrik hinterlegt *(K-8)* | `02-SRD.md` §6 |
 | **U-15** | **Ein** Einstellungs-Bildschirm mit Abschnitten statt mehrerer Einzelbildschirme *(K-10)* | Screen E1 |
@@ -65,6 +65,7 @@ Entscheidung ausgelöst hat. Sie sind Teil des Originalwortlauts und bleiben ste
 | **U-24** | **UI-Sprache für junge Menschen ohne Vorwissen** — kein Fachwort ohne Übersetzung („Quorum" → „genug Stimmen") | Übersetzungstabelle `07-Screen-Inventar.md` §8.6 |
 | **U-25** | Keine Aussage über eine **Eignung** von Kandidaten — nur über Schwellen, die es tatsächlich gibt | P-5 |
 | **U-26** | Der Passwort-Reset durch die Verwaltung ist ein **bewusster, dokumentierter Tauschhandel**, der endet, sobald ein Bewohner eine eigene E-Mail hinterlegt | O-16 |
+| **U-27** | **Zweistufiges Entfernen von Mitgliedern.** „Ausgezogen" (weich) erhält Stimmen und Historie und ist der reguläre Weg für tatsächliche Auszüge. „Entfernen" (hart, endgültig) verlangt die **Eingabe des exakten Anzeigenamens** zur Bestätigung und ist ausdrücklich **nicht** für Auszüge gedacht, sondern das Moderationswerkzeug gegen Personen, die über den Einladungslink **fälschlich oder in böser Absicht** beigetreten sind (Eindringlinge) — deren Stimmen/Bewerbungen sollen nicht in Score oder Protokoll verbleiben | screens `O-organisation.md` O16; entschieden 2026-09-16 |
 
 ---
 
@@ -92,8 +93,8 @@ ausführlich in `02-SRD.md` §5.3 bei S-05 und S-49.
 
 ## 3. Offene Punkte
 
-Keine. Alle 26 Entscheidungen sind entschieden — das war der Zweck des Abschnitts „Entschieden"
-im Plan. Zwei tragen einen Nachtrag:
+Keine. Alle 27 Entscheidungen sind entschieden — das war der Zweck des Abschnitts „Entschieden"
+im Plan (U-1…U-26) bzw. des Prototyp-Abgleichs vom 2026-09-16 (U-27). Zwei tragen einen Nachtrag:
 
 - **U-12** war im Plan als „weiterhin offen" markiert. Sie ist seither als **S-49** in den Scope
   aufgenommen und mit **O-15** vorbelegt (Ablauf 7 Tage, Nutzungsgrenze = Zahl fehlender

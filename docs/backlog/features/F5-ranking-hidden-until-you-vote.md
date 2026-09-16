@@ -152,6 +152,14 @@ that candidate **in the current `Vote.stage`**, four things stay hidden: the sco
 distribution, the vote count, and the rank position. **Enforced server-side** — never merely
 hidden in the client, and never leaked through an aggregate endpoint.
 
+**Vote correction does not defeat this rule (clarified 2026-09-16).** A resident may change their
+own already-cast vote at any point before the round/stage closes — fixing a mistake stays
+possible. This is not a loophole in the hide-until-voted invariant: editing your own vote never
+reveals anyone else's vote, distribution, score, or rank ahead of your own first vote on that
+candidate. The two are orthogonal — "have you voted yet" (gates visibility) and "can you still
+change what you voted" (a correction path) are separate questions, and only the first one guards
+against anchoring/bandwagon effects.
+
 ### Self-redaction (S-31)
 
 Any deliberation artifact whose `Application.became_resident_id` equals the viewing profile is

@@ -200,7 +200,7 @@ Neutral gegenüber WG, Wohnprojekt, Haus und Vermieter-Objekt. UI-Label in v1 du
 | `join_code` | `text` | ⚙️ | **ein Code für den ganzen Haushalt**, nicht pro Person. Fünf Auflagen, siehe Kasten unten |
 | `join_code_rotated_at` | `timestamptz?` | ⚙️ | |
 | `join_code_expires_at` | `timestamptz?` | ⚙️ | **Neu (S-49).** Vorschlag `join_code_rotated_at + 7 Tage`, mit einem Tippen verlängerbar (O-15). Abgelaufen ⇒ Code lehnt jeden Beitritt ab, unabhängig von `join_code_max_uses` |
-| `join_code_max_uses` | `int?` | ⚙️ | **Neu (S-49).** `null` = unbegrenzt (Default für Bestandshaushalte bei Migration). Für neue Haushalte vorbelegt mit der Zahl der noch fehlenden Bewohnenden (O-15) |
+| `join_code_max_uses` | `int?` | ⚙️ | **Neu (S-49).** `null` = unbegrenzt (Default für Bestandshaushalte bei Migration). Für neue Haushalte vorbelegt mit **1** (Einmal-Code, aktualisiert O-15 2026-09-16) — Ausnahme: der Gründungs-Link direkt nach `A1 Registrierung`, vorbelegt mit der Zahl der bei der Gründung erwarteten Bewohnenden |
 | `join_code_uses` | `int` | ⚙️ | **Neu (S-49).** Zähler, hochgesetzt bei jedem erfolgreichen Beitritt über diesen Code. Setzt sich bei Rotation zurück, weil ein rotierter Code ohnehin ein neuer Wert ist |
 | `entity_label` | `enum(wg, wohnprojekt, haus, objekt)` | ⚙️ | in v1 fest `wg`, später pro Objekt wählbar |
 | `entity_label` | `enum(wg, wohnprojekt, haus, objekt)` | ⚙️ | in v1 fest `wg`, später pro Objekt wählbar |
@@ -275,7 +275,17 @@ Neutral gegenüber WG, Wohnprojekt, Haus und Vermieter-Objekt. UI-Label in v1 du
 >    Passwortäquivalent ohne Verfallsdatum.
 > 5. **Nutzungsgrenze** (`join_code_max_uses`/`join_code_uses`). Derselbe Grund wie 4: ohne Grenze
 >    kann derselbe Code beliebig oft eingelöst werden, auch nachdem alle erwarteten Bewohnenden
->    bereits beigetreten sind.
+>    bereits beigetreten sind. Standard seit O-15 (aktualisiert 2026-09-16): **1**, mit der
+>    Gründungs-Link-Ausnahme.
+>
+> **Ergänzung, entschieden 2026-09-16 — Speicherformat.** Die fünf Auflagen legen Umgang, nicht
+> Speicherformat fest. Entscheidung: `join_code` darf **im Klartext gespeichert und dauerhaft
+> (nicht nur einmalig) angezeigt werden**, lesbar ausschließlich für Moderation und
+> Haushalts-Account desselben Haushalts. Begründung: wer diese Ansicht erreicht, ist bereits
+> authentifiziertes Mitglied mit entsprechenden Rechten — dauerhafte Klartext-Lesbarkeit erhöht
+> das Risiko gegenüber einer Einmal-Anzeige nicht wesentlich. Das ersetzt keine der fünf Auflagen
+> oben, insbesondere nicht Punkt 2/3 (Log- und Query-String-Verbot, G-A5 bleibt unverändert
+> gültig).
 >
 > Punkt 2 ist die unbequemste: „nicht ins Anwendungslog schreiben" ist trivial, „das Zugriffslog des
 > Webservers für eine Route redigieren" ist eine Konfigurationsaufgabe, die man vergisst. Sie gehört

@@ -1256,7 +1256,7 @@ Umsetzung wird beim Repo-Aufsetzen konkretisiert und in `GUARDRAILS.md` maschine
 | Passkeys | optional, jederzeit abschaltbar (P-2: Passwort bleibt universell) |
 | Session-Handling | HttpOnly, Secure, SameSite; serverseitige Invalidierung; Abmeldung fremder Geräte |
 | E-Mail-Verifikation | nachgelagert, blockiert die erste Abstimmung nicht — **aber keine sensiblen Inhalte per Mail vor Verifikation**, und Verifikation vor Benachrichtigungsversand |
-| **Beitrittscode `Household.join_code`** | Drei überprüfbare Zusicherungen, keine Empfehlungen: **(1) rotierbar** durch die organisierende Person — die Rotation entwertet ausstehende Einladungen; **(2) niemals in Logs, auch nicht in Zugriffslogs** — der Einladungslink trägt den Code im Pfad, deshalb braucht **genau diese Route Pfad-Redaktion im Zugriffslog**; **(3) niemals in einem Query-String**. Durchgesetzt durch `GUARDRAILS.md` **G-A5**. |
+| **Beitrittscode `Household.join_code`** | Drei überprüfbare Zusicherungen, keine Empfehlungen: **(1) rotierbar** durch die organisierende Person — die Rotation entwertet ausstehende Einladungen; **(2) niemals in Logs, auch nicht in Zugriffslogs** — der Einladungslink trägt den Code im Pfad, deshalb braucht **genau diese Route Pfad-Redaktion im Zugriffslog**; **(3) niemals in einem Query-String**. Durchgesetzt durch `GUARDRAILS.md` **G-A5**. **Speicherformat, entschieden 2026-09-16:** Klartext, dauerhaft lesbar für Moderation und Haushalts-Account desselben Haushalts (nicht nur einmalige Anzeige) — akzeptiertes Risiko, da diese Rollen bereits authentifizierte Mitglieder mit entsprechenden Rechten sind. Details `domain/identity.md` §2.1. |
 | Ratenbegrenzung | Anmeldung, Passwort-Reset, Beitrittscode, Token-Link |
 
 ### 11.3 Integrität

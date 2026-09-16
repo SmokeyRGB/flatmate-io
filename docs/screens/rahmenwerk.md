@@ -332,14 +332,44 @@ bzw. den Fließtext ausgeschrieben, wo eine Regel greift; die Standardregel gilt
 
 ---
 
+## §8.6 — UI-Vokabular (Übersetzungstabelle, U-24)
+
+> **Geschlossen 2026-09-16 (O-G).** Diese Tabelle war zweimal zitiert (Kopf des Quellabschnitts,
+> §12) und existierte nicht — siehe `README.md` und `review-log.md` §Offene-Punkte-Register. Die
+> Einträge unten sind aus den tatsächlichen deutschen UI-Texten des Lovable-Prototyps geerntet, wo
+> U-24 bereits gelebte Praxis war, nicht neu erfunden.
+
+| Modellbegriff | UI-Wort |
+|---|---|
+| Quorum / `quorum_share` | „genug Stimmen" — konkret ausgeschrieben als „3 von 6 Stimmen reichen" |
+| `hide_results_until_voted` | „Ergebnisse verdeckt, bis du abgestimmt hast" |
+| Score (§8.1) | „X von 100 Punkten, Mittelwert aus N Stimme(n)" |
+| Haushalts-Account ohne `ResidentProfile` | „Das WG-Konto verwaltet die WG — Bewerbungen und Abstimmung bleiben bei den Bewohner:innen." |
+| `moved_out` (weich) | „Ausgezogen" |
+| Hartes Entfernen (U-27) | „Entfernen" |
+| `join_code` | „Einladungslink" / „Beitrittscode" |
+| Selbst-Redaktion (S-31) | „Bewertungen über deine eigene Bewerbung siehst du nicht — das ist eine feste Regel, kein Zufall." |
+| `former_resident` | „Ehemalige Bewohner:innen" — lesend, Stimme bleibt gespeichert, zählt nicht mehr zum Quorum |
+
+> **Architekturhinweis (2026-09-16).** v0.1 liefert nur diese `de`-Tabelle, aber die Struktur soll
+> von Anfang an **eine Schlüssel→Text-Tabelle sein, kein Text inline im Code** — auch englischsprachige
+> WGs in deutschsprachigen Ländern sind ein plausibler Bedarf für später. Kein Mehrsprachigkeitssystem
+> in v0.1 bauen, nur nicht die spätere Erweiterung durch inline-Strings verbauen. Siehe
+> `../adr/0006-stack-nextjs-postgres-drizzle.md` für eine Notiz dazu.
+
+---
+
 ## §12 — Barrierefreiheit
 
 - **Nie Farbe allein.** Zustandskennzeichnungen (Bewerbungsstatus, Slot-Zusagen, Quorum-Fortschritt)
   immer Symbol **und** Text.
 - **Textentsprechung der vierstufigen Skala** (C1, C2, C3): Stufen sind benannt („Nein" · „Eher
   nicht" · „Finde gut" · „Unbedingt"), nie nur als Balken oder Farbverlauf dargestellt.
-- **Tastaturbedienung des Durchlaufs** (C1–C3): ↑/↓ oder Zifferntasten zwischen den vier Stufen,
-  Enter bestätigt, kein Bildschirm setzt Hover voraus (§4.1.0-Kriterium bleibt gültig).
+- **Tastaturbedienung des Durchlaufs** (C1–C3): ↑/↓ oder Zifferntasten wählen **und bestätigen
+  sofort** (wie ein Klick), Enter/Leertaste bestätigen die fokussierte Stufe erneut, sichtbarer
+  Fokusring, kein Bildschirm setzt Hover voraus (§4.1.0-Kriterium bleibt gültig). Geringe
+  Priorität, da der Durchlauf primär mobil/touch ist — aber sofortiges Bestätigen statt nur
+  Fokus-Bewegung, präzisiert 2026-09-16.
 - **Fokusreihenfolge** folgt der visuellen Reihenfolge auf allen Beteiligungs-Bildschirmen; der
   primäre CTA auf B1/O1 ist das erste fokussierbare Element nach der Kopfzeile.
 - **Fehlertexte ohne Fachjargon** (§6) sind zugleich eine Barrierefreiheits-Anforderung: sie dürfen
