@@ -23,6 +23,18 @@
 
 # Environment files containing sensitive information.
 *.env
+/.env*.local
+
+# --- Next.js/TypeScript app (src/, ADR-006) ------------------------------------
+# Build/dependency artifacts for the implementation slice at repo root — never
+# useful to commit, and node_modules/ alone would otherwise be tens of thousands
+# of files landing in the first `git status` after `npm install`.
+/node_modules/
+/.next/
+/out/
+/coverage/
+/.vercel/
+/*.tsbuildinfo
 
 
 

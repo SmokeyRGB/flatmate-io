@@ -109,7 +109,7 @@ for src in "${mdfiles[@]}"; do
     printf '%s' "$n" | grep -qE "$GENERIC_NAMES" && continue
     key="$n"
     if [ -z "${seen[$key]+x}" ]; then
-      if find . -name "$n" -not -path './.git/*' -print -quit | grep -q .; then
+      if find . -name '.git' -prune -o -name 'node_modules' -prune -o -name "$n" -print -quit 2>/dev/null | grep -q .; then
         seen[$key]=ok
       else
         seen[$key]=bad
@@ -134,7 +134,7 @@ for src in "${mdfiles[@]}"; do
     printf '%s' "$n" | grep -qE "$GENERIC_NAMES" && continue
     key="path:$n"
     if [ -z "${seen[$key]+x}" ]; then
-      if find . -name "$n" -not -path './.git/*' -print -quit | grep -q .; then
+      if find . -name '.git' -prune -o -name 'node_modules' -prune -o -name "$n" -print -quit 2>/dev/null | grep -q .; then
         seen[$key]=ok
       else
         seen[$key]=bad
