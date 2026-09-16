@@ -125,15 +125,16 @@ tests/integration/raw-sql/household-scoping.test.ts tests/integration/raw-sql/po
       where `household_id` matches the session context set by T005. `pgTable`'s `withRLS`/the
       policy addition enables RLS automatically (FR-0.2: *"Postgres row-level security active,
       with at least one policy, on every table carrying a `household_id`"*).
-- [ ] T016 [US1] Confirm the application's Postgres role is not the owner of the `Application`
+- [X] T016 [US1] Confirm the application's Postgres role is not the owner of the `Application`
       table (G-C2) — structural enforcement, not convention; verify in the migration/role setup,
-      not just documented. Test written (`tests/integration/policy/table-ownership.test.ts`); not
-      yet run — blocked on the `app_runtime` role/password, see implementation notes below.
+      not just documented. Verified live: `app_runtime` (LOGIN, `NOSUPERUSER NOCREATEDB
+      NOCREATEROLE NOBYPASSRLS`) queries as, `postgres` owns.
 - [X] T017 [US1] Create the central repository/policy object in
       `src/modules/casting/repository.ts`: the only sanctioned entry point for reading/writing
       `Application`, internally always opening its transaction through the T005 helper. No other
       file may query `Application` directly (FR-0.1).
-- [ ] T018 [US1] Run T011–T014 and confirm all four pass.
+- [X] T018 [US1] Run T011–T014 and confirm all four pass. Verified against the live Supabase
+      project (`flatmate-io`, `eu-west-1`) via `app_runtime` over the transaction-mode pooler.
 
 **Checkpoint**: User Story 1 is independently functional — authorization is enforced through the
 policy layer and through RLS independently, and the pool-reuse leak is proven closed.
@@ -178,7 +179,7 @@ the `Application` table from Phase 2 and this phase's own code, without User Sto
       anywhere in `src/modules/casting/` — no derived boolean stands in for it (FR-0.12); add a
       lint or review note if a boolean-flag pattern is detected. Reviewed: `repository.ts` and
       `transitions.ts` read/write only `state`; no derived boolean exists.
-- [ ] T025 [US2] Run T019–T021 and confirm all three pass.
+- [X] T025 [US2] Run T019–T021 and confirm all three pass. Verified against the live database.
 
 **Checkpoint**: User Stories 1 and 2 both work independently — authorization holds, and the state
 machine rejects undeclared transitions and audits backward ones.
@@ -231,9 +232,9 @@ table from Phase 4, without needing a real `Application` state transition to hav
       already closed off by T031's `USING (false)`) to rows where `household_id` matches the
       session context set by T005 (FR-0.2 — `ActivityEvent` carries `household_id`, so it is
       covered by the same "every table carrying a `household_id`" requirement as `Application`).
-- [ ] T033 [US3] Confirm the application's Postgres role is not the owner of the `ActivityEvent`
-      table (G-C2) — mirrors T016 for the second `household_id`-carrying table. Same
-      `table-ownership.test.ts` as T016; not yet run — same blocker.
+- [X] T033 [US3] Confirm the application's Postgres role is not the owner of the `ActivityEvent`
+      table (G-C2) — mirrors T016 for the second `household_id`-carrying table. Verified live in
+      the same query as T016 (`table-ownership.test.ts` checks both tables).
 - [X] T034 [US3] Implement the per-`event_type` payload positive-list validator in
       `src/modules/audit/repository.ts`, called before every `ActivityEvent` insert (FR-0.14). Per
       `research.md` §4, this is application-layer validation only — no database-level mirror is
@@ -242,7 +243,11 @@ table from Phase 4, without needing a real `Application` state transition to hav
 - [X] T035 [US3] Implement the retention-redaction path that sets 🔴/⚫ payload fields to `null`
       on `ActivityEvent` rows referencing an `Application` whose `retention_until` (T010's field,
       `docs/domain/casting.md` §7) has passed, leaving structure and timestamps intact (FR-0.13).
-- [ ] T036 [US3] Run T026–T030 and confirm all five pass.
+- [X] T036 [US3] Run T026–T030 and confirm all five pass. Verified against the live database — one
+      real bug found and fixed along the way: the append-only `RESTRICTIVE ... USING (false)`
+      policy from T031 blocked *every* UPDATE unconditionally, including the retention-redaction
+      path FR-0.13 itself permits. Narrowed to allow UPDATE only on rows whose referenced
+      `Application` has passed `retention_until`, and only when the resulting `payload` is empty.
 
 **Checkpoint**: All three user stories are independently functional.
 
@@ -258,13 +263,16 @@ table from Phase 4, without needing a real `Application` state transition to hav
       latent bug this surfaced: Rules 2/2b's `find .` filename lookups had no `node_modules`
       exclusion (only `.git`), so adding a real `node_modules/` made every lookup crawl it —
       harmless before this feature, since there was no implementation tree yet.
-- [ ] T039 Run `quickstart.md`'s full validation sequence end to end (§1–§4) and confirm every
-      `Expected` outcome holds.
+- [X] T039 Run `quickstart.md`'s full validation sequence end to end (§1–§4) and confirm every
+      `Expected` outcome holds. §1's manual `grep "SET "` smoke check reports two lines
+      (`TRANSITION_SET`/`FORWARD_SET` variable names) — false positives from that check's own
+      naive pattern, not real `SET` statements; the authoritative check (T006's lint, run in T012)
+      is clean. §2–§4 all green against the live database.
 - [X] T040 Confirm no `.skip`/`.only`/commented-out body exists in any file containing a
       `[GUARDED]` test (G-D's own CI check) — T011, T013, T014, T029, T030 at minimum.
-- [ ] T041 [P] Update `docs/review-log.md`'s "ADR-006 (2026-09-16)" open item once T011 (G-D10)
+- [X] T041 [P] Update `docs/review-log.md`'s "ADR-006 (2026-09-16)" open item once T011 (G-D10)
       passes under the transaction-mode pooler specifically — this is the empirical verification
-      that entry is tracking, not a formality.
+      that entry is tracking, not a formality. Closed (struck through, `Geklärt 2026-09-16`).
 
 ---
 

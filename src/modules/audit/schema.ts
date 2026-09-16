@@ -32,14 +32,27 @@ export const activityEvent = pgTable(
       using: HOUSEHOLD_MATCH,
       withCheck: HOUSEHOLD_MATCH,
     }),
-    // FR-0.13: append-only. RESTRICTIVE policies AND with the permissive one above, so no
-    // household match can ever satisfy an UPDATE/DELETE — this holds even under raw SQL.
-    // Combined with `FORCE ROW LEVEL SECURITY` (applied in the migration) so it also holds
-    // against the table-owning migration role, not only app_runtime.
+    // FR-0.13: append-only, "except by the deletion concept acting on the entries' referenced
+    // data" — i.e. retention redaction is the one permitted UPDATE, not a blanket denial. A bare
+    // USING(false) here (this policy's first draft) blocked the redaction path itself, caught by
+    // tests/unit/audit/payload-allowlist.test.ts's retention-redaction test failing against the
+    // live database (2026-09-16). USING scopes which existing rows may be targeted (only ones
+    // whose Application has actually passed retention_until — the same condition
+    // redactExpiredActivityEvents() already checks, not a new bypass); WITH CHECK scopes the
+    // resulting row (payload must become exactly empty). Everything else — tampering with
+    // event_type, actor fields, or redacting before retention is up — stays denied, under raw
+    // SQL and (via FORCE ROW LEVEL SECURITY) the table-owning migration role too.
     pgPolicy("activityevent_append_only_update", {
       as: "restrictive",
       for: "update",
-      using: sql`false`,
+      using: sql`EXISTS (
+        SELECT 1 FROM application
+        WHERE application.id = activity_event.subject_id
+          AND activity_event.subject_type = 'application'
+          AND application.retention_until IS NOT NULL
+          AND application.retention_until < now()
+      )`,
+      withCheck: sql`payload = '{}'::jsonb`,
     }),
     pgPolicy("activityevent_append_only_delete", {
       as: "restrictive",

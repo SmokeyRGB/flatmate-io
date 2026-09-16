@@ -15,6 +15,13 @@
       "when": 1789590183237,
       "tag": "0001_rls_perf_fix_select_wrap",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1789591365349,
+      "tag": "0002_fix_activityevent_redaction_exception",
+      "breakpoints": true
     }
   ]
 }
