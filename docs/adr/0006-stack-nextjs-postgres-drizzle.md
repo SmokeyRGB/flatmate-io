@@ -67,6 +67,14 @@ Die beiden Pflichtprüfungen aus ADR-004 bleiben damit **vollständig in eigener
 `app_redaction_subjects()` sammelt weiterhin alle Profile des Accounts. Supabase Auth nimmt diese
 Arbeit nicht ab und kann sie nicht abnehmen.
 
+> **Ergänzung 2026-09-16 — UI-Text als Tabelle, nicht als Inline-String.** Aus dem Prototyp-Abgleich
+> (Screening der UI-Vokabular-Lücke O-G, `screens/rahmenwerk.md` §8.6): v0.1 liefert nur ein
+> deutsches UI-Vokabular, aber es soll als **Schlüssel→Text-Tabelle** strukturiert werden, nicht als
+> Text inline in Next.js-Komponenten. Grund: englischsprachige Bewohner:innen in deutschsprachigen
+> WGs sind ein plausibler späterer Bedarf. Das ist **keine** Festlegung auf ein bestimmtes i18n-Paket
+> und **kein** Auftrag, Mehrsprachigkeit in v0.1 zu bauen — nur eine Randbedingung, die verhindert,
+> dass die spätere Erweiterung eine Textsuche-und-Ersetze-Migration wird.
+
 ### Konsequenzen
 
 **Positiv**
