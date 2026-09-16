@@ -30,6 +30,7 @@ Wer eine Aufgabe umsetzt, liest deshalb **nicht die Kette, sondern das Paket fü
 | …verstehen, **was gebaut wird** | `backlog/README.md` — der v0.1-Schnitt in fünf Features |
 | …**eine Aufgabe umsetzen** | genau ein Paket aus `backlog/requirements/` — `F0` bis `F5`. Das Paket ist absichtlich selbsttragend |
 | …wissen, **was ich nicht kaputt machen darf** | `MINIMAL-GATE.md` (neun Gates, kurz) und `GUARDRAILS.md` (vollständig) |
+| …Farben, Typografie und Komponenten der Oberfläche sehen | `09-Design-System.md` — abgeleitet aus dem Lovable-Clickthrough in `prototype/`, außerhalb dieses Ordners (siehe §4) |
 | …wissen, **wo eine Regel wirklich steht** | `SPEC-INDEX.md` — eine Zeile je Thema, eine maßgebliche Fundstelle |
 | …prüfen, **ob etwas vergessen wurde** | `COVERAGE.md` — jede v0.1-Scope-Zeile mit ihren Anforderungs-IDs |
 | …wissen, **was noch offen ist** | `review-log.md`, Abschnitt *Offene-Punkte-Register* — der **einzige** Ort für Status |
@@ -147,6 +148,7 @@ Diese Regel stammt aus `05-ADRs.md` und gilt für **alle** Familien oben.
 | `06-Compliance-Anhang.md` | Rechtsanalyse, Datenkategorien, Betroffenenrechte, **Q-1…Q-14** |
 | `07-Screen-Inventar.md` | ❄️ eingefroren — gepflegt in `screens/` |
 | `08-UX-Entscheidungen.md` | `U-1`…`U-26` |
+| `09-Design-System.md` | Farbpalette (hell/dunkel), Typografie, Abstände, Formen, Komponentenmuster — abgeleitet aus dem Lovable-Clickthrough |
 | `GUARDRAILS.md` | `G-A`…`G-N`, Durchsetzungsstand, Teststrategie, Implementierungspflichten |
 | `MINIMAL-GATE.md` | die neun Gates vor der ersten Zeile Code |
 | `SPEC-INDEX.md` | ein Thema, eine maßgebliche Fundstelle |
