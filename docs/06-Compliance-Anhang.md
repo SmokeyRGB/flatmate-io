@@ -95,14 +95,18 @@ Ergebnisse hängen an ihr.
 | Unterstützung bei Betroffenenrechten (Art. 28 Abs. 3 lit. e) | Flatmate.io | Feature **„Datenauskunft erzeugen"** pro `Application` ([§7.1](#71--art-15-auskunft)) |
 | Löschung nach Zweckerreichung (Art. 5 Abs. 1 lit. e) | `Household` weisungsbefugt, Flatmate.io vollzieht | Aufbewahrungsautomatik mit Vorwarnung ([§5](#5--speicherbegrenzung-und-löschkonzept)) |
 | Information der Bewerbenden (Art. 13) | **`Household`** | Copy-Paste-Textbaustein als *Hilfsmittel*, nicht als eigene Pflichterfüllung ([§4](#4--art-13-vs-art-14--korrigierte-abgrenzung)) |
-| Unterauftragsverarbeiter (Art. 28 Abs. 2 und 4) | Flatmate.io | **Supabase** (Datenbank-Hosting **und** Anmeldedienst, EU-Region — ADR-006) sowie ein Transaktions-E-Mail-Dienst; vollständige Liste in der AVV, EU-Verarbeitung nach ADR-006 |
+| Unterauftragsverarbeiter (Art. 28 Abs. 2 und 4) | Flatmate.io | **Supabase** (Datenbank-Hosting **und** Anmeldedienst, EU-Region — ADR-006), **AWS** (Solver-Dienst, Region `eu-central-1` — ADR-005, v1.1) sowie ein Transaktions-E-Mail-Dienst; vollständige Liste in der AVV, EU-Verarbeitung nach ADR-005/ADR-006 |
 | Meldung von Verletzungen (Art. 33 Abs. 2) | Flatmate.io meldet **an den `Household`**, dieser an die Aufsichtsbehörde | Prozess in [§11.5](#115--organisatorische-maßnahmen) |
 
 > ⚠️ **TBD — und ab v0.2 ein Blocker, keine Fußnote.** Zu ergänzen ist die konkrete Liste der
 > Unterauftragsverarbeiter. **Ein Anbieter steht seit ADR-006 fest: Supabase**, und zwar für zwei
 > Zwecke zugleich — Datenbank-Hosting und Anmeldedienst (Supabase Auth). Dass es **derselbe**
 > Anbieter für beides ist, war ein tragendes Argument der Entscheidung: Die AVV-Kette wird dadurch
-> nicht länger, sie bekommt einen Namen. **Offen bleibt** der Transaktions-E-Mail-Dienst.
+> nicht länger, sie bekommt einen Namen. **Seit 2026-09-16 kommt AWS hinzu** (ADR-005s Solver-Dienst,
+> `eu-central-1`) — anders als bei Supabase ist das ein **neuer** Name, keine zweite Rolle für einen
+> bestehenden. Der Solver liegt in v1.1; die AWS-AVV muss trotzdem vor dessen Inbetriebnahme stehen,
+> nicht erst vor v0.2 (G-B4 kennt keine Version, nur „neues ausgehendes Netzwerkziel"). Siehe
+> `review-log.md` für den offenen Punkt. **Offen bleibt** außerdem der Transaktions-E-Mail-Dienst.
 >
 > **Was hier weiterhin bewusst nicht erfunden wird**, sondern beim Anbieter zu erheben und dann
 > hier einzutragen ist: Firma und Sitz, der konkrete Verarbeitungsort samt EU-Nachweis, der Wortlaut
