@@ -201,7 +201,7 @@ if [ -d docs/adr ]; then
     [ -n "$n" ] || continue
     c=$(ls docs/adr/$(printf '%04d' "$((10#$n))")-*.md 2>/dev/null | wc -l)
     [ "$c" -eq 1 ] || note r5 "ADR-$n resolves to $c record file(s) in docs/adr/"
-  done < <(grep -rhoE 'ADR-[0-9]{3}' --include='*.md' docs 2>/dev/null |
+  done < <(grep -rhoE 'ADR-[0-9]{3}' --include='*.md' "${SCOPE[@]}" 2>/dev/null |
              sed 's/ADR-//' | tr -d '\r' | sort -u)
 else
   [ "$QUIET" = 1 ] || echo "  (skipped: docs/adr/ does not exist yet)"
@@ -244,6 +244,8 @@ if [ -d docs ]; then
   done < <( { grep -rn 'Ideas/Flatmate\.io/' --include='*.md' docs 2>/dev/null
               grep -rnE '\]\(\.\./\.\./' --include='*.md' docs 2>/dev/null
               grep -rn '~/\.claude/' --include='*.md' docs 2>/dev/null
+              grep -rnE '\]\([^)]*specs/' --include='*.md' docs 2>/dev/null
+              grep -rnE '`[^`]*specs/[^`]*`' --include='*.md' docs 2>/dev/null
             } | grep -v '/_logs/' | tr -d '\r' )
 else
   [ "$QUIET" = 1 ] || echo "  (skipped: docs/ does not exist yet)"
