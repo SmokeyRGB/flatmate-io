@@ -173,11 +173,119 @@ h3 {
   .badge {
     display: inline-flex;
     align-items: center;
+    gap: 0.25rem;
     border-radius: 9999px;
     background: var(--color-muted);
     color: var(--color-muted-foreground);
     padding: 0.125rem 0.625rem;
     font-size: 0.75rem;
     font-weight: 500;
+  }
+  /* Solid role chip (e.g. "Moderation") — distinct from the muted status pill above. */
+  .badge-role {
+    background: var(--color-primary);
+    color: var(--color-primary-foreground);
+  }
+
+  .eyebrow {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--color-muted-foreground);
+  }
+
+  /* Three-tint callout system — never introduce a new hue, reuse these (09-Design-System.md). */
+  .callout {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    border-radius: 0.75rem;
+    padding: 0.75rem;
+    font-size: 0.8125rem;
+  }
+  .callout svg {
+    flex-shrink: 0;
+    margin-top: 0.125rem;
+  }
+  .callout-info {
+    background: color-mix(in srgb, var(--color-secondary) 60%, transparent);
+  }
+  .callout-caution {
+    background: color-mix(in srgb, var(--color-destructive) 5%, transparent);
+    border: 1px solid color-mix(in srgb, var(--color-destructive) 40%, transparent);
+    color: var(--color-destructive);
+  }
+  .callout-celebratory {
+    background: color-mix(in srgb, var(--color-primary) 10%, transparent);
+    border: 1px solid color-mix(in srgb, var(--color-primary) 40%, transparent);
+  }
+
+  /* Featured "next action" card — banded (page-defining prompt) or quiet (still important). */
+  .card-featured {
+    border-color: color-mix(in srgb, var(--color-primary) 40%, transparent);
+    overflow: hidden;
+    padding: 0;
+  }
+  .card-band {
+    background: var(--color-primary);
+    color: var(--color-primary-foreground);
+    padding: 0.625rem 1.25rem;
+  }
+  .card-band .eyebrow {
+    color: inherit;
+    opacity: 0.85;
+  }
+  .card-featured-body {
+    padding: 1.25rem;
+  }
+
+  /* Groups content scoped to the current casting round — larger radius than a plain card. */
+  .panel-round {
+    border-radius: 1.25rem;
+    background: color-mix(in srgb, var(--color-primary) 5%, transparent);
+    border: 1px solid color-mix(in srgb, var(--color-primary) 30%, transparent);
+    padding: 1rem;
+  }
+
+  /* Tab switcher (mode/identity pick) — muted track, active = raised cream sub-pill. Do not
+     confuse with a choice selector (e.g. a vote scale), which uses solid primary fill instead. */
+  .tab-track {
+    display: flex;
+    gap: 0.25rem;
+    background: var(--color-muted);
+    border-radius: 9999px;
+    padding: 0.25rem;
+  }
+  .tab-item {
+    flex: 1;
+    border-radius: 9999px;
+    padding: 0.375rem 1rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--color-muted-foreground);
+    transition: background 0.15s ease, color 0.15s ease;
+  }
+  .tab-item-active {
+    background: var(--color-card);
+    color: var(--color-foreground);
+    box-shadow: var(--shadow-card);
+  }
+
+  /* Read-only copyable value (e.g. a join code) — flat tinted block, monospace. */
+  .code-block {
+    background: color-mix(in srgb, var(--color-secondary) 50%, transparent);
+    border-radius: 0.5rem;
+    padding: 0.625rem;
+  }
+
+  /* Back affordance on sub-pages — plain text, no button chrome. */
+  .back-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--color-muted-foreground);
   }
 }

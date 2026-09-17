@@ -1,13 +1,13 @@
 "use client";
 
+import { Trash2 } from "lucide-react";
 import { useActionState, useState } from "react";
 import { removeMemberAction, type RemoveMemberFormState } from "./actions";
 
 const initialState: RemoveMemberFormState = { error: null };
 
-// FR-1.26/U-27 hard tier: "Entfernen" requires typing the exact display name, not a plain click —
-// specifically for a person who joined falsely or maliciously via the join code, not for a real
-// move-out (that's the separate, one-click "set moved out" action next to this one).
+// FR-1.26/U-27 hard tier: requires typing the exact display name, not a plain click — the
+// nearby callout on the members page explains when to use this over the reversible "Moved out".
 export function RemoveMemberForm({ accountId, displayName }: { accountId: string; displayName: string }) {
   const [state, formAction, pending] = useActionState(removeMemberAction, initialState);
   const [typedName, setTypedName] = useState("");
@@ -27,7 +27,7 @@ export function RemoveMemberForm({ accountId, displayName }: { accountId: string
         disabled={pending || typedName !== displayName}
         className="btn-link text-destructive disabled:opacity-40"
       >
-        Remove (intruder)
+        <Trash2 className="mr-1 inline size-3.5" /> Remove
       </button>
       {state.error && <p className="field-error w-full">{state.error}</p>}
     </form>

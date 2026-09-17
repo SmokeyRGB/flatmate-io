@@ -1,5 +1,6 @@
 "use client";
 
+import { Info } from "lucide-react";
 import { useActionState } from "react";
 import { registerHouseholdAction, type RegisterFormState } from "./actions";
 
@@ -15,7 +16,8 @@ export function RegisterForm() {
     <div className="mx-auto max-w-md space-y-6 p-6">
       <h1 className="font-serif text-2xl font-semibold">Register your household</h1>
 
-      <div role="note" className="card text-sm">
+      <div role="note" className="callout callout-info">
+        <Info className="size-4" />
         This email address will be visible to everyone who joins your household.
       </div>
 

@@ -1,3 +1,4 @@
+import { ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { listRoundsForSession } from "@/modules/casting/repository";
@@ -28,17 +29,34 @@ export default async function DashboardPage() {
 
       {active ? (
         <Link href={`/rounds/${active.id}`} className="card block transition hover:shadow-none">
-          <p className="text-sm text-muted-foreground">Active round</p>
-          <p className="text-lg font-medium">{active.title}</p>
-          <span className="badge mt-1">{active.status}</span>
+          <p className="eyebrow">Active round</p>
+          <p className="mt-1 text-lg font-medium">{active.title}</p>
+          <span className="badge mt-2">{active.status}</span>
         </Link>
       ) : (
-        <p className="text-sm text-muted-foreground">No round yet.</p>
+        // The single most important prompt on this page when nothing else is going on yet —
+        // the "banded" featured-card variant (09-Design-System.md), not a quiet one.
+        <div className="card card-featured">
+          <div className="card-band">
+            <p className="eyebrow">As next</p>
+          </div>
+          <div className="card-featured-body space-y-3">
+            <p className="text-lg font-semibold">Open your first casting round</p>
+            <p className="text-sm text-muted-foreground">
+              Nothing is running yet — open a round once you have rooms to cast for.
+            </p>
+            <Link href="/rounds/new" className="btn btn-primary">
+              Open a new round <ArrowRight className="size-4" />
+            </Link>
+          </div>
+        </div>
       )}
 
-      <Link href="/rounds/new" className="btn btn-primary">
-        Open a new round
-      </Link>
+      {active && (
+        <Link href="/rounds/new" className="btn-link">
+          Open another round
+        </Link>
+      )}
 
       {rest.length > 0 && (
         <div>

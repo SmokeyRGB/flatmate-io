@@ -17,18 +17,20 @@ export function SignInForm() {
     <div className="mx-auto max-w-md space-y-6 p-6">
       <h1 className="font-serif text-2xl font-semibold">Sign in</h1>
 
-      <div className="flex gap-2 rounded-full bg-muted p-1">
+      {/* Tab switcher, not a choice selector — active tab is a raised cream sub-pill, not a
+          solid-color fill (09-Design-System.md distinguishes the two explicitly). */}
+      <div className="tab-track">
         <button
           type="button"
           onClick={() => setMode("household")}
-          className={`flex-1 rounded-full px-4 py-1.5 text-sm font-medium transition ${mode === "household" ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}
+          className={`tab-item ${mode === "household" ? "tab-item-active" : ""}`}
         >
           Household
         </button>
         <button
           type="button"
           onClick={() => setMode("resident")}
-          className={`flex-1 rounded-full px-4 py-1.5 text-sm font-medium transition ${mode === "resident" ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}
+          className={`tab-item ${mode === "resident" ? "tab-item-active" : ""}`}
         >
           Resident
         </button>

@@ -1,3 +1,5 @@
+import { ArrowLeft, DoorOpen, ShieldCheck, TriangleAlert, UserMinus, UserPlus } from "lucide-react";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { PermissionDeniedError, getHousehold, getResidentList } from "@/modules/identity/repository";
 import { getCurrentSession } from "@/modules/identity/session-cookie";
@@ -60,14 +62,21 @@ export default async function MembersPage() {
     </div>
   ) : null;
 
+  const backLink = (
+    <Link href="/dashboard" className="back-link">
+      <ArrowLeft className="size-4" /> Dashboard
+    </Link>
+  );
+
   if (leadWithJoinCode) {
     return (
       <div className="mx-auto max-w-md space-y-4 p-6">
+        {backLink}
         <h1 className="font-serif text-2xl font-semibold">Members</h1>
         <p className="text-sm text-muted-foreground">
           No one has joined yet — share your join code to invite the first resident.
         </p>
-        <p className="card font-mono text-sm">{household?.joinCode}</p>
+        <p className="code-block font-mono text-sm">{household?.joinCode}</p>
         <form action={rotateJoinCodeAction}>
           <button type="submit" className="btn btn-primary">
             Rotate join code
@@ -80,6 +89,7 @@ export default async function MembersPage() {
 
   return (
     <div className="mx-auto max-w-2xl space-y-6 p-6">
+      {backLink}
       <h1 className="font-serif text-2xl font-semibold">Members</h1>
 
       {createResidentForm}
@@ -87,24 +97,32 @@ export default async function MembersPage() {
       <ul className="space-y-3">
         {members.map((m) => (
           <li key={m.id} className="card">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-wrap items-center gap-2">
               <span className="font-medium">{m.displayName}</span>
-              <span className="flex items-center gap-2">
-                <span className="badge">{m.status}</span>
-                {m.role === "moderator" && <span className="badge">moderator</span>}
-              </span>
+              {m.role === "moderator" && (
+                <span className="badge badge-role">
+                  <ShieldCheck className="size-3" /> Moderation
+                </span>
+              )}
+              {m.status === "moved_out" && (
+                <span className="badge">
+                  <DoorOpen className="size-3" /> moved out
+                </span>
+              )}
             </div>
 
             {canAct && m.accountId && (
-              <div className="mt-3 flex flex-wrap items-center gap-3">
+              <div className="mt-3 flex flex-wrap items-center gap-2">
                 {m.status !== "moved_out" ? (
                   <>
-                    {/* EC-1.7: administration may appoint (or unappoint) a moderator. */}
+                    {/* EC-1.7: administration may appoint (or unappoint) a moderator — a
+                        reversible admin toggle, so it's a neutral secondary button, not a
+                        destructive-weight link. */}
                     {isAdmin && m.role === "member" && (
                       <form action={setMemberRoleAction}>
                         <input type="hidden" name="accountId" value={m.accountId} />
                         <input type="hidden" name="toRole" value="moderator" />
-                        <button type="submit" className="btn-link">
+                        <button type="submit" className="btn btn-secondary">
                           Make moderator
                         </button>
                       </form>
@@ -113,15 +131,18 @@ export default async function MembersPage() {
                       <form action={setMemberRoleAction}>
                         <input type="hidden" name="accountId" value={m.accountId} />
                         <input type="hidden" name="toRole" value="member" />
-                        <button type="submit" className="btn-link">
+                        <button type="submit" className="btn btn-secondary">
                           Make member
                         </button>
                       </form>
                     )}
+                    {/* The two ways a person leaves — both destructive-weight (red); only the
+                        confirmation step (typed name below) communicates which one is dangerous,
+                        not the color, since "moved out" is fully reversible via Reactivate. */}
                     <form action={setMovedOutAction}>
                       <input type="hidden" name="accountId" value={m.accountId} />
-                      <button type="submit" className="btn-link">
-                        Set moved out
+                      <button type="submit" className="btn-link text-destructive">
+                        <UserMinus className="mr-1 inline size-3.5" /> Moved out
                       </button>
                     </form>
                     <RemoveMemberForm accountId={m.accountId} displayName={m.displayName} />
@@ -129,8 +150,8 @@ export default async function MembersPage() {
                 ) : (
                   <form action={reactivateMemberAction}>
                     <input type="hidden" name="accountId" value={m.accountId} />
-                    <button type="submit" className="btn-link">
-                      Reactivate
+                    <button type="submit" className="btn btn-secondary">
+                      <UserPlus className="size-4" /> Reactivate
                     </button>
                   </form>
                 )}
@@ -141,12 +162,23 @@ export default async function MembersPage() {
       </ul>
 
       {canAct && (
+        <div className="callout callout-caution">
+          <TriangleAlert className="size-4" />
+          <p>
+            Use &quot;Remove&quot; only for someone who joined via the join code but doesn&apos;t
+            actually live here. For an actual move-out, use &quot;Moved out&quot; instead — it
+            keeps their history and can be reversed with Reactivate.
+          </p>
+        </div>
+      )}
+
+      {canAct && (
         <div className="space-y-1 border-t border-border pt-4">
           {/* FR-1.26: "share or rotate" — the code itself must be visible to share, not just a
               blind rotate action. Deliberately NOT styled like a member row (card) — that shape
               reads as "a person," which this isn't. */}
-          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Join code</p>
-          <p className="font-mono text-sm">{household?.joinCode}</p>
+          <p className="eyebrow">Join code</p>
+          <p className="code-block font-mono text-sm">{household?.joinCode}</p>
           <form action={rotateJoinCodeAction}>
             <button type="submit" className="btn-link">
               Rotate join code

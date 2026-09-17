@@ -1,3 +1,5 @@
+import { ArrowLeft } from "lucide-react";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { listRooms } from "@/modules/casting/repository";
 import { getCurrentSession } from "@/modules/identity/session-cookie";
@@ -12,6 +14,9 @@ export default async function NewRoundPage() {
 
   return (
     <div className="mx-auto max-w-md space-y-6 p-6">
+      <Link href="/dashboard" className="back-link">
+        <ArrowLeft className="size-4" /> Dashboard
+      </Link>
       <h1 className="font-serif text-2xl font-semibold">Open a casting round</h1>
       <RoundForm rooms={rooms.map((r) => ({ id: r.id, label: r.label }))} />
     </div>
