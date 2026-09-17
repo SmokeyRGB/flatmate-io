@@ -638,3 +638,30 @@ corresponding acceptance scenario cannot actually be exercised end to end today.
 **Checkpoint**: re-run `/speckit-converge` after T082–T086 land — US1's and US3's own
 Independent Tests should then be exercisable through the running application, not only via
 direct repository/auth calls in tests.
+
+---
+
+## Phase 10: Convergence (2026-09-17, second /speckit-converge pass)
+
+- [X] T087 Fix a real race condition in `openRound` (`src/modules/casting/repository.ts`): the
+      initial read of the `CastingRound` row used a plain `SELECT`, so two concurrent opens could
+      both read `status = draft` before either wrote, producing two duplicate
+      `RoundParticipation` snapshot batches and two `settings_snapshot` writes — violating EC-1.9
+      ("exactly one opening takes effect"). Changed to `SELECT ... FOR UPDATE` so the second
+      transaction blocks until the first commits, then correctly re-reads `status = open` and
+      refuses. New test: `round-open-atomicity.test.ts`'s concurrent-open case. Per EC-1.9
+      (contradicts — the requirement was explicit and the implementation violated it under
+      concurrency, previously untested).
+- [X] T088 Implement the "appoint it moderator" action EC-1.7 requires and which never existed in
+      any form reachable by application code — every test and the schema itself assumed a
+      `Membership.role` of `"moderator"` was reachable, but the only way it was ever set was a
+      raw `tx.update(membership).set({role: "moderator"})` inside test fixtures
+      (`resident-list-access.test.ts`), never through `identity/repository.ts` or any route. Added
+      `setMemberRole` (household_admin-only, per EC-1.7's own wording; refuses to touch the
+      `household_admin` role itself), wired a "Make moderator"/"Make member" toggle into
+      `/members` (admin-only), and registered `membership.role_changed` in the audit payload
+      allowlist (FR-1.20). Without this, the entire U-30 moderator-parity correction from this
+      session was unreachable by any real household. New test:
+      `tests/integration/policy/member-role-appointment.test.ts`. Per EC-1.7 (missing).
+
+**Checkpoint**: re-run `/speckit-converge` after T087–T088 land.
