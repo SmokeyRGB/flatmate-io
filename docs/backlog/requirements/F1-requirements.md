@@ -94,7 +94,7 @@ roles · parallel rounds offered in the UI · anything about applications, votes
 
 ### Administration boundary
 
-- **FR-1.23** An account acting without an active resident profile shall reach household administration only — rooms, members, join code, procedure rules, retention — and shall not reach casting rounds, applications, votes, slots, appointments or casting notes.
+- **FR-1.23** An account acting without an active resident profile shall reach household administration only — rooms, members, join code, procedure rules, retention — plus a `CastingRound`'s identity and lifecycle only: existence, `title`, `status`, `room_ids`, timestamps and retention fields. It shall not reach anything derived from `Application` — explicitly including counts, participation, score or ranking — and shall not reach `Application`, `Slot`, `Appointment` or `CastingNote` at all. Source: S-50, as narrowed by ADR-014.
 - **FR-1.24** Two exceptions to FR-1.23 remain available to administration: retention actions, and producing a subject-access export **without displaying its contents**.
 
 ---
@@ -147,7 +147,7 @@ Given a rating weight was changed while a round was open, when any resident view
 Given all rounds are `draft`, `closed` or `archived`, when I change the quorum share, then the change is accepted.
 
 **AC-1.16 — The administration boundary holds**
-Given I am acting without a resident profile, when I request a casting round, application, vote, slot, appointment or casting note by any route, then access is refused.
+Given I am acting without a resident profile, when I request a casting round's identity or lifecycle fields (existence, `title`, `status`, `room_ids`, timestamps, retention fields), then access is granted; when I request anything else — an application, a vote, a slot, an appointment, a casting note, or anything derived from `Application` including via a casting round (count, participation, score, ranking) — by any route, then access is refused.
 
 **AC-1.17 — Export without insight is permitted to administration**
 Given I am acting without a resident profile, when I produce a subject-access export, then the export is produced and its contents are not displayed to me.

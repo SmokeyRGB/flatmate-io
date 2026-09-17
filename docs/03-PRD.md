@@ -127,9 +127,9 @@ sondern in *Art* des Zugriffs. Sie entstehen aus **orthogonalen `Membership`-Att
 
 | Dimension | Haushalts-Account | Moderator | Bewohnender | Ehemaliger | Bewerbender ohne Konto |
 |-----------|-------------------|-----------|-------------|-----------|------------------------|
-| Startbildschirm | **Organisation → Haushalt** (Zimmer, Mitglieder, Aufbewahrung — kein Zugriff auf Runden, S-50/U-20) | **Start** (Aufgabenliste, wie Bewohnender), mit **Moderations-Brücke** am Fuß zur Organisationsfläche (U-5) | **Start** — Aufgabenliste, sortiert nach Zeitdruck (U-1, U-9, Screen-Inventar §2) | — (kein Zugang) | keiner (nur ggf. Token-Seite) |
+| Startbildschirm | **Organisation → Haushalt** (Zimmer, Mitglieder, Aufbewahrung, Rundenidentität und -Lebenszyklus — kein Zugriff auf alles aus `Application` Abgeleitete, S-50/U-20, präzisiert durch ADR-014) | **Start** (Aufgabenliste, wie Bewohnender), mit **Moderations-Brücke** am Fuß zur Organisationsfläche (U-5) | **Start** — Aufgabenliste, sortiert nach Zeitdruck (U-1, U-9, Screen-Inventar §2) | — (kein Zugang) | keiner (nur ggf. Token-Seite) |
 | Zentraler Handlungsaufruf | „Beitrittscode teilen" / „ResidentProfile anlegen" | **genau ein** primärer CTA aus der Aufgabenliste, plus Moderations-Brücke „N Dinge brauchen deine Moderation →" | **genau ein** primärer CTA aus der Aufgabenliste (z. B. „Notiz zu Lea schreiben — 4 andere warten darauf"), sortiert nach Zeitdruck, nicht nach fester Rangliste (Screen-Inventar §2) | — | „Wann kannst du?" (v1.1) |
-| Sieht Beratungsinhalte | **Nein — kein Zugriff auf `CastingRound`s ohne eigenes `ResidentProfile`** (S-50/U-20). Ausnahmen: Aufbewahrungsansicht und Datenauskunft-Export (ohne Einsicht) | Ja, außer wo Selbst-Redaktion greift | Ja, außer wo Selbst-Redaktion greift | **Nein** | **Nein** |
+| Sieht Beratungsinhalte | **Nein — sieht von einer `CastingRound` nur Identität und Lebenszyklus (Existenz, `title`, `status`, `room_ids`, Zeitstempel), nichts aus `Application` Abgeleitetes, einschließlich Zahlen** (S-50/U-20, präzisiert durch ADR-014). Ausnahmen: Aufbewahrungsansicht und Datenauskunft-Export (ohne Einsicht) | Ja, außer wo Selbst-Redaktion greift | Ja, außer wo Selbst-Redaktion greift | **Nein** | **Nein** |
 | Sieht Rangliste und Score | **Nein** (S-50/U-20, folgt aus fehlendem `ResidentProfile`) | Ja | Ja, erst nach eigener Stimmabgabe (Standard, S-14) | Nein | Nein |
 | Sieht Teilnehmendenliste (wer nimmt an der Runde teil) | **Nein** (S-50/U-20) | Ja | Ja | Nein | Nein |
 | Sieht Bewohnerliste (wer wohnt im Haushalt) | Ja, **voll** | Ja, **lesend** | **Nein** (U-22 — geändert gegenüber V0.5: bisher „Ja, Duplikatsschutz S-05"; die Duplikatsschutz-Begründung von S-05/E-06 wird in `02-SRD.md` nachgezogen) | Nein | Nein |
@@ -145,10 +145,13 @@ sondern in *Art* des Zugriffs. Sie entstehen aus **orthogonalen `Membership`-Att
 > **Band:** `v0.1` — später: Terminbestätigung, Notiz, Veto (`v0.2`)
 
 > **Geändert ggü. V0.5 (S-50/U-20 — größter Einzeleingriff dieser Version).** Ein
-> Haushalts-Account ohne aktives `ResidentProfile` erreicht **keine** Castings mehr — keine
-> `CastingRound`, keine `RoundParticipation`, kein `Application`-Anlegen/-Statuswechsel/-Löschen,
+> Haushalts-Account ohne aktives `ResidentProfile` erreicht **nichts aus `Application`
+> Abgeleitetes** mehr — keine `RoundParticipation`, kein `Application`-Anlegen/-Statuswechsel/-Löschen,
 > keine `CastingNote`, keinen `Slot`, keinen `Appointment` und keine fremde
-> `AvailabilityWindow`. Er behält Zimmer, Mitglieder, Beitrittscode, Aufbewahrung, die
+> `AvailabilityWindow`. **Präzisiert durch ADR-014:** `CastingRound` ist davon ausgenommen, aber
+> nur in Identität und Lebenszyklus — Existenz, `title`, `status`, `room_ids`, Zeitstempel und
+> Aufbewahrungsfelder; jede Zahl aus Bewerbungen (Bewerbungszahl, Beteiligung, Score, Rangliste)
+> bleibt unsichtbar. Er behält außerdem Zimmer, Mitglieder, Beitrittscode, Aufbewahrung, die
 > Haushalts-Einstellungen (inkl. Abstimmungsverfahren) und **zwei benannte Ausnahmen**:
 > Aufbewahrung (unverändert) und **„Datenauskunft erzeugen" als Export ohne Einsicht** — die
 > Verwaltung stößt den Export an, sieht die Inhalte aber nicht im Bildschirm (Screen-Inventar
@@ -223,7 +226,7 @@ sondern in *Art* des Zugriffs. Sie entstehen aus **orthogonalen `Membership`-Att
 - [ ] **Geändert ggü. V0.6 (ADR-013):** Die angemeldete Identität ist im Avatar-Menü ablesbar und ändert sich innerhalb der Sitzung nicht. Ein Wechsel-Indikator „auf jedem Bildschirm" entfällt damit endgültig (§4.1.0) — es gibt nichts mehr, das sich unter der Sitzung ändern könnte
 - [ ] **Geschützter Test (G-D14, ADR-013):** Eine `Session`, deren `Account` eine `Membership` mit `is_resident = false` hat, trägt `acting_profile_id = null` über ihre ganze Lebensdauer; ein nachträglicher Schreibzugriff auf dieses Feld wird abgelehnt
 - [ ] **Geschützter Test (U-21):** Ein Konto ohne `household_admin` sieht den Organisationsabschnitt „Haushalt" auch dann nicht, wenn `Session.acting_profile_id` `null` ist — sichtbare Abschnitte richten sich ausschließlich nach `Membership.role`/`Membership.permissions`
-- [ ] **S-50/U-20, geschützter Test:** Für ein Konto ohne `ResidentProfile` liefert jede Runden-, Bewerbungs-, Termin- und Notizansicht keinen Inhalt — Ausnahmen sind ausschließlich die Aufbewahrungsansicht und der Datenauskunft-Export (ohne Einsicht)
+- [ ] **S-50/U-20, geschützter Test (G-D15, präzisiert durch ADR-014):** Für ein Konto ohne `ResidentProfile` liefert jede Bewerbungs-, Termin- und Notizansicht keinen Inhalt; eine Rundenansicht liefert ausschließlich Identität und Lebenszyklus der `CastingRound` (Existenz, `title`, `status`, `room_ids`, Zeitstempel, Aufbewahrungsfelder) und nichts aus `Application` Abgeleitetes, einschließlich Zahlen — Ausnahmen sind ausschließlich die Aufbewahrungsansicht und der Datenauskunft-Export (ohne Einsicht)
 - [ ] Wird ein `Membership` auf `moved_out` gesetzt, liefert der nächste Abruf jeder Runden-, Bewerbungs-, Stimmen- und Notizansicht für dieses Profil keinen Inhalt — nicht ein ausgeblendetes Element, sondern keine Daten
 - [ ] Nach `moved_out` erhält das Profil keine weitere `Notification`, einschließlich eines bereits geplanten Digests
 - [ ] Nach `moved_out` sinken **Zähler und Nenner** der Beteiligungs- und Quorum-Anzeige offener Runden um jeweils 1 (sofern die Person abgestimmt hatte)
@@ -989,7 +992,7 @@ den Zeitpunkt der Push-Berechtigungsanfrage und §6.2 für das Rückfallverhalte
 | Bildschirm | Zweck | Klasse |
 |-----------|-------|--------|
 | Registrierung (Haushalt) | `Household` + `Account` anlegen, Hinweis auf gemeinsam genutzte Adresse | Organisation |
-| Organisation → Haushalt | Zimmer, Beitrittscode, Aufbewahrung, Abstimmungsverfahren — **kein** Zugriff auf Runden ohne eigenes `ResidentProfile` (S-50/U-20) | Organisation |
+| Organisation → Haushalt | Zimmer, Beitrittscode, Aufbewahrung, Abstimmungsverfahren, Rundenidentität und -Lebenszyklus — **kein** Zugriff auf alles aus `Application` Abgeleitete ohne eigenes `ResidentProfile` (S-50/U-20, präzisiert durch ADR-014) | Organisation |
 | **Teilnehmendenliste** (ersetzt „Bewohnerliste" für Bewohnende) | Information — wer nimmt an dieser Runde teil; **nur Namen**, keine Handlungen, keine Angabe, wer schon abgestimmt hat. Einstieg über den Beteiligungsstand auf dem Start-Bildschirm (K-11) | Beteiligung |
 | **Bewohnerliste** (ersetzt „Bewohnerliste" für Verwaltung/Moderation) | Verwaltung — wer gehört zum Haushalt: Name, Beitrittsdatum, Kontakt, Status. **Geändert ggü. V0.5 (U-22):** Verwaltung voll, Moderator lesend, Bewohnende **gar nicht** — bisher „für alle sichtbar, Duplikatsschutz S-05"; die Begründung von S-05/E-06 wird in `02-SRD.md` nachgezogen | Organisation |
 | **Einstellungen** (ersetzt „Haushalts-Einstellungen" + „Persönliche Einstellungen") | *Ein* Bildschirm mit Abschnitten: Benachrichtigungen (inkl. Push und E-Mail nachtragen), Konto (Passwort, Passkey), Abmelden — siehe §4.3 für die Haushalts-seitigen Einstellungen, die in Organisation → Haushalt bleiben | Beteiligung |
@@ -1221,8 +1224,10 @@ aber **nie** auf dem primären-CTA-Platz und **nie** über einer Aufgabe mit ges
 > **Umbenannt ggü. V0.5:** Diese Fläche heißt jetzt **Organisation → Haushalt** und ist nur für
 > ein Konto ohne `ResidentProfile` auf genau die hier gelisteten Bereiche beschränkt — der
 > Bereich „Abstimmung" bleibt zwar hier (er ist eine Verfahrenseinstellung, kein
-> Casting-Inhalt), Runde/Bewerbungen/Termine/Notizen sind für ein solches Konto dagegen **nicht
-> erreichbar** (S-50/U-20, §4.0.1).
+> Casting-Inhalt). Bewerbungen/Termine/Notizen sind für ein solches Konto **nicht erreichbar**;
+> von der Runde selbst sind nur Identität und Lebenszyklus sichtbar (Existenz, `title`, `status`,
+> `room_ids`, Zeitstempel, Aufbewahrungsfelder), nichts aus `Application` Abgeleitetes
+> (S-50/U-20, präzisiert durch ADR-014, §4.0.1).
 
 | Bereich | Einstellungen |
 |---------|---------------|
