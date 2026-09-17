@@ -9,7 +9,8 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
-    "verify": "eslint && tsx scripts/lint/session-context.ts && tsx scripts/lint/import-boundary.ts && tsx scripts/lint/rls-coverage.ts && tsx scripts/lint/guarded-tests.ts && vitest run"
+    "verify": "eslint && tsx scripts/lint/session-context.ts && tsx scripts/lint/import-boundary.ts && tsx scripts/lint/rls-coverage.ts && tsx scripts/lint/guarded-tests.ts && vitest run",
+    "prepare": "husky"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.116.0",
@@ -28,6 +29,7 @@
     "drizzle-kit": "^0.31.10",
     "eslint": "^9",
     "eslint-config-next": "16.3.5",
+    "husky": "^9.1.7",
     "tailwindcss": "^4",
     "tsx": "^4.23.13",
     "typescript": "^5",
