@@ -94,19 +94,25 @@ fi
 # ---------------------------------------------------------------------------
 # Rule 2 — every backticked *.md filename exists somewhere in the project.
 # Resolved by basename, which is what makes the repo's bare-filename house
-# style safe across moves. Historical records are exempt.
+# style safe across moves. Historical records are exempt — this now also
+# covers the whole docs/prompts/ folder (implementer-prompt.md,
+# lovable-correction-prompt.md, lovable-handover-prompt.md): all three are
+# from the finished Lovable prototype build phase, not iterated further, so
+# they're frozen the same way archive/ and _logs/ are, without living under
+# those paths. The prototype they document is a design/UX reference only —
+# never a source for implementation decisions (see CLAUDE.md / README §1).
 # ---------------------------------------------------------------------------
 if run 2; then
 head_ 2 "backticked *.md names exist"
 declare -A seen
 for src in "${mdfiles[@]}"; do
-  case "$src" in */_logs/*|archive/*|./archive/*|*/.old/*) continue ;; esac
+  case "$src" in */_logs/*|archive/*|./archive/*|*/.old/*|*/docs/prompts/*) continue ;; esac
   while IFS= read -r n; do
     [ -n "$n" ] || continue
     printf '%s' "$n" | grep -qE "$GENERIC_NAMES" && continue
     key="$n"
     if [ -z "${seen[$key]+x}" ]; then
-      if find . -name "$n" -not -path './.git/*' -print -quit | grep -q .; then
+      if find . -name '.git' -prune -o -name 'node_modules' -prune -o -name "$n" -print -quit 2>/dev/null | grep -q .; then
         seen[$key]=ok
       else
         seen[$key]=bad
@@ -124,14 +130,14 @@ done
 # of which the split ever produced (they became audit-und-notifications.md).
 # Resolved by basename, like the bare form, so a folder move stays cheap.
 for src in "${mdfiles[@]}"; do
-  case "$src" in */_logs/*|archive/*|./archive/*|*/.old/*) continue ;; esac
+  case "$src" in */_logs/*|archive/*|./archive/*|*/.old/*|*/docs/prompts/*) continue ;; esac
   while IFS= read -r p; do
     [ -n "$p" ] || continue
     n=$(basename "$p")
     printf '%s' "$n" | grep -qE "$GENERIC_NAMES" && continue
     key="path:$n"
     if [ -z "${seen[$key]+x}" ]; then
-      if find . -name "$n" -not -path './.git/*' -print -quit | grep -q .; then
+      if find . -name '.git' -prune -o -name 'node_modules' -prune -o -name "$n" -print -quit 2>/dev/null | grep -q .; then
         seen[$key]=ok
       else
         seen[$key]=bad
@@ -151,7 +157,7 @@ fi
 if run 3; then
 head_ 3 ":LINE refs only into frozen collectors"
 for src in "${mdfiles[@]}"; do
-  case "$src" in */_logs/*|archive/*|./archive/*|*/.old/*) continue ;; esac
+  case "$src" in */_logs/*|archive/*|./archive/*|*/.old/*|*/docs/prompts/*) continue ;; esac
   while IFS= read -r h; do
     [ -n "$h" ] || continue
     printf '%s' "$h" | grep -qE "$FROZEN_RE:[0-9]+" && continue
@@ -201,7 +207,7 @@ if [ -d docs/adr ]; then
     [ -n "$n" ] || continue
     c=$(ls docs/adr/$(printf '%04d' "$((10#$n))")-*.md 2>/dev/null | wc -l)
     [ "$c" -eq 1 ] || note r5 "ADR-$n resolves to $c record file(s) in docs/adr/"
-  done < <(grep -rhoE 'ADR-[0-9]{3}' --include='*.md' docs 2>/dev/null |
+  done < <(grep -rhoE 'ADR-[0-9]{3}' --include='*.md' "${SCOPE[@]}" 2>/dev/null |
              sed 's/ADR-//' | tr -d '\r' | sort -u)
 else
   [ "$QUIET" = 1 ] || echo "  (skipped: docs/adr/ does not exist yet)"
@@ -244,7 +250,9 @@ if [ -d docs ]; then
   done < <( { grep -rn 'Ideas/Flatmate\.io/' --include='*.md' docs 2>/dev/null
               grep -rnE '\]\(\.\./\.\./' --include='*.md' docs 2>/dev/null
               grep -rn '~/\.claude/' --include='*.md' docs 2>/dev/null
-            } | grep -v '/_logs/' | tr -d '\r' )
+              grep -rnE '\]\([^)]*specs/' --include='*.md' docs 2>/dev/null
+              grep -rnE '`[^`]*specs/[^`]*`' --include='*.md' docs 2>/dev/null
+            } | grep -v '/_logs/' | grep -v 'docs/prompts/' | tr -d '\r' )
 else
   [ "$QUIET" = 1 ] || echo "  (skipped: docs/ does not exist yet)"
 fi

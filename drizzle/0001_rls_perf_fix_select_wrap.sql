@@ -1,0 +1,2 @@
+ALTER POLICY "application_household_isolation" ON "application" TO public USING (household_id = (select current_setting('app.household_id', true)::uuid)) WITH CHECK (household_id = (select current_setting('app.household_id', true)::uuid));--> statement-breakpoint
+ALTER POLICY "activityevent_household_isolation" ON "activity_event" TO public USING (household_id = (select current_setting('app.household_id', true)::uuid)) WITH CHECK (household_id = (select current_setting('app.household_id', true)::uuid));

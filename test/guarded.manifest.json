@@ -1,0 +1,117 @@
+{
+  "$comment": "docs/GUARDRAILS.md G-D1-G-D15, per docs/MINIMAL-GATE.md item 6. Entries this slice (001-f0-foundations) does not implement stay \"pending\" so a later feature can't silently skip one (G-D's own CI check, T040).",
+  "invariants": [
+    {
+      "id": "G-D1",
+      "title": "Selbst-Redaktion — niemand liest Beratungsinhalte über sich selbst",
+      "status": "pending",
+      "testFiles": []
+    },
+    {
+      "id": "G-D2",
+      "title": "Quorum-Verhalten",
+      "status": "pending",
+      "testFiles": []
+    },
+    {
+      "id": "G-D3",
+      "title": "Zustandsübergänge — nur deklarierte Übergänge, jeder auditiert",
+      "status": "implemented",
+      "testFiles": [
+        "tests/unit/casting/state-machine.test.ts",
+        "tests/unit/audit/backward-transition.test.ts"
+      ]
+    },
+    {
+      "id": "G-D4",
+      "title": "Löschvollständigkeit — in einer Transaktion",
+      "status": "pending",
+      "testFiles": []
+    },
+    {
+      "id": "G-D5",
+      "title": "Kein Leck über Benachrichtigungen",
+      "status": "pending",
+      "testFiles": []
+    },
+    {
+      "id": "G-D6",
+      "title": "Auskunftsexport ist vollständig und sauber abgegrenzt",
+      "status": "pending",
+      "testFiles": []
+    },
+    {
+      "id": "G-D7",
+      "title": "Kein Freitext, kein Wert in ActivityEvent.payload",
+      "status": "implemented",
+      "testFiles": ["tests/unit/audit/payload-allowlist.test.ts"]
+    },
+    {
+      "id": "G-D8",
+      "title": "Payload-Redaktion zum Fristende",
+      "status": "implemented",
+      "testFiles": ["tests/unit/audit/payload-allowlist.test.ts"]
+    },
+    {
+      "id": "G-D9",
+      "title": "became_resident_id wird nie auf null gesetzt",
+      "status": "pending",
+      "testFiles": []
+    },
+    {
+      "id": "G-D10",
+      "title": "Kein Kontext-Leck über den Verbindungspool",
+      "status": "implemented",
+      "testFiles": ["tests/integration/raw-sql/pool-reuse.test.ts"]
+    },
+    {
+      "id": "G-D11",
+      "title": "Der Offline-Stimmpuffer überlebt den Versand nicht",
+      "status": "pending",
+      "testFiles": []
+    },
+    {
+      "id": "G-D12",
+      "title": "Invite-Token-Einlösung schlägt bei bestehendem ResidentProfile fehl",
+      "status": "pending",
+      "testFiles": []
+    },
+    {
+      "id": "G-D13",
+      "title": "Der Notiz-Erinnerungs-Reminder respektiert Selbst-Redaktion",
+      "status": "pending",
+      "testFiles": []
+    },
+    {
+      "id": "G-D14",
+      "title": "Eine Sitzung, eine Identität — Haushalts-Account besetzt nie ein Profil",
+      "status": "pending",
+      "testFiles": []
+    },
+    {
+      "id": "G-D15",
+      "title": "Der Haushalts-Account sieht die Runde, aber keine Zahl aus Bewerbungen",
+      "status": "pending",
+      "testFiles": []
+    }
+  ],
+  "visibilityInvariants": {
+    "$comment": "AC-0.6/G-C7: each table carrying household_id is tested twice — once through the policy layer, once as raw SQL bypassing it. A pass on one path never substitutes for the other.",
+    "application_via_policy": {
+      "status": "implemented",
+      "testFile": "tests/integration/policy/household-scoping.test.ts"
+    },
+    "application_via_raw_sql": {
+      "status": "implemented",
+      "testFile": "tests/integration/raw-sql/household-scoping.test.ts"
+    },
+    "activityevent_via_policy": {
+      "status": "implemented",
+      "testFile": "tests/integration/policy/activityevent-scoping.test.ts"
+    },
+    "activityevent_via_raw_sql": {
+      "status": "implemented",
+      "testFile": "tests/integration/raw-sql/activityevent-scoping.test.ts"
+    }
+  }
+}

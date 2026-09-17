@@ -3,7 +3,9 @@
 > **Nummer:** ADR-006 — dauerhaft. Nummern werden nie neu vergeben.
 > **Abweichung von der Quelle:** Seit 2026-09-11 weicht dieser Record in den Zeilen
 > *Authentifizierung*, *Hosting* und *Auslieferung* von der eingefrorenen Fassung in `../05-ADRs.md`
-> ab. Die eingefrorene Fassung bleibt als historischer Stand stehen; **maßgeblich ist diese Datei.**
+> ab; seit 2026-09-16 zusätzlich in der Entscheidung selbst (**kein Serverless** entfällt) sowie in
+> den Zeilen *Auslieferung* und *Datenbankverbindung*. Die eingefrorene Fassung bleibt als
+> historischer Stand stehen; **maßgeblich ist diese Datei.**
 
 ## ADR-006 — Stack: Next.js/TypeScript, Postgres, Drizzle, Supabase (EU) mit Supabase Auth
 
@@ -18,9 +20,39 @@
 > ist für dieses Modell falsch und wurde bei der Prüfung verworfen — siehe *Konsequenzen, negativ*,
 > erster Punkt. Wer diesen Record später liest, soll den Irrtum nicht erneut machen.
 >
-> Unberührt bleiben: Next.js, TypeScript, Postgres, Drizzle, EU-Verarbeitung, kein Serverless.
+> Unberührt bleiben: Next.js, TypeScript, Postgres, Drizzle, EU-Verarbeitung. **Kein Serverless**
+> wird durch die folgende Änderung aufgehoben — siehe unten.
 > Unberührt bleibt ebenfalls **ADR-007** — Passwort primär, Passkey optional ist eine Aussage über
 > die *Methode*, nicht über den *Betreiber*.
+
+> ### Änderung 2026-09-16 — App-Hosting wechselt zu Vercel (Serverless); Solver zieht in ADR-005 um
+>
+> Die ursprüngliche Festlegung — **kein Serverless**, ein Docker-Image mit App und Solver zusammen —
+> wird ersetzt durch: **App auf Vercel** (Serverless/Edge, Hobby-Tarif, EU-Region `fra1`), **Solver
+> als eigener Dienst** (siehe ADR-005s Änderung vom selben Tag). Der Anlass war ursprünglich der
+> Wunsch nach kostenlosem Hosting; der eigentliche Auslöser für die *Bestätigung* war der Vergleich
+> der Optionen in dieser Konversation, dokumentiert unter dem entsprechenden offenen Punkt in
+> `review-log.md`.
+>
+> **Was diese Änderung nicht mehr begründet:** „Kein Serverless folgt aus ADR-005" — das war richtig,
+> solange der Solver ein Kindprozess **im selben Prozess wie die App** war. Seit ADR-005 den Solver
+> in einen eigenen Dienst verschiebt, entfällt genau diese Kopplung. Der zweite, unabhängige Grund
+> aus diesem Record — dass Serverless „dauerhafte Verbindungen mit `SET LOCAL` unangenehm macht" —
+> entfällt **nicht** automatisch mit; er wird unten in der Zeile *Datenbankverbindung* neu
+> adressiert, nicht stillschweigend übergangen.
+>
+> **Neu, ungelöst und ausdrücklich benannt statt verschwiegen:** die Sicherheit des
+> RLS-Sitzungskontexts unter Serverless hängt jetzt vollständig von der Disziplin ab, die FR-0.3/
+> FR-0.4 (`backlog/requirements/F0-requirements.md`) ohnehin schon verlangen — `SET LOCAL` und die davon
+> abhängige Abfrage in **derselben** Transaktion, durch **einen** Transaktions-Helfer, nie über
+> getrennte Verbindungen aus dem eigenen Verbindungspool. Unter einem langlebigen Container war das
+> eine Empfehlung mit komfortablem Sicherheitsabstand (wenige, lange lebende Verbindungen). Unter
+> Serverless mit Supabases Transaktions-Pooler ist dieselbe Disziplin **die einzige** Absicherung,
+> nicht mehr eine von mehreren. Der geschützte Test **G-D10 / AC-0.7** (zwei Haushalte, dieselbe
+> physische Verbindung nacheinander, zweiter sieht nichts vom ersten) ist damit nicht mehr nur ein
+> Test unter vielen, sondern der Beleg, dass dieser Wechsel sicher ist — **vor** der ersten Policy zu
+> schreiben, nicht danach (Minimal-Gate-Reihenfolge, `MINIMAL-GATE.md` Punkt 7 gilt unverändert und
+> jetzt schärfer).
 
 ### Kontext
 
@@ -42,16 +74,20 @@ verlangt eine Laufzeit, die Kindprozesse starten darf — was viele Serverless-U
 | **Datenzugriff** | **Drizzle ORM** | Nah an SQL — bei RLS entscheidend, weil man sehen muss, welches Statement wirklich läuft. Typsichere Migrationen, kein verstecktes Verhalten, `SET LOCAL` unkompliziert | Prisma: bequemer, aber mehr Magie zwischen Code und Statement. Genau die Magie, die bei RLS-Debugging und bei AI-generiertem Code teuer wird |
 | **Authentifizierung** | **Supabase Auth (GoTrue)** für Anmeldedaten und Anmeldevorgang. **Der Sitzungs- und Profilkontext bleibt in der eigenen `Session`-Tabelle** — ADR-004 wird davon nicht berührt | Abgegeben wird genau der „Rattenschwanz" aus ADR-007: Zurücksetzen, Ratenbegrenzung, Brute-Force-Schutz, Hash-Parameter, Token-Ausgabe. Das ist der Teil, an dem ein Solo-Projekt am teuersten falsch liegt, und er geht an den Anbieter, der **ohnehin schon die gesamte Datenbank verarbeitet** — kein neuer Dritter, kein zusätzlicher AVV | **self-hosted, Credentials-Provider, Argon2id** (bis 2026-09-11 die Festlegung): volle Kontrolle, volle Portabilität, aber die gesamte Anmeldesicherheit in eigener Verantwortung. Clerk/Auth0: ein *zusätzlicher* Anbieter **neben** dem Hoster — genau der Nachteil, den Supabase Auth nicht hat, weil es derselbe Anbieter ist |
 | **Hosting** | **Supabase, EU-Region**, mit AVV | Der Haushalt ist Verantwortlicher, Flatmate.io Auftragsverarbeiter — die Kette muss lückenlos in der EU liegen. Supabase **ist** Postgres, kein Derivat: RLS, `FORCE ROW LEVEL SECURITY`, `SET LOCAL` und Drizzle laufen unverändert | Nicht-EU-Hosting: Drittlandtransfer mit Zusatzaufwand, den ein Non-Profit nicht tragen will. Selbst betriebenes Postgres: keine fremde Verarbeitung, aber Sicherung, Einspielung von Aktualisierungen und Wiederherstellung in Eigenregie |
-| **Auslieferung** | Docker-Image (App + Python-Solver); **Postgres als verwalteter Dienst daneben, nicht im selben Image** | Ein Artefakt, reproduzierbar, Rücknahme über das vorherige Image. Der Solver bleibt Kindprozess im Container — die Bedingung aus ADR-005 gilt unverändert | Serverless: **schließt den Solver-Kindprozess aus** (ADR-005) und macht dauerhafte Verbindungen mit `SET LOCAL` unangenehm |
-| **Datenbankverbindung** | **Direkte Verbindung (Session-Modus)**, nicht der Transaktions-Pooler | Der Sitzungskontext aus ADR-004 wird per `SET LOCAL` gesetzt. Wer versehentlich über den Transaktions-Pooler verbindet, verschiebt die Lebensdauer dieses Kontexts — und ein Sitzungskontext, der nicht zur Anweisung passt, ist ein **stiller** RLS-Fehler, kein lauter | Transaktions-Pooler als Standardverbindung: mehr Verbindungen, aber die Kontextsetzung wird zur Fußangel |
+| **Auslieferung** *(seit 2026-09-16)* | **Vercel** (App, Serverless/Edge, EU-Region `fra1`) **+ AWS Lambda** (Solver-Dienst, `eu-central-1`, ADR-005) — zwei Deployables statt einem | Kostenloses App-Hosting, sobald der Solver kein Kindprozess der App mehr ist (ADR-005). Der Solver-Port trägt die Trennung | War bis 2026-09-16: ein Docker-Image (App + Python-Solver), verworfen zugunsten kostenlosen Hostings, siehe Konsequenzen für den Preis dieser Wahl |
+| **Datenbankverbindung** *(seit 2026-09-16)* | **Supabases Transaktions-Pooler**, mit derselben `SET-LOCAL`-in-einer-Transaktion-Disziplin wie zuvor, nur jetzt ohne das Sicherheitspolster einer langlebigen Verbindung | Serverless kann keine dauerhafte Direktverbindung halten; der Transaktions-Pooler ist die einzige Option, die zu vielen kurzlebigen Funktionsaufrufen passt. Die Absicherung ist FR-0.3/FR-0.4s einziger Transaktions-Helfer plus der geschützte Test G-D10/AC-0.7 — **kein neuer Mechanismus, aber jetzt die einzige Verteidigungslinie statt einer von zweien** | War bis 2026-09-16: direkte Verbindung (Session-Modus), verworfen mit derselben Begründung wie die Auslieferung — siehe die Änderungsnotiz oben für das, was dabei *nicht* stillschweigend übergangen wird |
 
 ### Entscheidung
 
-Wie oben. Zwei Punkte sind keine Vorlieben, sondern **Folgen anderer Records** und daher nicht
-einzeln verhandelbar, ohne diese mitzuverhandeln:
+Wie oben. Ein Punkt ist keine Vorliebe, sondern **Folge eines anderen Records** und daher nicht
+einzeln verhandelbar, ohne diesen mitzuverhandeln:
 
 - **Postgres** folgt aus ADR-004 (ohne RLS kein zweiter Zaun).
-- **Kein Serverless** folgt aus ADR-005 (ohne Kindprozess kein lokaler Solver).
+
+**Kein Serverless** folgte bis 2026-09-16 aus ADR-005 (ohne Kindprozess **im selben Prozess** kein
+lokaler Solver) — seit ADR-005 den Solver in einen eigenen Dienst verschiebt, entfällt diese
+Kopplung, und Serverless-App-Hosting ist wieder verhandelbar. Siehe die Änderungsnotiz 2026-09-16
+oben für das, was dabei ausdrücklich *nicht* automatisch mit-gelöst wird.
 
 **Die Grenze der Auslagerung — der wichtigste Satz dieses Records.** Supabase Auth besitzt die
 *Anmeldung*, nicht die *Autorisierung*:
@@ -79,8 +115,11 @@ Arbeit nicht ab und kann sie nicht abnehmen.
 
 **Positiv**
 
-- Eine Codebasis, ein Typsystem, ein Deployable, eine Migrationskette.
+- Eine Codebasis, ein Typsystem, eine Migrationskette. *(Bis 2026-09-16: „ein Deployable" — seit
+  der Trennung von App (Vercel) und Solver (ADR-005, AWS Lambda) sind es zwei; siehe Negativ.)*
 - Autorisierung serverseitig, ohne Client-Vertrauen.
+- **Kostenloses App-Hosting** *(seit 2026-09-16)*, sobald der Solver kein Kindprozess der App mehr
+  ist — siehe ADR-005s Änderung vom selben Tag.
 - **Die AVV-Kette wird durch diese Entscheidung nicht länger.** Auth und Datenbank liegen beim
   *selben* Auftragsverarbeiter; die Liste der Unterauftragsverarbeiter
   (`06-Compliance-Anhang.md` §98) bekommt einen Namen, keinen zusätzlichen Eintrag.
@@ -137,21 +176,32 @@ Arbeit nicht ab und kann sie nicht abnehmen.
 - **Next.js ist ein bewegliches Ziel.** App Router, Server Actions und Caching-Verhalten haben sich
   wiederholt geändert. Ein Projekt mit langem Atem zahlt Migrationsaufwand. Gegenmittel:
   Fachlogik im puren Kern, damit ein Framework-Wechsel die Domäne nicht anfasst.
-- **Kein Serverless heißt Betriebskosten** — ein laufender Container statt Skalierung auf Null. Bei
-  einem spendenfinanzierten Projekt eine dauerhafte Position.
+- **Serverless heißt: der RLS-Sitzungskontext hat nur noch eine Verteidigungslinie** *(seit
+  2026-09-16, ersetzt die alte Betriebskosten-Zeile — die entfällt, weil Vercels Hobby-Tarif
+  kostenlos ist)*. Unter dem alten Docker-Container war die `SET-LOCAL`-Disziplin aus FR-0.3/FR-0.4
+  eine von zwei Absicherungen (wenige, langlebige Verbindungen als zusätzliches Polster). Unter
+  Supabases Transaktions-Pooler ist sie die **einzige**. Siehe die Änderungsnotiz oben und
+  `G-D10`/`AC-0.7`.
+- **AWS wird ein neuer Unterauftragsverarbeiter** — nicht durch diese Entscheidung selbst, sondern
+  durch ADR-005s Solver-Dienst, der dieselbe Entkopplung erst ermöglicht hat. Siehe ADR-005s eigene
+  Konsequenzen und `06-Compliance-Anhang.md` §4 für die AVV-Pflicht (G-B4).
 - **Drizzle ist weniger verbreitet als Prisma**, also weniger Trainingsmaterial für AI-Agenten und
   mehr falsch geratene API-Aufrufe. Deshalb die `GUARDRAILS.md`-Regel „keine Bibliotheks-API ohne
   Verifikation gegen die installierte Version".
-- **Ein Image mit Node *und* Python** ist größer, langsamer gebaut und hat zwei
-  Sicherheitsaktualisierungsketten.
-- **Zwangsbedingung aus ADR-005.** Die Hostingumgebung muss einen lokalen Python-Kindprozess mit
-  Zeitlimit und fixem Seed ausführen können. Eine Umgebung ohne langlebige Prozesse ist damit
-  ausgeschlossen — auch wenn der Solver erst in v1.1 gebaut wird. Wer diese Bedingung beim
-  Aufsetzen übergeht, verliert ADR-005, ohne es zu bemerken.
+- **~~Ein Image mit Node *und* Python ist größer, langsamer gebaut~~** *(seit 2026-09-16 nicht mehr
+  diese Zeile betreffend — das App-Image trägt kein Python mehr. Die Sorge lebt unverändert in
+  ADR-005 weiter, jetzt als Solver-eigenes Image.)*
+- **~~Zwangsbedingung aus ADR-005~~** *(seit 2026-09-16 aufgehoben, nicht stillschweigend
+  gestrichen: bis 2026-09-16 musste die Hostingumgebung einen lokalen Python-Kindprozess ausführen
+  können, was jede Umgebung ohne langlebige Prozesse ausschloss. Seit ADR-005 den Solver in einen
+  eigenen Dienst verschiebt, entfällt diese Zwangsbedingung für die App-Hostingwahl — sie gilt
+  jetzt nur noch für den Solver-Dienst selbst, dort weiterhin in voller Schärfe.)*
 
-> **Das gibt man auf, wenn** die Betriebskosten das Spendenmodell übersteigen (dann: Solver als
-> separater, bedarfsgestarteter Dienst und die App serverless — aber erst, wenn ADR-005 entsprechend
-> angepasst ist).
+> **Das gibt man auf, wenn** *(seit 2026-09-16, ersetzt die alte Fassung — die Betriebskosten-
+> Aufgabebedingung hat bereits ausgelöst)*: die zusätzliche Komplexität aus zwei Deployables, die
+> AWS-AVV oder die verschärfte Abhängigkeit von der `SET-LOCAL`-Disziplin sich als teurer erweisen
+> als das kostenlose Hosting wert ist. Dann zurück zu einem Docker-Image mit App und Solver
+> zusammen — ADR-005s Solver-Port und diese Zeile machen den Rückweg genauso billig wie den Hinweg.
 >
 > **Für die Auth-Entscheidung gilt eine eigene Aufgabebedingung:** Man geht zu einem selbst
 > betriebenen Anmeldedienst zurück, wenn Supabase Auth die Anforderungen aus ADR-007 nicht trägt —
@@ -166,12 +216,31 @@ Arbeit nicht ab und kann sie nicht abnehmen.
 > · **Geändert am 2026-09-11** (Samuel Zink): Authentifizierung von *self-hosted, Argon2id* auf
 > **Supabase Auth** umgestellt, Hosting auf **Supabase (EU)** benannt, Verbindungsart als
 > *direkt, Session-Modus* festgeschrieben. Ausgelöst durch die Aufgabebedingung dieses Records.
-> · **Aufgabebedingung:** Betriebskosten über dem Spendenmodell (dann: Solver als separater,
-> bedarfsgestarteter Dienst und die App serverless — aber erst, wenn ADR-005 entsprechend angepasst
-> ist). Für Auth gesondert: siehe Kasten oben.
+> · **Geändert am 2026-09-16** (Samuel Zink): „Kein Serverless" aufgehoben. App-Hosting auf
+> **Vercel** (Serverless/Edge, `fra1`) umgestellt; Datenbankverbindung auf **Supabases
+> Transaktions-Pooler** umgestellt. Ausgelöst durch die Aufgabebedingung dieses Records
+> (Betriebskosten/kostenloses Hosting) und ermöglicht durch ADR-005s Verschiebung des Solvers in
+> einen eigenen Dienst — siehe die Änderungsnotiz 2026-09-16 oben.
+> · **Aufgabebedingung** *(seit 2026-09-16 neu gefasst)*: siehe „Das gibt man auf, wenn" oben. Für
+> Auth gesondert: siehe Kasten oben.
 > · **Was ein späterer Widerspruch kostet:** Praktisch die gesamte Codebasis. Dies ist der teuerste
 > Record dieser Liste, und der einzige, dessen Widerspruch zugleich ADR-005 mitnimmt
-> · Status wechselt auf `Angenommen`, sobald im Code umgesetzt und überprüft.
+> · Status wechselt auf `Angenommen`, sobald im Code umgesetzt und überprüft — für die 2026-09-16-
+> Änderung insbesondere: sobald der geschützte Test G-D10/AC-0.7 unter dem Transaktions-Pooler grün
+> ist und die AWS-AVV vorliegt.
+>
+> **Folgearbeiten aus der Änderung von 2026-09-16 — Stand 2026-09-16:**
+>
+> 1. 🟡 **G-D10/AC-0.7 unter dem Transaktions-Pooler verifizieren**, vor der ersten Policy
+>    (`MINIMAL-GATE.md` Punkt 7). Bisher nur für eine langlebige Direktverbindung gedacht — unter
+>    dem Pooler ist der Test die einzige Absicherung, nicht mehr eine von zweien.
+> 2. 🟡 **AWS als Unterauftragsverarbeiter in `06-Compliance-Anhang.md` §4 eintragen** und AVV
+>    abschließen, bevor der Solver-Dienst live geht (G-B4). Siehe `review-log.md` für den offenen
+>    Punkt.
+> 3. 🟡 **Die spec-kit-Planungsartefakte für Feature 001 (F0) auf Serverless/Transaktions-Pooler
+>    aktualisieren** — waren zwischenzeitlich auf Docker-Container/Direktverbindung korrigiert
+>    worden, bevor diese Änderung feststand. Liegt außerhalb der Übergabegrenze dieses Ordners
+>    (`README.md` §1) und wird dort, nicht hier, nachgezogen.
 >
 > **Folgearbeiten aus der Änderung von 2026-09-11 — Stand 2026-09-11:**
 >
