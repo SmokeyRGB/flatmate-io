@@ -15,7 +15,7 @@ describe("Application household isolation — raw SQL (AC-0.6)", () => {
     const profileB = uuid();
 
     const rowA = await withSessionContext(
-      { householdId: householdA, residentProfileId: profileA },
+      { accountId: uuid(), householdId: householdA, profileId: profileA },
       async (tx) => {
         const result = await tx.execute<{ id: string }>(
           sql`INSERT INTO application (household_id, state, created_by_account_id, created_by_profile_id)
@@ -27,7 +27,7 @@ describe("Application household isolation — raw SQL (AC-0.6)", () => {
     );
 
     const rowB = await withSessionContext(
-      { householdId: householdB, residentProfileId: profileB },
+      { accountId: uuid(), householdId: householdB, profileId: profileB },
       async (tx) => {
         const result = await tx.execute<{ id: string }>(
           sql`INSERT INTO application (household_id, state, created_by_account_id, created_by_profile_id)
@@ -41,7 +41,7 @@ describe("Application household isolation — raw SQL (AC-0.6)", () => {
     type ApplicationRow = { id: string; household_id: string };
 
     const rowsSeenByA = await withSessionContext(
-      { householdId: householdA, residentProfileId: profileA },
+      { accountId: uuid(), householdId: householdA, profileId: profileA },
       async (tx) => tx.execute<ApplicationRow>(sql`SELECT id, household_id FROM application`),
     );
 
@@ -51,10 +51,10 @@ describe("Application household isolation — raw SQL (AC-0.6)", () => {
     expect(rowsSeenByA.every((r: ApplicationRow) => r.household_id === householdA)).toBe(true);
 
     // Cleanup, from each row's own household context (RLS-scoped DELETE).
-    await withSessionContext({ householdId: householdA, residentProfileId: profileA }, (tx) =>
+    await withSessionContext({ accountId: uuid(), householdId: householdA, profileId: profileA }, (tx) =>
       tx.execute(sql`DELETE FROM application WHERE id = ${rowA.id}::uuid`),
     );
-    await withSessionContext({ householdId: householdB, residentProfileId: profileB }, (tx) =>
+    await withSessionContext({ accountId: uuid(), householdId: householdB, profileId: profileB }, (tx) =>
       tx.execute(sql`DELETE FROM application WHERE id = ${rowB.id}::uuid`),
     );
   });

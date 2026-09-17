@@ -85,14 +85,20 @@
     {
       "id": "G-D14",
       "title": "Eine Sitzung, eine Identität — Haushalts-Account besetzt nie ein Profil",
-      "status": "pending",
-      "testFiles": []
+      "status": "implemented",
+      "testFiles": [
+        "tests/integration/policy/household-account-identity.test.ts",
+        "tests/integration/raw-sql/session-immutable-profile.test.ts"
+      ]
     },
     {
       "id": "G-D15",
       "title": "Der Haushalts-Account sieht die Runde, aber keine Zahl aus Bewerbungen",
-      "status": "pending",
-      "testFiles": []
+      "status": "implemented",
+      "testFiles": [
+        "tests/integration/policy/round-visibility-household-account.test.ts",
+        "tests/integration/raw-sql/round-visibility-household-account.test.ts"
+      ]
     }
   ],
   "visibilityInvariants": {
@@ -112,6 +118,78 @@
     "activityevent_via_raw_sql": {
       "status": "implemented",
       "testFile": "tests/integration/raw-sql/activityevent-scoping.test.ts"
+    },
+    "account_via_policy": {
+      "status": "implemented",
+      "testFile": "tests/integration/policy/identity-household-scoping.test.ts"
+    },
+    "account_via_raw_sql": {
+      "status": "implemented",
+      "testFile": "tests/integration/raw-sql/identity-household-scoping.test.ts"
+    },
+    "session_via_policy": {
+      "status": "implemented",
+      "testFile": "tests/integration/policy/session-household-scoping.test.ts"
+    },
+    "session_via_raw_sql": {
+      "status": "implemented",
+      "testFile": "tests/integration/raw-sql/session-household-scoping.test.ts"
+    },
+    "household_via_policy": {
+      "status": "implemented",
+      "testFile": "tests/integration/policy/household-and-settings-scoping.test.ts"
+    },
+    "household_via_raw_sql": {
+      "status": "implemented",
+      "testFile": "tests/integration/raw-sql/household-and-settings-scoping.test.ts"
+    },
+    "householdsettings_via_policy": {
+      "status": "implemented",
+      "testFile": "tests/integration/policy/household-and-settings-scoping.test.ts"
+    },
+    "householdsettings_via_raw_sql": {
+      "status": "implemented",
+      "testFile": "tests/integration/raw-sql/household-and-settings-scoping.test.ts"
+    },
+    "residentprofile_via_policy": {
+      "status": "implemented",
+      "testFile": "tests/integration/policy/identity-household-scoping.test.ts"
+    },
+    "residentprofile_via_raw_sql": {
+      "status": "implemented",
+      "testFile": "tests/integration/raw-sql/identity-household-scoping.test.ts"
+    },
+    "membership_via_policy": {
+      "status": "implemented",
+      "testFile": "tests/integration/policy/identity-household-scoping.test.ts"
+    },
+    "membership_via_raw_sql": {
+      "status": "implemented",
+      "testFile": "tests/integration/raw-sql/identity-household-scoping.test.ts"
+    },
+    "room_via_policy": {
+      "status": "implemented",
+      "testFile": "tests/integration/policy/room-household-scoping.test.ts"
+    },
+    "room_via_raw_sql": {
+      "status": "implemented",
+      "testFile": "tests/integration/raw-sql/room-household-scoping.test.ts"
+    },
+    "castinground_via_policy": {
+      "status": "implemented",
+      "testFile": "tests/integration/policy/round-household-scoping.test.ts"
+    },
+    "castinground_via_raw_sql": {
+      "status": "implemented",
+      "testFile": "tests/integration/raw-sql/round-household-scoping.test.ts"
+    },
+    "roundparticipation_via_policy": {
+      "status": "implemented",
+      "testFile": "tests/integration/policy/round-household-scoping.test.ts"
+    },
+    "roundparticipation_via_raw_sql": {
+      "status": "implemented",
+      "testFile": "tests/integration/raw-sql/round-household-scoping.test.ts"
     }
   }
 }

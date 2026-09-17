@@ -10,7 +10,7 @@ afterEach(async () => {
   for (const id of cleanupIds) {
     // Deleted through the row's own household context, since app_runtime's RLS policy scopes
     // DELETE to household_id like every other command (schema.ts's `for: "all"` policy).
-    await withSessionContext({ householdId: HOUSEHOLD_FOR_CLEANUP[id], residentProfileId: uuid() }, (tx) =>
+    await withSessionContext({ accountId: uuid(), householdId: HOUSEHOLD_FOR_CLEANUP[id], profileId: uuid() }, (tx) =>
       tx.delete(application).where(eq(application.id, id)),
     );
   }
@@ -30,7 +30,7 @@ describe("Application household isolation — policy layer (AC-0.6)", () => {
     const profileB = uuid();
 
     const [rowA] = await withSessionContext(
-      { householdId: householdA, residentProfileId: profileA },
+      { accountId: uuid(), householdId: householdA, profileId: profileA },
       (tx) =>
         tx
           .insert(application)
@@ -46,7 +46,7 @@ describe("Application household isolation — policy layer (AC-0.6)", () => {
     cleanupIds.push(rowA.id);
 
     const [rowB] = await withSessionContext(
-      { householdId: householdB, residentProfileId: profileB },
+      { accountId: uuid(), householdId: householdB, profileId: profileB },
       (tx) =>
         tx
           .insert(application)
@@ -62,7 +62,7 @@ describe("Application household isolation — policy layer (AC-0.6)", () => {
     cleanupIds.push(rowB.id);
 
     const rowsSeenByA = await withSessionContext(
-      { householdId: householdA, residentProfileId: profileA },
+      { accountId: uuid(), householdId: householdA, profileId: profileA },
       (tx) => tx.select().from(application), // deliberately no .where(...)
     );
 

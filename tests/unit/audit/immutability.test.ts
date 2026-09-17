@@ -17,7 +17,7 @@ describe("ActivityEvent immutability (FR-0.13, AC-0.11)", () => {
     const householdId = uuid();
     const profileId = uuid();
 
-    const event = await withSessionContext({ householdId, residentProfileId: profileId }, (tx) =>
+    const event = await withSessionContext({ accountId: uuid(), householdId, profileId: profileId }, (tx) =>
       recordActivityEvent(tx, {
         householdId,
         eventType: "application.state_changed",
@@ -30,7 +30,7 @@ describe("ActivityEvent immutability (FR-0.13, AC-0.11)", () => {
     );
 
     const updateResult = await withSessionContext(
-      { householdId, residentProfileId: profileId },
+      { accountId: uuid(), householdId, profileId: profileId },
       (tx) =>
         tx
           .update(activityEvent)
@@ -41,13 +41,13 @@ describe("ActivityEvent immutability (FR-0.13, AC-0.11)", () => {
     expect(updateResult).toHaveLength(0);
 
     const deleteResult = await withSessionContext(
-      { householdId, residentProfileId: profileId },
+      { accountId: uuid(), householdId, profileId: profileId },
       (tx) => tx.delete(activityEvent).where(eq(activityEvent.id, event.id)).returning(),
     );
     expect(deleteResult).toHaveLength(0);
 
     const [stillThere] = await withSessionContext(
-      { householdId, residentProfileId: profileId },
+      { accountId: uuid(), householdId, profileId: profileId },
       (tx) => tx.select().from(activityEvent).where(eq(activityEvent.id, event.id)),
     );
     expect(stillThere).toBeDefined();
@@ -58,7 +58,7 @@ describe("ActivityEvent immutability (FR-0.13, AC-0.11)", () => {
     const householdId = uuid();
     const profileId = uuid();
 
-    const event = await withSessionContext({ householdId, residentProfileId: profileId }, (tx) =>
+    const event = await withSessionContext({ accountId: uuid(), householdId, profileId: profileId }, (tx) =>
       recordActivityEvent(tx, {
         householdId,
         eventType: "application.state_changed",
@@ -71,7 +71,7 @@ describe("ActivityEvent immutability (FR-0.13, AC-0.11)", () => {
     );
 
     const rawUpdate = await withSessionContext(
-      { householdId, residentProfileId: profileId },
+      { accountId: uuid(), householdId, profileId: profileId },
       (tx) =>
         tx.execute(
           sql`UPDATE activity_event SET event_type = 'tampered' WHERE id = ${event.id}::uuid RETURNING id`,
@@ -80,7 +80,7 @@ describe("ActivityEvent immutability (FR-0.13, AC-0.11)", () => {
     expect(rawUpdate).toHaveLength(0);
 
     const rawDelete = await withSessionContext(
-      { householdId, residentProfileId: profileId },
+      { accountId: uuid(), householdId, profileId: profileId },
       (tx) => tx.execute(sql`DELETE FROM activity_event WHERE id = ${event.id}::uuid RETURNING id`),
     );
     expect(rawDelete).toHaveLength(0);

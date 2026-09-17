@@ -1,0 +1,72 @@
+import { describe, expect, it } from "vitest";
+import { claimResidentProfile } from "@/modules/identity/auth";
+import { createResidentProfile } from "@/modules/identity/repository";
+import {
+  createRoom,
+  createRound,
+  forceChangeSettingWhileRoundOpen,
+  hasProcedureChangedNotice,
+  openRound,
+  ProcedureLockedError,
+  updateHouseholdSettingsWithProcedureLock,
+} from "@/modules/casting/repository";
+import { deleteTestAccount, registerTestHousehold, type TestHousehold } from "../../helpers/identity";
+
+async function claim(hh: TestHousehold, name: string) {
+  const actor = { accountId: hh.accountId, profileId: null };
+  const profile = await createResidentProfile(hh.context, name, actor);
+  const { accountId } = await claimResidentProfile(hh.context, profile.id, "test-password-not-real-1234");
+  return { profileId: profile.id, accountId };
+}
+
+// AC-1.13/AC-1.14/AC-1.15/FR-1.21/FR-1.22/I-7.
+describe("Procedure lock while a round is open", () => {
+  it("refuses a locked-setting change while open, names the round, allows it once no round is open (AC-1.13/AC-1.15)", async () => {
+    let hh: TestHousehold | undefined;
+    const accountIds: string[] = [];
+    try {
+      hh = await registerTestHousehold();
+      const actor = { accountId: hh.accountId, profileId: null };
+      const resident = await claim(hh, "Resident1");
+      accountIds.push(resident.accountId);
+      const roomA = await createRoom(hh.context, "Room A", actor);
+      const round = await createRound(hh.context, "Round", [roomA.id], actor);
+
+      // AC-1.15: no round open yet (still draft) — the change succeeds.
+      await expect(
+        updateHouseholdSettingsWithProcedureLock(hh.context, { quorumShare: "0.6" }, actor),
+      ).resolves.toMatchObject({ quorumShare: "0.6" });
+
+      await openRound(hh.context, round.id, actor);
+
+      // AC-1.13: refused while open, and the error names the open round.
+      await expect(
+        updateHouseholdSettingsWithProcedureLock(hh.context, { quorumShare: "0.7" }, actor),
+      ).rejects.toMatchObject({ openRoundId: round.id } satisfies Partial<ProcedureLockedError>);
+    } finally {
+      for (const id of accountIds) await deleteTestAccount(id);
+      if (hh) await hh.cleanup();
+    }
+  });
+
+  it("records an ActivityEvent and a procedure-changed notice when forced through anyway (AC-1.14)", async () => {
+    let hh: TestHousehold | undefined;
+    const accountIds: string[] = [];
+    try {
+      hh = await registerTestHousehold();
+      const actor = { accountId: hh.accountId, profileId: null };
+      const resident = await claim(hh, "Resident1");
+      accountIds.push(resident.accountId);
+      const roomA = await createRoom(hh.context, "Room A", actor);
+      const round = await createRound(hh.context, "Round", [roomA.id], actor);
+      await openRound(hh.context, round.id, actor);
+
+      await forceChangeSettingWhileRoundOpen(hh.context, "quorumShare", "0.9", round.id, actor);
+
+      await expect(hasProcedureChangedNotice(hh.context, round.id)).resolves.toBe(true);
+    } finally {
+      for (const id of accountIds) await deleteTestAccount(id);
+      if (hh) await hh.cleanup();
+    }
+  });
+});
