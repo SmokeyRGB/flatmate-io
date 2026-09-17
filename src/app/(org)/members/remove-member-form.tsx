@@ -1,35 +1,92 @@
 "use client";
 
-import { Trash2 } from "lucide-react";
-import { useActionState, useState } from "react";
+import { Trash2, TriangleAlert } from "lucide-react";
+import { useActionState, useEffect, useRef, useState } from "react";
 import { removeMemberAction, type RemoveMemberFormState } from "./actions";
 
 const initialState: RemoveMemberFormState = { error: null };
 
-// FR-1.26/U-27 hard tier: requires typing the exact display name, not a plain click — the
-// nearby callout on the members page explains when to use this over the reversible "Moved out".
+// FR-1.26/U-27 hard tier: requires typing the exact display name, not a plain click. Presented as
+// a modal dialog per docs/09-Design-System.md's "Dialogs & confirmations" — title, consequence
+// explanation, a nested cautionary callout, the typed-name field (placeholder previews the
+// expected value), and a solid destructive confirm button that stays disabled (50% opacity)
+// until the name matches — not the always-visible inline control this replaces
+// (003-remove-resident-modal).
 export function RemoveMemberForm({ accountId, displayName }: { accountId: string; displayName: string }) {
   const [state, formAction, pending] = useActionState(removeMemberAction, initialState);
   const [typedName, setTypedName] = useState("");
+  const dialogRef = useRef<HTMLDialogElement>(null);
+
+  // `removeMember` performs a soft `status: "moved_out"` transition, not a deletion — the row
+  // stays in the list (it re-renders with a "moved out" badge and a Reactivate button instead),
+  // so closing "for free" via the row unmounting (as originally assumed in research.md Decision
+  // 4) does not happen. Close explicitly on a successful, already-open submission; a failed one
+  // (state.error set) stays open so the inline error is visible (FR-008).
+  useEffect(() => {
+    if (state.error === null && dialogRef.current?.open) {
+      dialogRef.current.close();
+    }
+  }, [state]);
 
   return (
-    <form action={formAction} className="flex flex-wrap items-center gap-2">
-      <input type="hidden" name="accountId" value={accountId} />
-      <input
-        name="confirmDisplayName"
-        value={typedName}
-        onChange={(e) => setTypedName(e.target.value)}
-        placeholder={`Type "${displayName}" to confirm`}
-        className="field-input py-1 text-sm"
-      />
+    <>
       <button
-        type="submit"
-        disabled={pending || typedName !== displayName}
-        className="btn-link text-destructive disabled:opacity-40"
+        type="button"
+        onClick={() => dialogRef.current?.showModal()}
+        aria-label={`Remove ${displayName}`}
+        title="Remove"
+        className="shrink-0 rounded-full p-1.5 text-destructive transition hover:bg-destructive/10"
       >
-        <Trash2 className="mr-1 inline size-3.5" /> Remove
+        <Trash2 className="size-5" />
       </button>
-      {state.error && <p className="field-error w-full">{state.error}</p>}
-    </form>
+
+      {/* Resetting on `close` covers both the Cancel button below and the native Escape-dismiss
+          gesture (which fires `close` too) — one handler, no separate case needed. */}
+      <dialog ref={dialogRef} className="dialog" onClose={() => setTypedName("")}>
+        <h2 className="font-serif text-lg font-semibold">Remove {displayName}?</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Their access is revoked immediately. This cannot be undone.
+        </p>
+
+        <div className="callout callout-caution mt-3">
+          <TriangleAlert className="size-4" />
+          <p>
+            Use this only for someone who joined via the join code but doesn&apos;t actually live
+            here. For an actual move-out, use &quot;Moved out&quot; instead — it keeps their
+            history and can be reversed with Reactivate.
+          </p>
+        </div>
+
+        <form action={formAction} className="mt-4 space-y-3">
+          <input type="hidden" name="accountId" value={accountId} />
+          <div>
+            <label htmlFor={`confirm-${accountId}`} className="field-label">
+              Type &quot;{displayName}&quot; to confirm
+            </label>
+            <input
+              id={`confirm-${accountId}`}
+              name="confirmDisplayName"
+              value={typedName}
+              onChange={(e) => setTypedName(e.target.value)}
+              placeholder={displayName}
+              className="field-input"
+            />
+          </div>
+          {state.error && <p className="field-error">{state.error}</p>}
+          <div className="flex items-center gap-4">
+            <button
+              type="submit"
+              disabled={pending || typedName !== displayName}
+              className="btn btn-destructive"
+            >
+              {pending ? "Removing…" : "Remove"}
+            </button>
+            <button type="button" onClick={() => dialogRef.current?.close()} className="btn-link">
+              Cancel
+            </button>
+          </div>
+        </form>
+      </dialog>
+    </>
   );
 }

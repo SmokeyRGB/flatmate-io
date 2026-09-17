@@ -78,4 +78,26 @@ describe("Resident list actions are audited", () => {
       if (hh) await hh.cleanup();
     }
   });
+
+  // 003-remove-resident-modal, T015: pins the exact failure mode removeMemberAction's broadened
+  // catch (src/app/(org)/members/actions.ts) must handle gracefully — a target that no longer
+  // has a Membership row (spec.md's edge case: "someone else already removed them") throws a
+  // plain Error distinct from DisplayNameConfirmationMismatchError, not the mismatch error.
+  it("removeMember throws a plain (non-mismatch) error for a target with no Membership row", async () => {
+    let hh: TestHousehold | undefined;
+    try {
+      hh = await registerTestHousehold();
+      const bogusAccountId = "00000000-0000-0000-0000-000000000000";
+      let caught: unknown;
+      try {
+        await removeMember(hh.context, hh.accountId, bogusAccountId, "Anything");
+      } catch (err) {
+        caught = err;
+      }
+      expect(caught).toBeInstanceOf(Error);
+      expect(caught).not.toBeInstanceOf(DisplayNameConfirmationMismatchError);
+    } finally {
+      if (hh) await hh.cleanup();
+    }
+  });
 });
