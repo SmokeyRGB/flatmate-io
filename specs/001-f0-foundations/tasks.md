@@ -350,3 +350,17 @@ its own test passing. See the in-session Convergence Findings table for full evi
       precedent for payload shape (research.md §4) rather than duplicating REDACTABLE_KEYS in SQL.
       Verified against the live database: 29/29 tests pass, `npm run verify` and
       `check-refs.sh` both clean.
+
+---
+
+## Phase 8: Convergence (2026-09-17, second pass)
+
+Found by `/speckit-converge` after T042–T046 closed the first pass's findings: the automated
+`npm run verify` gate now exists, but `quickstart.md` — the artifact `plan.md`'s Phase 1 produced
+and T039 treats as the definition of "the full validation sequence" — was never updated to mention
+it, so following quickstart.md §4 literally would still skip everything T042–T045 built.
+
+- [ ] T047 Update `quickstart.md` §4 "Full gate" to include `npm run verify` (or its constituent
+      checks) alongside `bash tools/check-refs.sh --quiet`, so the documented full-gate sequence
+      actually covers the session-context lint, import-boundary lint, RLS-coverage check, and
+      guarded-tests check T042–T045 added, per plan.md's Phase 1 quickstart deliverable (partial)
