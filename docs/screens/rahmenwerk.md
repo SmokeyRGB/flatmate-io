@@ -214,11 +214,13 @@ irreführend: Sie liest sich, als verliehe ein Null-Wert Rechte. Richtig ist und
 > **Geschützter Test (für `GUARDRAILS.md`):** Ein Konto ohne `household_admin` sieht den Abschnitt
 > „Haushalt" auch dann nicht, wenn `acting_profile_id` `null` ist.
 
-### 4.3 Verwaltung erreicht keine Castings
+### 4.3 Verwaltung erreicht keine Bewerbungsdaten
 
 Ein ohne Bewohnerprofil angemeldetes Konto erreicht **nur** Haushaltsverwaltung: Zimmer,
-Mitglieder, Beitrittscode, Verfahrensregeln, Aufbewahrung (U-20). Runden, Bewerbungen, Termine und
-Notizen setzen ein `ResidentProfile` voraus.
+Mitglieder, Beitrittscode, Verfahrensregeln, Aufbewahrung (U-20), plus einer `CastingRound`
+Identität und Lebenszyklus — Existenz, `title`, `status`, `room_ids`, Zeitstempel und
+Aufbewahrungsfelder (präzisiert durch ADR-014). Bewerbungen, Termine und Notizen sowie alles aus
+`Application` Abgeleitete — einschließlich Zahlen — setzen dagegen ein `ResidentProfile` voraus.
 
 Was das löst:
 
