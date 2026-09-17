@@ -63,11 +63,12 @@ roles · parallel rounds offered in the UI · anything about applications, votes
 ### Resident list (administration)
 
 - **FR-1.25** The household resident list shall show, per member: display name, join date, contact detail if present, and status.
-- **FR-1.26** The resident list shall offer the actions: remove member, set `moved_out`, reactivate, and share or rotate the join code.
-- **FR-1.27** The resident list and its actions shall be **fully available to administration**, **read-only to a profile with moderator rights**, and **not reachable at all — by any route —** by a profile without moderator rights.
+- **FR-1.26** The resident list shall offer the actions: remove member, set `moved_out`, reactivate, and share or rotate the join code. **Two-tier removal (U-27, decided 2026-09-16, incorporated here 2026-09-17):** `moved_out` is the regular path for an actual move-out — votes and history are kept. "Remove" is final, requires **typing the exact display name** to confirm (not a plain click), and is meant specifically for a person who joined falsely or maliciously via the join code — not for real move-outs.
+- **FR-1.27** *(Revised 2026-09-17)* The resident list and its actions shall be **fully available to administration and to a profile with moderator rights** (full parity — the same rows, the same actions), and **not reachable at all — by any route —** by a profile without moderator rights.
 - **FR-1.28** The resident list shall be a screen distinct from the round participant list (FR-1.19); neither shall link to the other's data.
 - **FR-1.29** When administration is the only member of the household, the resident-list screen shall lead with the join-code action instead of displaying an empty list.
 - **FR-1.30** Every removal, `moved_out` and reactivation on the resident list shall be recorded as an append-only audit entry naming both the account and the acting profile.
+- **FR-1.31** *(New 2026-09-17, U-30)* Every resident (any profile with an active `ResidentProfile`, moderator rights or not) shall be able to see a read-only list of the household's **current** members — `status = active` only, no `moved_out` or `prepared` entries — showing display names only, no actions, no contact detail, no join dates. This is a screen distinct from both the administration resident list (FR-1.25–FR-1.30) and the round participant list (FR-1.19); none of the three shall link to either other's data. Purpose: lets a resident recognize and report — outside the app — a person who joined via the join code without actually living there.
 
 ### Rooms
 
@@ -83,7 +84,7 @@ roles · parallel rounds offered in the UI · anything about applications, votes
 - **FR-1.15** On the transition `draft → open`, the system shall store a copy of the voting rules in force at that moment: the four rating weights, the quorum share, the hidden-results setting, and the favourite-budget settings.
 - **FR-1.16** FR-1.14 and FR-1.15 shall take effect together with the state change, or not at all.
 - **FR-1.17** The round-participation entries shall be the denominator for all participation and quorum displays for that round.
-- **FR-1.18** The system shall allow a moderator to add a resident to an open round after opening, marked as added manually rather than from the snapshot.
+- **FR-1.18** *(Revised 2026-09-17 — automatic, not moderator-gated)* The system shall add a resident to every currently `open` round automatically, the moment that resident becomes `active` (claims their profile) — marked as `joined_after_open` rather than from the snapshot. A moderator may additionally add a resident by hand for correction cases the automatic path missed (marked `added_manually`), but the automatic path is the default, not a fallback for it.
 - **FR-1.19** All residents taking part in a round shall be able to see a list of the round's participants, showing names only.
 - **FR-1.20** The system shall record every casting-round and room state change as an append-only audit entry naming both the account and the acting profile.
 
@@ -131,11 +132,11 @@ Given a household whose quorum share is 0.5 and a round that has just been opene
 **AC-1.10 — Snapshot and state change are atomic**
 Given a round in `draft`, when opening it fails part-way for any reason, then the round is still `draft` and no round-participation entries and no frozen rules exist for it.
 
-**AC-1.11 — A resident joining later does not change the denominator**
-Given an open round with 7 participants, when an eighth resident joins the household, then the round's participation and quorum displays still divide by 7 until a moderator adds them explicitly.
+**AC-1.11 — A resident joining later automatically joins every open round** *(Revised 2026-09-17)*
+Given an open round with 7 participants, when an eighth resident claims their profile (becomes `active`), then the round's participation and quorum displays automatically divide by 8 from that point on — no moderator action required.
 
-**AC-1.12 — Manual addition is distinguishable**
-Given an open round, when a moderator adds a resident to it, then that entry is marked as added manually and not as part of the opening snapshot.
+**AC-1.12 — Post-snapshot addition is distinguishable** *(Revised 2026-09-17)*
+Given an open round, when a resident joins it after opening — automatically on claiming their profile, or by a moderator's manual correction — then that entry is marked `joined_after_open` or `added_manually` respectively, and never as part of the opening snapshot.
 
 **AC-1.13 — Procedure changes are blocked while open**
 Given a round in state `open`, when I attempt to change a rating weight, then the change is refused and the reason names the open round.
@@ -158,8 +159,8 @@ Given I am a resident in an open round, when I open the participant list, then I
 **AC-1.19 — State changes are attributable**
 Given any casting-round or room state change, when I inspect the audit record, then it names both the account and the acting profile.
 
-**AC-1.20 — Moderator access to the resident list is read-only**
-Given a profile with moderator rights, when it opens the resident list, then the list is shown and no action controls appear.
+**AC-1.20 — Moderator access to the resident list has full parity with administration** *(Revised 2026-09-17)*
+Given a profile with moderator rights, when it opens the resident list, then the list is shown with every action control administration itself would see — remove, `moved_out`, reactivate, share/rotate join code.
 
 **AC-1.21 — No route reaches the resident list without moderator rights**
 Given a profile without moderator rights, when it requests the resident list by any route, then the request is refused.
@@ -169,6 +170,9 @@ Given a household where administration is the only member, when administration o
 
 **AC-1.23 — Removal is attributable**
 Given a member is removed from the resident list, when I inspect the audit record, then it names both the account and the acting profile.
+
+**AC-1.24 — Residents see a reduced, current-members-only household view** *(New 2026-09-17, U-30)*
+Given I am a resident, when I open the household members view, then I see the display names of members with `status = active` only — no `moved_out` or `prepared` entries, no actions, no contact detail, no join dates — and this view is not reachable from, and does not link to, the administration resident list or the round participant list.
 
 ---
 
@@ -183,7 +187,7 @@ Given a member is removed from the resident list, when I inspect the audit recor
 - **C-1.7** The audit log is append-only. Entries are never updated or deleted; personal payload is redacted at end of retention. Source: S-27, `ADR-003`.
 - **C-1.8** Documents are written in German, identifiers in English. Source: `ADR-012`. (These exercise deliverables are English by the Exercise 10 precedent.)
 - **C-1.9** The application never sends messages to applicants. Nothing in this feature may introduce outbound applicant contact. Source: S-16 out-of-scope list.
-- **C-1.10** With the resident-visible list and its removal right gone (**U-22**, superseding **U-16**), only **two** of the four original structural duplicate-protection mechanisms survive: the join entry in the `ActivityEvent` feed, and the resident count in the quorum denominator. The join-link protections (**S-49**, owned by F2) are therefore a **precondition** of S-05, not an enhancement. Source: `02-SRD.md` §5.3 (S-05, S-49); `07-Screen-Inventar.md` O16.
+- **C-1.10** With the resident-visible list and its removal right gone (**U-22**, superseding **U-16**), only **two** of the four original structural duplicate-protection mechanisms survive: the join entry in the `ActivityEvent` feed, and the resident count in the quorum denominator. The join-link protections (**S-49**, owned by F2) are therefore a **precondition** of S-05, not an enhancement. Source: `02-SRD.md` §5.3 (S-05, S-49); `07-Screen-Inventar.md` O16. **Partially restored 2026-09-17 (U-30):** residents regain read-only visibility of current household members (a reduced view, distinct from O16, no actions) specifically so a resident can recognize and report a join-code intruder out-of-band — this brings back a version of the visibility pillar without reopening the removal-right pillar U-22 also took away.
 
 ---
 
@@ -201,7 +205,7 @@ Given a member is removed from the resident list, when I inspect the audit recor
 | **EC-1.8** | A resident is made ineligible to vote mid-round | Their round-participation entry records it; already-cast votes are unaffected by this feature (F5 governs their arithmetic) |
 | **EC-1.9** | Two moderators open the same `draft` round simultaneously | Exactly one opening takes effect; exactly one set of snapshot entries and frozen rules exists |
 | **EC-1.10** | Household registers with an address already used by another household | Permitted. Households are not deduplicated by email |
-| **EC-1.11** | A moderator attempts to set `moved_out` on the resident profile created via FR-1.5, where it is the last such profile | Refused. FR-1.27 already limits a moderator to read-only on the resident list; this names the case by which that boundary keeps EC-1.7's fallback — administration creating a resident profile — from being needed in the first place |
+| **EC-1.11** | A moderator attempts to set `moved_out` on the resident profile created via FR-1.5, where it is the last such profile | **Superseded 2026-09-17 by FR-1.27's moderator-parity revision.** Previously refused only because FR-1.27 gave moderators no write access to the resident list at all; now that moderators have full parity with administration, this is the same case as administration doing it — permitted, same as it always was for administration, with EC-1.7's fallback (administration creates a resident profile and appoints a moderator) available exactly as before if it leaves the household without an active resident |
 
 ---
 

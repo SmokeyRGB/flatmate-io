@@ -95,3 +95,23 @@
 > dieselbe Frage (K-11, U-22, siehe Vergleichstabelle in §7-Einleitung zu O16).
 
 ---
+
+#### B5 · Wer wohnt hier (Bewohnenden-Ansicht) — neu, U-30 (2026-09-17)
+
+| | |
+|---|---|
+| **Zweck** | Beantwortet „wer wohnt hier" für Bewohnende — nicht dieselbe Antwort wie O16 (Verwaltung/Moderator, voll) und nicht dieselbe wie B4 (nur Rundenteilnehmende). Eine bewohnende Person erkennt hier, ob eine ihr unbekannte Person auf der Liste steht, und meldet das außerhalb der App der Moderation (Eindringling über den Beitrittscode, FR-1.31) |
+| **Zugang** | Von B1 aus, eigener Menüpunkt — nicht von O16 oder B4 aus verlinkt (FR-1.31: keines der drei Screens verlinkt in ein anderes) |
+
+**Kernelemente**
+
+- Nur Anzeigenamen der Mitglieder mit `status = active` — kein `moved_out`, kein `prepared`
+- Keine Handlungen jeder Art — reine Information, kein Button, kein Kontextmenü
+- Keine Kontaktdaten, kein Beitrittsdatum, kein Status-Label — nur der Name
+
+> **Warum keine Handlung, auch keine "Melden"-Schaltfläche.** Die Meldung läuft absichtlich
+> außerhalb der App (Nachricht, persönliches Gespräch) — ein In-App-Meldeweg würde eine neue
+> Moderationsschlange und ein neues Missbrauchspotential (Falschmeldungen gegen echte
+> Mitbewohnende) eröffnen, das FR-1.31 nicht verlangt und U-30 nicht vorsieht.
+
+---
