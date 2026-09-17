@@ -38,15 +38,17 @@ describe("Application household isolation — raw SQL (AC-0.6)", () => {
       },
     );
 
+    type ApplicationRow = { id: string; household_id: string };
+
     const rowsSeenByA = await withSessionContext(
       { householdId: householdA, residentProfileId: profileA },
-      async (tx) => tx.execute<{ id: string; household_id: string }>(sql`SELECT id, household_id FROM application`),
+      async (tx) => tx.execute<ApplicationRow>(sql`SELECT id, household_id FROM application`),
     );
 
-    const ids = rowsSeenByA.map((r) => r.id);
+    const ids = rowsSeenByA.map((r: ApplicationRow) => r.id);
     expect(ids).toContain(rowA.id);
     expect(ids).not.toContain(rowB.id);
-    expect(rowsSeenByA.every((r) => r.household_id === householdA)).toBe(true);
+    expect(rowsSeenByA.every((r: ApplicationRow) => r.household_id === householdA)).toBe(true);
 
     // Cleanup, from each row's own household context (RLS-scoped DELETE).
     await withSessionContext({ householdId: householdA, residentProfileId: profileA }, (tx) =>

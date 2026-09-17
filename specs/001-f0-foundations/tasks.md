@@ -377,15 +377,17 @@ scripts never run a full `tsc` strict-mode type-check, so this was invisible unt
 findings are CRITICAL: Constitution Minimal-Gate item 2 requires TypeScript strict mode, and a
 project that fails `npm run build` fails it outright, not partially.
 
-- [ ] T048 Exclude `prototype/` from the root `tsconfig.json`'s compilation scope — it is a
+- [X] T048 Exclude `prototype/` from the root `tsconfig.json`'s compilation scope — it is a
       separate Bun/Vite app with its own dependencies and module resolution (outside the handover
       boundary, per `CLAUDE.md`), and `npm run build`'s type-check currently tries to resolve its
       imports against this project's `node_modules`, producing dozens of `Cannot find module`
       errors. Mirrors the `eslint.config.mjs` fix from T042, applied to `tsconfig.json` instead
       (Constitution Minimal-Gate item 2 / plan: ADR-006, contradicts)
-- [ ] T049 Fix the two implicit-`any` type errors `npm run build` reports in
+- [X] T049 Fix the two implicit-`any` type errors `npm run build` reports in
       `tests/integration/raw-sql/activityevent-scoping.test.ts` and
       `tests/integration/raw-sql/household-scoping.test.ts` (`.map((r) => ...)` callbacks over
       `tx.execute()`'s untyped result rows) by adding an explicit row-shape type, so the project
       satisfies `strict` mode end to end, not only where `vitest`'s transform pipeline happens to
-      infer types on its own (Constitution Minimal-Gate item 2, contradicts)
+      infer types on its own (Constitution Minimal-Gate item 2, contradicts). Verified: `npm run
+      build` now succeeds end to end (compiles, type-checks, generates static pages); `npm run
+      verify` (29/29 tests) and `check-refs.sh` both still clean.

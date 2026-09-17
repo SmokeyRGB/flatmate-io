@@ -35,17 +35,17 @@ describe("ActivityEvent household isolation — raw SQL (FR-0.2/AC-0.6)", () => 
       },
     );
 
+    type ActivityEventRow = { id: string; household_id: string };
+
     const rowsSeenByA = await withSessionContext(
       { householdId: householdA, residentProfileId: uuid() },
       (tx) =>
-        tx.execute<{ id: string; household_id: string }>(
-          sql`SELECT id, household_id FROM activity_event`,
-        ),
+        tx.execute<ActivityEventRow>(sql`SELECT id, household_id FROM activity_event`),
     );
 
-    const ids = rowsSeenByA.map((r) => r.id);
+    const ids = rowsSeenByA.map((r: ActivityEventRow) => r.id);
     expect(ids).toContain(rowA.id);
     expect(ids).not.toContain(rowB.id);
-    expect(rowsSeenByA.every((r) => r.household_id === householdA)).toBe(true);
+    expect(rowsSeenByA.every((r: ActivityEventRow) => r.household_id === householdA)).toBe(true);
   });
 });
