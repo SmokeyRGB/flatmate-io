@@ -2,6 +2,7 @@ import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import { withSessionContext, type SessionContext } from "@/db/session-context";
 import { recordActivityEvent } from "@/modules/audit/repository";
 import { activityEvent } from "@/modules/audit/schema";
+import { assertHasPermission } from "@/modules/identity/repository";
 import { householdSettings, membership, residentProfile } from "@/modules/identity/schema";
 import { application, castingRound, room, roundParticipation } from "./schema";
 import { assertTransitionAllowed, type ApplicationState } from "./transitions";
@@ -414,6 +415,13 @@ export async function updateHouseholdSettingsWithProcedureLock(
   patch: Partial<Record<LockedSettingsField, unknown>>,
   actor: Actor,
 ) {
+  // FR-1.8/G-C (Convergence): this had no authorization check at all — any signed-in account,
+  // including a plain resident with no granted permissions, could change household settings as
+  // long as no round was open. `manage_settings` is household_admin-implicit (assertHasPermission)
+  // and otherwise individually grantable, same shape as manage_rooms/close_round elsewhere.
+  if (!actor.accountId) throw new Error("updateHouseholdSettingsWithProcedureLock requires an actor accountId");
+  await assertHasPermission(context, actor.accountId, "manage_settings");
+
   return withSessionContext(context, async (tx) => {
     const changedFields = Object.keys(patch) as LockedSettingsField[];
     const [openRound] = await tx

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { claimResidentProfile } from "@/modules/identity/auth";
-import { createResidentProfile } from "@/modules/identity/repository";
+import { createResidentProfile, PermissionDeniedError } from "@/modules/identity/repository";
 import {
   createRoom,
   createRound,
@@ -64,6 +64,27 @@ describe("Procedure lock while a round is open", () => {
       await forceChangeSettingWhileRoundOpen(hh.context, "quorumShare", "0.9", round.id, actor);
 
       await expect(hasProcedureChangedNotice(hh.context, round.id)).resolves.toBe(true);
+    } finally {
+      for (const id of accountIds) await deleteTestAccount(id);
+      if (hh) await hh.cleanup();
+    }
+  });
+
+  // FR-1.8/G-C (Convergence, found via manual UI testing): a plain resident with no granted
+  // permissions must not be able to change household settings at all, regardless of the
+  // procedure lock's own state.
+  it("refuses a plain resident with no manage_settings permission", async () => {
+    let hh: TestHousehold | undefined;
+    const accountIds: string[] = [];
+    try {
+      hh = await registerTestHousehold();
+      const resident = await claim(hh, "Resident1");
+      accountIds.push(resident.accountId);
+      const residentActor = { accountId: resident.accountId, profileId: resident.profileId };
+
+      await expect(
+        updateHouseholdSettingsWithProcedureLock(hh.context, { quorumShare: "0.6" }, residentActor),
+      ).rejects.toThrow(PermissionDeniedError);
     } finally {
       for (const id of accountIds) await deleteTestAccount(id);
       if (hh) await hh.cleanup();
