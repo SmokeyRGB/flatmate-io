@@ -342,9 +342,11 @@ export async function assertIsAdministration(context: SessionContext, accountId:
 }
 
 // V-3 (docs/domain/invarianten.md §5.3): "moved_out" revokes access immediately — the Membership
-// is revoked in the same step as the ResidentProfile transition, not left for a caller to
-// remember separately. Shared by both removal tiers below (U-27): the soft path (an actual
-// move-out, via transitionResidentProfileStatus) and the hard path (removeMember) both end here.
+// AND any Session already issued for the account are revoked in the same step as the
+// ResidentProfile transition, not left for a caller to remember separately (a still-valid Session
+// would otherwise go on resolving to this profile regardless of Membership.revokedAt). Shared by
+// both removal tiers below (U-27): the soft path (an actual move-out, via
+// transitionResidentProfileStatus) and the hard path (removeMember) both end here.
 async function revokeMembershipForProfile(
   context: SessionContext,
   residentProfileId: string,
@@ -359,6 +361,14 @@ async function revokeMembershipForProfile(
     if (!target) return; // profile was never claimed (still `prepared`) — nothing to revoke
 
     await tx.update(membership).set({ revokedAt: new Date() }).where(eq(membership.id, target.id));
+
+    // V-3: a pre-existing session must stop working immediately, not just at its next
+    // resolveSessionContext-independent check — revoking the Membership alone leaves any session
+    // already issued for this account still resolving (session.revokedAt is a separate column).
+    await tx
+      .update(session)
+      .set({ revokedAt: new Date() })
+      .where(and(eq(session.accountId, target.accountId), isNull(session.revokedAt)));
 
     await recordActivityEvent(tx, {
       householdId: context.householdId,
