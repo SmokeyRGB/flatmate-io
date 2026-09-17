@@ -665,3 +665,23 @@ direct repository/auth calls in tests.
       `tests/integration/policy/member-role-appointment.test.ts`. Per EC-1.7 (missing).
 
 **Checkpoint**: re-run `/speckit-converge` after T087–T088 land.
+
+---
+
+## Phase 11: Convergence (2026-09-17, /speckit-analyze)
+
+- [X] T089 Fix a real authorization gap in `src/modules/casting/repository.ts`: `createRoom`,
+      `renameRoom`, `transitionRoomStatus`, `removeRoom`, `createRound`, `openRound`, and
+      `addResidentToRound` performed no internal permission check of their own — same bug class
+      already found and fixed once for `updateHouseholdSettingsWithProcedureLock` (see its own
+      "Convergence" comment) — relying entirely on the calling Server Action
+      (`src/app/(org)/rooms/actions.ts`, `rounds/new/actions.ts`) to have checked `manage_rooms`/
+      `close_round` first. No live exploit (the one production route to each was already gated),
+      but inconsistent with `identity/repository.ts`'s member-management functions, which
+      self-enforce regardless of caller. Added `assertHasPermission` calls matching the existing
+      pattern. New test: `tests/integration/policy/room-round-authorization.test.ts`. Per G-C
+      (Constitution Principle I, hard floor) (contradicts — inconsistent, non-machine-guaranteed
+      enforcement of an authorization rule the rest of the codebase enforces at the module
+      boundary).
+
+**Checkpoint**: re-run `/speckit-analyze` after T089 lands.

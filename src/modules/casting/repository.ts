@@ -65,7 +65,13 @@ export async function transitionApplication(
 }
 
 // FR-1.9: create, rename, remove — the moderator's room CRUD (manage_rooms).
+// G-C (speckit-analyze finding C1): these four functions had no authorization check of their
+// own — same class of bug already found and fixed once for `manage_settings` above — relying
+// entirely on src/app/(org)/rooms/actions.ts to have checked first. Self-enforcing here matches
+// identity/repository.ts's member-management functions, which are safe regardless of caller.
 export async function createRoom(context: SessionContext, label: string, actor: Actor) {
+  if (!actor.accountId) throw new Error("createRoom requires an actor accountId");
+  await assertHasPermission(context, actor.accountId, "manage_rooms");
   return withSessionContext(context, async (tx) => {
     const [row] = await tx
       .insert(room)
@@ -94,6 +100,8 @@ export async function renameRoom(
   newLabel: string,
   actor: Actor,
 ) {
+  if (!actor.accountId) throw new Error("renameRoom requires an actor accountId");
+  await assertHasPermission(context, actor.accountId, "manage_rooms");
   return withSessionContext(context, async (tx) => {
     const [updated] = await tx
       .update(room)
@@ -124,6 +132,8 @@ export async function transitionRoomStatus(
   toStatus: RoomStatus,
   actor: Actor,
 ) {
+  if (!actor.accountId) throw new Error("transitionRoomStatus requires an actor accountId");
+  await assertHasPermission(context, actor.accountId, "manage_rooms");
   return withSessionContext(context, async (tx) => {
     const [current] = await tx.select().from(room).where(eq(room.id, roomId));
     if (!current) throw new Error(`Room not found: ${roomId}`);
@@ -160,6 +170,8 @@ export class RoomInUseByOpenRoundError extends Error {
 
 // EC-1.6: refused while a round covering it is open; the room may be set not_available instead.
 export async function removeRoom(context: SessionContext, roomId: string, actor: Actor) {
+  if (!actor.accountId) throw new Error("removeRoom requires an actor accountId");
+  await assertHasPermission(context, actor.accountId, "manage_rooms");
   return withSessionContext(context, async (tx) => {
     const [openRoundCoveringIt] = await tx
       .select({ id: castingRound.id })
@@ -193,7 +205,13 @@ export async function listRooms(context: SessionContext) {
 }
 
 // FR-1.12: create a round in draft, selecting the rooms it covers.
+// FR-1.12: round-lifecycle actions (create/open/manual-add) are gated on `close_round`, the
+// permission `data-model.md` already documents for `draft → open` — same G-C fix as createRoom
+// above (speckit-analyze finding C1): no internal check previously, relied entirely on the one
+// caller (src/app/(org)/rounds/new/actions.ts) to have checked first.
 export async function createRound(context: SessionContext, title: string, roomIds: string[], actor: Actor) {
+  if (!actor.accountId) throw new Error("createRound requires an actor accountId");
+  await assertHasPermission(context, actor.accountId, "close_round");
   return withSessionContext(context, async (tx) => {
     const [row] = await tx
       .insert(castingRound)
@@ -222,6 +240,8 @@ const LOCKED_ROOM_STATUSES: ReadonlySet<RoomStatus> = new Set(["occupied", "not_
 // RoundParticipation and freezes HouseholdSettings' four locked fields into settings_snapshot —
 // both effects or neither, in one transaction. EC-1.1/EC-1.2/EC-1.3 preconditions checked first.
 export async function openRound(context: SessionContext, roundId: string, actor: Actor) {
+  if (!actor.accountId) throw new Error("openRound requires an actor accountId");
+  await assertHasPermission(context, actor.accountId, "close_round");
   return withSessionContext(context, async (tx) => {
     // EC-1.9: two moderators opening the same draft round simultaneously must produce exactly
     // one opening. `FOR UPDATE` locks this row for the rest of the transaction — a concurrent
@@ -324,6 +344,8 @@ export async function addResidentToRound(
   residentProfileId: string,
   actor: Actor,
 ) {
+  if (!actor.accountId) throw new Error("addResidentToRound requires an actor accountId");
+  await assertHasPermission(context, actor.accountId, "close_round");
   return withSessionContext(context, async (tx) => {
     const [row] = await tx
       .insert(roundParticipation)
