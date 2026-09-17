@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { getHousehold, getResidentList } from "@/modules/identity/repository";
+import { PermissionDeniedError, getHousehold, getResidentList } from "@/modules/identity/repository";
 import { getCurrentSession } from "@/modules/identity/session-cookie";
 import {
   createResidentProfileAction,
@@ -18,10 +18,30 @@ export default async function MembersPage() {
   const current = await getCurrentSession();
   if (!current) redirect("/sign-in");
 
-  const { members, canAct, isAdmin, leadWithJoinCode } = await getResidentList(
-    current.context,
-    current.context.accountId,
-  );
+  // FR-1.27: "not reachable at all — by any route" for a non-moderator, non-admin caller — this
+  // is that refusal actually reaching a resident (e.g. via the dashboard's Members link), not an
+  // unexpected crash. Convergence: previously uncaught, it hit Next's raw error overlay.
+  let residentList: Awaited<ReturnType<typeof getResidentList>>;
+  try {
+    residentList = await getResidentList(current.context, current.context.accountId);
+  } catch (err) {
+    if (err instanceof PermissionDeniedError) {
+      return (
+        <div className="mx-auto max-w-md space-y-4 p-6">
+          <h1 className="text-2xl font-semibold text-[#190F09]">Members</h1>
+          <p className="text-sm text-[#6B4F3B]">
+            This list is for administration and moderators. If you want to see who lives here, use{" "}
+            <a href="/who-lives-here" className="text-[#B6522D] underline">
+              Who lives here
+            </a>
+            .
+          </p>
+        </div>
+      );
+    }
+    throw err;
+  }
+  const { members, canAct, isAdmin, leadWithJoinCode } = residentList;
   const household = canAct ? await getHousehold(current.context) : null;
 
   const createResidentForm = isAdmin ? (
@@ -127,12 +147,12 @@ export default async function MembersPage() {
       </ul>
 
       {canAct && (
-        <div className="space-y-2">
+        <div className="space-y-1 border-t border-[#D9C7B8] pt-4">
           {/* FR-1.26: "share or rotate" — the code itself must be visible to share, not just a
-              blind rotate action. */}
-          <p className="rounded-xl border border-[#D9C7B8] bg-[#FBF3EA] p-4 font-mono text-sm">
-            {household?.joinCode}
-          </p>
+              blind rotate action. Deliberately NOT styled like a member row (rounded-xl card) —
+              that shape reads as "a person," which this isn't. */}
+          <p className="text-xs font-medium uppercase tracking-wide text-[#6B4F3B]">Join code</p>
+          <p className="font-mono text-sm text-[#190F09]">{household?.joinCode}</p>
           <form action={rotateJoinCodeAction}>
             <button type="submit" className="text-sm text-[#B6522D] underline">
               Rotate join code

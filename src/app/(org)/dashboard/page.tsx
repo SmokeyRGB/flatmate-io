@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { listRoundsForSession } from "@/modules/casting/repository";
+import { getMembershipForAccount } from "@/modules/identity/repository";
 import { getCurrentSession } from "@/modules/identity/session-cookie";
 
 // Screen O1. EC-1.5: exactly one round is presented as "active"; the rest are reachable only via
@@ -11,6 +12,15 @@ export default async function DashboardPage() {
 
   const rounds = await listRoundsForSession(current.context);
   const [active, ...rest] = rounds;
+
+  // FR-1.27: the Members link is only useful to administration/moderator — a plain resident
+  // following it would hit a refusal (now handled gracefully on that page, but there's no reason
+  // to lead them there in the first place).
+  const membershipRow = await getMembershipForAccount(current.context, current.context.accountId);
+  const canSeeMembersList =
+    current.context.profileId === null ||
+    membershipRow?.role === "household_admin" ||
+    membershipRow?.role === "moderator";
 
   return (
     <div className="mx-auto max-w-2xl space-y-6 p-6">
@@ -52,9 +62,11 @@ export default async function DashboardPage() {
         <Link href="/rooms" className="text-[#B6522D] underline">
           Rooms
         </Link>
-        <Link href="/members" className="text-[#B6522D] underline">
-          Members
-        </Link>
+        {canSeeMembersList && (
+          <Link href="/members" className="text-[#B6522D] underline">
+            Members
+          </Link>
+        )}
         <Link href="/settings" className="text-[#B6522D] underline">
           Settings
         </Link>
