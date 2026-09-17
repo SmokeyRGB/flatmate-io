@@ -78,6 +78,20 @@
       "when": 1789647999999,
       "tag": "0010_membership_auto_join_open_rounds",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1789680132450,
+      "tag": "0011_round_participation_active_pairing_unique",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1789680146328,
+      "tag": "0012_auto_join_open_rounds_idempotent",
+      "breakpoints": true
     }
   ]
 }

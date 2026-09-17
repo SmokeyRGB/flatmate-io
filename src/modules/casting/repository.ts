@@ -338,6 +338,10 @@ export async function openRound(context: SessionContext, roundId: string, actor:
 
 // FR-1.18: add a resident to an already-open round, marked as added manually, never touching the
 // existing snapshot rows.
+// speckit-bug-fix round-participation-duplicate-on-manual-add: the auto-join trigger may have
+// already added this resident (source `joined_after_open`) before a moderator gets here — the
+// active-pairing unique index (drizzle/0011) makes a second insert conflict; on conflict this
+// returns the existing active row unchanged instead of writing a duplicate denominator row.
 export async function addResidentToRound(
   context: SessionContext,
   roundId: string,
@@ -347,7 +351,7 @@ export async function addResidentToRound(
   if (!actor.accountId) throw new Error("addResidentToRound requires an actor accountId");
   await assertHasPermission(context, actor.accountId, "close_round");
   return withSessionContext(context, async (tx) => {
-    const [row] = await tx
+    const [inserted] = await tx
       .insert(roundParticipation)
       .values({
         roundId,
@@ -356,19 +360,37 @@ export async function addResidentToRound(
         source: "added_manually",
         canVote: true,
       })
+      .onConflictDoNothing({
+        target: [roundParticipation.roundId, roundParticipation.residentProfileId],
+        where: isNull(roundParticipation.removedAt),
+      })
       .returning();
+
+    if (!inserted) {
+      const [existing] = await tx
+        .select()
+        .from(roundParticipation)
+        .where(
+          and(
+            eq(roundParticipation.roundId, roundId),
+            eq(roundParticipation.residentProfileId, residentProfileId),
+            isNull(roundParticipation.removedAt),
+          ),
+        );
+      return existing;
+    }
 
     await recordActivityEvent(tx, {
       householdId: context.householdId,
       eventType: "casting_round.participant_added",
       subjectType: "round_participation",
-      subjectId: row.id,
+      subjectId: inserted.id,
       actorAccountId: actor.accountId,
       actorProfileId: actor.profileId,
       payload: { source: "added_manually" },
     });
 
-    return row;
+    return inserted;
   });
 }
 

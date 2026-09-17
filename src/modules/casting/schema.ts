@@ -10,6 +10,7 @@ import {
   pgTable,
   text,
   timestamp,
+  uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
 
@@ -180,6 +181,12 @@ export const roundParticipation = pgTable(
   (t) => [
     index("round_participation_household_id_idx").on(t.householdId),
     index("round_participation_round_id_idx").on(t.roundId),
+    // The trigger (auto_join_open_rounds) and addResidentToRound's manual insert are two
+    // independent writers into this table for the same pairing — this is what stops either of
+    // them from producing a second active denominator row for a resident already in the round.
+    uniqueIndex("round_participation_active_pairing_idx")
+      .on(t.roundId, t.residentProfileId)
+      .where(sql`removed_at IS NULL`),
     pgPolicy("round_participation_household_isolation", {
       as: "permissive",
       for: "all",

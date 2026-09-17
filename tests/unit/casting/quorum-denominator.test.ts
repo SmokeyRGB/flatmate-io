@@ -79,7 +79,39 @@ describe("Quorum denominator growth after opening", () => {
       // auto-added — this call exercises the manual path as a correction on top of that, which
       // must not create a duplicate entry with a different source for the same profile pairing.)
       const addedRow = await addResidentToRound(hh.context, round.id, r2.profileId, actor);
-      expect(addedRow.source).toBe("added_manually");
+      expect(addedRow?.source).toBe("joined_after_open"); // the trigger's row wins, not a second row
+
+      const active = await activeParticipants(hh, round.id);
+      const r2Rows = active.filter((p) => p.residentProfileId === r2.profileId);
+      expect(r2Rows).toHaveLength(1); // no duplicate denominator row for the same pairing
+    } finally {
+      for (const id of accountIds) await deleteTestAccount(id);
+      if (hh) await hh.cleanup();
+    }
+  });
+
+  it("addResidentToRound called twice for the same resident does not duplicate the row", async () => {
+    let hh: TestHousehold | undefined;
+    const accountIds: string[] = [];
+    try {
+      hh = await registerTestHousehold();
+      const actor = { accountId: hh.accountId, profileId: null };
+      const r1 = await claim(hh, "Resident1");
+      accountIds.push(r1.accountId);
+      const roomA = await createRoom(hh.context, "Room A", actor);
+      const round = await createRound(hh.context, "Round", [roomA.id], actor);
+      await openRound(hh.context, round.id, actor);
+
+      // A profile with no Membership yet (not claimed) — never touched by the auto-join trigger —
+      // isolates the manual-path insert from a second manual-path insert for the same pairing.
+      const profile = await createResidentProfile(hh.context, "Resident2", actor);
+
+      const first = await addResidentToRound(hh.context, round.id, profile.id, actor);
+      const second = await addResidentToRound(hh.context, round.id, profile.id, actor);
+      expect(second?.id).toBe(first?.id);
+
+      const active = await activeParticipants(hh, round.id);
+      expect(active.filter((p) => p.residentProfileId === profile.id)).toHaveLength(1);
     } finally {
       for (const id of accountIds) await deleteTestAccount(id);
       if (hh) await hh.cleanup();
