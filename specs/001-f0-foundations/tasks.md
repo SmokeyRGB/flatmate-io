@@ -360,7 +360,8 @@ Found by `/speckit-converge` after T042–T046 closed the first pass's findings:
 and T039 treats as the definition of "the full validation sequence" — was never updated to mention
 it, so following quickstart.md §4 literally would still skip everything T042–T045 built.
 
-- [ ] T047 Update `quickstart.md` §4 "Full gate" to include `npm run verify` (or its constituent
+- [X] T047 Update `quickstart.md` §4 "Full gate" to include `npm run verify` (or its constituent
       checks) alongside `bash tools/check-refs.sh --quiet`, so the documented full-gate sequence
       actually covers the session-context lint, import-boundary lint, RLS-coverage check, and
-      guarded-tests check T042–T045 added, per plan.md's Phase 1 quickstart deliverable (partial)
+      guarded-tests check T042–T045 added, per plan.md's Phase 1 quickstart deliverable (partial).
+      Verified: both commands in the updated §4 pass exactly as documented.

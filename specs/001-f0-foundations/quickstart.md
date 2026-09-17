@@ -58,8 +58,12 @@ readable (id, timestamps, actor, `event_type`) with only its 🔴/⚫ payload fi
 ```bash
 bash tools/check-refs.sh --quiet   # unrelated to F0's runtime behavior, but must stay green —
                                     # this feature's own spec/plan/data-model live under specs/
-vitest run
+npm run verify                     # eslint + session-context/import-boundary/RLS-coverage/
+                                    # guarded-tests checks (T042-T045) + the full Vitest suite
 ```
 
-**Expected**: `check-refs.sh` exits 0 (as it does today); the full Vitest suite is green with no
-`.skip`/`.only` on any `[GUARDED]`-marked test (G-D's own enforcement, `test/guarded.manifest.json`).
+**Expected**: `check-refs.sh` exits 0 (as it does today); `npm run verify` exits 0 — eslint clean,
+all four custom checks pass (`scripts/lint/{session-context,import-boundary,rls-coverage,
+guarded-tests}.ts`), and the full Vitest suite is green with no `.skip`/`.only` on any
+`[GUARDED]`-marked test (G-D's own enforcement, `test/guarded.manifest.json` — the guarded-tests
+check makes this an automated failure, not just a manual review step).
