@@ -222,7 +222,12 @@ const LOCKED_ROOM_STATUSES: ReadonlySet<RoomStatus> = new Set(["occupied", "not_
 // both effects or neither, in one transaction. EC-1.1/EC-1.2/EC-1.3 preconditions checked first.
 export async function openRound(context: SessionContext, roundId: string, actor: Actor) {
   return withSessionContext(context, async (tx) => {
-    const [round] = await tx.select().from(castingRound).where(eq(castingRound.id, roundId));
+    // EC-1.9: two moderators opening the same draft round simultaneously must produce exactly
+    // one opening. `FOR UPDATE` locks this row for the rest of the transaction — a concurrent
+    // openRound's own SELECT ... FOR UPDATE blocks here until this transaction commits or rolls
+    // back, then re-reads the now-`open` row and correctly fails the status check below, instead
+    // of both transactions reading `draft` and both inserting a duplicate snapshot.
+    const [round] = await tx.select().from(castingRound).where(eq(castingRound.id, roundId)).for("update");
     if (!round) throw new Error(`CastingRound not found: ${roundId}`);
     if (round.status !== "draft") {
       throw new RoundOpenPreconditionError(`Round ${roundId} is not in draft`);

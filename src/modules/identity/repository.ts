@@ -261,6 +261,8 @@ export async function resolveSessionContext(
   });
 }
 
+export type MembershipRole = "household_admin" | "moderator" | "member";
+
 export type ResidentListEntry = {
   id: string;
   accountId: string | null; // null if the profile is still `prepared` (never claimed, no Account yet)
@@ -268,6 +270,7 @@ export type ResidentListEntry = {
   joinDate: Date | null;
   status: ResidentProfileStatus;
   contactDetail: null; // no contact-detail field exists on ResidentProfile in F1's scope
+  role: MembershipRole | null; // null alongside accountId === null (not yet claimed)
 };
 
 // FR-1.25/FR-1.26/FR-1.27 (revised 2026-09-17, U-30)/FR-1.29: full parity for administration AND
@@ -292,6 +295,7 @@ export async function getResidentList(
         displayName: residentProfile.displayName,
         joinDate: residentProfile.movedInOn,
         status: residentProfile.status,
+        role: membership.role,
       })
       .from(residentProfile)
       .leftJoin(membership, eq(membership.residentProfileId, residentProfile.id))
@@ -302,6 +306,7 @@ export async function getResidentList(
       accountId: r.accountId ?? null,
       joinDate: r.joinDate ? new Date(r.joinDate) : null,
       contactDetail: null,
+      role: r.role ?? null,
     }));
 
     // AC-1.22/FR-1.29: administration is the only member -> lead with the join-code action
@@ -513,6 +518,48 @@ export async function rotateJoinCode(context: SessionContext, actingAccountId: s
     });
 
     return updated;
+  });
+}
+
+export class CannotChangeAdminRoleError extends Error {
+  constructor() {
+    super("The household_admin role cannot be changed via this action");
+    this.name = "CannotChangeAdminRoleError";
+  }
+}
+
+// EC-1.7 (Convergence): "administration may create a resident profile and appoint it moderator" —
+// the appointment action that was never actually built. Administration-only, per EC-1.7's own
+// wording ("administration may... appoint"), not moderator-parity like the resident-list actions
+// FR-1.26 names. Toggles only between "member" and "moderator" — household_admin is the
+// registering account's own role (C-1.4) and is never reassigned by this action.
+export async function setMemberRole(
+  context: SessionContext,
+  actingAccountId: string,
+  targetAccountId: string,
+  toRole: "member" | "moderator",
+): Promise<void> {
+  await assertIsAdministration(context, actingAccountId);
+
+  await withSessionContext(context, async (tx) => {
+    const [target] = await tx.select().from(membership).where(eq(membership.accountId, targetAccountId));
+    if (!target) throw new Error(`Membership not found for account ${targetAccountId}`);
+    if (target.role === "household_admin") throw new CannotChangeAdminRoleError();
+
+    const fromRole = target.role;
+    if (fromRole === toRole) return;
+
+    await tx.update(membership).set({ role: toRole }).where(eq(membership.id, target.id));
+
+    await recordActivityEvent(tx, {
+      householdId: context.householdId,
+      eventType: "membership.role_changed",
+      subjectType: "membership",
+      subjectId: target.id,
+      actorAccountId: actingAccountId,
+      actorProfileId: null,
+      payload: { fromRole, toRole },
+    });
   });
 }
 

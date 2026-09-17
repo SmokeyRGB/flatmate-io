@@ -114,4 +114,39 @@ describe("Round opening: atomic snapshot + frozen rules (AC-1.8, AC-1.9, AC-1.10
       if (hh) await hh.cleanup();
     }
   });
+
+  // EC-1.9 (Convergence): two moderators opening the same draft round simultaneously must
+  // produce exactly one opening, not two duplicate snapshot batches. `openRound`'s initial read
+  // uses `SELECT ... FOR UPDATE` specifically to serialize this race.
+  it("lets exactly one of two concurrent opens succeed (EC-1.9)", async () => {
+    let hh: TestHousehold | undefined;
+    const accountIds: string[] = [];
+    try {
+      hh = await registerTestHousehold();
+      const actor = { accountId: hh.accountId, profileId: null };
+      const resident = await claim(hh, "Resident1");
+      accountIds.push(resident.accountId);
+      const roomA = await createRoom(hh.context, "Room A", actor);
+      const round = await createRound(hh.context, "Round", [roomA.id], actor);
+
+      const results = await Promise.allSettled([
+        openRound(hh.context, round.id, actor),
+        openRound(hh.context, round.id, actor),
+      ]);
+
+      const fulfilled = results.filter((r) => r.status === "fulfilled");
+      const rejected = results.filter((r) => r.status === "rejected");
+      expect(fulfilled).toHaveLength(1);
+      expect(rejected).toHaveLength(1);
+      expect((rejected[0] as PromiseRejectedResult).reason).toBeInstanceOf(RoundOpenPreconditionError);
+
+      const participants = await withSessionContext(hh.context, (tx) =>
+        tx.select().from(roundParticipation).where(eq(roundParticipation.roundId, round.id)),
+      );
+      expect(participants).toHaveLength(1); // exactly one snapshot batch, not two
+    } finally {
+      for (const id of accountIds) await deleteTestAccount(id);
+      if (hh) await hh.cleanup();
+    }
+  });
 });

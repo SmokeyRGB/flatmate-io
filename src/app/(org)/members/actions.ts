@@ -7,6 +7,7 @@ import {
   reactivateMember,
   removeMember,
   rotateJoinCode,
+  setMemberRole,
   setMovedOut,
 } from "@/modules/identity/repository";
 import { getCurrentSession } from "@/modules/identity/session-cookie";
@@ -74,6 +75,18 @@ export async function reactivateMemberAction(formData: FormData): Promise<void> 
   const targetAccountId = String(formData.get("accountId") ?? "");
   if (!targetAccountId) return;
   await reactivateMember(current.context, current.context.accountId, targetAccountId);
+  revalidatePath("/members");
+}
+
+// EC-1.7 (Convergence): the "appoint it moderator" action — administration-only, toggles
+// member <-> moderator.
+export async function setMemberRoleAction(formData: FormData): Promise<void> {
+  const current = await getCurrentSession();
+  if (!current) throw new Error("Not signed in");
+  const targetAccountId = String(formData.get("accountId") ?? "");
+  const toRole = String(formData.get("toRole") ?? "");
+  if (!targetAccountId || (toRole !== "member" && toRole !== "moderator")) return;
+  await setMemberRole(current.context, current.context.accountId, targetAccountId, toRole);
   revalidatePath("/members");
 }
 

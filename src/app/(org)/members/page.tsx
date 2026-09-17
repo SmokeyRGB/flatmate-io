@@ -5,6 +5,7 @@ import {
   createResidentProfileAction,
   reactivateMemberAction,
   rotateJoinCodeAction,
+  setMemberRoleAction,
   setMovedOutAction,
 } from "./actions";
 import { RemoveMemberForm } from "./remove-member-form";
@@ -74,13 +75,35 @@ export default async function MembersPage() {
           <li key={m.id} className="rounded-xl border border-[#D9C7B8] bg-[#FBF3EA] p-4">
             <div className="flex items-center justify-between">
               <span className="font-medium text-[#190F09]">{m.displayName}</span>
-              <span className="text-sm text-[#6B4F3B]">{m.status}</span>
+              <span className="text-sm text-[#6B4F3B]">
+                {m.status}
+                {m.role === "moderator" && " · moderator"}
+              </span>
             </div>
 
             {canAct && m.accountId && (
               <div className="mt-2 flex flex-wrap items-center gap-3">
                 {m.status !== "moved_out" ? (
                   <>
+                    {/* EC-1.7: administration may appoint (or unappoint) a moderator. */}
+                    {isAdmin && m.role === "member" && (
+                      <form action={setMemberRoleAction}>
+                        <input type="hidden" name="accountId" value={m.accountId} />
+                        <input type="hidden" name="toRole" value="moderator" />
+                        <button type="submit" className="text-sm text-[#B6522D] underline">
+                          Make moderator
+                        </button>
+                      </form>
+                    )}
+                    {isAdmin && m.role === "moderator" && (
+                      <form action={setMemberRoleAction}>
+                        <input type="hidden" name="accountId" value={m.accountId} />
+                        <input type="hidden" name="toRole" value="member" />
+                        <button type="submit" className="text-sm text-[#B6522D] underline">
+                          Make member
+                        </button>
+                      </form>
+                    )}
                     <form action={setMovedOutAction}>
                       <input type="hidden" name="accountId" value={m.accountId} />
                       <button type="submit" className="text-sm text-[#B6522D] underline">
