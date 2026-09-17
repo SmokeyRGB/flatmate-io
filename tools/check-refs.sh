@@ -95,15 +95,18 @@ fi
 # Rule 2 — every backticked *.md filename exists somewhere in the project.
 # Resolved by basename, which is what makes the repo's bare-filename house
 # style safe across moves. Historical records are exempt — this now also
-# covers docs/prompts/lovable-handover-prompt.md: the Lovable prototype it
-# handed off to is built and no longer iterated, so the file is frozen the
-# same way archive/ and _logs/ are, without living under those paths.
+# covers the whole docs/prompts/ folder (implementer-prompt.md,
+# lovable-correction-prompt.md, lovable-handover-prompt.md): all three are
+# from the finished Lovable prototype build phase, not iterated further, so
+# they're frozen the same way archive/ and _logs/ are, without living under
+# those paths. The prototype they document is a design/UX reference only —
+# never a source for implementation decisions (see CLAUDE.md / README §1).
 # ---------------------------------------------------------------------------
 if run 2; then
 head_ 2 "backticked *.md names exist"
 declare -A seen
 for src in "${mdfiles[@]}"; do
-  case "$src" in */_logs/*|archive/*|./archive/*|*/.old/*|*/lovable-handover-prompt.md) continue ;; esac
+  case "$src" in */_logs/*|archive/*|./archive/*|*/.old/*|*/docs/prompts/*) continue ;; esac
   while IFS= read -r n; do
     [ -n "$n" ] || continue
     printf '%s' "$n" | grep -qE "$GENERIC_NAMES" && continue
@@ -127,7 +130,7 @@ done
 # of which the split ever produced (they became audit-und-notifications.md).
 # Resolved by basename, like the bare form, so a folder move stays cheap.
 for src in "${mdfiles[@]}"; do
-  case "$src" in */_logs/*|archive/*|./archive/*|*/.old/*|*/lovable-handover-prompt.md) continue ;; esac
+  case "$src" in */_logs/*|archive/*|./archive/*|*/.old/*|*/docs/prompts/*) continue ;; esac
   while IFS= read -r p; do
     [ -n "$p" ] || continue
     n=$(basename "$p")
@@ -154,7 +157,7 @@ fi
 if run 3; then
 head_ 3 ":LINE refs only into frozen collectors"
 for src in "${mdfiles[@]}"; do
-  case "$src" in */_logs/*|archive/*|./archive/*|*/.old/*|*/lovable-handover-prompt.md) continue ;; esac
+  case "$src" in */_logs/*|archive/*|./archive/*|*/.old/*|*/docs/prompts/*) continue ;; esac
   while IFS= read -r h; do
     [ -n "$h" ] || continue
     printf '%s' "$h" | grep -qE "$FROZEN_RE:[0-9]+" && continue
@@ -249,7 +252,7 @@ if [ -d docs ]; then
               grep -rn '~/\.claude/' --include='*.md' docs 2>/dev/null
               grep -rnE '\]\([^)]*specs/' --include='*.md' docs 2>/dev/null
               grep -rnE '`[^`]*specs/[^`]*`' --include='*.md' docs 2>/dev/null
-            } | grep -v '/_logs/' | grep -v 'lovable-handover-prompt\.md' | tr -d '\r' )
+            } | grep -v '/_logs/' | grep -v 'docs/prompts/' | tr -d '\r' )
 else
   [ "$QUIET" = 1 ] || echo "  (skipped: docs/ does not exist yet)"
 fi
