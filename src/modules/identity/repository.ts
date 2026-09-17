@@ -51,6 +51,9 @@ export async function createResidentProfile(
   displayName: string,
   actor: Actor,
 ) {
+  if (actor.accountId) {
+    await assertIsAdministration(context, actor.accountId);
+  }
   return withSessionContext(context, async (tx) => {
     if (await isDisplayNameTaken(context, displayName)) {
       throw new DuplicateDisplayNameError(displayName);
@@ -273,7 +276,7 @@ export type ResidentListEntry = {
 export async function getResidentList(
   context: SessionContext,
   accountId: string,
-): Promise<{ members: ResidentListEntry[]; canAct: boolean; leadWithJoinCode: boolean }> {
+): Promise<{ members: ResidentListEntry[]; canAct: boolean; isAdmin: boolean; leadWithJoinCode: boolean }> {
   const membershipRow = await getMembershipForAccount(context, accountId);
   const isAdmin = membershipRow?.role === "household_admin";
   const isModerator = membershipRow?.role === "moderator";
@@ -305,7 +308,7 @@ export async function getResidentList(
     // instead of an empty list. "Only member" means no resident member exists yet.
     const leadWithJoinCode = isAdmin && members.length === 0;
 
-    return { members, canAct: isAdmin || isModerator, leadWithJoinCode };
+    return { members, canAct: isAdmin || isModerator, isAdmin, leadWithJoinCode };
   });
 }
 
@@ -326,7 +329,7 @@ async function assertIsAdministrationOrModerator(context: SessionContext, accoun
   }
 }
 
-async function assertIsAdministration(context: SessionContext, accountId: string): Promise<void> {
+export async function assertIsAdministration(context: SessionContext, accountId: string): Promise<void> {
   const membershipRow = await getMembershipForAccount(context, accountId);
   if (!membershipRow || membershipRow.role !== "household_admin") {
     throw new ResidentListActionDeniedError();

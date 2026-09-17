@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import {
   DisplayNameConfirmationMismatchError,
+  createResidentProfile,
   reactivateMember,
   removeMember,
   rotateJoinCode,
@@ -12,6 +13,25 @@ import { getCurrentSession } from "@/modules/identity/session-cookie";
 
 export interface RemoveMemberFormState {
   error: string | null;
+}
+
+// FR-1.3/FR-1.5: the household account creates a resident profile (including one for the person
+// operating it) — a person then claims it via `/claim` (Convergence T082) to actually sign in as
+// that resident. A duplicate display name (FR-1.4) surfaces via Next's error boundary, same as
+// every other unhandled repository error this form's siblings (setMovedOutAction etc.) leave
+// uncaught — not worth a client-component reducer just for this one message.
+export async function createResidentProfileAction(formData: FormData): Promise<void> {
+  const current = await getCurrentSession();
+  if (!current) throw new Error("Not signed in");
+  const displayName = String(formData.get("displayName") ?? "").trim();
+  if (!displayName) return;
+
+  await createResidentProfile(current.context, displayName, {
+    accountId: current.context.accountId,
+    profileId: current.context.profileId,
+  });
+
+  revalidatePath("/members");
 }
 
 // FR-1.26/U-27 hard tier: requires the exact display name typed as confirmation, not a plain click.

@@ -114,6 +114,31 @@ export async function registerHousehold(email: string, password: string) {
 // via claimResidentProfile below, a separate, later step.
 export class ClaimError extends Error {}
 
+// Convergence T082: resolves (household, display_name) to a `prepared` ResidentProfile ready to
+// be claimed — the lookup a claim UI needs before it can call claimResidentProfile below.
+// Mirrors signIn's resident-mode lookup, but requires status = "prepared" specifically: an
+// already-active or moved_out profile has either already been claimed or isn't claimable again.
+export async function findPreparedResidentProfile(householdId: string, displayName: string) {
+  const bootstrapContext: SessionContext = {
+    accountId: randomUUID(),
+    householdId,
+    profileId: null,
+  };
+  const [profile] = await withSessionContext(bootstrapContext, (tx) =>
+    tx
+      .select()
+      .from(residentProfile)
+      .where(
+        and(
+          eq(residentProfile.householdId, householdId),
+          eq(residentProfile.displayName, displayName),
+          eq(residentProfile.status, "prepared"),
+        ),
+      ),
+  );
+  return profile ?? null;
+}
+
 // The "sign up against a prepared profile" step FR-1.5 implies but doesn't name as its own FR —
 // needed for AC-1.3's independent test ("a sign-out/sign-in cycle is required to act as that
 // resident") to be exercisable at all. Creates a new Supabase Auth user at the profile's derived

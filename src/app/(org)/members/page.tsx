@@ -1,22 +1,49 @@
 import { redirect } from "next/navigation";
 import { getHousehold, getResidentList } from "@/modules/identity/repository";
 import { getCurrentSession } from "@/modules/identity/session-cookie";
-import { reactivateMemberAction, rotateJoinCodeAction, setMovedOutAction } from "./actions";
+import {
+  createResidentProfileAction,
+  reactivateMemberAction,
+  rotateJoinCodeAction,
+  setMovedOutAction,
+} from "./actions";
 import { RemoveMemberForm } from "./remove-member-form";
 
 // Screen O16. FR-1.25–FR-1.29 (revised 2026-09-17, U-30): full parity for administration AND a
-// moderator; leads with the join-code action when administration is the only member.
+// moderator; leads with the join-code action when administration is the only member. The
+// "create a resident profile" form (FR-1.3/FR-1.5) is administration-only, per its own wording —
+// U-30's parity is scoped to the resident-list actions FR-1.26 names, not profile creation.
 export default async function MembersPage() {
   const current = await getCurrentSession();
   if (!current) redirect("/sign-in");
 
-  const { members, canAct, leadWithJoinCode } = await getResidentList(
+  const { members, canAct, isAdmin, leadWithJoinCode } = await getResidentList(
     current.context,
     current.context.accountId,
   );
+  const household = isAdmin ? await getHousehold(current.context) : null;
+
+  const createResidentForm = isAdmin ? (
+    <div className="space-y-2">
+      <form action={createResidentProfileAction} className="flex gap-2">
+        <input
+          name="displayName"
+          placeholder="New resident's display name"
+          className="flex-1 rounded-[10px] border border-[#D9C7B8] bg-[#FBF3EA] px-3 py-2"
+        />
+        <button type="submit" className="rounded-full bg-[#B6522D] px-4 py-2 text-sm text-[#FBF3EA]">
+          Add resident
+        </button>
+      </form>
+      <p className="text-xs text-[#6B4F3B]">
+        After adding them, tell them your household id (
+        <span className="font-mono">{household?.id}</span>) and the display name you chose — they
+        set their own password at <span className="font-mono">/claim</span>.
+      </p>
+    </div>
+  ) : null;
 
   if (leadWithJoinCode) {
-    const household = await getHousehold(current.context);
     return (
       <div className="mx-auto max-w-md space-y-4 p-6">
         <h1 className="text-2xl font-semibold text-[#190F09]">Members</h1>
@@ -31,6 +58,7 @@ export default async function MembersPage() {
             Rotate join code
           </button>
         </form>
+        {createResidentForm}
       </div>
     );
   }
@@ -38,6 +66,8 @@ export default async function MembersPage() {
   return (
     <div className="mx-auto max-w-2xl space-y-6 p-6">
       <h1 className="text-2xl font-semibold text-[#190F09]">Members</h1>
+
+      {createResidentForm}
 
       <ul className="space-y-3">
         {members.map((m) => (

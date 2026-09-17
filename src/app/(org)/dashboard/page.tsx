@@ -17,11 +17,14 @@ export default async function DashboardPage() {
       <h1 className="text-2xl font-semibold text-[#190F09]">Organisation</h1>
 
       {active ? (
-        <div className="rounded-xl border border-[#D9C7B8] bg-[#FBF3EA] p-4">
+        <Link
+          href={`/rounds/${active.id}`}
+          className="block rounded-xl border border-[#D9C7B8] bg-[#FBF3EA] p-4"
+        >
           <p className="text-sm text-[#6B4F3B]">Active round</p>
           <p className="text-lg font-medium text-[#190F09]">{active.title}</p>
           <p className="text-sm text-[#6B4F3B]">{active.status}</p>
-        </div>
+        </Link>
       ) : (
         <p className="text-sm text-[#6B4F3B]">No round yet.</p>
       )}
@@ -36,7 +39,9 @@ export default async function DashboardPage() {
           <ul className="mt-2 space-y-1">
             {rest.map((r: { id: string; title: string; status: string }) => (
               <li key={r.id} className="text-sm text-[#6B4F3B]">
-                {r.title} — {r.status}
+                <Link href={`/rounds/${r.id}`} className="underline">
+                  {r.title} — {r.status}
+                </Link>
               </li>
             ))}
           </ul>

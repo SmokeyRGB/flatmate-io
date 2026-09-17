@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useActionState, useState } from "react";
 import { signInAction, type SignInFormState } from "./actions";
 
@@ -73,6 +74,13 @@ export function SignInForm() {
                 className="w-full rounded-[10px] border border-[#D9C7B8] bg-[#FBF3EA] px-3 py-2"
               />
             </div>
+            <p className="text-xs text-[#6B4F3B]">
+              Not signed up yet?{" "}
+              <Link href="/claim" className="text-[#B6522D] underline">
+                Claim your resident profile
+              </Link>
+              .
+            </p>
           </>
         )}
 
