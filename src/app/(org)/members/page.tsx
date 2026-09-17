@@ -21,7 +21,7 @@ export default async function MembersPage() {
     current.context,
     current.context.accountId,
   );
-  const household = isAdmin ? await getHousehold(current.context) : null;
+  const household = canAct ? await getHousehold(current.context) : null;
 
   const createResidentForm = isAdmin ? (
     <div className="space-y-2">
@@ -104,11 +104,18 @@ export default async function MembersPage() {
       </ul>
 
       {canAct && (
-        <form action={rotateJoinCodeAction}>
-          <button type="submit" className="text-sm text-[#B6522D] underline">
-            Rotate join code
-          </button>
-        </form>
+        <div className="space-y-2">
+          {/* FR-1.26: "share or rotate" — the code itself must be visible to share, not just a
+              blind rotate action. */}
+          <p className="rounded-xl border border-[#D9C7B8] bg-[#FBF3EA] p-4 font-mono text-sm">
+            {household?.joinCode}
+          </p>
+          <form action={rotateJoinCodeAction}>
+            <button type="submit" className="text-sm text-[#B6522D] underline">
+              Rotate join code
+            </button>
+          </form>
+        </div>
       )}
     </div>
   );

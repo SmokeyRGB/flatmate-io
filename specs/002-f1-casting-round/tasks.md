@@ -629,6 +629,12 @@ corresponding acceptance scenario cannot actually be exercised end to end today.
       (`tests/integration/policy/procedure-lock.test.ts`) but never read by any route today
       (missing).
 
-**Checkpoint**: re-run `/speckit-converge` after T082–T085 land — US1's and US3's own
+- [X] T086 Show the household's current `join_code` on `/members` (`src/app/(org)/members/page.tsx`)
+      for administration and a moderator (parity, U-30) whenever the member list is non-empty —
+      found while re-checking FR-1.26 ("share or rotate the join code"): the empty-state branch
+      already showed it, but the regular member-list view offered only a blind "Rotate" button
+      with no code ever visible to actually share (partial).
+
+**Checkpoint**: re-run `/speckit-converge` after T082–T086 land — US1's and US3's own
 Independent Tests should then be exercisable through the running application, not only via
 direct repository/auth calls in tests.
