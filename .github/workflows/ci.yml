@@ -1,0 +1,33 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      # Runs first and needs no secrets: catches compile/type errors fast, per
+      # docs/GUARDRAILS.md's Minimal-Gate item 2 (TypeScript strict).
+      - run: npm run build
+
+      # eslint + the four custom guardrail checks + the full test suite. The integration tests
+      # talk to the real Supabase project (transaction-mode pooler), so this needs the
+      # DATABASE_URL secret — see the repo's CI setup notes for how to add it.
+      - run: npm run verify
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+      - run: bash tools/check-refs.sh --quiet
