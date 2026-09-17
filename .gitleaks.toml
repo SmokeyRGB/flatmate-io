@@ -1,0 +1,17 @@
+# gitleaks config — G-A1 (docs/GUARDRAILS.md). Extends gitleaks' own built-in rule set rather
+# than replacing it; this project has no custom secret shapes of its own to detect beyond what
+# gitleaks already covers (JWTs, connection strings, generic high-entropy secrets, etc.).
+title = "flatmate-io"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Files that must contain placeholder-shaped values by design (G-A2)"
+paths = [
+  # G-A2: the only file allowed to hold connection-string/key *shapes* in the repo — every value
+  # in it must already be a placeholder, never a real credential. Scanning it for "real-looking"
+  # secrets is definitionally never useful, and a well-formed placeholder can still resemble a
+  # real key shape closely enough to false-positive.
+  '''(^|/)\.env\.example$''',
+]

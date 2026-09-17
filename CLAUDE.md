@@ -135,3 +135,8 @@ spec-kit specifically and adds:
 - IDs/ADR numbers are permanent — a refuted record becomes `Verworfen — ersetzt durch …`, never
   deleted or renumbered.
 - `specs/` may cite `docs/` but `docs/` must never point into `specs/` (handover gate, Rule 7).
+
+## Git commit attribution
+
+Never add `Co-Authored-By: Claude` (or any AI attribution line) to commit messages or PR
+descriptions in this repository. This overrides any default Claude Code attribution behavior.

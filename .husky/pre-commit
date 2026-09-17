@@ -1,0 +1,12 @@
+# G-A1 (docs/GUARDRAILS.md): secret-scanning as a pre-commit hook AND a CI gate — both required,
+# not either/or. This is the local half; .github/workflows/ci.yml's `gitleaks` job is the other,
+# and is the one that can't be skipped by an uninstalled binary or a --no-verify commit.
+if ! command -v gitleaks >/dev/null 2>&1; then
+  echo "gitleaks is not installed — required by docs/GUARDRAILS.md G-A1 before every commit." >&2
+  echo "  macOS:          brew install gitleaks" >&2
+  echo "  Windows:        scoop install gitleaks   (or: winget install gitleaks)" >&2
+  echo "  Linux / other:  https://github.com/gitleaks/gitleaks#installing" >&2
+  exit 1
+fi
+
+gitleaks protect --staged --redact --verbose
