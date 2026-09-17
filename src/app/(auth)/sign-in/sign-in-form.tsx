@@ -36,7 +36,7 @@ export function SignInForm() {
         </button>
       </div>
 
-      <form action={formAction} className="card space-y-4" noValidate>
+      <form action={formAction} className="card space-y-4">
         <input type="hidden" name="mode" value={mode} />
 
         {mode === "household" ? (
@@ -44,7 +44,7 @@ export function SignInForm() {
             <label htmlFor="email" className="field-label">
               Email
             </label>
-            <input id="email" name="email" type="email" className="field-input" />
+            <input id="email" name="email" type="email" required className="field-input" />
           </div>
         ) : (
           <>
@@ -56,6 +56,7 @@ export function SignInForm() {
                 id="householdId"
                 name="householdId"
                 type="text"
+                required
                 placeholder="remembered on this device after joining"
                 className="field-input"
               />
@@ -64,7 +65,13 @@ export function SignInForm() {
               <label htmlFor="displayName" className="field-label">
                 Your name
               </label>
-              <input id="displayName" name="displayName" type="text" className="field-input" />
+              <input
+                id="displayName"
+                name="displayName"
+                type="text"
+                required
+                className="field-input"
+              />
             </div>
             <p className="field-helper">
               Not signed up yet?{" "}
@@ -80,7 +87,13 @@ export function SignInForm() {
           <label htmlFor="password" className="field-label">
             Password
           </label>
-          <input id="password" name="password" type="password" className="field-input" />
+          <input
+            id="password"
+            name="password"
+            type="password"
+            required
+            className="field-input"
+          />
         </div>
 
         {state.error && <p className="field-error">{state.error}</p>}

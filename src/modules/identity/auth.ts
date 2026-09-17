@@ -239,6 +239,13 @@ export async function signIn(
   if (input.kind === "household") {
     email = input.email;
   } else {
+    // Blank fields reach here unvalidated from the resident sign-in form (no `required`,
+    // `noValidate`) — reject before householdId hits withSessionContext's assertUuid, whose plain
+    // Error isn't a SignInError and would otherwise surface as an unhandled crash.
+    if (!input.householdId.trim() || !input.displayName.trim()) {
+      throw new SignInError("Household and name are required");
+    }
+
     // Resolve display_name -> ResidentProfile.id within the already-known household. This read
     // is legitimately RLS-scoped (household_id is a real input here, not something being
     // discovered), unlike the account_id -> household_id bootstrap below.
