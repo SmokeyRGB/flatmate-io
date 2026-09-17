@@ -9,39 +9,32 @@ export function RoundForm({ rooms }: { rooms: { id: string; label: string }[] })
   const [state, formAction, pending] = useActionState(createAndOpenRoundAction, initialState);
 
   return (
-    <form action={formAction} className="space-y-4">
-      <div className="space-y-1">
-        <label htmlFor="title" className="block text-sm font-medium text-[#190F09]">
+    <form action={formAction} className="card space-y-4">
+      <div>
+        <label htmlFor="title" className="field-label">
           Round title
         </label>
-        <input
-          id="title"
-          name="title"
-          placeholder="e.g. Nachbesetzung Herbst"
-          className="w-full rounded-[10px] border border-[#D9C7B8] bg-[#FBF3EA] px-3 py-2"
-        />
+        <input id="title" name="title" placeholder="e.g. Nachbesetzung Herbst" className="field-input" />
       </div>
 
-      <fieldset className="space-y-2">
-        <legend className="text-sm font-medium text-[#190F09]">Rooms this round covers</legend>
-        {rooms.map((r) => (
-          <label key={r.id} className="flex items-center gap-2 text-sm text-[#190F09]">
-            <input type="checkbox" name="roomIds" value={r.id} />
-            {r.label}
-          </label>
-        ))}
-        {rooms.length === 0 && (
-          <p className="text-sm text-[#6B4F3B]">No rooms yet — add one on the Rooms screen first.</p>
-        )}
+      <fieldset>
+        <legend className="field-label">Rooms this round covers</legend>
+        <div className="space-y-2">
+          {rooms.map((r) => (
+            <label key={r.id} className="flex items-center gap-2 text-sm">
+              <input type="checkbox" name="roomIds" value={r.id} className="accent-primary" />
+              {r.label}
+            </label>
+          ))}
+          {rooms.length === 0 && (
+            <p className="text-sm text-muted-foreground">No rooms yet — add one on the Rooms screen first.</p>
+          )}
+        </div>
       </fieldset>
 
-      {state.error && <p className="text-sm text-[#B3261E]">{state.error}</p>}
+      {state.error && <p className="field-error">{state.error}</p>}
 
-      <button
-        type="submit"
-        disabled={pending}
-        className="rounded-full bg-[#B6522D] px-4 py-2 font-medium text-[#FBF3EA] disabled:opacity-60"
-      >
+      <button type="submit" disabled={pending} className="btn btn-primary">
         {pending ? "Opening…" : "Open round"}
       </button>
     </form>

@@ -12,7 +12,7 @@ export default async function NewRoundPage() {
 
   return (
     <div className="mx-auto max-w-md space-y-6 p-6">
-      <h1 className="text-2xl font-semibold text-[#190F09]">Open a casting round</h1>
+      <h1 className="font-serif text-2xl font-semibold">Open a casting round</h1>
       <RoundForm rooms={rooms.map((r) => ({ id: r.id, label: r.label }))} />
     </div>
   );

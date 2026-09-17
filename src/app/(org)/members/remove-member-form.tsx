@@ -20,16 +20,16 @@ export function RemoveMemberForm({ accountId, displayName }: { accountId: string
         value={typedName}
         onChange={(e) => setTypedName(e.target.value)}
         placeholder={`Type "${displayName}" to confirm`}
-        className="rounded-[8px] border border-[#D9C7B8] bg-white px-2 py-1 text-sm"
+        className="field-input py-1 text-sm"
       />
       <button
         type="submit"
         disabled={pending || typedName !== displayName}
-        className="text-sm text-[#B3261E] underline disabled:opacity-40"
+        className="btn-link text-destructive disabled:opacity-40"
       >
         Remove (intruder)
       </button>
-      {state.error && <p className="w-full text-sm text-[#B3261E]">{state.error}</p>}
+      {state.error && <p className="field-error w-full">{state.error}</p>}
     </form>
   );
 }

@@ -13,55 +13,32 @@ export function RegisterForm() {
 
   return (
     <div className="mx-auto max-w-md space-y-6 p-6">
-      <h1 className="text-2xl font-semibold text-[#190F09]">Register your household</h1>
+      <h1 className="font-serif text-2xl font-semibold">Register your household</h1>
 
-      <div
-        role="note"
-        className="rounded-xl border border-[#D9C7B8] bg-[#FBF3EA] p-4 text-sm text-[#190F09]"
-      >
+      <div role="note" className="card text-sm">
         This email address will be visible to everyone who joins your household.
       </div>
 
-      <form action={formAction} className="space-y-4" noValidate>
-        <div className="space-y-1">
-          <label htmlFor="email" className="block text-sm font-medium text-[#190F09]">
+      <form action={formAction} className="card space-y-4" noValidate>
+        <div>
+          <label htmlFor="email" className="field-label">
             Email
           </label>
-          <input
-            id="email"
-            name="email"
-            type="email"
-            className="w-full rounded-[10px] border border-[#D9C7B8] bg-[#FBF3EA] px-3 py-2"
-          />
-          {state.fieldError === "email" && (
-            <p className="text-sm text-[#B3261E]">{state.error}</p>
-          )}
+          <input id="email" name="email" type="email" className="field-input" />
+          {state.fieldError === "email" && <p className="field-error">{state.error}</p>}
         </div>
 
-        <div className="space-y-1">
-          <label htmlFor="password" className="block text-sm font-medium text-[#190F09]">
+        <div>
+          <label htmlFor="password" className="field-label">
             Password
           </label>
-          <input
-            id="password"
-            name="password"
-            type="password"
-            className="w-full rounded-[10px] border border-[#D9C7B8] bg-[#FBF3EA] px-3 py-2"
-          />
-          {state.fieldError === "password" && (
-            <p className="text-sm text-[#B3261E]">{state.error}</p>
-          )}
+          <input id="password" name="password" type="password" className="field-input" />
+          {state.fieldError === "password" && <p className="field-error">{state.error}</p>}
         </div>
 
-        {state.error && !state.fieldError && (
-          <p className="text-sm text-[#B3261E]">{state.error}</p>
-        )}
+        {state.error && !state.fieldError && <p className="field-error">{state.error}</p>}
 
-        <button
-          type="submit"
-          disabled={pending}
-          className="w-full rounded-full bg-[#B6522D] px-4 py-2 font-medium text-[#FBF3EA] disabled:opacity-60"
-        >
+        <button type="submit" disabled={pending} className="btn btn-primary w-full">
           {pending ? "Registering…" : "Register household"}
         </button>
       </form>

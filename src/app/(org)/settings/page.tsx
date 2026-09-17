@@ -14,7 +14,7 @@ export default async function SettingsPage() {
 
   return (
     <div className="mx-auto max-w-md space-y-6 p-6">
-      <h1 className="text-2xl font-semibold text-[#190F09]">Household settings</h1>
+      <h1 className="font-serif text-2xl font-semibold">Household settings</h1>
       <SettingsForm quorumShare={settings?.quorumShare ?? "0.5"} />
     </div>
   );

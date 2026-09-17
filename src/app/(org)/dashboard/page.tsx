@@ -24,32 +24,29 @@ export default async function DashboardPage() {
 
   return (
     <div className="mx-auto max-w-2xl space-y-6 p-6">
-      <h1 className="text-2xl font-semibold text-[#190F09]">Organisation</h1>
+      <h1 className="font-serif text-2xl font-semibold">Organisation</h1>
 
       {active ? (
-        <Link
-          href={`/rounds/${active.id}`}
-          className="block rounded-xl border border-[#D9C7B8] bg-[#FBF3EA] p-4"
-        >
-          <p className="text-sm text-[#6B4F3B]">Active round</p>
-          <p className="text-lg font-medium text-[#190F09]">{active.title}</p>
-          <p className="text-sm text-[#6B4F3B]">{active.status}</p>
+        <Link href={`/rounds/${active.id}`} className="card block transition hover:shadow-none">
+          <p className="text-sm text-muted-foreground">Active round</p>
+          <p className="text-lg font-medium">{active.title}</p>
+          <span className="badge mt-1">{active.status}</span>
         </Link>
       ) : (
-        <p className="text-sm text-[#6B4F3B]">No round yet.</p>
+        <p className="text-sm text-muted-foreground">No round yet.</p>
       )}
 
-      <Link href="/rounds/new" className="inline-block rounded-full bg-[#B6522D] px-4 py-2 text-[#FBF3EA]">
+      <Link href="/rounds/new" className="btn btn-primary">
         Open a new round
       </Link>
 
       {rest.length > 0 && (
         <div>
-          <p className="text-sm font-medium text-[#190F09]">Other rounds</p>
+          <p className="text-sm font-medium">Other rounds</p>
           <ul className="mt-2 space-y-1">
             {rest.map((r: { id: string; title: string; status: string }) => (
-              <li key={r.id} className="text-sm text-[#6B4F3B]">
-                <Link href={`/rounds/${r.id}`} className="underline">
+              <li key={r.id} className="text-sm text-muted-foreground">
+                <Link href={`/rounds/${r.id}`} className="btn-link">
                   {r.title} — {r.status}
                 </Link>
               </li>
@@ -58,20 +55,20 @@ export default async function DashboardPage() {
         </div>
       )}
 
-      <div className="flex flex-wrap gap-4 text-sm">
-        <Link href="/rooms" className="text-[#B6522D] underline">
+      <div className="flex flex-wrap gap-4 border-t border-border pt-4 text-sm">
+        <Link href="/rooms" className="btn-link">
           Rooms
         </Link>
         {canSeeMembersList && (
-          <Link href="/members" className="text-[#B6522D] underline">
+          <Link href="/members" className="btn-link">
             Members
           </Link>
         )}
-        <Link href="/settings" className="text-[#B6522D] underline">
+        <Link href="/settings" className="btn-link">
           Settings
         </Link>
         {current.context.profileId !== null && (
-          <Link href="/who-lives-here" className="text-[#B6522D] underline">
+          <Link href="/who-lives-here" className="btn-link">
             Who lives here
           </Link>
         )}

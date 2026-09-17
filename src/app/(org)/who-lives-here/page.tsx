@@ -15,8 +15,8 @@ export default async function WhoLivesHerePage() {
   if (current.context.profileId === null) {
     return (
       <div className="mx-auto max-w-md space-y-4 p-6">
-        <h1 className="text-2xl font-semibold text-[#190F09]">Who lives here</h1>
-        <p className="text-sm text-[#6B4F3B]">
+        <h1 className="font-serif text-2xl font-semibold">Who lives here</h1>
+        <p className="text-sm text-muted-foreground">
           This view is for residents. Administration sees the full member list under Members.
         </p>
       </div>
@@ -27,13 +27,13 @@ export default async function WhoLivesHerePage() {
 
   return (
     <div className="mx-auto max-w-md space-y-4 p-6">
-      <h1 className="text-2xl font-semibold text-[#190F09]">Who lives here</h1>
-      <p className="text-sm text-[#6B4F3B]">
+      <h1 className="font-serif text-2xl font-semibold">Who lives here</h1>
+      <p className="text-sm text-muted-foreground">
         If you don&apos;t recognize someone on this list, let a moderator know — outside the app.
       </p>
       <ul className="space-y-2">
         {members.map((m, i) => (
-          <li key={i} className="rounded-xl border border-[#D9C7B8] bg-[#FBF3EA] p-3 text-[#190F09]">
+          <li key={i} className="card py-2">
             {m.displayName}
           </li>
         ))}

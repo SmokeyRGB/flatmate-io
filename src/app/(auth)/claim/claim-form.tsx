@@ -13,56 +13,37 @@ export function ClaimForm() {
 
   return (
     <div className="mx-auto max-w-md space-y-6 p-6">
-      <h1 className="text-2xl font-semibold text-[#190F09]">Claim your resident profile</h1>
-      <p className="text-sm text-[#6B4F3B]">
+      <h1 className="font-serif text-2xl font-semibold">Claim your resident profile</h1>
+      <p className="text-sm text-muted-foreground">
         Ask whoever registered the household for its household id and the display name they
         created for you, then set your own password here.
       </p>
 
-      <form action={formAction} className="space-y-4" noValidate>
-        <div className="space-y-1">
-          <label htmlFor="householdId" className="block text-sm font-medium text-[#190F09]">
+      <form action={formAction} className="card space-y-4" noValidate>
+        <div>
+          <label htmlFor="householdId" className="field-label">
             Household
           </label>
-          <input
-            id="householdId"
-            name="householdId"
-            type="text"
-            className="w-full rounded-[10px] border border-[#D9C7B8] bg-[#FBF3EA] px-3 py-2"
-          />
+          <input id="householdId" name="householdId" type="text" className="field-input" />
         </div>
 
-        <div className="space-y-1">
-          <label htmlFor="displayName" className="block text-sm font-medium text-[#190F09]">
+        <div>
+          <label htmlFor="displayName" className="field-label">
             Your name
           </label>
-          <input
-            id="displayName"
-            name="displayName"
-            type="text"
-            className="w-full rounded-[10px] border border-[#D9C7B8] bg-[#FBF3EA] px-3 py-2"
-          />
+          <input id="displayName" name="displayName" type="text" className="field-input" />
         </div>
 
-        <div className="space-y-1">
-          <label htmlFor="password" className="block text-sm font-medium text-[#190F09]">
+        <div>
+          <label htmlFor="password" className="field-label">
             Choose a password
           </label>
-          <input
-            id="password"
-            name="password"
-            type="password"
-            className="w-full rounded-[10px] border border-[#D9C7B8] bg-[#FBF3EA] px-3 py-2"
-          />
+          <input id="password" name="password" type="password" className="field-input" />
         </div>
 
-        {state.error && <p className="text-sm text-[#B3261E]">{state.error}</p>}
+        {state.error && <p className="field-error">{state.error}</p>}
 
-        <button
-          type="submit"
-          disabled={pending}
-          className="w-full rounded-full bg-[#B6522D] px-4 py-2 font-medium text-[#FBF3EA] disabled:opacity-60"
-        >
+        <button type="submit" disabled={pending} className="btn btn-primary w-full">
           {pending ? "Claiming…" : "Claim profile"}
         </button>
       </form>

@@ -1,26 +1,183 @@
 @import "tailwindcss";
 
+/* docs/09-Design-System.md — "apartment notebook": warm paper, terracotta accent, card-based. */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #f9f4ea;
+  --card: #fefcf7;
+  --foreground: #321f14;
+  --muted-foreground: #6b594e;
+  --primary: #b6522d;
+  --primary-foreground: #fbf8f1;
+  --secondary: #efe7d8;
+  --secondary-foreground: #442d20;
+  --muted: #f0ebdf;
+  --accent: #e7debd;
+  --accent-foreground: #412714;
+  --border: #ded6c9;
+  --destructive: #be241f;
+  --destructive-foreground: #fbf8f1;
+  --vote-no: #be241f;
+  --vote-rather-not: #dcaf61;
+  --vote-rather-not-foreground: #402712;
+  --vote-like: #69aa77;
+  --vote-like-foreground: #132717;
+  --vote-absolutely: #00572e;
+  --vote-absolutely-foreground: #f8f5ee;
 }
 
 @theme inline {
   --color-background: var(--background);
+  --color-card: var(--card);
+  --color-card-foreground: var(--foreground);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-vote-no: var(--vote-no);
+  --color-vote-rather-not: var(--vote-rather-not);
+  --color-vote-rather-not-foreground: var(--vote-rather-not-foreground);
+  --color-vote-like: var(--vote-like);
+  --color-vote-like-foreground: var(--vote-like-foreground);
+  --color-vote-absolutely: var(--vote-absolutely);
+  --color-vote-absolutely-foreground: var(--vote-absolutely-foreground);
+  --font-serif: var(--font-fraunces);
+  --font-sans: var(--font-work-sans);
+  --shadow-card: 0 1px 2px rgba(50, 31, 20, 0.06), 0 6px 20px rgba(50, 31, 20, 0.05);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: #1d140d;
+    --card: #2b1f16;
+    --foreground: #f0ebe0;
+    --muted-foreground: #a79d91;
+    --primary: #d97c50;
+    --primary-foreground: #190f09;
+    --secondary: #3a2a1f;
+    --secondary-foreground: #e9e4da;
+    --muted: #3a2a1f;
+    --accent: #4e341f;
+    --accent-foreground: #f0ebe0;
+    --border: rgba(255, 255, 255, 0.14);
+    --destructive: #da4339;
+    --destructive-foreground: #f0ebe0;
+    --vote-no: #da4339;
+    --vote-rather-not: #c99d4e;
+    --vote-rather-not-foreground: #241a0c;
+    --vote-like: #63a471;
+    --vote-like-foreground: #0e1f12;
+    --vote-absolutely: #7cd591;
+    --vote-absolutely-foreground: #10230f;
   }
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-background);
+  color: var(--color-foreground);
+  font-family: var(--font-sans), sans-serif;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-serif), serif;
+  letter-spacing: -0.01em;
+}
+
+@layer components {
+  .card {
+    background: var(--color-card);
+    border: 1px solid var(--color-border);
+    border-radius: 1rem;
+    box-shadow: var(--shadow-card);
+    padding: 1rem;
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    border-radius: 9999px;
+    padding: 0.625rem 1.25rem;
+    font-weight: 500;
+    font-size: 0.875rem;
+    transition: transform 0.1s ease, opacity 0.15s ease;
+  }
+  .btn:active:not(:disabled) {
+    transform: scale(0.98);
+  }
+  .btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  .btn-primary {
+    background: var(--color-primary);
+    color: var(--color-primary-foreground);
+  }
+  .btn-secondary {
+    background: var(--color-secondary);
+    color: var(--color-secondary-foreground);
+  }
+  .btn-destructive {
+    background: var(--color-destructive);
+    color: var(--color-destructive-foreground);
+  }
+  .btn-link {
+    color: var(--color-primary);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    font-size: 0.875rem;
+    font-weight: 500;
+  }
+
+  .field-label {
+    display: block;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--color-foreground);
+    margin-bottom: 0.25rem;
+  }
+  .field-input {
+    width: 100%;
+    background: var(--color-card);
+    border: 1px solid var(--color-border);
+    border-radius: 0.625rem;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.9375rem;
+    color: var(--color-foreground);
+  }
+  .field-input:focus {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 1px;
+  }
+  .field-helper {
+    font-size: 0.75rem;
+    color: var(--color-muted-foreground);
+    margin-top: 0.25rem;
+  }
+  .field-error {
+    font-size: 0.8125rem;
+    color: var(--color-destructive);
+    margin-top: 0.25rem;
+  }
+
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 9999px;
+    background: var(--color-muted);
+    color: var(--color-muted-foreground);
+    padding: 0.125rem 0.625rem;
+    font-size: 0.75rem;
+    font-weight: 500;
+  }
 }

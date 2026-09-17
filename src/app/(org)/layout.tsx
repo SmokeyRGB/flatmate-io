@@ -13,12 +13,12 @@ export default async function OrgLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="flex min-h-full flex-col">
-      <header className="flex items-center justify-between border-b border-[#D9C7B8] bg-[#FBF3EA] px-4 py-3">
-        <span className="text-sm text-[#190F09]">
+      <header className="flex items-center justify-between border-b border-border bg-card px-4 py-3">
+        <span className="text-sm">
           Signed in as <strong>{identityLabel}</strong>
         </span>
         <form action={signOutAction}>
-          <button type="submit" className="text-sm text-[#B6522D] underline">
+          <button type="submit" className="btn-link">
             Sign out
           </button>
         </form>

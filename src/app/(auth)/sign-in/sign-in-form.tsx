@@ -15,44 +15,39 @@ export function SignInForm() {
 
   return (
     <div className="mx-auto max-w-md space-y-6 p-6">
-      <h1 className="text-2xl font-semibold text-[#190F09]">Sign in</h1>
+      <h1 className="font-serif text-2xl font-semibold">Sign in</h1>
 
-      <div className="flex gap-2">
+      <div className="flex gap-2 rounded-full bg-muted p-1">
         <button
           type="button"
           onClick={() => setMode("household")}
-          className={`rounded-full px-4 py-1 text-sm ${mode === "household" ? "bg-[#B6522D] text-[#FBF3EA]" : "bg-[#FBF3EA] text-[#190F09]"}`}
+          className={`flex-1 rounded-full px-4 py-1.5 text-sm font-medium transition ${mode === "household" ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}
         >
           Household
         </button>
         <button
           type="button"
           onClick={() => setMode("resident")}
-          className={`rounded-full px-4 py-1 text-sm ${mode === "resident" ? "bg-[#B6522D] text-[#FBF3EA]" : "bg-[#FBF3EA] text-[#190F09]"}`}
+          className={`flex-1 rounded-full px-4 py-1.5 text-sm font-medium transition ${mode === "resident" ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}
         >
           Resident
         </button>
       </div>
 
-      <form action={formAction} className="space-y-4" noValidate>
+      <form action={formAction} className="card space-y-4" noValidate>
         <input type="hidden" name="mode" value={mode} />
 
         {mode === "household" ? (
-          <div className="space-y-1">
-            <label htmlFor="email" className="block text-sm font-medium text-[#190F09]">
+          <div>
+            <label htmlFor="email" className="field-label">
               Email
             </label>
-            <input
-              id="email"
-              name="email"
-              type="email"
-              className="w-full rounded-[10px] border border-[#D9C7B8] bg-[#FBF3EA] px-3 py-2"
-            />
+            <input id="email" name="email" type="email" className="field-input" />
           </div>
         ) : (
           <>
-            <div className="space-y-1">
-              <label htmlFor="householdId" className="block text-sm font-medium text-[#190F09]">
+            <div>
+              <label htmlFor="householdId" className="field-label">
                 Household
               </label>
               <input
@@ -60,23 +55,18 @@ export function SignInForm() {
                 name="householdId"
                 type="text"
                 placeholder="remembered on this device after joining"
-                className="w-full rounded-[10px] border border-[#D9C7B8] bg-[#FBF3EA] px-3 py-2"
+                className="field-input"
               />
             </div>
-            <div className="space-y-1">
-              <label htmlFor="displayName" className="block text-sm font-medium text-[#190F09]">
+            <div>
+              <label htmlFor="displayName" className="field-label">
                 Your name
               </label>
-              <input
-                id="displayName"
-                name="displayName"
-                type="text"
-                className="w-full rounded-[10px] border border-[#D9C7B8] bg-[#FBF3EA] px-3 py-2"
-              />
+              <input id="displayName" name="displayName" type="text" className="field-input" />
             </div>
-            <p className="text-xs text-[#6B4F3B]">
+            <p className="field-helper">
               Not signed up yet?{" "}
-              <Link href="/claim" className="text-[#B6522D] underline">
+              <Link href="/claim" className="btn-link">
                 Claim your resident profile
               </Link>
               .
@@ -84,25 +74,16 @@ export function SignInForm() {
           </>
         )}
 
-        <div className="space-y-1">
-          <label htmlFor="password" className="block text-sm font-medium text-[#190F09]">
+        <div>
+          <label htmlFor="password" className="field-label">
             Password
           </label>
-          <input
-            id="password"
-            name="password"
-            type="password"
-            className="w-full rounded-[10px] border border-[#D9C7B8] bg-[#FBF3EA] px-3 py-2"
-          />
+          <input id="password" name="password" type="password" className="field-input" />
         </div>
 
-        {state.error && <p className="text-sm text-[#B3261E]">{state.error}</p>}
+        {state.error && <p className="field-error">{state.error}</p>}
 
-        <button
-          type="submit"
-          disabled={pending}
-          className="w-full rounded-full bg-[#B6522D] px-4 py-2 font-medium text-[#FBF3EA] disabled:opacity-60"
-        >
+        <button type="submit" disabled={pending} className="btn btn-primary w-full">
           {pending ? "Signing in…" : "Sign in"}
         </button>
       </form>
