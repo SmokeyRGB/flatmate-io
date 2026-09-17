@@ -494,12 +494,14 @@ export async function forceChangeSettingWhileRoundOpen(
   openRoundId: string,
   actor: Actor,
 ) {
-  return withSessionContext(context, async (tx) => {
-    if (!actor.accountId) throw new Error("forceChangeSettingWhileRoundOpen requires an actor accountId");
+  if (!actor.accountId) throw new Error("forceChangeSettingWhileRoundOpen requires an actor accountId");
+  const accountId = actor.accountId;
+  await assertHasPermission(context, accountId, "manage_settings");
 
+  return withSessionContext(context, async (tx) => {
     await tx
       .update(householdSettings)
-      .set({ [field]: value, updatedAt: new Date(), updatedByAccountId: actor.accountId })
+      .set({ [field]: value, updatedAt: new Date(), updatedByAccountId: accountId })
       .where(eq(householdSettings.householdId, context.householdId));
 
     await recordActivityEvent(tx, {

@@ -90,4 +90,26 @@ describe("Procedure lock while a round is open", () => {
       if (hh) await hh.cleanup();
     }
   });
+
+  it("refuses a plain resident with no manage_settings permission from forcing a change while open", async () => {
+    let hh: TestHousehold | undefined;
+    const accountIds: string[] = [];
+    try {
+      hh = await registerTestHousehold();
+      const actor = { accountId: hh.accountId, profileId: null };
+      const resident = await claim(hh, "Resident1");
+      accountIds.push(resident.accountId);
+      const residentActor = { accountId: resident.accountId, profileId: resident.profileId };
+      const roomA = await createRoom(hh.context, "Room A", actor);
+      const round = await createRound(hh.context, "Round", [roomA.id], actor);
+      await openRound(hh.context, round.id, actor);
+
+      await expect(
+        forceChangeSettingWhileRoundOpen(hh.context, "quorumShare", "0.9", round.id, residentActor),
+      ).rejects.toThrow(PermissionDeniedError);
+    } finally {
+      for (const id of accountIds) await deleteTestAccount(id);
+      if (hh) await hh.cleanup();
+    }
+  });
 });
