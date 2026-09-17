@@ -13,7 +13,7 @@
 
 ## Requirement Completeness
 
-- [ ] No [NEEDS CLARIFICATION] markers remain
+- [x] No [NEEDS CLARIFICATION] markers remain
 - [x] Requirements are testable and unambiguous
 - [x] Success criteria are measurable
 - [x] Success criteria are technology-agnostic (no implementation details)
@@ -31,12 +31,10 @@
 
 ## Notes
 
-- **One deliberate [NEEDS CLARIFICATION] marker remains**, in the Assumptions section: room
-  renaming after votes exist. `docs/backlog/requirements/F1-requirements.md` §8 explicitly names
-  this as needing a human decision, not an assumption — "it needs a decision rather than an
-  assumption" — so this spec routes it to `/speckit-clarify` rather than silently adopting the
-  source's own lean. This is the correct, deliberate use of the marker per the constitution's
-  challenge protocol, not a gap to close by guessing.
+- **The one deliberate [NEEDS CLARIFICATION] marker is now resolved** via `/speckit-clarify`
+  (Clarifications, Session 2026-09-17): room renaming stays unrestricted at any round state,
+  matching `docs/backlog/requirements/F1-requirements.md` §8's own lean, plus one addition beyond
+  it — each rename is now recorded as an `ActivityEvent` for resident visibility.
 - All functional requirements are quoted verbatim from `docs/backlog/requirements/F1-requirements.md`
   §3 (maßgeblich source), per the constitution's "cite, don't restate" principle — spot-checked
   against the source during validation; one transcription error (an added phrase in FR-1.28's

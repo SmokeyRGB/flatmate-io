@@ -14,6 +14,44 @@ rooms with independent state, casting rounds with room selection/voter snapshot/
 the procedure lock while a round is open, the resident list (administration), and the
 administration boundary (S-50).
 
+## Clarifications
+
+### Session 2026-09-17
+
+- Q: Should a moderator be able to rename a room at any time, even after votes exist for a round
+  covering it, or should renaming lock once a round covering that room is open? → A: Always allow
+  renaming, at any round state; every rename is recorded as an `ActivityEvent` so residents can see
+  that the room was renamed.
+
+### Session 2026-09-17 (second pass — post-implementation review)
+
+- Q: Should a resident joining after a round opens require a moderator to add them (FR-1.18 as
+  originally written), or should they become vote-eligible automatically? → A: Automatic. The
+  moment a resident claims their profile while a round is open, they join it — no moderator step.
+  `FR-1.18`, `AC-1.11`, `AC-1.12` revised accordingly (source: `docs/backlog/requirements/
+  F1-requirements.md`, 2026-09-17). The prior manual-add path (`addResidentToRound`) remains as a
+  moderator correction tool for cases the automatic path missed, not as the primary path anymore.
+- Q: Should a moderator's resident-list access stay read-only (`FR-1.27` as originally written), or
+  should moderators get the same actions as administration? → A: Full parity — administration and
+  moderator now see and can act on the resident list identically; only a profile-less
+  non-moderator/non-admin account is still refused entirely. `FR-1.27`, `AC-1.20` revised; `U-22`
+  (`docs/08-UX-Entscheidungen.md`) annotated as partially refined by the new `U-30`.
+- Q: Should residents (non-moderator) regain any visibility into household membership, given `U-22`
+  removed it entirely in favor of the join-code being the sole remaining protection? → A: Yes, but
+  narrowly — a new, separate, read-only view (screen `B5`, `docs/screens/B-start.md`) shows only
+  current (`active`) members' display names, no actions, no contact detail, no join dates, and does
+  not link to or from the administration resident list or the round participant list. Purpose:
+  lets a resident recognize and report — outside the app — someone who joined via the invite code
+  without actually living there, partially restoring one of the two protection mechanisms `U-22`
+  removed without reinstating the removal right. New `FR-1.31`/`AC-1.24`, new `U-30`.
+- **Incidentally corrected while implementing the above:** `U-27`'s already-decided two-tier
+  member removal (`docs/08-UX-Entscheidungen.md`, decided 2026-09-16 — soft `moved_out` for actual
+  move-outs vs. a hard, typed-display-name-confirmation `removeMember` for join-code intruders,
+  neither of which conflates with the other) had never actually been implemented correctly in this
+  feature's first pass — `removeMember` was a plain one-click revoke, and `moved_out`/reactivate
+  never touched `Membership` access at all, missing V-3's "access revoked immediately" requirement.
+  Fixed as part of this session's changes, not a new decision — `U-27` already required it.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Register a household and become one of its residents (Priority: P1)
@@ -103,10 +141,10 @@ even after the household's live settings change afterward.
 3. **Given** a round in `draft`, **When** opening it fails part-way for any reason, **Then** the
    round is still `draft` and no round-participation entries and no frozen rules exist for it
    (AC-1.10, FR-1.16 — the snapshot and the state change take effect together or not at all).
-4. **Given** an open round with 7 participants, **When** an eighth resident joins the household,
-   **Then** the round's participation and quorum displays still divide by 7 until a moderator adds
-   them explicitly, marked as added manually rather than from the snapshot (AC-1.11, AC-1.12,
-   FR-1.17, FR-1.18).
+4. **Given** an open round with 7 participants, **When** an eighth resident claims their profile,
+   **Then** the round's participation and quorum displays automatically divide by 8 from that
+   point on, marked distinctly from the opening snapshot (AC-1.11, AC-1.12, FR-1.17, FR-1.18 —
+   revised 2026-09-17: automatic, not moderator-gated).
 5. **Given** I am a resident in an open round, **When** I open the participant list, **Then** I see
    participants' names only — no actions, contact details, or join dates (AC-1.18, FR-1.19).
 6. **Given** a round in state `open`, **When** anyone attempts to change a rating weight, the
@@ -131,10 +169,11 @@ is confined to household setup and cannot reach casting content.
 around the objects User Stories 1–3 create; it does not block them and can be validated
 independently once a household, residents, and rooms exist.
 
-**Independent Test**: Can be fully tested by exercising the resident list as administration
-(full access), as a moderator profile (read-only), and as a non-moderator profile (no route
-reaches it) — and by confirming a profile-less administration session cannot reach casting rounds,
-applications, votes, slots, appointments, or casting notes by any route.
+**Independent Test**: Can be fully tested by exercising the resident list as administration and as
+a moderator profile (both full access, since 2026-09-17 — U-30), as a non-moderator profile (no
+route reaches it), and as any resident via the separate, reduced "who lives here" view (current
+members' names only, no actions) — and by confirming a profile-less administration session cannot
+reach casting rounds, applications, votes, slots, appointments, or casting notes by any route.
 
 **Acceptance Scenarios**:
 
@@ -142,13 +181,18 @@ applications, votes, slots, appointments, or casting notes by any route.
    another profile named "Jonas", **Then** creation is refused with an inline message naming the
    collision; **When** the only "Jonas" is `moved_out`, creation of a new "Jonas" succeeds
    (AC-1.3, AC-1.4, FR-1.4).
-2. **Given** the resident list, **When** administration views it, **Then** it shows per member:
-   display name, join date, contact detail if present, and status, with actions to remove, set
-   `moved_out`, reactivate, and share/rotate the join code (FR-1.25, FR-1.26).
-3. **Given** a profile with moderator rights, **When** it opens the resident list, **Then** the
-   list is shown with no action controls (AC-1.20, FR-1.27).
-4. **Given** a profile without moderator rights, **When** it requests the resident list by any
+2. **Given** the resident list, **When** administration or a moderator views it, **Then** both see
+   the same per-member data — display name, join date, contact detail if present, and status —
+   with the same actions: set `moved_out`, `remove` (typed-name confirmation, U-27, for a join-code
+   intruder rather than a real move-out), reactivate, and share/rotate the join code (FR-1.25,
+   FR-1.26, FR-1.27 — revised 2026-09-17: full parity, U-30).
+3. **Given** a profile without moderator rights, **When** it requests the resident list by any
    route, **Then** the request is refused (AC-1.21, FR-1.27).
+4. **Given** I am a resident, **When** I open the "who lives here" view, **Then** I see the
+   display names of current (`active`) members only — no `moved_out`/`prepared` entries, no
+   actions, no contact detail, no join dates — and this view neither links to nor is reachable
+   from the administration resident list or the round participant list (FR-1.31, AC-1.24, U-30,
+   screen `B5`).
 5. **Given** a household where administration is the only member, **When** administration opens
    the resident list, **Then** the join-code action is shown and no empty list is displayed
    (AC-1.22, FR-1.29).
@@ -182,9 +226,12 @@ summarized with its source ID:
   opening taking effect.
 - **EC-1.10**: Households are not deduplicated by email — registering with an address already used
   elsewhere is permitted.
-- **EC-1.11**: A moderator cannot set `moved_out` on the last remaining resident profile created
-  via FR-1.5 — the resident list is read-only to a moderator (FR-1.27), so this case cannot arise
-  through that route in the first place.
+- **EC-1.11**: *Superseded 2026-09-17 by FR-1.27's moderator-parity revision.* Previously refused
+  only because a moderator had no write access to the resident list at all; now that moderators
+  have full parity with administration (U-30), a moderator setting `moved_out` on the last
+  remaining resident profile created via FR-1.5 is the same case as administration doing it —
+  permitted, with EC-1.7's fallback (administration creates a resident profile and appoints a
+  moderator) available exactly as before if it leaves the household without an active resident.
 
 ## Requirements *(mandatory)*
 
@@ -223,16 +270,26 @@ groups them:
 - **FR-1.25**: *"The household resident list shall show, per member: display name, join date,
   contact detail if present, and status."*
 - **FR-1.26**: *"The resident list shall offer the actions: remove member, set `moved_out`,
-  reactivate, and share or rotate the join code."*
-- **FR-1.27**: *"The resident list and its actions shall be fully available to administration,
-  read-only to a profile with moderator rights, and not reachable at all — by any route — by a
-  profile without moderator rights."*
+  reactivate, and share or rotate the join code. **Two-tier removal (U-27, decided 2026-09-16,
+  incorporated here 2026-09-17):** `moved_out` is the regular path for an actual move-out — votes
+  and history are kept. 'Remove' is final, requires typing the exact display name to confirm (not
+  a plain click), and is meant specifically for a person who joined falsely or maliciously via the
+  join code — not for real move-outs."*
+- **FR-1.27** *(Revised 2026-09-17)*: *"The resident list and its actions shall be fully available
+  to administration and to a profile with moderator rights (full parity — the same rows, the same
+  actions), and not reachable at all — by any route — by a profile without moderator rights."*
 - **FR-1.28**: *"The resident list shall be a screen distinct from the round participant list
   (FR-1.19); neither shall link to the other's data."*
 - **FR-1.29**: *"When administration is the only member of the household, the resident-list screen
   shall lead with the join-code action instead of displaying an empty list."*
 - **FR-1.30**: *"Every removal, `moved_out` and reactivation on the resident list shall be recorded
   as an append-only audit entry naming both the account and the acting profile."*
+- **FR-1.31** *(New 2026-09-17, U-30)*: *"Every resident (any profile with an active
+  `ResidentProfile`, moderator rights or not) shall be able to see a read-only list of the
+  household's current members — `status = active` only, no `moved_out` or `prepared` entries —
+  showing display names only, no actions, no contact detail, no join dates. This is a screen
+  distinct from both the administration resident list (FR-1.25–FR-1.30) and the round participant
+  list (FR-1.19); none of the three shall link to either other's data."*
 
 **Rooms**
 
@@ -242,6 +299,11 @@ groups them:
   `occupied`, `on_hold`, `not_available`."*
 - **FR-1.11**: *"Changing one room's state to `occupied` shall not change the state of the casting
   round or of any other room."*
+- **Room renaming** *(resolved by Clarifications, Session 2026-09-17 — not present in the source
+  requirements packet, which left it open per its §8)*: A moderator may rename a room at any time,
+  regardless of round state or whether votes already reference it — a room name is a label, not a
+  scoring input (C-1.3). Each rename is recorded as an `ActivityEvent` entry so residents can see
+  that the room was renamed.
 
 **Casting round**
 
@@ -259,8 +321,11 @@ groups them:
   all."*
 - **FR-1.17**: *"The round-participation entries shall be the denominator for all participation
   and quorum displays for that round."*
-- **FR-1.18**: *"The system shall allow a moderator to add a resident to an open round after
-  opening, marked as added manually rather than from the snapshot."*
+- **FR-1.18** *(Revised 2026-09-17 — automatic, not moderator-gated)*: *"The system shall add a
+  resident to every currently `open` round automatically, the moment that resident becomes
+  `active` (claims their profile) — marked as `joined_after_open` rather than from the snapshot. A
+  moderator may additionally add a resident by hand for correction cases the automatic path
+  missed (marked `added_manually`), but the automatic path is the default, not a fallback for it."*
 - **FR-1.19**: *"All residents taking part in a round shall be able to see a list of the round's
   participants, showing names only."*
 - **FR-1.20**: *"The system shall record every casting-round and room state change as an
@@ -298,8 +363,9 @@ the user stories above:
 - **Room**: one of six states (FR-1.10), independent of round state (FR-1.11).
 - **CastingRound**: one of five states (FR-1.13), deliberately thin per C-1.2 — no round-level
   process-phase states.
-- **RoundParticipation**: one row per profile per round, sourced from the opening snapshot or
-  added manually (FR-1.14, FR-1.18); the quorum/participation denominator (FR-1.17).
+- **RoundParticipation**: one row per profile per round, sourced from the opening snapshot,
+  automatically upon claiming a profile while a round is open, or added manually by a moderator as
+  a correction (FR-1.14, FR-1.18); the quorum/participation denominator (FR-1.17).
 - **settings_snapshot**: the frozen copy of voting rules taken at `draft → open` (FR-1.15); a copy,
   never a reference (C-1.1) — consumed later by F5's score function.
 
@@ -342,9 +408,7 @@ the user stories above:
   agreements; organisations above households; SSO; ownership transfer as its own mechanism; role
   hierarchies or user-defined roles; parallel rounds offered in the UI; anything about
   applications, votes, or scheduling (those are F3–F5).
-- **[NEEDS CLARIFICATION: Room renaming after votes exist]** — `docs/backlog/requirements/F1-requirements.md`
-  §8 explicitly flags this as unresolved rather than assumable: *"Room renaming after votes exist
-  is not addressed by any scope line... it needs a decision rather than an assumption."* The
-  source's own lean is to permit it (a room is a label here, not a scoring input), but this spec
-  does not adopt that unilaterally — routed to `/speckit-clarify` per the constitution's challenge
-  protocol rather than assumed.
+- **Room renaming after votes exist**: resolved via `/speckit-clarify` (see Clarifications, Session
+  2026-09-17) — renaming stays unrestricted at any round state, matching the source's own lean (a
+  room is a label, not a scoring input), plus one addition beyond that lean: each rename is now
+  recorded as an `ActivityEvent` for resident visibility.
