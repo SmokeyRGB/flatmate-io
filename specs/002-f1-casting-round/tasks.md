@@ -592,3 +592,43 @@ the full reasoning trail.
 
 **Checkpoint**: all three requested/discovered corrections implemented, tested, documented, and
 verified against the live database.
+
+---
+
+## Phase 9: Convergence (2026-09-17, /speckit-converge)
+
+Found by inspecting `src/app/` against `spec.md`'s own acceptance scenarios: several FR-1.*
+paths are implemented and tested at the repository/auth layer only (unit or integration tests
+call the function directly) — no route in the running application reaches them, so the
+corresponding acceptance scenario cannot actually be exercised end to end today.
+
+- [X] T082 Build the UI path for creating and claiming a resident profile: a form letting the
+      signed-in household account call `createResidentProfile`
+      (`src/modules/identity/repository.ts`) to create a profile for itself, plus a claim/sign-up
+      route where a person enters that profile's household + display name and sets a password,
+      calling `claimResidentProfile` (`src/modules/identity/auth.ts`) — the step that creates the
+      resident's actual Supabase Auth account and Membership. Neither function is called from any
+      route today, so `sign-in`'s "Resident" mode (`src/app/(auth)/sign-in/sign-in-form.tsx`) can
+      never succeed for any household — no resident account can be created through any reachable
+      path in the deployed app. Per FR-1.5, US1/AC3 (missing).
+- [X] T083 After `registerHouseholdAction` (`src/app/(auth)/register/actions.ts`) succeeds, sign
+      the new household account in via `setSessionCookie` and `redirect()` (to `/dashboard`, or
+      to T082's new resident-profile step), matching the pattern `sign-in/actions.ts` already
+      uses. Today a successful registration returns silently with no navigation and no visible
+      confirmation. Per US1's registration flow (partial).
+- [X] T084 Build a round-detail view, reachable from the dashboard's active-round card
+      (`src/app/(org)/dashboard/page.tsx`), that calls `getRoundParticipants`
+      (`src/modules/casting/repository.ts`) to render participant display names. This is the read
+      path residents must be able to reach per FR-1.19/US3 Acceptance Scenario 5 — implemented
+      and unit-tested (`tests/unit/casting/round-participant-list.test.ts`) but never called from
+      any route (missing).
+- [X] T085 On the same round-detail view, surface `hasProcedureChangedNotice`
+      (`src/modules/casting/repository.ts`) as the "procedure was changed" notice FR-1.22/US3
+      Acceptance Scenario 7 requires when a locked setting was force-changed while the round was
+      open. Implemented and tested at the repository layer
+      (`tests/integration/policy/procedure-lock.test.ts`) but never read by any route today
+      (missing).
+
+**Checkpoint**: re-run `/speckit-converge` after T082–T085 land — US1's and US3's own
+Independent Tests should then be exercisable through the running application, not only via
+direct repository/auth calls in tests.
