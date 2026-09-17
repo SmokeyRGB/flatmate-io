@@ -22,6 +22,13 @@
       "when": 1789591365349,
       "tag": "0002_fix_activityevent_redaction_exception",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1789626772197,
+      "tag": "0003_activityevent_update_withcheck_mirrors_using",
+      "breakpoints": true
     }
   ]
 }

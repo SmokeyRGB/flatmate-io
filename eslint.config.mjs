@@ -12,6 +12,10 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // prototype/ is a separate Bun/Vite app (its own eslint.config.js, its own `bun run lint`)
+    // outside the handover boundary (CLAUDE.md) — not part of this Next.js project's source.
+    "prototype/**",
+    "drizzle/**",
   ]),
 ]);
 

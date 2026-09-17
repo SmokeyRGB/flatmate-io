@@ -323,22 +323,30 @@ database: the individual guardrail *mechanisms* are correct, but four of them ar
 automatically (only by hand), and one — retention redaction — has a real behavioral bug despite
 its own test passing. See the in-session Convergence Findings table for full evidence per item.
 
-- [ ] T042 Add an `npm run verify` script and wire `scripts/lint/session-context.ts` into it, so a
+- [X] T042 Add an `npm run verify` script and wire `scripts/lint/session-context.ts` into it, so a
       bare `SET`/misplaced `SET LOCAL` fails an actual automated step, not only a manual `tsx`
-      invocation, per FR-0.4 (partial)
-- [ ] T043 [P] Wire `scripts/lint/import-boundary.ts` into the same `npm run verify` script per
+      invocation, per FR-0.4 (partial). Also fixed a latent config gap this surfaced: the root
+      `eslint.config.mjs` (from T001's `create-next-app` scaffold) had no ignore for `prototype/`,
+      a separate Bun/Vite app outside the handover boundary — `eslint` was silently linting it too.
+- [X] T043 [P] Wire `scripts/lint/import-boundary.ts` into the same `npm run verify` script per
       FR-0.1 (partial)
-- [ ] T044 [P] Wire `scripts/lint/rls-coverage.ts` into the same `npm run verify` script per
+- [X] T044 [P] Wire `scripts/lint/rls-coverage.ts` into the same `npm run verify` script per
       EC-0.1/EC-0.2 (partial)
-- [ ] T045 Add `scripts/lint/guarded-tests.ts`: fails if any file referenced by an `implemented`
+- [X] T045 Add `scripts/lint/guarded-tests.ts`: fails if any file referenced by an `implemented`
       entry in `test/guarded.manifest.json` contains `.skip`/`.only`/a commented-out test body for
       its `[GUARDED]` test, and wire it into the same `npm run verify` script — promotes T040's
       one-off manual check into the ongoing, automated enforcement Constitution Principle I /
       Minimal-Gate item 6 call for (partial)
-- [ ] T046 Fix `redactExpiredActivityEvents()` in `src/modules/audit/repository.ts` to null only
+- [X] T046 Fix `redactExpiredActivityEvents()` in `src/modules/audit/repository.ts` to null only
       the 🔴/⚫-classified payload keys for a given `event_type`, not the whole `payload` object —
       currently a no-op for `application.state_changed` (neither `fromState` nor `toState` is
       classified sensitive), correcting the destruction of accountability data FR-0.13/G-D8
       require to survive redaction. Update `tests/unit/audit/payload-allowlist.test.ts`'s
       retention-redaction test to assert the payload is unchanged for this event_type, and add a
-      second case with a classified key once any exists (contradicts, per FR-0.13/G-D8)
+      second case with a classified key once any exists (contradicts, per FR-0.13/G-D8). Also
+      corrected the `activityevent_append_only_update` RLS policy's `WITH CHECK`, which hardcoded
+      `payload = '{}'::jsonb` (matching the bug) and would have rejected the fix — now mirrors
+      `USING`'s eligibility gate, matching this project's established single-enforcement-point
+      precedent for payload shape (research.md §4) rather than duplicating REDACTABLE_KEYS in SQL.
+      Verified against the live database: 29/29 tests pass, `npm run verify` and
+      `check-refs.sh` both clean.

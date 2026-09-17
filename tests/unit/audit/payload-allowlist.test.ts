@@ -41,10 +41,13 @@ describe("ActivityEvent payload allowlist (FR-0.14, EC-0.5, G-D7)", () => {
   });
 });
 
-// FR-0.13/G-D8: end-of-retention redaction clears payload but leaves structure, timestamps, and
-// the actor/action-kind chain readable.
+// FR-0.13/G-D8: end-of-retention redaction nulls only the 🔴/⚫-classified payload keys for an
+// event_type, leaving everything else — structure, timestamps, the actor/action-kind chain, and
+// any non-sensitive key — readable. Fixed 2026-09-17 (/speckit-converge T046): this test
+// originally asserted the payload became `{}` entirely, which was the bug, not the spec — see
+// src/modules/audit/repository.ts's REDACTABLE_KEYS comment for the full history.
 describe("ActivityEvent retention redaction (FR-0.13, EC-0.6, G-D8)", () => {
-  it("clears payload on events referencing an Application past its retention_until, keeps the rest readable", async () => {
+  it("leaves application.state_changed's payload untouched — fromState/toState are state names, not personal data, so nothing is classified sensitive for this event_type", async () => {
     const householdId = uuid();
     const profileId = uuid();
     const pastDate = new Date(Date.now() - 200 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
@@ -76,20 +79,65 @@ describe("ActivityEvent retention redaction (FR-0.13, EC-0.6, G-D8)", () => {
       }),
     );
 
-    await withSessionContext({ householdId, residentProfileId: profileId }, (tx) =>
-      redactExpiredActivityEvents(tx),
+    const redactedCount = await withSessionContext(
+      { householdId, residentProfileId: profileId },
+      (tx) => redactExpiredActivityEvents(tx),
     );
 
-    const [redacted] = await withSessionContext(
+    // Nothing classified sensitive for this event_type — correctly a no-op, not a partial clear.
+    expect(redactedCount).toBe(0);
+
+    const [afterRedaction] = await withSessionContext(
       { householdId, residentProfileId: profileId },
       (tx) => tx.select().from(activityEvent).where(eq(activityEvent.id, event.id)),
     );
 
-    expect(redacted.payload).toEqual({});
-    // Structure, timestamps, and the actor/action-kind chain stay readable.
-    expect(redacted.id).toBe(event.id);
-    expect(redacted.eventType).toBe("application.state_changed");
-    expect(redacted.actorProfileId).toBe(profileId);
-    expect(redacted.occurredAt).toBeInstanceOf(Date);
+    // The accountability data (what state it moved from/to) survives, exactly as FR-0.13's own
+    // rationale requires ("die Rechenschaftskette ist noch lesbar") — plus structure/timestamps.
+    expect(afterRedaction.payload).toEqual({ fromState: "new", toState: "archived" });
+    expect(afterRedaction.id).toBe(event.id);
+    expect(afterRedaction.eventType).toBe("application.state_changed");
+    expect(afterRedaction.actorProfileId).toBe(profileId);
+    expect(afterRedaction.occurredAt).toBeInstanceOf(Date);
+  });
+
+  it("does not touch events referencing an Application whose retention has not yet expired", async () => {
+    const householdId = uuid();
+    const profileId = uuid();
+    const futureDate = new Date(Date.now() + 200 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+
+    const [activeApplication] = await withSessionContext(
+      { householdId, residentProfileId: profileId },
+      (tx) =>
+        tx
+          .insert(application)
+          .values({
+            householdId,
+            state: "new",
+            createdByAccountId: uuid(),
+            createdByProfileId: profileId,
+            retentionUntil: futureDate,
+          })
+          .returning(),
+    );
+
+    await withSessionContext({ householdId, residentProfileId: profileId }, (tx) =>
+      recordActivityEvent(tx, {
+        householdId,
+        eventType: "application.state_changed",
+        subjectType: "application",
+        subjectId: activeApplication.id,
+        actorAccountId: null,
+        actorProfileId: profileId,
+        payload: { fromState: "new", toState: "screened" },
+      }),
+    );
+
+    const redactedCount = await withSessionContext(
+      { householdId, residentProfileId: profileId },
+      (tx) => redactExpiredActivityEvents(tx),
+    );
+
+    expect(redactedCount).toBe(0);
   });
 });

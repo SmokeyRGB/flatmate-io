@@ -38,10 +38,22 @@ export const activityEvent = pgTable(
     // tests/unit/audit/payload-allowlist.test.ts's retention-redaction test failing against the
     // live database (2026-09-16). USING scopes which existing rows may be targeted (only ones
     // whose Application has actually passed retention_until — the same condition
-    // redactExpiredActivityEvents() already checks, not a new bypass); WITH CHECK scopes the
-    // resulting row (payload must become exactly empty). Everything else — tampering with
-    // event_type, actor fields, or redacting before retention is up — stays denied, under raw
-    // SQL and (via FORCE ROW LEVEL SECURITY) the table-owning migration role too.
+    // redactExpiredActivityEvents() already checks, not a new bypass). Everything else —
+    // tampering with event_type/actor fields, or redacting before retention is up — stays denied,
+    // under raw SQL and (via FORCE ROW LEVEL SECURITY) the table-owning migration role too.
+    //
+    // `withCheck` here (2026-09-17, /speckit-converge T046) mirrors `using` exactly, rather than
+    // being omitted: a second draft used `withCheck: payload = '{}'::jsonb`, matching this
+    // schema's first (also wrong) redaction implementation, which cleared the whole payload. The
+    // corrected redaction only nulls the specific keys a future event_type registers as
+    // sensitive — a shape RLS's WITH CHECK cannot express (it sees only the new row, never the
+    // old one, so it can't verify "only these keys changed, and only to null"). Encoding that
+    // shape as a second, SQL-side copy of REDACTABLE_KEYS would also contradict this project's
+    // own established precedent (research.md §4: payload-shape enforcement is deliberately
+    // single-point, app-layer only, to avoid "the same rule in two places, now drifted"). Mirroring
+    // `using` is Postgres's own documented default when `withCheck` is omitted — written out
+    // explicitly here because `drizzle-kit generate`'s diff did not reliably pick up an *omitted*
+    // `withCheck` as a change when this was tried.
     pgPolicy("activityevent_append_only_update", {
       as: "restrictive",
       for: "update",
@@ -52,7 +64,13 @@ export const activityEvent = pgTable(
           AND application.retention_until IS NOT NULL
           AND application.retention_until < now()
       )`,
-      withCheck: sql`payload = '{}'::jsonb`,
+      withCheck: sql`EXISTS (
+        SELECT 1 FROM application
+        WHERE application.id = activity_event.subject_id
+          AND activity_event.subject_type = 'application'
+          AND application.retention_until IS NOT NULL
+          AND application.retention_until < now()
+      )`,
     }),
     pgPolicy("activityevent_append_only_delete", {
       as: "restrictive",

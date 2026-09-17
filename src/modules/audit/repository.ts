@@ -64,26 +64,46 @@ export async function recordActivityEvent(tx: Tx, input: RecordEventInput) {
   return row;
 }
 
-// FR-0.13: end-of-retention redaction. Clears payload (this F0 slice registers no event_type
-// with a non-sensitive payload field to preserve — see PAYLOAD_ALLOWLIST above) while leaving
-// id/occurred_at/event_type/actor fields readable, on ActivityEvent rows whose referenced
-// Application has passed its retention_until (docs/domain/casting.md §7).
-export async function redactExpiredActivityEvents(tx: Tx): Promise<number> {
-  const result = await tx
-    .update(activityEvent)
-    .set({ payload: {} })
-    .where(
-      and(
-        eq(activityEvent.subjectType, "application"),
-        sql`${activityEvent.subjectId} IN (
-          SELECT ${application.id} FROM ${application}
-          WHERE ${application.retentionUntil} IS NOT NULL
-            AND ${application.retentionUntil} < now()
-        )`,
-        sql`${activityEvent.payload} <> '{}'::jsonb`,
-      ),
-    )
-    .returning({ id: activityEvent.id });
+// FR-0.13/G-D8: end-of-retention redaction — "die personenbeziehbaren Payload-Felder [werden]
+// `null`", i.e. only the specific keys classified 🔴/⚫ per event_type, not the whole object.
+// Everything else in the payload is exactly the accountability data FR-0.13 requires to survive
+// ("die Rechenschaftskette ist noch lesbar"). `application.state_changed`'s keys (`fromState`,
+// `toState`) are state names, not personal data, so it has none registered — redaction is
+// correctly a no-op for this slice's one event_type, not a bug to "fix" by clearing them anyway.
+//
+// Fixed 2026-09-17 (/speckit-converge T046): the first implementation set `payload = {}`
+// unconditionally, which destroyed `fromState`/`toState` — exactly the state-transition history
+// this function exists to preserve. Caught by re-reading FR-0.13/G-D8 against the code, not by
+// the test that was passing at the time (it asserted the wrong behavior; corrected alongside).
+const REDACTABLE_KEYS: Readonly<Record<string, readonly string[]>> = {
+  "application.state_changed": [],
+};
 
-  return result.length;
+export async function redactExpiredActivityEvents(tx: Tx): Promise<number> {
+  let redactedCount = 0;
+
+  for (const [eventType, keys] of Object.entries(REDACTABLE_KEYS)) {
+    if (keys.length === 0) continue; // nothing classified sensitive for this event_type — nothing to null
+
+    const nullPatch = Object.fromEntries(keys.map((key) => [key, null]));
+    const result = await tx
+      .update(activityEvent)
+      .set({ payload: sql`${activityEvent.payload} || ${JSON.stringify(nullPatch)}::jsonb` })
+      .where(
+        and(
+          eq(activityEvent.eventType, eventType),
+          eq(activityEvent.subjectType, "application"),
+          sql`${activityEvent.subjectId} IN (
+            SELECT ${application.id} FROM ${application}
+            WHERE ${application.retentionUntil} IS NOT NULL
+              AND ${application.retentionUntil} < now()
+          )`,
+        ),
+      )
+      .returning({ id: activityEvent.id });
+
+    redactedCount += result.length;
+  }
+
+  return redactedCount;
 }
