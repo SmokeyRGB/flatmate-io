@@ -52,8 +52,9 @@ tatsächlich verhalten — nicht, was einzelne Köpfe über sich behaupten.
 | **3** | `03-PRD.md` | Nutzerflüsse, Akzeptanzkriterien, Score- und Quorum-Rechnung. Jeder Unterabschnitt von §4/§6 trägt eine `Band:`-Zeile |
 | **4** | `06-Compliance-Anhang.md` | Bindend für alles, was personenbezogene Daten berührt |
 | **5** | `07-Screen-Inventar.md` · `08-UX-Entscheidungen.md` | Die UI-Schicht. **Sie darf `02`, `03` und `04` korrigieren** — das ist U-7, und die drei werden dann nachgezogen, nicht umgekehrt |
-| **6** | `domain/` · `adr/` | Schema und Architektur. Neun ADRs sind `Bestätigt — verbindlich für v0.1`; fünf stehen weiter auf `Vorschlag — anfechtbar` und sind verhandelbar |
-| **7** | `00-Session-Brief.md` | **Nur historisch.** Verliert gegen jedes spätere Dokument — die Kette hat ihn beim Verfügbarkeits-Link ausdrücklich überstimmt (`02-SRD.md` §11 O-08) |
+| **6** | `09-Design-System.md` | Farbpalette (hell/dunkel), Typografie, Abstände, Formen und Komponentenmuster der Oberfläche — abgeleitet aus dem Lovable-Clickthrough in `prototype/` (siehe §4, dort nur als Designreferenz, nie als Implementierung zu verwenden). Bindet ausschließlich die visuelle Umsetzung, nie Scope, Flows oder Anforderungen; bei Widerspruch zu `07`/`08` gewinnt die UX-Entscheidung, `09` wird nachgezogen |
+| **7** | `domain/` · `adr/` | Schema und Architektur. Neun ADRs sind `Bestätigt — verbindlich für v0.1`; fünf stehen weiter auf `Vorschlag — anfechtbar` und sind verhandelbar |
+| **8** | `00-Session-Brief.md` | **Nur historisch.** Verliert gegen jedes spätere Dokument — die Kette hat ihn beim Verfügbarkeits-Link ausdrücklich überstimmt (`02-SRD.md` §11 O-08) |
 
 > **Warum der Session-Brief zuletzt steht.** Sechs Dokumentenköpfe nannten ihn bis 2026-09-09
 > „verbindliche Quelle". Er ist vom 2026-08-19; die Kette steht bei V0.5/V0.6, und zwei

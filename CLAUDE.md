@@ -62,8 +62,9 @@ bun run format    # prettier --write .
 3. `docs/03-PRD.md` — user flows, acceptance criteria, score/quorum computation
 4. `docs/06-Compliance-Anhang.md` — binding for anything touching personal data
 5. `docs/07-Screen-Inventar.md` / `docs/08-UX-Entscheidungen.md` — the UI layer; may correct `02`/`03`/`04` (those are then updated to match, never the reverse)
-6. `docs/domain/` / `docs/adr/` — schema and architecture
-7. `docs/00-Session-Brief.md` — historical only, loses to everything later
+6. `docs/09-Design-System.md` — visual tokens only (colors, typography, spacing, components), derived from `prototype/` (design reference only, never implementation); binds visual work but never scope/flows/requirements, and yields to `07`/`08` on conflict
+7. `docs/domain/` / `docs/adr/` — schema and architecture
+8. `docs/00-Session-Brief.md` — historical only, loses to everything later
 
 ### ID registry — one authoritative file per ID family
 
