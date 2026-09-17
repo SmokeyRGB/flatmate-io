@@ -172,8 +172,9 @@ independently once a household, residents, and rooms exist.
 **Independent Test**: Can be fully tested by exercising the resident list as administration and as
 a moderator profile (both full access, since 2026-09-17 — U-30), as a non-moderator profile (no
 route reaches it), and as any resident via the separate, reduced "who lives here" view (current
-members' names only, no actions) — and by confirming a profile-less administration session cannot
-reach casting rounds, applications, votes, slots, appointments, or casting notes by any route.
+members' names only, no actions) — and by confirming a profile-less administration session reaches
+only a casting round's identity/lifecycle fields, never applications, votes, slots, appointments,
+casting notes, or anything else derived from `Application`, by any route (ADR-014).
 
 **Acceptance Scenarios**:
 
@@ -199,9 +200,12 @@ reach casting rounds, applications, votes, slots, appointments, or casting notes
 6. **Given** a member is removed, set `moved_out`, or reactivated on the resident list, **When**
    the audit record is inspected, **Then** it names both the account and the acting profile
    (AC-1.23, FR-1.30).
-7. **Given** I am acting without a resident profile, **When** I request a casting round,
-   application, vote, slot, appointment, or casting note by any route, **Then** access is refused
-   (AC-1.16, FR-1.23).
+7. **Given** I am acting without a resident profile, **When** I request a casting round's identity
+   or lifecycle fields (existence, `title`, `status`, `room_ids`, timestamps, retention fields),
+   **Then** access is granted; **when** I request anything else — an application, a vote, a slot,
+   an appointment, a casting note, or anything derived from `Application` including via a casting
+   round (count, participation, score, ranking) — by any route, **then** access is refused
+   (AC-1.16, FR-1.23, ADR-014).
 8. **Given** I am acting without a resident profile, **When** I produce a subject-access export,
    **Then** the export is produced and its contents are not displayed to me (AC-1.17, FR-1.24).
 
@@ -342,8 +346,12 @@ groups them:
 **Administration boundary**
 
 - **FR-1.23**: *"An account acting without an active resident profile shall reach household
-  administration only — rooms, members, join code, procedure rules, retention — and shall not
-  reach casting rounds, applications, votes, slots, appointments or casting notes."*
+  administration only — rooms, members, join code, procedure rules, retention — plus a
+  `CastingRound`'s identity and lifecycle only: existence, `title`, `status`, `room_ids`,
+  timestamps and retention fields. It shall not reach anything derived from `Application` —
+  explicitly including counts, participation, score or ranking — and shall not reach
+  `Application`, `Slot`, `Appointment` or `CastingNote` at all."* (Source: S-50, as narrowed by
+  ADR-014.)
 - **FR-1.24**: *"Two exceptions to FR-1.23 remain available to administration: retention actions,
   and producing a subject-access export without displaying its contents."*
 
@@ -383,8 +391,9 @@ the user stories above:
   quorum share, the hidden-results setting, and the favourite-budget settings (AC-1.9, C-1.1).
 - **SC-004**: Zero routes exist through which a profile without moderator rights can reach the
   resident list, and zero routes exist through which a profile-less administration session can
-  reach casting rounds, applications, votes, slots, appointments, or casting notes (AC-1.21,
-  AC-1.16).
+  reach an application, a vote, a slot, an appointment, a casting note, or anything derived from
+  `Application` — a profile-less session is limited to a casting round's identity/lifecycle fields
+  only (AC-1.21, AC-1.16, ADR-014).
 - **SC-005**: 100% of casting-round, room, and resident-list state changes produce an audit entry
   naming both the acting account and the acting profile (AC-1.19, AC-1.23).
 

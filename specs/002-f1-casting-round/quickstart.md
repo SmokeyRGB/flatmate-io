@@ -53,8 +53,8 @@ in its place.
 ## 3. Opening a round: atomic snapshot + frozen rules (US3, FR-1.12–FR-1.22, AC-1.8–AC-1.14)
 
 ```bash
-vitest run tests/integration/policy/round-open.test.ts   # not yet created — this feature's own
-vitest run tests/integration/raw-sql/round-open.test.ts  # atomicity + frozen-settings assertions
+vitest run tests/integration/policy/round-open-atomicity.test.ts
+vitest run tests/unit/casting/quorum-denominator.test.ts
 ```
 
 **Expected**: opening a round with 7 eligible residents produces exactly 7
@@ -62,8 +62,11 @@ vitest run tests/integration/raw-sql/round-open.test.ts  # atomicity + frozen-se
 `HouseholdSettings.quorum_share` after opening does not change the now-`closed`-over
 `settings_snapshot` value the open round reads (AC-1.9); a forced mid-open failure (simulated) — a
 transaction rollback test — leaves the round in `draft` with zero `RoundParticipation` rows and no
-`settings_snapshot` (AC-1.10, FR-1.16); a resident joining after opening does not change the
-denominator until manually added (AC-1.11/AC-1.12); attempting to change any of the four locked
+`settings_snapshot` (AC-1.10, FR-1.16); a resident joining after an open round claims their
+profile is added automatically, marked `joined_after_open`, growing the denominator immediately —
+not gated on a moderator (AC-1.11/AC-1.12, revised 2026-09-17 — see `spec.md`'s Clarifications);
+`addResidentToRound` remains as a moderator's manual-correction fallback, marked `added_manually`.
+Attempting to change any of the four locked
 settings while a round is `open` is refused and the error names the open round (AC-1.13); the same
 change forced through an administrative bypass path is recorded as an `ActivityEvent` and
 surfaces as a notice on the round (AC-1.14).
@@ -83,20 +86,27 @@ from `pending` to `implemented`. Both the policy-layer call and the raw-SQL quer
 ## 4. Resident list and the administration boundary (US4, FR-1.23–FR-1.30, AC-1.16–AC-1.23)
 
 ```bash
-vitest run tests/integration/policy/resident-list.test.ts
-vitest run tests/integration/raw-sql/resident-list.test.ts
+vitest run tests/integration/policy/resident-list-access.test.ts
+vitest run tests/integration/policy/resident-list-audit.test.ts
 ```
 
-**Expected**: administration has full access (list + remove/moved_out/reactivate/join-code
-actions); a moderator profile sees the same list with zero action controls (AC-1.20); a
-non-moderator profile's request is refused by every route tried, not just the primary one
-(AC-1.21); a single-member household's resident-list screen leads with the join-code action
-instead of an empty list (AC-1.22); every removal/`moved_out`/reactivation writes an
-`ActivityEvent` naming both account and acting profile (AC-1.23).
+**Expected**: administration and a moderator profile see identical full access — list plus
+set-`moved_out`/typed-confirmation-`remove`/reactivate/join-code actions (AC-1.20, revised
+2026-09-17 — full parity, U-30); a non-moderator profile's request is refused by every route
+tried, not just the primary one (AC-1.21); a single-member household's resident-list screen leads
+with the join-code action instead of an empty list (AC-1.22); every removal/`moved_out`/
+reactivation writes an `ActivityEvent` naming both account and acting profile (AC-1.23).
+
+```bash
+vitest run tests/unit/identity/current-household-members.test.ts
+```
+
+**Expected**: a resident (any active profile) reads the reduced "who lives here" view (FR-1.31,
+screen B5) — current (`active`) members' display names only, no actions, no contact detail, no
+join dates; a profile-less session is refused.
 
 ```bash
 vitest run tests/integration/policy/admin-boundary.test.ts
-vitest run tests/integration/raw-sql/admin-boundary.test.ts
 ```
 
 **Expected**: a profile-less session's request for `Application`, `Vote`, `Slot`, `Appointment`,
