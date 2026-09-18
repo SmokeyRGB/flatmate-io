@@ -39,12 +39,11 @@ export async function registerTestHousehold(): Promise<TestHousehold> {
     // the household alone orphaned the casting rows silently — which is how the production project
     // accumulated 1.9k rooms and 1.5k rounds before anyone noticed.
     //
-    // Data-modifying CTEs rather than ten sequential deletes because tests call this in a finally
-    // inside the it() body, so teardown spends the test's own timeout budget. On a GitHub runner
-    // each round trip to eu-west-1 is expensive enough that ten of them, times the ~45 tests that
-    // register a household, added ~90s to the suite. Postgres runs every data-modifying CTE
-    // exactly once and to completion whether or not the primary query reads it, and with no FKs
-    // between these tables their order does not matter.
+    // Data-modifying CTEs rather than ten sequential deletes: on a GitHub runner each round trip
+    // to eu-west-1 is expensive enough that ten of them, times the ~35 tests that register a
+    // household, added ~90s to the suite even from afterEach. Postgres runs every data-modifying
+    // CTE exactly once and to completion whether or not the primary query reads it, and with no
+    // FKs between these tables their order does not matter.
     //
     // activity_event is deliberately absent: FR-0.13 makes it append-only, enforced by RESTRICTIVE
     // policies plus FORCE ROW LEVEL SECURITY, so this transaction could not delete it anyway.
@@ -73,4 +72,20 @@ export async function registerTestHousehold(): Promise<TestHousehold> {
 // household's own).
 export async function deleteTestAccount(accountId: string): Promise<void> {
   await adminClient().auth.admin.deleteUser(accountId);
+}
+
+// Runs every afterEach cleanup task to completion, even if one rejects, so a failure in one
+// household's teardown can never suppress another's (see proposal.md — sequential cleanup was
+// exactly how orphaned rows went unnoticed). Takes already-started promises rather than thunks:
+// call sites read as `cleanupAll(...accountIds.map(deleteTestAccount), hhA?.cleanup())`, and
+// Promise.allSettled attaches a handler to each in the same synchronous turn as this call, so
+// there is no window for an unhandled rejection. Concurrency is safe here — the tables have no
+// foreign keys between them, each cleanup is scoped to its own household_id, and the Supabase
+// Auth users involved are always distinct.
+export async function cleanupAll(...tasks: Array<Promise<unknown> | undefined>): Promise<void> {
+  const results = await Promise.allSettled(tasks.filter((task) => task !== undefined));
+  const reasons = results.filter((r) => r.status === "rejected").map((r) => r.reason);
+  if (reasons.length > 0) {
+    throw new AggregateError(reasons, "test cleanup failed");
+  }
 }

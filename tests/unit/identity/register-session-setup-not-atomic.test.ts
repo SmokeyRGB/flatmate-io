@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import { withSessionContext } from "@/db/session-context";
 import { account, household, householdSettings, membership, session } from "@/modules/identity/schema";
 import { registerHousehold, signIn, undoRegisterHousehold } from "@/modules/identity/auth";
-import { deleteTestAccount, testEmail } from "../../helpers/identity";
+import { cleanupAll, deleteTestAccount, testEmail } from "../../helpers/identity";
 
 // speckit-bug-fix register-action-not-atomic-with-signin: registerHousehold commits the Auth
 // user/Household/HouseholdSettings/Account/Membership before signIn ever runs. If signIn fails
@@ -19,7 +19,7 @@ describe("register: compensating cleanup when session setup fails", () => {
     } else {
       process.env.SESSION_TOKEN_HASH_SECRET = originalSecret;
     }
-    for (const id of accountIds) await deleteTestAccount(id);
+    await cleanupAll(...accountIds.map(deleteTestAccount));
     accountIds.length = 0;
   });
 
