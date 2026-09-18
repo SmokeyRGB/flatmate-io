@@ -19,10 +19,10 @@ rule that was written down into a rule that fails loudly.
 
 ---
 
-## `check-refs.sh` — do the cross-references still point at something real?
+## `check-refs.ts` — do the cross-references still point at something real?
 
 ```bash
-bash tools/check-refs.sh
+node tools/check-refs.ts
 ```
 
 The specification is eight documents that cite each other roughly 120 times, by filename and by
@@ -45,12 +45,29 @@ Seven rules. Each exists because that specific failure has already happened at l
 Useful flags:
 
 ```bash
-bash tools/check-refs.sh --only 3        # run a single rule
-bash tools/check-refs.sh --quiet         # counts only, no detail
-bash tools/check-refs.sh --scope docs    # the handover dry run: check docs/ in isolation
+node tools/check-refs.ts --only 3        # run a single rule
+node tools/check-refs.ts --quiet         # counts only, no detail
+node tools/check-refs.ts --scope docs    # the handover dry run: check docs/ in isolation
 ```
 
 Exit code is non-zero if anything failed, so it works as a gate.
+
+**Why it runs on plain `node`.** Both tools were Bash until they became unusable on Windows:
+`check-refs.sh` took **3m10s**, of which 2m12s was *system* time — Git Bash emulating `fork()`
+across ~4,300 process spawns, not the checking itself. Rule 2 alone accounted for 87% of the run,
+because it shelled out twice per citation and then walked the whole repo once per unique
+filename. Rewritten in TypeScript, every file is read once and rule 2's ~106 full-tree walks
+become one walk into a `Set`: **0.9s**, the same output byte for byte.
+
+The rewrite also fixed a correctness bug. Rule 2's old existence test —
+`find . -name "$n" -print -quit 2>/dev/null | grep -q .` — intermittently reported "not found"
+for files that plainly existed, with `2>/dev/null` swallowing any explanation. Under concurrent
+I/O it produced 20 false "DANGLING NAME" findings in one run and none in the next two, on an
+unchanged tree. A gate that fails at random and blames real files is a gate someone eventually
+disables. The `Set` lookup is deterministic by construction.
+
+Node 24 strips the types natively, so this stays a zero-dependency check: whoever receives
+`docs/` + `tools/` can validate the package with nothing installed but Node.
 
 **Deliberately not checked:** anything under `archive/` or `docs/_logs/`. Those are historical
 records. Their references were accurate on the day they were written, and rewriting a historical
@@ -59,17 +76,17 @@ table instead.
 
 ---
 
-## `done-check.sh` — is plan-sprint-v0.1 actually finished?
+## `done-check.ts` — is plan-sprint-v0.1 actually finished?
 
 ```bash
-bash tools/done-check.sh
+node tools/done-check.ts
 ```
 
-`check-refs.sh` asks *"is the tree consistent?"*. This one asks *"is the work done?"* — five
+`check-refs.ts` asks *"is the tree consistent?"*. This one asks *"is the work done?"* — six
 conditions that must all hold before this branch merges into `main`. It is written to fail today
 and pass at the end; that is the point of writing it first.
 
-The five conditions are listed in the script itself, each with the reason it is there.
+The six conditions are listed in the script itself, each with the reason it is there.
 
 ---
 

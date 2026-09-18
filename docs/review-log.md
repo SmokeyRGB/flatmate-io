@@ -48,7 +48,7 @@ Der Befund im Einzelnen, Stand 2026-09-09:
 5. **Offene Zeilen tragen keine Auszeichnung.** Damit zählt `grep -c '^| \*\*O-'` die
    tatsächlich offenen.
 
-Durchgesetzt wird das von **G-N5** (`GUARDRAILS.md`) und geprüft von `tools/done-check.sh`.
+Durchgesetzt wird das von **G-N5** (`GUARDRAILS.md`) und geprüft von `tools/done-check.ts`.
 
 ### ⚠ Zwei Nummernräume, die sich fast berühren
 

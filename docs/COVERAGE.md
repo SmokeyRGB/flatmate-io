@@ -72,7 +72,7 @@ functional requirement in `F0` §3 now has one.
 already implemented its participant list. But **none of them names S-05**, because the packets'
 convention is that only Constraints carry a `Source:` line. So a tool cannot follow a scope line
 to its requirements by reading the requirements — only the packet header's `Scope lines:` list
-and this table record the connection. That is why `tools/done-check.sh` cross-checks the ids
+and this table record the connection. That is why `tools/done-check.ts` cross-checks the ids
 named here against the packet they are attributed to: the mapping lives in one place, and a drift
 between it and the packet fails the build rather than going unnoticed.
 
@@ -120,7 +120,7 @@ level too.
 
 Two checks enforce this file rather than trusting it:
 
-- **`tools/done-check.sh` section 6** asserts that all 25 v0.1 scope lines appear in this file,
+- **`tools/done-check.ts` section 6** asserts that all 25 v0.1 scope lines appear in this file,
   that every one resolves to a packet and an `FR-`/`AC-` id, and that no row is marked `gap`.
 - **`GUARDRAILS.md` G-N2** asserts that every packet requirement cites a scope line that actually
   exists in `02-SRD.md` §5.3 — the reverse direction of this file's own check, so a stale or

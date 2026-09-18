@@ -4,7 +4,7 @@
 > **Was das hier ist:** die Übergabegrenze. **`docs/` und `tools/` zusammen kopiert sind alles,
 > was eine Implementierung braucht** — und nichts darüber hinaus. `tools/` gehört dazu, weil
 > dieser Ordner die beiden Prüfskripte durchgehend zitiert; ohne sie sind die Zusicherungen
-> hier Behauptungen. Regel 7 von `tools/check-refs.sh` erzwingt den Rest: kein Verweis aus
+> hier Behauptungen. Regel 7 von `tools/check-refs.ts` erzwingt den Rest: kein Verweis aus
 > `docs/` führt nach `coursework/`, `archive/`, `research/` oder `process/`.
 > **Sprachregelung:** Begründungsdokumente deutsch, implementierungsnahe Dokumente englisch
 > (ADR-012 samt benannter Ausnahme).
@@ -181,7 +181,7 @@ dieser Reihenfolge:
 Der dritte Grund ist heute der kleinste — aber die **Regel** dahinter ist der eigentliche Nutzen:
 Regel 3 verhindert, dass **neue** Zeilennummern-Verweise in lebende Dokumente entstehen.
 
-Deshalb: `tools/check-refs.sh` Regel 3 erlaubt `:LINE`-Verweise **ausschließlich** hierher, Regel
+Deshalb: `tools/check-refs.ts` Regel 3 erlaubt `:LINE`-Verweise **ausschließlich** hierher, Regel
 4 prüft die drei Dateien per Hash — über ihren **Inhalt**, mit vorher entfernten
 Wagenrückläufen, damit derselbe Hash auf einem Windows-Checkout (CRLF) und auf Linux/CI (LF)
 gilt. Eine gewollte Änderung heißt, den Hash im selben Commit mitzuführen — das macht die
@@ -211,8 +211,8 @@ vier liegen im Schnitt.
 ## 6. Prüfen
 
 ```bash
-bash tools/check-refs.sh     # sind die Querverweise noch heil?  (7 Regeln)
-bash tools/done-check.sh     # ist plan-sprint-v0.1 fertig?           (6 Abschnitte)
+node tools/check-refs.ts     # sind die Querverweise noch heil?  (7 Regeln)
+node tools/done-check.ts     # ist plan-sprint-v0.1 fertig?           (6 Abschnitte)
 ```
 
 Beide erklären sich selbst; `tools/README.md` sagt in einfacher Sprache, warum jede Regel
