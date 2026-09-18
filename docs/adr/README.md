@@ -97,7 +97,7 @@ Regel 3 existiert. Ab ADR-013 trägt jeder Record seine Umkehrbarkeit dort, wo s
 steht: in der **Aufgabebedingung** und in der **Kostenzeile** des Bestätigungsvermerks. Ein Symbol
 sagt „schwer"; die Kostenzeile sagt, *was* schwer ist.
 
-Durchgesetzt statt versprochen: `tools/check-refs.sh` Regel 5 prüft, dass jede zitierte
+Durchgesetzt statt versprochen: `tools/check-refs.ts` Regel 5 prüft, dass jede zitierte
 `ADR-NNN` auf **genau eine** Datei hier auflöst — eine in einer Spezifikation zitierte Nummer
 ohne Record dahinter fällt damit auf, und ebenso ein Record, der versehentlich in zwei Dateien
 zerfällt. Regel 4 prüft die Sammeldatei per Inhalts-Hash (zeilenendungsunabhängig). **G-N3** in `../GUARDRAILS.md` verbietet

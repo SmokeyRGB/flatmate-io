@@ -2,7 +2,7 @@
 
 > ❄️ **Eingefroren am 2026-09-09.** Momentaufnahme des Planungsstands V0.4. Die **gepflegte**
 > Fassung liegt in `domain/` — aufgeteilt nach den sechs Bounded Contexts aus §4. **Änderungen an dieser Datei sind nicht zulässig**;
-> `tools/check-refs.sh` erkennt sie per Hash (Regel 4).
+> `tools/check-refs.ts` erkennt sie per Hash (Regel 4).
 >
 > **Warum die Datei bleibt:** Verweise mit Zeilennummer sind nur in eine eingefrorene Datei
 > dauerhaft zitierfähig. Regel 3 des Prüfskripts erlaubt `:LINE`-Verweise ausschließlich hierher

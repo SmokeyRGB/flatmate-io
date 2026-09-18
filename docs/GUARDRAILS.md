@@ -1216,7 +1216,7 @@ Regel 1 und 3 der Register-Konvention und beabsichtigt: die Begründung, warum e
 entschieden wurde, gehört dorthin, wo die Frage gestellt wurde. Wer diese Texte entfernt, um
 „Status nur im Register" wörtlich zu nehmen, zerstört den wertvolleren Teil.
 
-**Grenze der Durchsetzung.** `tools/done-check.sh` prüft die eine Richtung, die maschinell
+**Grenze der Durchsetzung.** `tools/done-check.ts` prüft die eine Richtung, die maschinell
 prüfbar ist: **jede unausgezeichnete offene Zeile muss im Register stehen.** Es prüft **nicht**,
 ob eine als geschlossen markierte Zeile zu Recht so markiert ist — dafür müsste es den
 Auflösungstext verstehen. Diese Hälfte bleibt Review-Arbeit.

@@ -9,7 +9,7 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
-    "verify": "eslint && tsx scripts/lint/session-context.ts && tsx scripts/lint/import-boundary.ts && tsx scripts/lint/rls-coverage.ts && tsx scripts/lint/guarded-tests.ts && vitest run",
+    "verify": "eslint && tsx scripts/lint/session-context.ts && tsx scripts/lint/import-boundary.ts && tsx scripts/lint/rls-coverage.ts && tsx scripts/lint/guarded-tests.ts && node tools/check-refs.ts --quiet && vitest run",
     "seed:demo": "tsx --env-file=.env.local scripts/seed-demo-household.ts",
     "prepare": "husky"
   },

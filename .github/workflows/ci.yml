@@ -72,4 +72,7 @@ jobs:
           # needs to match any other environment's secret.
           SESSION_TOKEN_HASH_SECRET: ${{ secrets.SESSION_TOKEN_HASH_SECRET }}
 
-      - run: bash tools/check-refs.sh --quiet
+      # Cross-reference check. Runs on plain `node` — Node 24 strips the types natively, so the
+      # docs/ + tools/ handover package needs no TypeScript toolchain to validate itself.
+      # `npm run verify` above already runs this; kept here as the explicit non-quiet gate.
+      - run: node tools/check-refs.ts

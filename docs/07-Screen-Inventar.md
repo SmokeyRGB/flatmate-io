@@ -2,7 +2,7 @@
 
 > ❄️ **Eingefroren am 2026-09-09.** Momentaufnahme des Planungsstands V0.1. Die **gepflegte**
 > Fassung liegt in `screens/` — aufgeteilt nach den sechs Bildschirmgruppen. **Änderungen an
-> dieser Datei sind nicht zulässig**; `tools/check-refs.sh` erkennt sie per Hash (Regel 4).
+> dieser Datei sind nicht zulässig**; `tools/check-refs.ts` erkennt sie per Hash (Regel 4).
 >
 > **Warum die Datei bleibt:** Verweise mit Zeilennummer sind nur in eine eingefrorene Datei
 > dauerhaft zitierfähig. Regel 3 des Prüfskripts erlaubt `:LINE`-Verweise ausschließlich hierher

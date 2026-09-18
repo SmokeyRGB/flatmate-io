@@ -47,14 +47,14 @@ hook hard-fails the commit.
 Spec cross-reference checks (validate `docs/`, unrelated to the app):
 
 ```bash
-bash tools/check-refs.sh              # validate the spec's ~120 cross-references (7 rules)
-bash tools/check-refs.sh --only 3     # run a single rule
-bash tools/check-refs.sh --quiet      # counts only
-bash tools/check-refs.sh --scope docs # handover dry run: check docs/ in isolation (Rule 7)
-bash tools/done-check.sh              # is plan-sprint-v0.1 finished? (5 conditions)
+node tools/check-refs.ts              # validate the spec's ~120 cross-references (7 rules)
+node tools/check-refs.ts --only 3     # run a single rule
+node tools/check-refs.ts --quiet      # counts only
+node tools/check-refs.ts --scope docs # handover dry run: check docs/ in isolation (Rule 7)
+node tools/done-check.ts              # is plan-sprint-v0.1 finished? (6 conditions)
 ```
 
-Both exit non-zero on failure — run `check-refs.sh` after moving/renaming/editing any file under
+Both exit non-zero on failure — run `check-refs.ts` after moving/renaming/editing any file under
 `docs/`. `tools/README.md` explains why each rule exists.
 
 The `prototype/` app (Lovable/TanStack Start clickthrough, **not** the real product) uses **Bun**,
@@ -139,7 +139,7 @@ vs `O-6` (domain model), `C-1` (content rule) vs `C1` (screen), `EP-D` (epic) vs
 ### Frozen files
 
 `docs/04-Domaenenmodell.md`, `docs/05-ADRs.md`, `docs/07-Screen-Inventar.md` are frozen snapshots,
-hash-checked against `tools/frozen.sha256` (`check-refs.sh` Rule 4, CRLF-normalized so it matches
+hash-checked against `tools/frozen.sha256` (`check-refs.ts` Rule 4, CRLF-normalized so it matches
 on both Windows and CI). Their living counterparts are `docs/domain/`, `docs/adr/`,
 `docs/screens/`. Line-number references (`:LINE`) are **only** permitted into these three frozen
 files (Rule 3) — never into a living document, since edits silently shift what the line points to.

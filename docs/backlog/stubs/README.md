@@ -32,7 +32,7 @@ undetailed is fine — every one of these is a placeholder, not a packet. Being 
 These are not requirements. Nothing in this folder is buildable, and nothing here has been
 reviewed against the domain model, the screen inventory or `GUARDRAILS.md`. `docs/COVERAGE.md` is
 the `v0.1` counterpart to this index, and unlike these stubs, it **is** checked — by
-`tools/done-check.sh` section 6 and by `GUARDRAILS.md` G-N2.
+`tools/done-check.ts` section 6 and by `GUARDRAILS.md` G-N2.
 
 ---
 
