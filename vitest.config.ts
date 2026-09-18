@@ -19,8 +19,8 @@ export default defineConfig({
     // a defect is not a gate, it is a coin flip.
     //
     // 60s keeps a genuinely hung test bounded while leaving room for the slowest real test to
-    // triple. Teardown counts toward this budget too: these tests call hh.cleanup() in a finally
-    // inside the it() body, so the timeout covers setup, assertions and cleanup together.
+    // triple. Teardown runs in afterEach, outside this budget, so a hung test can no longer take
+    // its household's cleanup down with it.
     testTimeout: 60000,
   },
   resolve: {

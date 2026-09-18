@@ -39,12 +39,11 @@ export async function registerTestHousehold(): Promise<TestHousehold> {
     // the household alone orphaned the casting rows silently — which is how the production project
     // accumulated 1.9k rooms and 1.5k rounds before anyone noticed.
     //
-    // Data-modifying CTEs rather than ten sequential deletes because tests call this in a finally
-    // inside the it() body, so teardown spends the test's own timeout budget. On a GitHub runner
-    // each round trip to eu-west-1 is expensive enough that ten of them, times the ~45 tests that
-    // register a household, added ~90s to the suite. Postgres runs every data-modifying CTE
-    // exactly once and to completion whether or not the primary query reads it, and with no FKs
-    // between these tables their order does not matter.
+    // Data-modifying CTEs rather than ten sequential deletes: on a GitHub runner each round trip
+    // to eu-west-1 is expensive enough that ten of them, times the ~35 tests that register a
+    // household, added ~90s to the suite even from afterEach. Postgres runs every data-modifying
+    // CTE exactly once and to completion whether or not the primary query reads it, and with no
+    // FKs between these tables their order does not matter.
     //
     // activity_event is deliberately absent: FR-0.13 makes it append-only, enforced by RESTRICTIVE
     // policies plus FORCE ROW LEVEL SECURITY, so this transaction could not delete it anyway.
