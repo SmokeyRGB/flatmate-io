@@ -52,7 +52,15 @@ export async function removeMemberAction(
     if (err instanceof DisplayNameConfirmationMismatchError) {
       return { error: err.message };
     }
-    throw err;
+    // FR-008 / spec.md's Edge Cases (003-remove-resident-modal): unlike this action's siblings,
+    // the remove dialog explicitly promises an inline error for ANY failure — including the
+    // named edge case of the target's membership having already changed (e.g. someone else
+    // already acted on it) — never Next's default crash screen. Deliberately generic (not
+    // err.message): the underlying errors are internal repository messages (e.g. "Membership
+    // not found for account <uuid>"), not written for a moderator to read.
+    return {
+      error: "Could not remove this member — their details may have changed. Refresh and try again.",
+    };
   }
 
   revalidatePath("/members");

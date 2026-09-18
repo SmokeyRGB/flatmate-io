@@ -1,4 +1,4 @@
-import { ArrowLeft, DoorOpen, ShieldCheck, TriangleAlert, UserMinus, UserPlus } from "lucide-react";
+import { ArrowLeft, DoorOpen, ShieldCheck, UserMinus, UserPlus } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { PermissionDeniedError, getHousehold, getResidentList } from "@/modules/identity/repository";
@@ -97,24 +97,29 @@ export default async function MembersPage() {
       <ul className="space-y-3">
         {members.map((m) => (
           <li key={m.id} className="card">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="font-medium">{m.displayName}</span>
-              {m.role === "moderator" && (
-                <span className="badge badge-role">
-                  <ShieldCheck className="size-3" /> Moderation
-                </span>
-              )}
-              {m.status === "moved_out" && (
-                <span className="badge">
-                  <DoorOpen className="size-3" /> moved out
-                </span>
+            <div className="flex items-start justify-between gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="font-medium">{m.displayName}</span>
+                {m.role === "moderator" && (
+                  <span className="badge badge-role">
+                    <ShieldCheck className="size-3" /> Moderation
+                  </span>
+                )}
+                {m.status === "moved_out" && (
+                  <span className="badge">
+                    <DoorOpen className="size-3" /> moved out
+                  </span>
+                )}
+              </div>
+              {canAct && m.accountId && m.status !== "moved_out" && (
+                <RemoveMemberForm accountId={m.accountId} displayName={m.displayName} />
               )}
             </div>
 
             {canAct && m.accountId && (
-              <div className="mt-3 flex flex-wrap items-center gap-2">
+              <div className="mt-3">
                 {m.status !== "moved_out" ? (
-                  <>
+                  <div className="flex flex-wrap items-center gap-2">
                     {/* EC-1.7: administration may appoint (or unappoint) a moderator — a
                         reversible admin toggle, so it's a neutral secondary button, not a
                         destructive-weight link. */}
@@ -136,41 +141,31 @@ export default async function MembersPage() {
                         </button>
                       </form>
                     )}
-                    {/* The two ways a person leaves — both destructive-weight (red); only the
-                        confirmation step (typed name below) communicates which one is dangerous,
-                        not the color, since "moved out" is fully reversible via Reactivate. */}
+                    {/* "Moved out" is reversible (via Reactivate) and gets the same neutral
+                        secondary weight as the role toggle above; red is reserved for the one
+                        irreversible action (Entfernen, the card-corner trash icon). */}
                     <form action={setMovedOutAction}>
                       <input type="hidden" name="accountId" value={m.accountId} />
-                      <button type="submit" className="btn-link text-destructive">
-                        <UserMinus className="mr-1 inline size-3.5" /> Moved out
+                      <button type="submit" className="btn btn-secondary">
+                        <UserMinus className="size-4" /> Moved out
                       </button>
                     </form>
-                    <RemoveMemberForm accountId={m.accountId} displayName={m.displayName} />
-                  </>
+                  </div>
                 ) : (
-                  <form action={reactivateMemberAction}>
-                    <input type="hidden" name="accountId" value={m.accountId} />
-                    <button type="submit" className="btn btn-secondary">
-                      <UserPlus className="size-4" /> Reactivate
-                    </button>
-                  </form>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <form action={reactivateMemberAction}>
+                      <input type="hidden" name="accountId" value={m.accountId} />
+                      <button type="submit" className="btn btn-secondary">
+                        <UserPlus className="size-4" /> Reactivate
+                      </button>
+                    </form>
+                  </div>
                 )}
               </div>
             )}
           </li>
         ))}
       </ul>
-
-      {canAct && (
-        <div className="callout callout-caution">
-          <TriangleAlert className="size-4" />
-          <p>
-            Use &quot;Remove&quot; only for someone who joined via the join code but doesn&apos;t
-            actually live here. For an actual move-out, use &quot;Moved out&quot; instead — it
-            keeps their history and can be reversed with Reactivate.
-          </p>
-        </div>
-      )}
 
       {canAct && (
         <div className="space-y-1 border-t border-border pt-4">
