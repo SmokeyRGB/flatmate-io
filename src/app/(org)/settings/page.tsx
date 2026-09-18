@@ -2,7 +2,7 @@ import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { listRoundsForSession } from "@/modules/casting/repository";
-import { getHouseholdSettings } from "@/modules/identity/repository";
+import { assertIsAdministration, getHouseholdSettings, ResidentListActionDeniedError } from "@/modules/identity/repository";
 import { getCurrentSession } from "@/modules/identity/session-cookie";
 import { SettingsForm } from "./settings-form";
 
@@ -12,6 +12,27 @@ import { SettingsForm } from "./settings-form";
 export default async function SettingsPage() {
   const current = await getCurrentSession();
   if (!current) redirect("/sign-in");
+
+  // O20's access rule (docs/screens/O-organisation.md) is `household_admin` only, "unabhängig von
+  // acting_profile_id" — unlike the mutation action's broader `manage_settings` permission. This
+  // read path had no check at all (Convergence finding), letting any signed-in resident see the
+  // quorum share. Mirrors the members page's own guard-and-render-message pattern below.
+  try {
+    await assertIsAdministration(current.context, current.context.accountId);
+  } catch (err) {
+    if (err instanceof ResidentListActionDeniedError) {
+      return (
+        <div className="mx-auto max-w-md space-y-4 p-6">
+          <Link href="/dashboard" className="back-link">
+            <ArrowLeft className="size-4" /> Dashboard
+          </Link>
+          <h1 className="font-serif text-2xl font-semibold">Household settings</h1>
+          <p className="text-sm text-muted-foreground">This page is for administration only.</p>
+        </div>
+      );
+    }
+    throw err;
+  }
 
   const [settings, rounds] = await Promise.all([
     getHouseholdSettings(current.context),
