@@ -6,7 +6,7 @@ import { assertHasPermission } from "@/modules/identity/repository";
 import { householdSettings, membership, residentProfile } from "@/modules/identity/schema";
 import { application, castingRound, room, roundParticipation } from "./schema";
 import { assertTransitionAllowed, type ApplicationState } from "./transitions";
-import { assertRoomTransitionAllowed, type RoomStatus } from "./room-transitions";
+import { assertF1RoomTransitionAllowed, type RoomStatus } from "./room-transitions";
 
 export interface Actor {
   accountId: string | null;
@@ -139,7 +139,7 @@ export async function transitionRoomStatus(
     if (!current) throw new Error(`Room not found: ${roomId}`);
 
     const fromStatus = current.status;
-    assertRoomTransitionAllowed(fromStatus, toStatus);
+    assertF1RoomTransitionAllowed(fromStatus, toStatus);
 
     const [updated] = await tx
       .update(room)

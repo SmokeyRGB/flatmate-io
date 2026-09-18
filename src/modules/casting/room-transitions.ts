@@ -21,9 +21,9 @@ export const TRANSITIONS: ReadonlyArray<readonly [RoomStatus, RoomStatus]> = [
   ["occupied", "open"],
 ];
 
-// The subset of TRANSITIONS this feature's repository functions actually expose — used by tests
-// to assert the other pairs are declared-but-unreachable, not to gate the transition function
-// itself (which validates against the full table like every other machine in this project).
+// The subset of TRANSITIONS this feature's repository functions actually expose. Enforced by
+// assertF1RoomTransitionAllowed below (F1's repository mutation path), in addition to the full
+// TRANSITIONS shape-check — not a test-only aid.
 export const F1_REACHABLE_TRANSITIONS: ReadonlySet<string> = new Set([
   "planned->open",
   "open->on_hold",
@@ -43,6 +43,17 @@ export class InvalidRoomTransitionError extends Error {
 
 export function assertRoomTransitionAllowed(from: RoomStatus, to: RoomStatus): void {
   if (!TRANSITION_SET.has(`${from}->${to}`)) {
+    throw new InvalidRoomTransitionError(from, to);
+  }
+}
+
+// F1-scoped gate: on top of the general shape-check above, reject anything outside the subset
+// F1's repository is allowed to drive. promised/occupied and their reverses stay declared in
+// TRANSITIONS for the eventual full state machine (F3+, Application.state-driven) but are
+// rejected here.
+export function assertF1RoomTransitionAllowed(from: RoomStatus, to: RoomStatus): void {
+  assertRoomTransitionAllowed(from, to);
+  if (!F1_REACHABLE_TRANSITIONS.has(`${from}->${to}`)) {
     throw new InvalidRoomTransitionError(from, to);
   }
 }
