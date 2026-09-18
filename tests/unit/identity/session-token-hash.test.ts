@@ -11,7 +11,11 @@ describe("hashSessionToken", () => {
   });
 
   afterEach(() => {
-    process.env.SESSION_TOKEN_HASH_SECRET = originalSecret;
+    if (originalSecret === undefined) {
+      delete process.env.SESSION_TOKEN_HASH_SECRET;
+    } else {
+      process.env.SESSION_TOKEN_HASH_SECRET = originalSecret;
+    }
   });
 
   it("is deterministic for the same token", () => {
