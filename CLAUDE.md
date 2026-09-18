@@ -4,16 +4,47 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this repository is
 
-This is the **specification repository** for Flatmate.io, a flat-share (WG) applicant-screening
-and decision tool. There is **no implementation code yet** — no `specs/` directory exists, and
-the only runnable thing in the tree is `prototype/`, a Lovable-generated UI clickthrough used
-purely as a visual reference (its component/color/spacing choices were reverse-derived into
-`docs/09-Design-System.md`). It is explicitly **outside** the handover boundary — see below.
+Flatmate.io is a flat-share (WG) applicant-screening and decision tool. The repo holds both the
+**specification** (`docs/`, the handover package described below) and a **real Next.js
+implementation** (`src/`, `tests/`, `drizzle/`, `scripts/`) being built slice-by-slice from it via
+spec-kit (`specs/001-f0-foundations`, `specs/002-f1-casting-round`, …). `prototype/` is a separate
+Lovable-generated clickthrough used purely as a visual reference for `docs/09-Design-System.md` —
+**never copy its code**, and it is explicitly outside the `docs/` handover boundary.
 
-`docs/` + `tools/` together are **the complete handover package**: everything an implementation
-needs, and nothing more. This is enforced mechanically (see Commands), not by convention.
+`docs/` + `tools/` together are **the complete spec handover package**: everything an
+implementation slice needs, and nothing more. This is enforced mechanically (see Commands), not by
+convention.
 
 ## Commands
+
+Implementation (Next.js app, run from repo root, **npm** not bun/pnpm):
+
+```bash
+npm run dev       # next dev
+npm run build     # next build
+npm run lint       # eslint
+npm test          # vitest run
+npx vitest run tests/unit/casting/room-transitions.test.ts   # single file
+npx vitest run -t "test name substring"                       # single test by name
+npm run verify     # the full gate: lint + session-context + import-boundary + rls-coverage + guarded-tests lints, then vitest run
+npm run seed:demo # tsx --env-file=.env.local scripts/seed-demo-household.ts
+```
+
+`npm run verify` is what CI/pre-push effectively require — run it, not just `npm test`, before
+treating a change as done. The four custom lints under `scripts/lint/` are hand-written checks
+(not eslint plugins), each enforcing one guardrail mechanically:
+
+| Script | Guardrail | What it checks |
+|---|---|---|
+| `import-boundary.ts` | G-C1 / FR-0.1 | only `src/db/` and each module's own `repository.ts` may import the raw Postgres/Drizzle client |
+| `session-context.ts` | G-C8 / FR-0.4 | bare `SET` is never allowed; `SET LOCAL` for session context only in `src/db/session-context.ts` |
+| `rls-coverage.ts` | G-C7 | RLS invariants must be tested twice — through the policy layer and via raw SQL bypassing it |
+| `guarded-tests.ts` | G-D | every entry in `test/guarded.manifest.json` (G-D1…G-D15) stays honest: `pending`/`implemented` must match reality |
+
+Husky's pre-commit hook runs `gitleaks protect --staged` (G-A1) — install gitleaks locally or the
+hook hard-fails the commit.
+
+Spec cross-reference checks (validate `docs/`, unrelated to the app):
 
 ```bash
 bash tools/check-refs.sh              # validate the spec's ~120 cross-references (7 rules)
@@ -37,6 +68,35 @@ bun run build
 bun run lint      # eslint .
 bun run format    # prettier --write .
 ```
+
+## Architecture: the implementation
+
+- **Bounded contexts** (ADR-001), each its own directory under `src/modules/`: `identity`,
+  `casting`, `audit` exist today (F0/F1 slices); `deliberation`, `scheduling`, `notifications` are
+  not built yet. Each module owns a `schema.ts` (Drizzle tables), `repository.ts` (the only file
+  outside `src/db/` allowed to touch the raw client), and, where relevant, a `transitions.ts` for
+  its state machine. Cross-module access goes through a module's exported functions, never its
+  schema/repository directly — `import-boundary.ts` only enforces the raw-client rule, so respect
+  the module boundary by convention too.
+- **`src/db/`**: `client.ts` (the one place the raw Postgres/Drizzle client is constructed) and
+  `session-context.ts` (the one place `SET LOCAL` sets RLS session context inside a transaction).
+- **`src/app/`**: Next.js App Router route groups — `(auth)` (sign-in, register, claim) and `(org)`
+  (dashboard, members, rooms, rounds, settings, who-lives-here) — each with server actions
+  (`actions.ts`) calling into module repositories, never the DB client directly.
+- **Tests** (`tests/`, Vitest, `vitest.config.ts`): `tests/unit/<module>/`, plus
+  `tests/integration/policy/` and `tests/integration/raw-sql/` — the two-sided RLS check G-C7
+  demands. `test/guarded.manifest.json` tracks which G-D invariants have real test coverage;
+  update it in the same commit as the test, never mark `implemented` speculatively. Tests hit a
+  real Supabase instance (no mocking DB/auth calls per F0 precedent) — expect real network latency
+  (`testTimeout: 20000`).
+- **`drizzle/`**: generated migrations from `drizzle.config.ts`, which points at the three modules'
+  `schema.ts` files as the source of truth.
+- **`.specify/`**: spec-kit state — `memory/constitution.md` (MUST/MUST NOT restatement of the
+  guardrails below, spec-kit's binding source of truth), `bugs/` (per-bug assessment folders from
+  `speckit-bug-assess`), and the templates/workflows spec-kit itself uses. `specs/<NNN-slug>/`
+  holds each slice's `spec.md`/`plan.md`/`tasks.md`, generated by the `speckit-*` skills below —
+  `specs/` may cite `docs/`, but `docs/` must never point into `specs/` (Rule 7, the handover
+  gate).
 
 ## Architecture: how the spec is organized
 
@@ -103,14 +163,14 @@ comments, plus the named exceptions `docs/backlog/**`, `docs/COVERAGE.md`, `tool
 (per the constitution) everything under a future `specs/`. Never translate a German reasoning
 quote — reproduce it verbatim in quotation marks.
 
-### The stack, once implementation starts (ADR-006, confirmed)
+### The stack (ADR-006, confirmed) — now in use, see Architecture below
 
 Next.js/TypeScript, Postgres, Drizzle, Supabase EU with Supabase Auth. Six bounded contexts
-(ADR-001): `identity`, `casting`, `deliberation`, `scheduling`, `audit`, `notifications`, enforced
-by import-boundary lint, not convention. Planned tooling (`tools/README.md`): Vitest (incl. RLS
-tests run twice — once through the policy layer, once via raw SQL bypassing it, per G-C7),
-dependency-cruiser, gitleaks (pre-commit + CI), license-checker-rseidelsohn with an explicit
-allowlist. None of this is installed yet — there is no implementation repo/`specs/` tree so far.
+(ADR-001): `identity`, `casting`, `deliberation`, `scheduling`, `audit`, `notifications` — three
+built so far. Tooling per `tools/README.md`: Vitest (RLS tests run twice per G-C7), gitleaks
+(pre-commit via husky + CI). `dependency-cruiser` and `license-checker-rseidelsohn` are recorded
+decisions not yet wired in; the import-boundary/session-context/rls-coverage/guarded-tests checks
+that exist today are hand-written scripts under `scripts/lint/`, not those tools.
 
 ## Working under `.specify/` (spec-kit)
 
