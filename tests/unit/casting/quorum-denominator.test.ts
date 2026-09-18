@@ -5,7 +5,12 @@ import { claimResidentProfile } from "@/modules/identity/auth";
 import { createResidentProfile } from "@/modules/identity/repository";
 import { addResidentToRound, createRoom, createRound, openRound } from "@/modules/casting/repository";
 import { roundParticipation } from "@/modules/casting/schema";
-import { deleteTestAccount, registerTestHousehold, type TestHousehold } from "../../helpers/identity";
+import {
+  cleanupAll,
+  deleteTestAccount,
+  registerTestHousehold,
+  type TestHousehold,
+} from "../../helpers/identity";
 
 async function claim(hh: TestHousehold, name: string) {
   const actor = { accountId: hh.accountId, profileId: null };
@@ -27,9 +32,8 @@ let hh: TestHousehold | undefined;
 const accountIds: string[] = [];
 
 afterEach(async () => {
-  for (const id of accountIds) await deleteTestAccount(id);
+  await cleanupAll(...accountIds.map(deleteTestAccount), hh?.cleanup());
   accountIds.length = 0;
-  if (hh) await hh.cleanup();
   hh = undefined;
 });
 

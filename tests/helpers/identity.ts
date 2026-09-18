@@ -73,3 +73,19 @@ export async function registerTestHousehold(): Promise<TestHousehold> {
 export async function deleteTestAccount(accountId: string): Promise<void> {
   await adminClient().auth.admin.deleteUser(accountId);
 }
+
+// Runs every afterEach cleanup task to completion, even if one rejects, so a failure in one
+// household's teardown can never suppress another's (see proposal.md — sequential cleanup was
+// exactly how orphaned rows went unnoticed). Takes already-started promises rather than thunks:
+// call sites read as `cleanupAll(...accountIds.map(deleteTestAccount), hhA?.cleanup())`, and
+// Promise.allSettled attaches a handler to each in the same synchronous turn as this call, so
+// there is no window for an unhandled rejection. Concurrency is safe here — the tables have no
+// foreign keys between them, each cleanup is scoped to its own household_id, and the Supabase
+// Auth users involved are always distinct.
+export async function cleanupAll(...tasks: Array<Promise<unknown> | undefined>): Promise<void> {
+  const results = await Promise.allSettled(tasks.filter((task) => task !== undefined));
+  const reasons = results.filter((r) => r.status === "rejected").map((r) => r.reason);
+  if (reasons.length > 0) {
+    throw new AggregateError(reasons, "test cleanup failed");
+  }
+}

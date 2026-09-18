@@ -6,18 +6,25 @@ import {
   ResidentListActionDeniedError,
   setMemberRole,
 } from "@/modules/identity/repository";
-import { deleteTestAccount, registerTestHousehold, type TestHousehold } from "../../helpers/identity";
+import {
+  cleanupAll,
+  deleteTestAccount,
+  registerTestHousehold,
+  type TestHousehold,
+} from "../../helpers/identity";
 
 let hh: TestHousehold | undefined;
 let accountId: string | undefined;
 let memberAccountId: string | undefined;
 
 afterEach(async () => {
-  if (accountId) await deleteTestAccount(accountId);
-  if (memberAccountId) await deleteTestAccount(memberAccountId);
+  await cleanupAll(
+    accountId ? deleteTestAccount(accountId) : undefined,
+    memberAccountId ? deleteTestAccount(memberAccountId) : undefined,
+    hh?.cleanup(),
+  );
   accountId = undefined;
   memberAccountId = undefined;
-  if (hh) await hh.cleanup();
   hh = undefined;
 });
 

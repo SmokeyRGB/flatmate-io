@@ -2,14 +2,13 @@ import { afterEach, describe, expect, it } from "vitest";
 import { withSessionContext } from "@/db/session-context";
 import { account, membership, residentProfile } from "@/modules/identity/schema";
 import { createResidentProfile } from "@/modules/identity/repository";
-import { registerTestHousehold, type TestHousehold } from "../../helpers/identity";
+import { cleanupAll, registerTestHousehold, type TestHousehold } from "../../helpers/identity";
 
 let hhA: TestHousehold | undefined;
 let hhB: TestHousehold | undefined;
 
 afterEach(async () => {
-  if (hhA) await hhA.cleanup();
-  if (hhB) await hhB.cleanup();
+  await cleanupAll(hhA?.cleanup(), hhB?.cleanup());
   hhA = undefined;
   hhB = undefined;
 });

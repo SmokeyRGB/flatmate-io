@@ -1,7 +1,7 @@
 import { sql } from "drizzle-orm";
 import { afterEach, describe, expect, it } from "vitest";
 import { withSessionContext } from "@/db/session-context";
-import { registerTestHousehold, type TestHousehold } from "../../helpers/identity";
+import { cleanupAll, registerTestHousehold, type TestHousehold } from "../../helpers/identity";
 
 type HouseholdRow = { id: string };
 type SettingsRow = { household_id: string };
@@ -10,8 +10,7 @@ let hhA: TestHousehold | undefined;
 let hhB: TestHousehold | undefined;
 
 afterEach(async () => {
-  if (hhA) await hhA.cleanup();
-  if (hhB) await hhB.cleanup();
+  await cleanupAll(hhA?.cleanup(), hhB?.cleanup());
   hhA = undefined;
   hhB = undefined;
 });

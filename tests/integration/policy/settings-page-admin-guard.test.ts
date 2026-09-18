@@ -5,15 +5,19 @@ import {
   createResidentProfile,
   ResidentListActionDeniedError,
 } from "@/modules/identity/repository";
-import { deleteTestAccount, registerTestHousehold, type TestHousehold } from "../../helpers/identity";
+import {
+  cleanupAll,
+  deleteTestAccount,
+  registerTestHousehold,
+  type TestHousehold,
+} from "../../helpers/identity";
 
 let hh: TestHousehold | undefined;
 let memberAccountId: string | undefined;
 
 afterEach(async () => {
-  if (memberAccountId) await deleteTestAccount(memberAccountId);
+  await cleanupAll(memberAccountId ? deleteTestAccount(memberAccountId) : undefined, hh?.cleanup());
   memberAccountId = undefined;
-  if (hh) await hh.cleanup();
   hh = undefined;
 });
 

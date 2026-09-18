@@ -22,6 +22,13 @@ export default defineConfig({
     // triple. Teardown runs in afterEach, outside this budget, so a hung test can no longer take
     // its household's cleanup down with it.
     testTimeout: 60000,
+    // Vitest 5 defaults hookTimeout to 10000ms
+    // (node_modules/vitest/dist/chunks/index.DzobfTyw.js:14671). Teardown moved into afterEach on
+    // 2026-09-18 and so silently fell from the 60s test budget above to that 10s default — a
+    // single household's cleanup (one DB round trip plus one Supabase Auth deleteUser) can exceed
+    // that on its own against eu-west-1, where CI operations legitimately run 12-19s. Match
+    // testTimeout so teardown has the same budget it had before the move.
+    hookTimeout: 60000,
   },
   resolve: {
     alias: {

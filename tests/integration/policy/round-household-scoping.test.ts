@@ -4,17 +4,20 @@ import { claimResidentProfile } from "@/modules/identity/auth";
 import { createResidentProfile } from "@/modules/identity/repository";
 import { createRoom, createRound, openRound } from "@/modules/casting/repository";
 import { castingRound, roundParticipation } from "@/modules/casting/schema";
-import { deleteTestAccount, registerTestHousehold, type TestHousehold } from "../../helpers/identity";
+import {
+  cleanupAll,
+  deleteTestAccount,
+  registerTestHousehold,
+  type TestHousehold,
+} from "../../helpers/identity";
 
 let hhA: TestHousehold | undefined;
 let hhB: TestHousehold | undefined;
 const accountIds: string[] = [];
 
 afterEach(async () => {
-  for (const id of accountIds) await deleteTestAccount(id);
+  await cleanupAll(...accountIds.map(deleteTestAccount), hhA?.cleanup(), hhB?.cleanup());
   accountIds.length = 0;
-  if (hhA) await hhA.cleanup();
-  if (hhB) await hhB.cleanup();
   hhA = undefined;
   hhB = undefined;
 });

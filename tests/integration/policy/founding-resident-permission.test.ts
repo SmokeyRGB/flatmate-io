@@ -1,18 +1,25 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { claimResidentProfile } from "@/modules/identity/auth";
 import { createResidentProfile } from "@/modules/identity/repository";
-import { deleteTestAccount, registerTestHousehold, type TestHousehold } from "../../helpers/identity";
+import {
+  cleanupAll,
+  deleteTestAccount,
+  registerTestHousehold,
+  type TestHousehold,
+} from "../../helpers/identity";
 
 let hh: TestHousehold | undefined;
 let firstAccountId: string | undefined;
 let secondAccountId: string | undefined;
 
 afterEach(async () => {
-  if (firstAccountId) await deleteTestAccount(firstAccountId);
-  if (secondAccountId) await deleteTestAccount(secondAccountId);
+  await cleanupAll(
+    firstAccountId ? deleteTestAccount(firstAccountId) : undefined,
+    secondAccountId ? deleteTestAccount(secondAccountId) : undefined,
+    hh?.cleanup(),
+  );
   firstAccountId = undefined;
   secondAccountId = undefined;
-  if (hh) await hh.cleanup();
   hh = undefined;
 });
 
