@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import type { SessionContext } from "@/db/session-context";
 import { claimResidentProfile } from "@/modules/identity/auth";
 import { createResidentProfile } from "@/modules/identity/repository";
 import { createRoom, createRound, getRoundParticipants, openRound } from "@/modules/casting/repository";
@@ -19,7 +20,15 @@ describe("Round participant list", () => {
       const round = await createRound(hh.context, "Round", [roomA.id], actor);
       await openRound(hh.context, round.id, actor);
 
-      const participants = await getRoundParticipants(hh.context, round.id);
+      // rounds-page-participant-leak: read as the claimed RESIDENT session (profileId set), not
+      // hh.context (the profile-less household-account session) — ADR-014/G-D15 now refuses
+      // participant data for the latter, and this test asserts the resident-visible behavior.
+      const residentContext: SessionContext = {
+        accountId,
+        householdId: hh.householdId,
+        profileId: profile.id,
+      };
+      const participants = await getRoundParticipants(residentContext, round.id);
 
       expect(participants).toHaveLength(1);
       expect(participants[0]).toEqual({ displayName: "Visible Name" });

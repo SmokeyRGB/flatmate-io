@@ -424,7 +424,12 @@ export async function getRoundForSession(context: SessionContext, roundId: strin
 // FR-1.19/FR-1.28: names only — no join date, contact detail, or action controls. A distinct
 // query path from the resident-list read (identity/repository.ts's getResidentList); neither
 // links to the other's underlying rows.
+//
+// ADR-014/G-D15: a profile-less (household-account) session gets round identity/lifecycle only —
+// see getRoundForSession above — and participant names are Application-derived/participant data,
+// explicitly excluded. Enforced here (not just at the call site) so every caller is covered.
 export async function getRoundParticipants(context: SessionContext, roundId: string) {
+  if (context.profileId === null) return [];
   return withSessionContext(context, (tx) =>
     tx
       .select({ displayName: residentProfile.displayName })

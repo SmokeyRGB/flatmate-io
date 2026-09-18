@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { createRoom, createRound, getRoundForSession } from "@/modules/casting/repository";
+import {
+  createRoom,
+  createRound,
+  getRoundForSession,
+  getRoundParticipants,
+} from "@/modules/casting/repository";
 import { registerTestHousehold, type TestHousehold } from "../../helpers/identity";
 
 // [GUARDED] G-D15 (policy layer) — GUARDRAIL: G-D15 — siehe GUARDRAILS.md / ADR-014.
@@ -32,6 +37,25 @@ describe("[GUARDED] G-D15: a household-account session sees round identity/lifec
           "retention_warned_at",
         ].sort(),
       );
+    } finally {
+      if (hh) await hh.cleanup();
+    }
+  });
+
+  // rounds-page-participant-leak: getRoundForSession's column restriction above was covered, but
+  // getRoundParticipants (a sibling repository read used by the round-detail route) had no
+  // equivalent profile-less guard — it leaked participant display names. Pins the fix in place.
+  it("getRoundParticipants refuses participant data for a profile-less session", async () => {
+    let hh: TestHousehold | undefined;
+    try {
+      hh = await registerTestHousehold();
+      const actor = { accountId: hh.accountId, profileId: null };
+      const roomA = await createRoom(hh.context, "Room A", actor);
+      const round = await createRound(hh.context, "Test round", [roomA.id], actor);
+
+      const participants = await getRoundParticipants(hh.context, round.id);
+
+      expect(participants).toEqual([]);
     } finally {
       if (hh) await hh.cleanup();
     }

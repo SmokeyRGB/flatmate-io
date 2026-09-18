@@ -42,19 +42,23 @@ export default async function RoundDetailPage({ params }: { params: Promise<{ id
         </div>
       )}
 
-      {/* Everything below is scoped to this specific round — the larger-radius tinted panel
-          groups it visually, distinct from a plain card (09-Design-System.md). */}
-      <div className="panel-round">
-        <h2 className="font-serif text-lg font-medium">Participants</h2>
-        {/* FR-1.19/FR-1.28: names only — no join date, contact detail, or action controls. */}
-        <ul className="mt-3 space-y-2">
-          {participants.map((p, i) => (
-            <li key={i} className="card py-2 text-sm">
-              {p.displayName}
-            </li>
-          ))}
-        </ul>
-      </div>
+      {/* ADR-014/G-D15: a household-account session (no profile) never sees participant data —
+          getRoundParticipants already refuses server-side; this also skips the empty panel. */}
+      {current.context.profileId !== null && (
+        // Everything below is scoped to this specific round — the larger-radius tinted panel
+        // groups it visually, distinct from a plain card (09-Design-System.md).
+        <div className="panel-round">
+          <h2 className="font-serif text-lg font-medium">Participants</h2>
+          {/* FR-1.19/FR-1.28: names only — no join date, contact detail, or action controls. */}
+          <ul className="mt-3 space-y-2">
+            {participants.map((p, i) => (
+              <li key={i} className="card py-2 text-sm">
+                {p.displayName}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
   );
 }
