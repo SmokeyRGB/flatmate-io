@@ -20,6 +20,9 @@ async function claim(hh: TestHousehold, name: string) {
 }
 
 describe("Round opening: atomic snapshot + frozen rules (AC-1.8, AC-1.9, AC-1.10, FR-1.16)", () => {
+  // ponytail: 4 residents each round-trip Supabase Auth's admin API (claim + cleanup) — the
+  // default 20s runner timeout gets tight when the full suite runs many integration tests
+  // concurrently against the same live DB. Bump further if this still flakes.
   it("produces exactly N RoundParticipation rows and a frozen settings_snapshot (AC-1.8/FR-1.15)", async () => {
     let hh: TestHousehold | undefined;
     const accountIds: string[] = [];
@@ -52,7 +55,7 @@ describe("Round opening: atomic snapshot + frozen rules (AC-1.8, AC-1.9, AC-1.10
       for (const id of accountIds) await deleteTestAccount(id);
       if (hh) await hh.cleanup();
     }
-  });
+  }, 60_000);
 
   // AC-1.9/C-1.1: settings_snapshot is a copy, never a reference — a later live-settings change
   // does not affect an already-open round.
