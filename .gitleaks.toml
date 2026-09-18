@@ -16,3 +16,12 @@ regexTarget = "match"
 regexes = [
   '''^\[YOUR-[A-Z0-9-]+\]$''',
 ]
+
+# .next/** is a generated build-artifact directory (gitignored, never committed) whose cache and
+# manifest JSON files contain high-entropy preview/encryption keys Next.js generates locally —
+# not real secrets. The CI gitleaks job today scans git history only, so this is inert in
+# practice; it exists so a future switch to a filesystem scan mode (`-s .`/`--no-git`) doesn't
+# turn this gate red on generated files instead of source.
+paths = [
+  '''^\.next/''',
+]
