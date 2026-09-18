@@ -372,8 +372,8 @@ Prozess vs. Person, nicht bei „beschreibend vs. empfehlend".
 | Inhalt | nur Namen | Namen, Beitrittsdatum, Kontakt, Status |
 | Handlungen | keine | entfernen, `moved_out`, reaktivieren, Beitrittscode erzeugen/löschen |
 | Verwaltung | — | voll |
-| Moderator | ja | lesend |
-| Bewohnende | ja | **nein** |
+| Moderator | ja | **voll (Parität mit Verwaltung, U-30, 2026-09-17 — vormals lesend)** |
+| Bewohnende | ja | **nein, aber eigene reduzierte „Wer wohnt hier"-Ansicht (B5, U-30)** |
 
 **Kernelemente**
 
@@ -401,7 +401,8 @@ Prozess vs. Person, nicht bei „beschreibend vs. empfehlend".
   der reguläre Weg für tatsächliche Auszüge — Stimmen und Historie bleiben erhalten. „Entfernen"
   ist endgültig, verlangt die **Eingabe des exakten Anzeigenamens** zur Bestätigung (kein einfacher
   Klick) und ist ausdrücklich für **fälschlich oder böswillig über den Beitrittscode beigetretene
-  Personen** gedacht — nicht für Auszüge. Nur verfügbar mit `manage_members`
+  Personen** gedacht — nicht für Auszüge. **Verfügbar für Verwaltung und Moderator gleichermaßen
+  (U-30, 2026-09-17)** — vormals nur Verwaltung, da der Moderator bis dahin ohnehin nur lesend war
 
 **Abweichende Zustände**
 
@@ -415,6 +416,12 @@ Prozess vs. Person, nicht bei „beschreibend vs. empfehlend".
 > bleiben der Feed-Eintrag „X ist beigetreten" und die Bewohnerzahl im Nenner. Der Beitrittslink
 > wird dadurch zur **letzten verbliebenen Kontrolle** — Ablauf und Nutzungsgrenze sind deshalb
 > Pflicht, keine Zugabe.
+>
+> **Nachtrag U-30 (2026-09-17):** Bewohnende erhalten seither wieder eine (reduzierte) Sicht auf
+> die Mitgliedschaft — screen `B-start.md` B5 — womit ein Teil der ersten Säule (Sichtbarkeit)
+> zurückkehrt, ausdrücklich ohne das Entfernen-Recht wiederherzustellen. Der Beitrittslink bleibt
+> deshalb weiterhin Pflicht-Kontrolle, nicht nur Ergänzung — B5 ist eine Erkennungshilfe für
+> Bewohnende, kein Ersatz für die Ablauf-/Nutzungsgrenze.
 
 ---
 

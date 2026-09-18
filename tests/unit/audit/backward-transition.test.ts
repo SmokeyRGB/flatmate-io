@@ -17,7 +17,7 @@ describe("Backward transition produces exactly one ActivityEvent (FR-0.11, G-D3)
     const profileId = uuid();
     const actor = { accountId: uuid(), profileId };
 
-    const [seed] = await withSessionContext({ householdId, residentProfileId: profileId }, (tx) =>
+    const [seed] = await withSessionContext({ accountId: uuid(), householdId, profileId: profileId }, (tx) =>
       tx
         .insert(application)
         .values({
@@ -30,13 +30,13 @@ describe("Backward transition produces exactly one ActivityEvent (FR-0.11, G-D3)
     );
 
     await transitionApplication(
-      { householdId, residentProfileId: profileId },
+      { accountId: uuid(), householdId, profileId: profileId },
       seed.id,
       "new",
       actor,
     );
 
-    const events = await withSessionContext({ householdId, residentProfileId: profileId }, (tx) =>
+    const events = await withSessionContext({ accountId: uuid(), householdId, profileId: profileId }, (tx) =>
       tx
         .select()
         .from(activityEvent)

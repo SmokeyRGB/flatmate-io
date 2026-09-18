@@ -12,7 +12,7 @@ describe("ActivityEvent household isolation — raw SQL (FR-0.2/AC-0.6)", () => 
     const householdB = uuid();
 
     const rowA = await withSessionContext(
-      { householdId: householdA, residentProfileId: uuid() },
+      { accountId: uuid(), householdId: householdA, profileId: uuid() },
       async (tx) => {
         const result = await tx.execute<{ id: string }>(
           sql`INSERT INTO activity_event (household_id, event_type, subject_type, subject_id, payload)
@@ -24,7 +24,7 @@ describe("ActivityEvent household isolation — raw SQL (FR-0.2/AC-0.6)", () => 
     );
 
     const rowB = await withSessionContext(
-      { householdId: householdB, residentProfileId: uuid() },
+      { accountId: uuid(), householdId: householdB, profileId: uuid() },
       async (tx) => {
         const result = await tx.execute<{ id: string }>(
           sql`INSERT INTO activity_event (household_id, event_type, subject_type, subject_id, payload)
@@ -38,7 +38,7 @@ describe("ActivityEvent household isolation — raw SQL (FR-0.2/AC-0.6)", () => 
     type ActivityEventRow = { id: string; household_id: string };
 
     const rowsSeenByA = await withSessionContext(
-      { householdId: householdA, residentProfileId: uuid() },
+      { accountId: uuid(), householdId: householdA, profileId: uuid() },
       (tx) =>
         tx.execute<ActivityEventRow>(sql`SELECT id, household_id FROM activity_event`),
     );

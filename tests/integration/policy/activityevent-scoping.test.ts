@@ -16,7 +16,7 @@ describe("ActivityEvent household isolation — policy layer (FR-0.2/AC-0.6)", (
     const subjectB = uuid();
 
     const eventA = await withSessionContext(
-      { householdId: householdA, residentProfileId: uuid() },
+      { accountId: uuid(), householdId: householdA, profileId: uuid() },
       (tx) =>
         recordActivityEvent(tx, {
           householdId: householdA,
@@ -30,7 +30,7 @@ describe("ActivityEvent household isolation — policy layer (FR-0.2/AC-0.6)", (
     );
 
     const eventB = await withSessionContext(
-      { householdId: householdB, residentProfileId: uuid() },
+      { accountId: uuid(), householdId: householdB, profileId: uuid() },
       (tx) =>
         recordActivityEvent(tx, {
           householdId: householdB,
@@ -44,7 +44,7 @@ describe("ActivityEvent household isolation — policy layer (FR-0.2/AC-0.6)", (
     );
 
     const rowsSeenByA = await withSessionContext(
-      { householdId: householdA, residentProfileId: uuid() },
+      { accountId: uuid(), householdId: householdA, profileId: uuid() },
       (tx) => tx.select().from(activityEvent), // deliberately no .where(...)
     );
 

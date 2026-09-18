@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "round_participation_active_pairing_idx" ON "round_participation" USING btree ("round_id","resident_profile_id") WHERE removed_at IS NULL;

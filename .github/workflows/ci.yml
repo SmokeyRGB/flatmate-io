@@ -7,6 +7,26 @@ on:
     branches: [main]
 
 jobs:
+  # G-A1 (docs/GUARDRAILS.md): secret-scanning as a CI gate — the enforceable half; the pre-commit
+  # hook (.husky/pre-commit) is local-only and can be skipped (uninstalled binary, --no-verify).
+  # Uses the official gitleaks Docker image directly rather than gitleaks/gitleaks-action: v2 is
+  # being removed with GitHub's Node 20 runner deprecation (2026-09-16), and v3's org-account
+  # licensing doesn't apply to the plain open-source CLI this image ships.
+  gitleaks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # full history — gitleaks scans commits, not just the working tree
+
+      # Pinned to a released version, not :latest — a future image update must not be able to
+      # change scan rules/behavior without a deliberate bump of this line. Bump by editing the
+      # tag after checking https://github.com/gitleaks/gitleaks/releases.
+      - name: Gitleaks scan
+        uses: docker://ghcr.io/gitleaks/gitleaks:v8.30.1
+        with:
+          args: detect --redact --verbose
+
   verify:
     runs-on: ubuntu-latest
     steps:
@@ -24,10 +44,24 @@ jobs:
       - run: npm run build
 
       # eslint + the four custom guardrail checks + the full test suite. The integration tests
-      # talk to the real Supabase project (transaction-mode pooler), so this needs the
-      # DATABASE_URL secret — see the repo's CI setup notes for how to add it.
+      # talk to the real Supabase project (transaction-mode pooler) and, since F1, to Supabase
+      # Auth's admin API — so this needs DATABASE_URL plus the three Supabase env vars.
       - run: npm run verify
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          # Project URL and anon/publishable key are not secret — NEXT_PUBLIC_* is meant to ship
+          # in the browser bundle, so hardcoding them here (rather than as repo secrets) is
+          # correct, not a shortcut. flatmate-io project (cjinhzzvjryojvhngjjn), eu-west-1.
+          NEXT_PUBLIC_SUPABASE_URL: "https://cjinhzzvjryojvhngjjn.supabase.co"
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNqaW5oenp2anJ5b2p2aG5nampuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk0ODg5NzUsImV4cCI6MjEwNTA2NDk3NX0.ac1SbuP5Is9PYW2mgKrVeDzoZ_7huOsuxf82HIs0NH8" # gitleaks:allow — anon key, public by design
+          # This one IS a real secret (bypasses RLS entirely) — add it via GitHub: Settings >
+          # Secrets and variables > Actions > New repository secret, name
+          # SUPABASE_SERVICE_ROLE_KEY. Never hardcode it here the way the two values above are.
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          # HMAC key for Session.token_hash (src/modules/identity/auth.ts, hashSessionToken) —
+          # add via the same Settings > Secrets and variables > Actions path, name
+          # SESSION_TOKEN_HASH_SECRET. A random value generated once for CI is fine; it never
+          # needs to match any other environment's secret.
+          SESSION_TOKEN_HASH_SECRET: ${{ secrets.SESSION_TOKEN_HASH_SECRET }}
 
       - run: bash tools/check-refs.sh --quiet

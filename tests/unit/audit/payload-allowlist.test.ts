@@ -53,7 +53,7 @@ describe("ActivityEvent retention redaction (FR-0.13, EC-0.6, G-D8)", () => {
     const pastDate = new Date(Date.now() - 200 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
     const [expiredApplication] = await withSessionContext(
-      { householdId, residentProfileId: profileId },
+      { accountId: uuid(), householdId, profileId: profileId },
       (tx) =>
         tx
           .insert(application)
@@ -67,7 +67,7 @@ describe("ActivityEvent retention redaction (FR-0.13, EC-0.6, G-D8)", () => {
           .returning(),
     );
 
-    const event = await withSessionContext({ householdId, residentProfileId: profileId }, (tx) =>
+    const event = await withSessionContext({ accountId: uuid(), householdId, profileId: profileId }, (tx) =>
       recordActivityEvent(tx, {
         householdId,
         eventType: "application.state_changed",
@@ -80,7 +80,7 @@ describe("ActivityEvent retention redaction (FR-0.13, EC-0.6, G-D8)", () => {
     );
 
     const redactedCount = await withSessionContext(
-      { householdId, residentProfileId: profileId },
+      { accountId: uuid(), householdId, profileId: profileId },
       (tx) => redactExpiredActivityEvents(tx),
     );
 
@@ -88,7 +88,7 @@ describe("ActivityEvent retention redaction (FR-0.13, EC-0.6, G-D8)", () => {
     expect(redactedCount).toBe(0);
 
     const [afterRedaction] = await withSessionContext(
-      { householdId, residentProfileId: profileId },
+      { accountId: uuid(), householdId, profileId: profileId },
       (tx) => tx.select().from(activityEvent).where(eq(activityEvent.id, event.id)),
     );
 
@@ -107,7 +107,7 @@ describe("ActivityEvent retention redaction (FR-0.13, EC-0.6, G-D8)", () => {
     const futureDate = new Date(Date.now() + 200 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
     const [activeApplication] = await withSessionContext(
-      { householdId, residentProfileId: profileId },
+      { accountId: uuid(), householdId, profileId: profileId },
       (tx) =>
         tx
           .insert(application)
@@ -121,7 +121,7 @@ describe("ActivityEvent retention redaction (FR-0.13, EC-0.6, G-D8)", () => {
           .returning(),
     );
 
-    await withSessionContext({ householdId, residentProfileId: profileId }, (tx) =>
+    await withSessionContext({ accountId: uuid(), householdId, profileId: profileId }, (tx) =>
       recordActivityEvent(tx, {
         householdId,
         eventType: "application.state_changed",
@@ -134,7 +134,7 @@ describe("ActivityEvent retention redaction (FR-0.13, EC-0.6, G-D8)", () => {
     );
 
     const redactedCount = await withSessionContext(
-      { householdId, residentProfileId: profileId },
+      { accountId: uuid(), householdId, profileId: profileId },
       (tx) => redactExpiredActivityEvents(tx),
     );
 

@@ -1,0 +1,1 @@
+ALTER TYPE "public"."round_participation_source" ADD VALUE 'joined_after_open';

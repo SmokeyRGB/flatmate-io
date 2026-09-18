@@ -1,3 +1,7 @@
-export default function Home() {
-  return <main>Flatmate.io — F0 substrate, no UI yet (see specs/001-f0-foundations).</main>;
+import { redirect } from "next/navigation";
+import { getCurrentSession } from "@/modules/identity/session-cookie";
+
+export default async function Home() {
+  const current = await getCurrentSession();
+  redirect(current ? "/dashboard" : "/sign-in");
 }

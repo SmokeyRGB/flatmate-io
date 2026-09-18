@@ -12,6 +12,24 @@ type Tx = PgTransaction<any, any, any>;
 // ships, not invented here ahead of time.
 const PAYLOAD_ALLOWLIST: Readonly<Record<string, readonly string[]>> = {
   "application.state_changed": ["fromState", "toState"],
+  // F1 event types (identity/casting modules) — registered here, the one write path, per FR-1.20.
+  "resident_profile.created": [],
+  "resident_profile.status_changed": ["fromStatus", "toStatus"],
+  "room.created": [],
+  "room.renamed": [], // no fromLabel/toLabel — a room label is free text, not a counter/reference (G-D7)
+  "room.status_changed": ["fromStatus", "toStatus"],
+  "room.removed": [],
+  "casting_round.created": [],
+  "casting_round.opened": ["participantCount"],
+  "casting_round.participant_added": ["source"],
+  "household_settings.changed": ["field"],
+  "household_settings.changed_while_round_open": ["field", "roundId"],
+  "membership.revoked": [],
+  "membership.reactivated": [],
+  "membership.removed_as_intruder": [], // U-27's hard-removal tier — distinct event type from
+  // membership.revoked so the audit trail preserves *why*, even though no other field differs yet
+  "household.join_code_rotated": [],
+  "membership.role_changed": ["fromRole", "toRole"], // EC-1.7's "appoint it moderator" (Convergence)
 };
 
 export class PayloadValidationError extends Error {}

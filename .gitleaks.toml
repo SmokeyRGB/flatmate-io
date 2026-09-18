@@ -1,0 +1,27 @@
+# gitleaks config — G-A1 (docs/GUARDRAILS.md). Extends gitleaks' own built-in rule set rather
+# than replacing it; this project has no custom secret shapes of its own to detect beyond what
+# gitleaks already covers (JWTs, connection strings, generic high-entropy secrets, etc.).
+title = "flatmate-io"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Placeholder tokens (G-A2), not whole files — a well-formed [YOUR-...] placeholder"
+# can resemble a real key shape closely enough to false-positive, but only the placeholder text
+# itself should be exempt. regexTarget = "match" means these regexes are compared against the
+# matched secret substring, not the whole line/file, so a real credential pasted into
+# .env.example (replacing a placeholder) is still caught instead of being silently ignored.
+regexTarget = "match"
+regexes = [
+  '''^\[YOUR-[A-Z0-9-]+\]$''',
+]
+
+# .next/** is a generated build-artifact directory (gitignored, never committed) whose cache and
+# manifest JSON files contain high-entropy preview/encryption keys Next.js generates locally —
+# not real secrets. The CI gitleaks job today scans git history only, so this is inert in
+# practice; it exists so a future switch to a filesystem scan mode (`-s .`/`--no-git`) doesn't
+# turn this gate red on generated files instead of source.
+paths = [
+  '''^\.next/''',
+]

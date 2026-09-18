@@ -29,6 +29,69 @@
       "when": 1789626772197,
       "tag": "0003_activityevent_update_withcheck_mirrors_using",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1789642271947,
+      "tag": "0004_identity_module",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1789642999999,
+      "tag": "0005_identity_login_bootstrap_function",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1789643199999,
+      "tag": "0006_session_acting_profile_id_immutable",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1789643284606,
+      "tag": "0007_casting_rooms_and_rounds",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1789643400000,
+      "tag": "0008_casting_round_admin_view",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1789647846536,
+      "tag": "0009_round_participation_joined_after_open",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1789647999999,
+      "tag": "0010_membership_auto_join_open_rounds",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1789680132450,
+      "tag": "0011_round_participation_active_pairing_unique",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1789680146328,
+      "tag": "0012_auto_join_open_rounds_idempotent",
+      "breakpoints": true
     }
   ]
 }

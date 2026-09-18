@@ -1,6 +1,21 @@
 <!--
 Sync Impact Report
 ==================
+Version change: 1.0.0 → 1.1.0
+Modified principles: II (Precedence order) — added rank 6, `09-Design-System.md` (visual tokens
+  only, below the UI layer 07/08, above domain/adr); renumbered old ranks 6-7 to 7-8. Source
+  change: docs/README.md §2 gained the same row, by human decision, since 09-Design-System.md
+  was previously findable only via the ID registry (§3/§4), not the precedence table.
+Added sections: none
+Removed sections: none
+Templates requiring follow-up: none (plan/spec/tasks/checklist templates don't enumerate
+  precedence ranks by number, so the renumbering doesn't touch them).
+Deferred TODOs: none.
+-->
+
+<!--
+Sync Impact Report
+==================
 Version change: [none, template] → 1.0.0 (initial ratification)
 Modified principles: n/a (first version)
 Added sections:
@@ -54,8 +69,13 @@ Where documents conflict, `docs/README.md` §2 fixes which one wins — highest 
 4. `06-Compliance-Anhang.md` — binding for everything that touches personal data.
 5. `07-Screen-Inventar.md` / `08-UX-Entscheidungen.md` — the UI layer; per U-7 it may correct
    `02`, `03`, and `04`, and those are then updated to match, never the reverse.
-6. `domain/` · `adr/` — schema and architecture.
-7. `00-Session-Brief.md` — historical only; loses to every later document.
+6. `09-Design-System.md` — visual tokens: color palette, typography, spacing, shapes, and
+   component patterns, derived from the `prototype/` clickthrough (design reference only —
+   `prototype/`'s code must never be copied into an implementation). Binds only the visual
+   implementation, never scope, flows, or requirements; on conflict with `07`/`08` the UX
+   decision wins and `09` is updated to match, never the reverse.
+7. `domain/` · `adr/` — schema and architecture.
+8. `00-Session-Brief.md` — historical only; loses to every later document.
 
 ### III. The five principles (P-1…P-5)
 
@@ -198,4 +218,4 @@ challenge protocol (Principle X) as any other confirmed-tier ADR. Complexity int
 (`docs/backlog/requirements/F0`…`F5`); use `docs/MINIMAL-GATE.md` and `docs/GUARDRAILS.md` for
 enforcement detail this constitution only summarizes.
 
-**Version**: 1.0.0 | **Ratified**: 2026-09-16 | **Last Amended**: 2026-09-16
+**Version**: 1.1.0 | **Ratified**: 2026-09-16 | **Last Amended**: 2026-09-17

@@ -7,3 +7,7 @@ feature.json
 
 # Per-machine extension config overrides.
 extensions/*/local-config.yml
+
+# Fetched, re-derivable extension-catalog search index — not installed-extension state itself
+# (that's extensions/.registry and extensions.yml, both tracked).
+extensions/.cache/

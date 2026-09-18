@@ -1,0 +1,138 @@
+# Data inventory — ADR-010, docs/domain/personenbezogene-felder.md.
+#
+# Every column on every table this codebase has created so far (F0 + F1) is declared here,
+# including ⚙️ (not personal) columns — ADR-010 requires that explicitly, since an undeclared
+# column silently defeats the whole gate ("sonst wird 'nicht deklariert' zu 'unauffällig'").
+#
+# Categories: 🔴 personenbezogen/Bewerbende · 🟠 personenbezogen/Bewohnende+Accounts ·
+# ⚫ Beratungsinhalt (V-1 self-redaction) · ⚙️ not personal data.
+#
+# No CI check reads this file yet (F0 scoped that gate out; F1's tasks.md T067 only asked for the
+# declarations themselves) — this is the Art.-30-shaped source of truth the future check will
+# validate against, not itself an enforcement mechanism.
+
+tables:
+  # --- F0 (src/modules/casting/schema.ts, src/modules/audit/schema.ts) ---
+  application:
+    id: { category: "⚙️" }
+    household_id: { category: "⚙️", purpose: "RLS-Anker (ADR-004)" }
+    round_id: { category: "⚙️" }
+    state: { category: "⚙️" }
+    state_changed_at: { category: "⚙️" }
+    became_resident_id: { category: "🟠", purpose: "trägt V-1 (Selbst-Redaktion)", legal_basis: "Art. 6(1)(f) DSGVO", retention: "an Application.retention_until gebunden" }
+    created_by_account_id: { category: "🟠", purpose: "Zurechenbarkeit (ADR-004)", legal_basis: "Art. 6(1)(f) DSGVO", retention: "an Application.retention_until gebunden" }
+    created_by_profile_id: { category: "🟠", purpose: "Zurechenbarkeit (ADR-004)", legal_basis: "Art. 6(1)(f) DSGVO", retention: "an Application.retention_until gebunden" }
+    retention_until: { category: "⚙️" }
+    created_at: { category: "⚙️" }
+    deleted_at: { category: "⚙️" }
+
+  activity_event:
+    id: { category: "⚙️" }
+    household_id: { category: "⚙️", purpose: "RLS-Anker" }
+    round_id: { category: "⚙️" }
+    event_type: { category: "⚙️" }
+    subject_type: { category: "⚙️" }
+    subject_id: { category: "⚙️" }
+    actor_account_id: { category: "🟠", purpose: "Zurechenbarkeit (P-4, ADR-003)", legal_basis: "Art. 6(1)(f) DSGVO", retention: "redigiert am Fristende der referenzierten Application (G-D8)" }
+    actor_profile_id: { category: "🟠", purpose: "Zurechenbarkeit (P-4, ADR-003)", legal_basis: "Art. 6(1)(f) DSGVO", retention: "redigiert am Fristende der referenzierten Application (G-D8)" }
+    payload: { category: "🟠", purpose: "Referenzen/Zähler je event_type (G-D7) — pauschal 🟠 deklariert, da der Inhalt je nach event_type variiert (ADR-010's jsonb-Hinweis)", legal_basis: "Art. 6(1)(f) DSGVO", retention: "einzelne Schlüssel redigiert am Fristende (G-D8)" }
+    occurred_at: { category: "⚙️" }
+    correlation_id: { category: "⚙️" }
+    reverses_event_id: { category: "⚙️" }
+
+  # --- F1 (src/modules/identity/schema.ts) ---
+  account:
+    id: { category: "⚙️" }
+    household_id: { category: "⚙️", purpose: "RLS-Anker (denormalisiert, wie Application.household_id)" }
+    email: { category: "🟠", purpose: "Anmeldeadresse (FR-1.1); abgeleitet/nicht zustellbar bei Resident-Accounts", legal_basis: "Art. 6(1)(b) DSGVO (Vertrag)", retention: "bis Account-Löschung" }
+    email_verified_at: { category: "🟠", purpose: "Zustellungs-Autorität (identity.md §2.1)", legal_basis: "Art. 6(1)(b) DSGVO", retention: "bis Account-Löschung" }
+    locale: { category: "⚙️" }
+    created_at: { category: "⚙️" }
+    deleted_at: { category: "⚙️" }
+
+  session:
+    id: { category: "⚙️" }
+    household_id: { category: "⚙️", purpose: "RLS-Anker (denormalisiert)" }
+    token_hash: { category: "🟠", purpose: "Sitzungs-Authentisierung", legal_basis: "Art. 6(1)(b) DSGVO", retention: "bis expires_at/revoked_at" }
+    account_id: { category: "🟠", purpose: "welcher Account", legal_basis: "Art. 6(1)(b) DSGVO", retention: "bis expires_at/revoked_at" }
+    acting_profile_id: { category: "🟠", purpose: "handelnde Identität (ADR-013, G-D14)", legal_basis: "Art. 6(1)(b) DSGVO", retention: "bis expires_at/revoked_at" }
+    remember_me: { category: "⚙️" }
+    expires_at: { category: "⚙️" }
+    created_at: { category: "⚙️" }
+    revoked_at: { category: "⚙️" }
+
+  household:
+    id: { category: "⚙️" }
+    name: { category: "⚙️" }
+    owner_account_id: { category: "🟠", purpose: "Zuordnung, keine Sicherheitsgrenze (C-1.4)", legal_basis: "Art. 6(1)(f) DSGVO", retention: "bis Household-Löschung" }
+    contact_email: { category: "🟠", purpose: "Art. 13(1)(a)-Kontaktangabe an Bewerbende", legal_basis: "Art. 6(1)(f) DSGVO", retention: "bis Household-Löschung" }
+    join_code: { category: "⚙️", purpose: "identifiziert einen Haushalt, keine Person (G-A5) — TOM-Liste statt Art.-30" }
+    join_code_rotated_at: { category: "⚙️" }
+    created_at: { category: "⚙️" }
+    deleted_at: { category: "⚙️" }
+
+  household_settings:
+    household_id: { category: "⚙️" }
+    scale_weights: { category: "⚙️" }
+    favorite_budget_factor: { category: "⚙️" }
+    hide_results_until_voted: { category: "⚙️" }
+    quorum_share: { category: "⚙️" }
+    updated_at: { category: "⚙️" }
+    updated_by_account_id: { category: "🟠", purpose: "Zurechenbarkeit", legal_basis: "Art. 6(1)(f) DSGVO", retention: "bis HouseholdSettings-Löschung" }
+
+  resident_profile:
+    id: { category: "⚙️" }
+    household_id: { category: "⚙️" }
+    display_name: { category: "🟠", purpose: "Feed-Beschriftung + Anmeldekennung (O-12)", legal_basis: "Art. 6(1)(b) DSGVO", retention: "bis ResidentProfile-Löschung" }
+    status: { category: "⚙️" }
+    moved_in_on: { category: "🟠", purpose: "Wohn-Tatsache", legal_basis: "Art. 6(1)(f) DSGVO", retention: "bis ResidentProfile-Löschung" }
+    moved_out_on: { category: "🟠", purpose: "Wohn-Tatsache, löst V-3 aus", legal_basis: "Art. 6(1)(f) DSGVO", retention: "bis ResidentProfile-Löschung" }
+    room_id: { category: "⚙️" }
+    created_at: { category: "⚙️" }
+
+  membership:
+    id: { category: "⚙️" }
+    household_id: { category: "⚙️" }
+    account_id: { category: "⚙️" }
+    resident_profile_id: { category: "⚙️" }
+    is_resident: { category: "⚙️" }
+    role: { category: "🟠", purpose: "\"X ist Moderator\" ist eine Aussage über eine identifizierte Person (Art. 4 Nr. 1 DSGVO)", legal_basis: "Art. 6(1)(f) DSGVO", retention: "bis Membership-Löschung; auf Auskunftsverlangen offenzulegen" }
+    permissions: { category: "🟠", purpose: "wie role", legal_basis: "Art. 6(1)(f) DSGVO", retention: "bis Membership-Löschung; auf Auskunftsverlangen offenzulegen" }
+    joined_via_code: { category: "⚙️" }
+    joined_at: { category: "⚙️" }
+    revoked_at: { category: "⚙️" }
+
+  room:
+    id: { category: "⚙️" }
+    household_id: { category: "⚙️" }
+    label: { category: "⚙️" }
+    status: { category: "⚙️" }
+    current_resident_profile_id: { category: "🟠", purpose: "wer aktuell darin wohnt", legal_basis: "Art. 6(1)(f) DSGVO", retention: "bis Room-Löschung" }
+    created_at: { category: "⚙️" }
+    deleted_at: { category: "⚙️" }
+
+  casting_round:
+    id: { category: "⚙️" }
+    household_id: { category: "⚙️" }
+    title: { category: "⚙️", purpose: "einziges Freitextfeld in der für den Haushalts-Account sichtbaren Hälfte (ADR-014) — bewusst kein Personenbezug erwartet" }
+    status: { category: "⚙️" }
+    room_ids: { category: "⚙️" }
+    settings_snapshot: { category: "⚙️" }
+    opened_at: { category: "⚙️" }
+    closed_at: { category: "⚙️" }
+    phase_deadline_at: { category: "⚙️" }
+    quorum_denominator_frozen: { category: "⚙️" }
+    retention_until: { category: "⚙️" }
+    retention_extensions: { category: "⚙️" }
+    retention_warned_at: { category: "⚙️" }
+    created_at: { category: "⚙️" }
+
+  round_participation:
+    id: { category: "⚙️" }
+    round_id: { category: "⚙️" }
+    household_id: { category: "⚙️" }
+    resident_profile_id: { category: "🟠", purpose: "wer an dieser Runde teilnimmt", legal_basis: "Art. 6(1)(f) DSGVO", retention: "an CastingRound.retention_until gebunden" }
+    source: { category: "⚙️" }
+    can_vote: { category: "⚙️" }
+    added_at: { category: "⚙️" }
+    removed_at: { category: "⚙️" }

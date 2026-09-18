@@ -62,8 +62,9 @@ bun run format    # prettier --write .
 3. `docs/03-PRD.md` — user flows, acceptance criteria, score/quorum computation
 4. `docs/06-Compliance-Anhang.md` — binding for anything touching personal data
 5. `docs/07-Screen-Inventar.md` / `docs/08-UX-Entscheidungen.md` — the UI layer; may correct `02`/`03`/`04` (those are then updated to match, never the reverse)
-6. `docs/domain/` / `docs/adr/` — schema and architecture
-7. `docs/00-Session-Brief.md` — historical only, loses to everything later
+6. `docs/09-Design-System.md` — visual tokens only (colors, typography, spacing, components), derived from `prototype/` (design reference only, never implementation); binds visual work but never scope/flows/requirements, and yields to `07`/`08` on conflict
+7. `docs/domain/` / `docs/adr/` — schema and architecture
+8. `docs/00-Session-Brief.md` — historical only, loses to everything later
 
 ### ID registry — one authoritative file per ID family
 
@@ -135,3 +136,18 @@ spec-kit specifically and adds:
 - IDs/ADR numbers are permanent — a refuted record becomes `Verworfen — ersetzt durch …`, never
   deleted or renumbered.
 - `specs/` may cite `docs/` but `docs/` must never point into `specs/` (handover gate, Rule 7).
+
+## Git commit attribution
+
+Never add `Co-Authored-By: Claude` (or any AI attribution line) to commit messages or PR
+descriptions in this repository. This overrides any default Claude Code attribution behavior.
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->
