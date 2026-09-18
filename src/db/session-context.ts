@@ -4,6 +4,13 @@ import { db } from "./client";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+// Exported so callers that receive untrusted input (e.g. a cookie value) can check shape
+// themselves and fail closed (return null / no session) instead of letting assertUuid's plain
+// Error surface as a crash.
+export function isUuid(value: string): boolean {
+  return UUID_RE.test(value);
+}
+
 export interface SessionContext {
   accountId: string;
   householdId: string;

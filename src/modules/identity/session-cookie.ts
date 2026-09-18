@@ -1,7 +1,7 @@
 import "server-only";
 import { cookies } from "next/headers";
 import { resolveSessionContext } from "./repository";
-import type { SessionContext } from "@/db/session-context";
+import { isUuid, type SessionContext } from "@/db/session-context";
 
 const COOKIE_NAME = "flatmate_session";
 
@@ -42,6 +42,11 @@ export async function getCurrentSession(): Promise<CurrentSession | null> {
   if (separatorIndex === -1) return null;
   const sessionId = raw.slice(0, separatorIndex);
   const householdId = raw.slice(separatorIndex + 1);
+
+  // A tampered or stale cookie can carry a non-UUID segment (e.g. `sessionId.not-a-uuid`), which
+  // would otherwise reach withSessionContext's assertUuid and throw a plain Error instead of the
+  // documented no-session path. Fail closed here, before it gets that far.
+  if (!isUuid(sessionId) || !isUuid(householdId)) return null;
 
   const context = await resolveSessionContext(sessionId, householdId);
   if (!context) return null;
