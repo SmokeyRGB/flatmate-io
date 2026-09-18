@@ -85,14 +85,19 @@ const ADR_RE = /ADR-[0-9]{3}/g;
 const U_ID_RE = /\bU-[0-9]{1,2}\b/g;
 const S_ID_RE = /\bS-[0-9]{2}\b/g;
 
-// Rule 7's five forbidden shapes, in the order the shell version's five greps run — which is the
+// Rule 7's five forbidden shapes, in the order the shell version's five greps ran — which is the
 // order findings are emitted in, and a line matching several is reported once per pattern.
+//
+// The last two guarded `specs/` while spec-kit owned that directory. Since the move to OpenSpec
+// (2026-09-18) the implementation side is `openspec/`, so they match either: `specs/` alone would
+// still catch `openspec/specs/` by substring, but would miss `openspec/changes/`, which is where
+// a proposal actually lives and so the likelier thing for a docs file to reach for.
 const BOUNDARY_PATTERNS = [
   /Ideas\/Flatmate\.io\//,
   /\]\(\.\.\/\.\.\//,
   /~\/\.claude\//,
-  /\]\([^)]*specs\//,
-  /`[^`]*specs\/[^`]*`/,
+  /\]\([^)]*(openspec|specs)\//,
+  /`[^`]*(openspec|specs)\/[^`]*`/,
 ];
 
 function escapeRegExp(s: string): string {

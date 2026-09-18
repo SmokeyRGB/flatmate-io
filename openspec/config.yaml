@@ -1,0 +1,68 @@
+schema: spec-driven
+
+# Shown to the agent when it creates or applies artifacts. It deliberately cites rather than
+# restates: docs/README.md §3 is a formal ID register where every rule has exactly one
+# authoritative file, and per Principle V writing a rule out again in new prose is a defect, not a
+# convenience. Everything below is a pointer plus the few constraints that must be in front of the
+# agent before it reads anything.
+context: |
+  Flatmate.io is a flat-share applicant-screening tool. `docs/` is the specification and is
+  authoritative; `openspec/` implements against it. Read CLAUDE.md first — it explains how to
+  read `docs/` without loading all ~544k tokens of it, and carries the governance this file
+  summarizes.
+
+  THE HARD FLOOR — never violated, never routed around:
+    - G-C  authorization and visibility
+    - G-D  the protected [GUARDED] tests tracked in test/guarded.manifest.json
+    - G-L  the P-5 AI boundary: AI may structure text, never decide anything about the flat
+  All three are defined in docs/GUARDRAILS.md. If a task appears solvable only by violating one,
+  that is a finding about the task or the rule — stop, describe the conflict, and wait for a
+  human decision. Never weaken or delete a guarded test, never disable a check; disabling a rule
+  is itself a change requiring human approval (G-G3).
+
+  PRECEDENCE on conflict is fixed by docs/README.md §2, highest first: GUARDRAILS → 02-SRD →
+  03-PRD → 06-Compliance-Anhang → 07-Screen-Inventar / 08-UX-Entscheidungen → 09-Design-System →
+  domain/ + adr/ → 00-Session-Brief. A file under openspec/ must never silently redefine
+  anything in docs/; where they genuinely conflict, that is a finding to report, not something to
+  resolve inside a proposal.
+
+  CITE, DON'T RESTATE. Every requirement or decision id (S-*, FR-n.m, AC-n.m, ADR-*, U-*, V-*,
+  G-*, P-1…P-5) has exactly one authoritative source, listed in docs/SPEC-INDEX.md. Link to it
+  and quote it. If SPEC-INDEX.md has no row for the topic, add the row first. Watch the
+  near-collisions: O-06 (SRD) vs O-6 (domain model), C-1 (content rule) vs C1 (screen).
+
+  FROZEN FILES: docs/04-Domaenenmodell.md, docs/05-ADRs.md, docs/07-Screen-Inventar.md are
+  hash-checked against tools/frozen.sha256. Editing one, or the manifest, requires an explicit
+  human decision recorded in the same commit. Line-number references (:LINE) are permitted only
+  into those three.
+
+  THE HANDOVER GATE: docs/ + tools/ is a self-contained package. `openspec/` may cite `docs/`;
+  `docs/` must never point into `openspec/`. Enforced mechanically by tools/check-refs.ts rule 7.
+
+  LANGUAGE (ADR-012): docs/01–08, the ADRs and the compliance annex are German and stay German —
+  never translate a quote, reproduce it verbatim. Everything implementation-facing is English:
+  entities, fields, states, enums, functions, tables, commit messages, code comments, plus
+  docs/backlog/**, docs/COVERAGE.md, tools/** and everything under openspec/.
+
+  BEFORE A CHANGE IS DONE: `npm run verify` must pass. That is eslint, the four hand-written
+  guardrail lints in scripts/lint/, tools/check-refs.ts, and the full vitest suite against the
+  flatmate-io-dev Supabase project. Not `npm test` — the lints are the guardrails.
+
+  STATUS of any open question lives only in docs/review-log.md §Offene-Punkte-Register. Do not
+  add a status field for an open question anywhere else.
+
+# Every rule is a quoted string: an unquoted list item containing ": " parses as a YAML map, and
+# OpenSpec then silently drops that artifact's whole rule set with a one-line warning.
+rules:
+  proposal:
+    - "Cite the requirement packet or scope line this serves (docs/backlog/requirements/F0-F5, or an S-* line) and quote it, rather than restating it in new words."
+    - "State explicitly which guardrails the change touches, and say so plainly if it touches none."
+    - "Record assumptions rather than silently resolving an ambiguity that would change scope or observable behaviour."
+  design:
+    - "Respect the bounded contexts from ADR-001. Cross-module access goes through a module's exported functions, never its schema.ts or repository.ts."
+    - "Only src/db/ and a module's own repository.ts may touch the raw Postgres/Drizzle client (G-C1, enforced by scripts/lint/import-boundary.ts)."
+    - "Session context is set only via src/db/session-context.ts, and only with SET LOCAL (G-C8)."
+  tasks:
+    - "Every task names the files it touches."
+    - "An RLS-relevant change needs tests on both sides - through the policy layer, and via raw SQL bypassing it (G-C7)."
+    - "Never mark a test implemented in test/guarded.manifest.json before the test exists and passes."

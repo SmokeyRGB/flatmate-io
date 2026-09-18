@@ -1,43 +1,46 @@
 import { sql } from "drizzle-orm";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { withSessionContext } from "@/db/session-context";
 import { signIn } from "@/modules/identity/auth";
 import { registerTestHousehold, type TestHousehold } from "../../helpers/identity";
 
 type Row = { id: string; household_id: string };
 
+let hhA: TestHousehold | undefined;
+let hhB: TestHousehold | undefined;
+
+afterEach(async () => {
+  if (hhA) await hhA.cleanup();
+  if (hhB) await hhB.cleanup();
+  hhA = undefined;
+  hhB = undefined;
+});
+
 // G-C7, the same scenario as the policy-layer test, bypassing it via raw SQL.
 describe("session isolation — raw SQL", () => {
   it("household A sees only its own Session rows", async () => {
-    let hhA: TestHousehold | undefined;
-    let hhB: TestHousehold | undefined;
-    try {
-      hhA = await registerTestHousehold();
-      hhB = await registerTestHousehold();
-      const a = hhA;
-      const b = hhB;
+    hhA = await registerTestHousehold();
+    hhB = await registerTestHousehold();
+    const a = hhA;
+    const b = hhB;
 
-      const { session: sessionA } = await signIn({
-        kind: "household",
-        email: a.email,
-        password: "test-password-not-real-1234",
-      });
-      const { session: sessionB } = await signIn({
-        kind: "household",
-        email: b.email,
-        password: "test-password-not-real-1234",
-      });
+    const { session: sessionA } = await signIn({
+      kind: "household",
+      email: a.email,
+      password: "test-password-not-real-1234",
+    });
+    const { session: sessionB } = await signIn({
+      kind: "household",
+      email: b.email,
+      password: "test-password-not-real-1234",
+    });
 
-      const rows = await withSessionContext(a.context, (tx) =>
-        tx.execute<Row>(sql`SELECT id, household_id FROM session`),
-      );
+    const rows = await withSessionContext(a.context, (tx) =>
+      tx.execute<Row>(sql`SELECT id, household_id FROM session`),
+    );
 
-      expect(rows.map((r: Row) => r.id)).toContain(sessionA.id);
-      expect(rows.map((r: Row) => r.id)).not.toContain(sessionB.id);
-      expect(rows.every((r: Row) => r.household_id === a.householdId)).toBe(true);
-    } finally {
-      if (hhA) await hhA.cleanup();
-      if (hhB) await hhB.cleanup();
-    }
+    expect(rows.map((r: Row) => r.id)).toContain(sessionA.id);
+    expect(rows.map((r: Row) => r.id)).not.toContain(sessionB.id);
+    expect(rows.every((r: Row) => r.household_id === a.householdId)).toBe(true);
   });
 });

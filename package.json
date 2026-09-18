@@ -23,6 +23,7 @@
     "react-dom": "19.2.8"
   },
   "devDependencies": {
+    "@fission-ai/openspec": "^1.13.1",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^24.13.5",
     "@types/react": "^19",

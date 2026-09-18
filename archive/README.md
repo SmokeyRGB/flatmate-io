@@ -18,6 +18,20 @@
 | `06-Correction-Pass-Findings.md` | what that pass found |
 | `Now,next,later board.jpg` | photo of the physical board |
 
+`2026-09-spec-kit/` — the records spec-kit produced before the project moved to OpenSpec on
+2026-09-18. The workflow is gone; what it *learned* is not, so the judgement-bearing artifacts are
+kept and the generated scaffolding is not.
+
+| Folder | What it was |
+|---|---|
+| `constitution.md` | spec-kit's project constitution (v1.1.0, ratified 2026-09-16). Its governance — the hard floor, the confirmed/open ADR tiers, the challenge protocol — now lives in `CLAUDE.md`; the rules it restated were always owned by `docs/GUARDRAILS.md` and `docs/README.md` §2 |
+| `assessments/` | one full idea-assessment chain (intake → research → problem → concept → decision) for the remove-resident modal, which produced feature 003 |
+| `bugs/` | **22** bugs, each with its assess → fix → test record — the debugging history of F0 and F1, including why `activity_event`'s redaction exception is shaped the way it is, why `acting_profile_id` needs a database trigger, and two rounds on the auto-join trigger |
+
+Not kept: `specs/001`–`003` (the per-feature `spec`/`plan`/`tasks`/`research`/`quickstart` sets)
+and `.specify/`'s templates, scripts and workflow definitions. Those are generated scaffolding,
+recoverable from git history, and describe work that is already merged and tested.
+
 ## Why the paths inside are wrong, and why they stay wrong
 
 Every file in here refers to its siblings as `Exercise 10/…`, because that is where they lived
@@ -25,7 +39,7 @@ when they were written. Those paths no longer resolve.
 
 **They are not going to be corrected.** These are statements about where things were on a
 particular day, not pointers meant to be followed. Rewriting them to satisfy a link checker would
-make the archive claim a history it does not have. `tools/check-refs.sh` therefore excludes
+make the archive claim a history it does not have. `tools/check-refs.ts` therefore excludes
 `archive/**` by design, and this table is the translation instead:
 
 | Path as written inside | Where that file is now |
@@ -49,7 +63,7 @@ to nothing.
 
 The map's **Appendix A — Traceability** was the only artifact linking board vocabulary to the
 `S-` scope lines every specification uses. That mapping is now carried by `docs/COVERAGE.md`,
-which does the same job per scope line and is checked by `tools/done-check.sh`.
+which does the same job per scope line and is checked by `tools/done-check.ts`.
 
 The epics themselves were renamed `EP-A` … `EP-E` in `docs/backlog/roadmap.md`, because the bare
 letters collided with the screen-group prefixes in `docs/07-Screen-Inventar.md` while naming
