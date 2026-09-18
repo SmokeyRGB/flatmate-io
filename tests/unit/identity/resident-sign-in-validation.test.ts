@@ -19,7 +19,16 @@ describe("signIn resident-mode input validation", () => {
 
   it("rejects an empty displayName", async () => {
     await expect(
-      signIn({ kind: "resident", householdId: "some-id", displayName: "", password: "x" }),
+      signIn({ kind: "resident", householdId: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", displayName: "", password: "x" }),
+    ).rejects.toThrow(SignInError);
+  });
+
+  // A non-blank but non-UUID-shaped householdId (e.g. "not-a-uuid") must also fail as a
+  // SignInError before reaching withSessionContext's assertUuid, whose plain Error is not caught
+  // by signInAction and previously surfaced as an unhandled 500.
+  it("rejects a non-blank, malformed householdId", async () => {
+    await expect(
+      signIn({ kind: "resident", householdId: "not-a-uuid", displayName: "Jonas", password: "x" }),
     ).rejects.toThrow(SignInError);
   });
 });

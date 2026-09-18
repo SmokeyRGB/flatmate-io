@@ -1,7 +1,7 @@
 import { createHmac, randomUUID } from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
 import { and, eq, ne } from "drizzle-orm";
-import { withSessionContext, type SessionContext } from "@/db/session-context";
+import { isUuid, withSessionContext, type SessionContext } from "@/db/session-context";
 import { recordActivityEvent } from "@/modules/audit/repository";
 import { resolveAccountHousehold } from "./repository";
 import { account, household, householdSettings, membership, residentProfile, session } from "./schema";
@@ -256,6 +256,12 @@ export async function signIn(
     // Error isn't a SignInError and would otherwise surface as an unhandled crash.
     if (!input.householdId.trim() || !input.displayName.trim()) {
       throw new SignInError("Household and name are required");
+    }
+    // A non-blank but non-UUID-shaped householdId (e.g. "not-a-uuid") would otherwise still reach
+    // withSessionContext's assertUuid below and throw a plain Error there instead — same isUuid
+    // shape check the claim action and cookie parser already use for this exact input.
+    if (!isUuid(input.householdId)) {
+      throw new SignInError("Invalid household");
     }
 
     // Resolve display_name -> ResidentProfile.id within the already-known household. This read
