@@ -3,6 +3,7 @@ import { roomStatusEnum } from "@/modules/casting/schema";
 import {
   assertF1RoomTransitionAllowed,
   assertRoomTransitionAllowed,
+  f1TargetStatusesFor,
   F1_REACHABLE_TRANSITIONS,
   InvalidRoomTransitionError,
   TRANSITIONS,
@@ -72,5 +73,34 @@ describe("assertF1RoomTransitionAllowed (F1 repository gate)", () => {
     expect(() => assertF1RoomTransitionAllowed("planned", "occupied")).toThrow(
       InvalidRoomTransitionError,
     );
+  });
+});
+
+// Rooms page bug: the select must offer only THIS room's legal targets, not every F1-reachable
+// target flattened across all rooms (planned would wrongly offer on_hold/not_available).
+describe("f1TargetStatusesFor (rooms page select options)", () => {
+  it("offers only the current status's own declared F1 targets, plus itself", () => {
+    expect(new Set(f1TargetStatusesFor("planned"))).toEqual(new Set(["planned", "open"]));
+    expect(new Set(f1TargetStatusesFor("open"))).toEqual(
+      new Set(["open", "on_hold", "not_available"]),
+    );
+    expect(new Set(f1TargetStatusesFor("on_hold"))).toEqual(
+      new Set(["on_hold", "open", "not_available"]),
+    );
+  });
+
+  it("falls back to just the current status when it has no outgoing F1 transition", () => {
+    expect(f1TargetStatusesFor("not_available")).toEqual(["not_available"]);
+    expect(f1TargetStatusesFor("promised")).toEqual(["promised"]);
+    expect(f1TargetStatusesFor("occupied")).toEqual(["occupied"]);
+  });
+
+  it("every option it returns for a status is actually accepted by assertF1RoomTransitionAllowed", () => {
+    for (const from of ["planned", "open", "on_hold", "not_available"] as const) {
+      for (const to of f1TargetStatusesFor(from)) {
+        if (to === from) continue;
+        expect(() => assertF1RoomTransitionAllowed(from, to)).not.toThrow();
+      }
+    }
   });
 });

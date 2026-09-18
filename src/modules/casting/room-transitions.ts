@@ -34,6 +34,18 @@ export const F1_REACHABLE_TRANSITIONS: ReadonlySet<string> = new Set([
 
 const TRANSITION_SET = new Set(TRANSITIONS.map(([from, to]) => `${from}->${to}`));
 
+// UI helper: the F1-reachable targets for one specific current status, always including that
+// status itself so a `<select>` bound to it never lacks a matching option. Used by the rooms
+// page to build a per-room option list — never the flattened set of every room's targets, or a
+// room can be offered a transition undeclared from its own status (rejected by
+// assertF1RoomTransitionAllowed above).
+export function f1TargetStatusesFor(status: RoomStatus): RoomStatus[] {
+  const targets = [...F1_REACHABLE_TRANSITIONS]
+    .filter((pair) => pair.startsWith(`${status}->`))
+    .map((pair) => pair.split("->")[1] as RoomStatus);
+  return [...new Set([status, ...targets])];
+}
+
 export class InvalidRoomTransitionError extends Error {
   constructor(from: RoomStatus, to: RoomStatus) {
     super(`Undeclared Room transition: ${from} -> ${to}`);

@@ -1,17 +1,10 @@
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { F1_REACHABLE_TRANSITIONS, type RoomStatus } from "@/modules/casting/room-transitions";
+import { f1TargetStatusesFor } from "@/modules/casting/room-transitions";
 import { listRooms } from "@/modules/casting/repository";
 import { getCurrentSession } from "@/modules/identity/session-cookie";
 import { createRoomAction, removeRoomAction, renameRoomAction, transitionRoomAction } from "./actions";
-
-// F1 only ever drives rooms into these states via transitionRoomAction (see
-// F1_REACHABLE_TRANSITIONS in room-transitions.ts) — promised/occupied are Application-state-
-// driven (F3+) and must not appear as choices here, or submitting them 500s server-side.
-const F1_TARGET_STATUSES = [
-  ...new Set([...F1_REACHABLE_TRANSITIONS].map((pair) => pair.split("->")[1] as RoomStatus)),
-];
 
 // Screen O14. FR-1.9–FR-1.11: create/rename/remove rooms; each room's state is its own.
 export default async function RoomsPage() {
@@ -54,9 +47,9 @@ export default async function RoomsPage() {
               <form action={transitionRoomAction} className="flex gap-1">
                 <input type="hidden" name="roomId" value={r.id} />
                 <select name="toStatus" defaultValue={r.status} className="field-input py-1 text-sm">
-                  {/* Include the room's current status so the select always has a matching option,
-                      even if that status (e.g. "planned") isn't itself an F1-reachable target. */}
-                  {[...new Set([r.status, ...F1_TARGET_STATUSES])].map((s) => (
+                  {/* Options are this room's own legal targets (plus its current status), not
+                      every F1-reachable target across all rooms — see f1TargetStatusesFor. */}
+                  {f1TargetStatusesFor(r.status).map((s) => (
                     <option key={s} value={s}>
                       {s}
                     </option>
