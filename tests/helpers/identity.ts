@@ -1,15 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
-import { eq } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 import { withSessionContext, type SessionContext } from "@/db/session-context";
 import { registerHousehold } from "@/modules/identity/auth";
-import {
-  account,
-  household,
-  householdSettings,
-  membership,
-  residentProfile,
-  session,
-} from "@/modules/identity/schema";
 import { uuid } from "./uuid";
 
 function adminClient() {
@@ -40,13 +32,36 @@ export async function registerTestHousehold(): Promise<TestHousehold> {
   const { household: householdRow, context } = await registerHousehold(email, password);
 
   const cleanup = async () => {
+    const id = context.householdId;
+
+    // One statement, one round trip. Every table here carries household_id as a bare uuid with
+    // **no foreign key** to household (verified: the schema has zero FK constraints), so deleting
+    // the household alone orphaned the casting rows silently — which is how the production project
+    // accumulated 1.9k rooms and 1.5k rounds before anyone noticed.
+    //
+    // Data-modifying CTEs rather than ten sequential deletes because tests call this in a finally
+    // inside the it() body, so teardown spends the test's own timeout budget. On a GitHub runner
+    // each round trip to eu-west-1 is expensive enough that ten of them, times the ~45 tests that
+    // register a household, added ~90s to the suite. Postgres runs every data-modifying CTE
+    // exactly once and to completion whether or not the primary query reads it, and with no FKs
+    // between these tables their order does not matter.
+    //
+    // activity_event is deliberately absent: FR-0.13 makes it append-only, enforced by RESTRICTIVE
+    // policies plus FORCE ROW LEVEL SECURITY, so this transaction could not delete it anyway.
     await withSessionContext(context, async (tx) => {
-      await tx.delete(residentProfile).where(eq(residentProfile.householdId, context.householdId));
-      await tx.delete(membership).where(eq(membership.householdId, context.householdId));
-      await tx.delete(session).where(eq(session.householdId, context.householdId));
-      await tx.delete(account).where(eq(account.householdId, context.householdId));
-      await tx.delete(householdSettings).where(eq(householdSettings.householdId, context.householdId));
-      await tx.delete(household).where(eq(household.id, context.householdId));
+      await tx.execute(sql`
+        with
+          d_participation as (delete from round_participation where household_id = ${id}),
+          d_round         as (delete from casting_round       where household_id = ${id}),
+          d_room          as (delete from room                where household_id = ${id}),
+          d_application   as (delete from application         where household_id = ${id}),
+          d_profile       as (delete from resident_profile    where household_id = ${id}),
+          d_membership    as (delete from membership          where household_id = ${id}),
+          d_session       as (delete from session             where household_id = ${id}),
+          d_account       as (delete from account             where household_id = ${id}),
+          d_settings      as (delete from household_settings  where household_id = ${id})
+        delete from household where id = ${id}
+      `);
     });
     await adminClient().auth.admin.deleteUser(context.accountId);
   };
