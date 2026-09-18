@@ -1,5 +1,5 @@
 import { and, eq, inArray, isNull, sql } from "drizzle-orm";
-import { withSessionContext, type SessionContext } from "@/db/session-context";
+import { isUuid, withSessionContext, type SessionContext } from "@/db/session-context";
 import { recordActivityEvent } from "@/modules/audit/repository";
 import { activityEvent } from "@/modules/audit/schema";
 import { assertHasPermission } from "@/modules/identity/repository";
@@ -12,6 +12,11 @@ export interface Actor {
   accountId: string | null;
   profileId: string | null;
 }
+
+// The tx type withSessionContext's callback receives — inferred rather than duplicated, so a
+// helper that takes an already-open tx (shared across createRound + openRound, see
+// createAndOpenRound below) stays in sync with withSessionContext's own signature.
+type Tx = Parameters<Parameters<typeof withSessionContext>[1]>[0];
 
 // FR-0.1: the only sanctioned entry point for reading/writing Application — every call opens its
 // transaction through the session-context helper (FR-0.3), never queries the raw client directly.
@@ -209,27 +214,35 @@ export async function listRooms(context: SessionContext) {
 // permission `data-model.md` already documents for `draft → open` — same G-C fix as createRoom
 // above (speckit-analyze finding C1): no internal check previously, relied entirely on the one
 // caller (src/app/(org)/rounds/new/actions.ts) to have checked first.
+async function insertDraftRoundTx(
+  tx: Tx,
+  context: SessionContext,
+  title: string,
+  roomIds: string[],
+  actor: Actor,
+) {
+  const [row] = await tx
+    .insert(castingRound)
+    .values({ householdId: context.householdId, title, roomIds, status: "draft" })
+    .returning();
+
+  await recordActivityEvent(tx, {
+    householdId: context.householdId,
+    eventType: "casting_round.created",
+    subjectType: "casting_round",
+    subjectId: row.id,
+    actorAccountId: actor.accountId,
+    actorProfileId: actor.profileId,
+    payload: {},
+  });
+
+  return row;
+}
+
 export async function createRound(context: SessionContext, title: string, roomIds: string[], actor: Actor) {
   if (!actor.accountId) throw new Error("createRound requires an actor accountId");
   await assertHasPermission(context, actor.accountId, "close_round");
-  return withSessionContext(context, async (tx) => {
-    const [row] = await tx
-      .insert(castingRound)
-      .values({ householdId: context.householdId, title, roomIds, status: "draft" })
-      .returning();
-
-    await recordActivityEvent(tx, {
-      householdId: context.householdId,
-      eventType: "casting_round.created",
-      subjectType: "casting_round",
-      subjectId: row.id,
-      actorAccountId: actor.accountId,
-      actorProfileId: actor.profileId,
-      payload: {},
-    });
-
-    return row;
-  });
+  return withSessionContext(context, (tx) => insertDraftRoundTx(tx, context, title, roomIds, actor));
 }
 
 export class RoundOpenPreconditionError extends Error {}
@@ -239,100 +252,123 @@ const LOCKED_ROOM_STATUSES: ReadonlySet<RoomStatus> = new Set(["occupied", "not_
 // FR-1.14/FR-1.15/FR-1.16: draft -> open takes an atomic snapshot of eligible residents into
 // RoundParticipation and freezes HouseholdSettings' four locked fields into settings_snapshot —
 // both effects or neither, in one transaction. EC-1.1/EC-1.2/EC-1.3 preconditions checked first.
+async function openRoundTx(tx: Tx, context: SessionContext, roundId: string, actor: Actor) {
+  // EC-1.9: two moderators opening the same draft round simultaneously must produce exactly
+  // one opening. `FOR UPDATE` locks this row for the rest of the transaction — a concurrent
+  // openRound's own SELECT ... FOR UPDATE blocks here until this transaction commits or rolls
+  // back, then re-reads the now-`open` row and correctly fails the status check below, instead
+  // of both transactions reading `draft` and both inserting a duplicate snapshot.
+  const [round] = await tx.select().from(castingRound).where(eq(castingRound.id, roundId)).for("update");
+  if (!round) throw new Error(`CastingRound not found: ${roundId}`);
+  if (round.status !== "draft") {
+    throw new RoundOpenPreconditionError(`Round ${roundId} is not in draft`);
+  }
+
+  // EC-1.1: no rooms selected.
+  if (round.roomIds.length === 0) {
+    throw new RoundOpenPreconditionError("This round has no rooms selected");
+  }
+
+  // EC-1.2: every covered room is already occupied/not_available.
+  const coveredRooms = await tx.select().from(room).where(inArray(room.id, round.roomIds));
+  const hasAvailableRoom = coveredRooms.some((r) => !LOCKED_ROOM_STATUSES.has(r.status));
+  if (!hasAvailableRoom) {
+    throw new RoundOpenPreconditionError(
+      "Every room this round covers is already occupied or not available",
+    );
+  }
+
+  // EC-1.3: zero eligible residents. Eligible = active ResidentProfile with an is_resident
+  // Membership in this household.
+  const eligibleProfiles = await tx
+    .select({
+      profileId: residentProfile.id,
+      canVote: membership.isResident,
+    })
+    .from(residentProfile)
+    .innerJoin(membership, eq(membership.residentProfileId, residentProfile.id))
+    .where(
+      and(
+        eq(residentProfile.householdId, context.householdId),
+        eq(residentProfile.status, "active"),
+        isNull(membership.revokedAt),
+      ),
+    );
+  if (eligibleProfiles.length === 0) {
+    // EC-1.4: exactly one eligible resident is fine — only zero is refused.
+    throw new RoundOpenPreconditionError("There are no eligible residents to snapshot");
+  }
+
+  const [settings] = await tx
+    .select()
+    .from(householdSettings)
+    .where(eq(householdSettings.householdId, context.householdId));
+  if (!settings) throw new Error(`HouseholdSettings not found for household ${context.householdId}`);
+
+  // FR-1.16: both effects together, in the same transaction — a thrown error above or below
+  // this point leaves the round untouched in `draft` with no RoundParticipation rows written.
+  await tx.insert(roundParticipation).values(
+    eligibleProfiles.map((p) => ({
+      roundId,
+      householdId: context.householdId,
+      residentProfileId: p.profileId,
+      source: "snapshot_at_open" as const,
+      canVote: p.canVote,
+    })),
+  );
+
+  const [updated] = await tx
+    .update(castingRound)
+    .set({
+      status: "open",
+      openedAt: new Date(),
+      settingsSnapshot: {
+        scaleWeights: settings.scaleWeights,
+        favoriteBudgetFactor: settings.favoriteBudgetFactor,
+        hideResultsUntilVoted: settings.hideResultsUntilVoted,
+        quorumShare: settings.quorumShare,
+      },
+    })
+    .where(eq(castingRound.id, roundId))
+    .returning();
+
+  await recordActivityEvent(tx, {
+    householdId: context.householdId,
+    eventType: "casting_round.opened",
+    subjectType: "casting_round",
+    subjectId: roundId,
+    actorAccountId: actor.accountId,
+    actorProfileId: actor.profileId,
+    payload: { participantCount: eligibleProfiles.length },
+  });
+
+  return updated;
+}
+
 export async function openRound(context: SessionContext, roundId: string, actor: Actor) {
   if (!actor.accountId) throw new Error("openRound requires an actor accountId");
   await assertHasPermission(context, actor.accountId, "close_round");
+  return withSessionContext(context, (tx) => openRoundTx(tx, context, roundId, actor));
+}
+
+// rounds-new-orphan-draft-atomicity: createRound and openRound each committed in their own
+// transaction, so a precondition failure during open left the draft round (and its
+// casting_round.created ActivityEvent) permanently behind — every failed "new round" submission
+// accumulated an orphan draft. The only real-world caller creates and opens in the same breath
+// (src/app/(org)/rounds/new/actions.ts), so this runs both steps inside one withSessionContext
+// transaction: a thrown RoundOpenPreconditionError rolls back the draft insert too, the same way
+// openRoundTx's own preconditions already roll back its snapshot writes (AC-1.10).
+export async function createAndOpenRound(
+  context: SessionContext,
+  title: string,
+  roomIds: string[],
+  actor: Actor,
+) {
+  if (!actor.accountId) throw new Error("createAndOpenRound requires an actor accountId");
+  await assertHasPermission(context, actor.accountId, "close_round");
   return withSessionContext(context, async (tx) => {
-    // EC-1.9: two moderators opening the same draft round simultaneously must produce exactly
-    // one opening. `FOR UPDATE` locks this row for the rest of the transaction — a concurrent
-    // openRound's own SELECT ... FOR UPDATE blocks here until this transaction commits or rolls
-    // back, then re-reads the now-`open` row and correctly fails the status check below, instead
-    // of both transactions reading `draft` and both inserting a duplicate snapshot.
-    const [round] = await tx.select().from(castingRound).where(eq(castingRound.id, roundId)).for("update");
-    if (!round) throw new Error(`CastingRound not found: ${roundId}`);
-    if (round.status !== "draft") {
-      throw new RoundOpenPreconditionError(`Round ${roundId} is not in draft`);
-    }
-
-    // EC-1.1: no rooms selected.
-    if (round.roomIds.length === 0) {
-      throw new RoundOpenPreconditionError("This round has no rooms selected");
-    }
-
-    // EC-1.2: every covered room is already occupied/not_available.
-    const coveredRooms = await tx.select().from(room).where(inArray(room.id, round.roomIds));
-    const hasAvailableRoom = coveredRooms.some((r) => !LOCKED_ROOM_STATUSES.has(r.status));
-    if (!hasAvailableRoom) {
-      throw new RoundOpenPreconditionError(
-        "Every room this round covers is already occupied or not available",
-      );
-    }
-
-    // EC-1.3: zero eligible residents. Eligible = active ResidentProfile with an is_resident
-    // Membership in this household.
-    const eligibleProfiles = await tx
-      .select({
-        profileId: residentProfile.id,
-        canVote: membership.isResident,
-      })
-      .from(residentProfile)
-      .innerJoin(membership, eq(membership.residentProfileId, residentProfile.id))
-      .where(
-        and(
-          eq(residentProfile.householdId, context.householdId),
-          eq(residentProfile.status, "active"),
-          isNull(membership.revokedAt),
-        ),
-      );
-    if (eligibleProfiles.length === 0) {
-      // EC-1.4: exactly one eligible resident is fine — only zero is refused.
-      throw new RoundOpenPreconditionError("There are no eligible residents to snapshot");
-    }
-
-    const [settings] = await tx
-      .select()
-      .from(householdSettings)
-      .where(eq(householdSettings.householdId, context.householdId));
-    if (!settings) throw new Error(`HouseholdSettings not found for household ${context.householdId}`);
-
-    // FR-1.16: both effects together, in the same transaction — a thrown error above or below
-    // this point leaves the round untouched in `draft` with no RoundParticipation rows written.
-    await tx.insert(roundParticipation).values(
-      eligibleProfiles.map((p) => ({
-        roundId,
-        householdId: context.householdId,
-        residentProfileId: p.profileId,
-        source: "snapshot_at_open" as const,
-        canVote: p.canVote,
-      })),
-    );
-
-    const [updated] = await tx
-      .update(castingRound)
-      .set({
-        status: "open",
-        openedAt: new Date(),
-        settingsSnapshot: {
-          scaleWeights: settings.scaleWeights,
-          favoriteBudgetFactor: settings.favoriteBudgetFactor,
-          hideResultsUntilVoted: settings.hideResultsUntilVoted,
-          quorumShare: settings.quorumShare,
-        },
-      })
-      .where(eq(castingRound.id, roundId))
-      .returning();
-
-    await recordActivityEvent(tx, {
-      householdId: context.householdId,
-      eventType: "casting_round.opened",
-      subjectType: "casting_round",
-      subjectId: roundId,
-      actorAccountId: actor.accountId,
-      actorProfileId: actor.profileId,
-      payload: { participantCount: eligibleProfiles.length },
-    });
-
-    return updated;
+    const round = await insertDraftRoundTx(tx, context, title, roomIds, actor);
+    return openRoundTx(tx, context, round.id, actor);
   });
 }
 
@@ -399,6 +435,10 @@ export async function addResidentToRound(
 // is out of F1's scope (research.md §3) — household scoping (RLS) is what gates a resident
 // session's access here, same as every other table in this feature.
 export async function getRoundForSession(context: SessionContext, roundId: string) {
+  // A route param is untrusted input — fail closed on a malformed id the same way
+  // claim/actions.ts and session-cookie.ts do, instead of letting Postgres's `::uuid` cast (or
+  // the Drizzle-builder branch below) throw a raw DB error up through the page.
+  if (!isUuid(roundId)) return null;
   return withSessionContext(context, async (tx) => {
     if (context.profileId === null) {
       const [row] = await tx.execute<{

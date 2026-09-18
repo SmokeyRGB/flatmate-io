@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { assertHasPermission } from "@/modules/identity/repository";
 import { getCurrentSession } from "@/modules/identity/session-cookie";
-import { createRound, openRound, RoundOpenPreconditionError } from "@/modules/casting/repository";
+import { createAndOpenRound, RoundOpenPreconditionError } from "@/modules/casting/repository";
 
 export interface CreateRoundFormState {
   error: string | null;
@@ -23,10 +23,12 @@ export async function createAndOpenRoundAction(
   const roomIds = formData.getAll("roomIds").map(String).filter(Boolean);
 
   const actor = { accountId: current.context.accountId, profileId: current.context.profileId };
-  const round = await createRound(current.context, title, roomIds, actor);
 
+  // rounds-new-orphan-draft-atomicity: create + open now run in one transaction (repository
+  // layer) — a precondition failure below rolls back the draft insert too, instead of leaving an
+  // orphan draft round behind for every failed submission.
   try {
-    await openRound(current.context, round.id, actor);
+    await createAndOpenRound(current.context, title, roomIds, actor);
   } catch (err) {
     if (err instanceof RoundOpenPreconditionError) {
       return { error: err.message };
