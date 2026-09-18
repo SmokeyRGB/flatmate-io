@@ -2,6 +2,12 @@ import { randomUUID } from "node:crypto";
 import { and, eq, gt, isNull, ne, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { withSessionContext, type SessionContext } from "@/db/session-context";
+
+// Mirrors casting/repository.ts's own `Tx` alias — kept in sync with withSessionContext's
+// signature so a `...Tx` helper below can be composed under one outer transaction by callers
+// that need more than one write to commit atomically (speckit-bug-fix
+// identity-moveout-session-revocation-not-atomic).
+type Tx = Parameters<Parameters<typeof withSessionContext>[1]>[0];
 import { recordActivityEvent } from "@/modules/audit/repository";
 import { account, household, householdSettings, membership, residentProfile, session } from "./schema";
 import {
@@ -81,52 +87,61 @@ export async function createResidentProfile(
 // FR-1.26 ("set moved_out", "reactivate") and the claim step (prepared -> active) all route
 // through this one transition function — ADR-002's "declared table, no silent fallthrough"
 // discipline, mirrored from casting/repository.ts's transitionApplication.
+async function transitionResidentProfileStatusTx(
+  tx: Tx,
+  residentProfileId: string,
+  toStatus: ResidentProfileStatus,
+  actor: Actor,
+) {
+  const [current] = await tx
+    .select()
+    .from(residentProfile)
+    .where(eq(residentProfile.id, residentProfileId));
+
+  if (!current) {
+    throw new Error(`ResidentProfile not found: ${residentProfileId}`);
+  }
+
+  const fromStatus = current.status;
+  assertResidentProfileTransitionAllowed(fromStatus, toStatus);
+
+  const patch: { status: ResidentProfileStatus; movedOutOn?: string | null } = { status: toStatus };
+  if (toStatus === "moved_out") {
+    patch.movedOutOn = new Date().toISOString().slice(0, 10);
+  } else if (fromStatus === "moved_out") {
+    // moved_out -> active (reactivation, U-27/U-30): clear the stale move-out date rather than
+    // leaving it dangling on an otherwise-active profile.
+    patch.movedOutOn = null;
+  }
+
+  const [updated] = await tx
+    .update(residentProfile)
+    .set(patch)
+    .where(eq(residentProfile.id, residentProfileId))
+    .returning();
+
+  await recordActivityEvent(tx, {
+    householdId: current.householdId,
+    eventType: "resident_profile.status_changed",
+    subjectType: "resident_profile",
+    subjectId: residentProfileId,
+    actorAccountId: actor.accountId,
+    actorProfileId: actor.profileId,
+    payload: { fromStatus, toStatus },
+  });
+
+  return updated;
+}
+
 export async function transitionResidentProfileStatus(
   context: SessionContext,
   residentProfileId: string,
   toStatus: ResidentProfileStatus,
   actor: Actor,
 ) {
-  return withSessionContext(context, async (tx) => {
-    const [current] = await tx
-      .select()
-      .from(residentProfile)
-      .where(eq(residentProfile.id, residentProfileId));
-
-    if (!current) {
-      throw new Error(`ResidentProfile not found: ${residentProfileId}`);
-    }
-
-    const fromStatus = current.status;
-    assertResidentProfileTransitionAllowed(fromStatus, toStatus);
-
-    const patch: { status: ResidentProfileStatus; movedOutOn?: string | null } = { status: toStatus };
-    if (toStatus === "moved_out") {
-      patch.movedOutOn = new Date().toISOString().slice(0, 10);
-    } else if (fromStatus === "moved_out") {
-      // moved_out -> active (reactivation, U-27/U-30): clear the stale move-out date rather than
-      // leaving it dangling on an otherwise-active profile.
-      patch.movedOutOn = null;
-    }
-
-    const [updated] = await tx
-      .update(residentProfile)
-      .set(patch)
-      .where(eq(residentProfile.id, residentProfileId))
-      .returning();
-
-    await recordActivityEvent(tx, {
-      householdId: current.householdId,
-      eventType: "resident_profile.status_changed",
-      subjectType: "resident_profile",
-      subjectId: residentProfileId,
-      actorAccountId: actor.accountId,
-      actorProfileId: actor.profileId,
-      payload: { fromStatus, toStatus },
-    });
-
-    return updated;
-  });
+  return withSessionContext(context, (tx) =>
+    transitionResidentProfileStatusTx(tx, residentProfileId, toStatus, actor),
+  );
 }
 
 // The ONE deliberate RLS-bootstrap exception (drizzle/0005_identity_login_bootstrap_function.sql,
@@ -347,38 +362,42 @@ export async function assertIsAdministration(context: SessionContext, accountId:
 // would otherwise go on resolving to this profile regardless of Membership.revokedAt). Shared by
 // both removal tiers below (U-27): the soft path (an actual move-out, via
 // transitionResidentProfileStatus) and the hard path (removeMember) both end here.
-async function revokeMembershipForProfile(
+// speckit-bug-fix identity-moveout-session-revocation-not-atomic: split into a `Tx` helper (no
+// `withSessionContext` of its own) so setMovedOut/removeMember can compose it under the same
+// outer transaction as transitionResidentProfileStatusTx — the status update, the
+// membership/session revocation, and both audit writes now commit or roll back together instead
+// of as two independent commits.
+async function revokeMembershipForProfileTx(
+  tx: Tx,
   context: SessionContext,
   residentProfileId: string,
   eventType: "membership.revoked" | "membership.removed_as_intruder",
   actor: Actor,
 ): Promise<void> {
-  await withSessionContext(context, async (tx) => {
-    const [target] = await tx
-      .select()
-      .from(membership)
-      .where(eq(membership.residentProfileId, residentProfileId));
-    if (!target) return; // profile was never claimed (still `prepared`) — nothing to revoke
+  const [target] = await tx
+    .select()
+    .from(membership)
+    .where(eq(membership.residentProfileId, residentProfileId));
+  if (!target) return; // profile was never claimed (still `prepared`) — nothing to revoke
 
-    await tx.update(membership).set({ revokedAt: new Date() }).where(eq(membership.id, target.id));
+  await tx.update(membership).set({ revokedAt: new Date() }).where(eq(membership.id, target.id));
 
-    // V-3: a pre-existing session must stop working immediately, not just at its next
-    // resolveSessionContext-independent check — revoking the Membership alone leaves any session
-    // already issued for this account still resolving (session.revokedAt is a separate column).
-    await tx
-      .update(session)
-      .set({ revokedAt: new Date() })
-      .where(and(eq(session.accountId, target.accountId), isNull(session.revokedAt)));
+  // V-3: a pre-existing session must stop working immediately, not just at its next
+  // resolveSessionContext-independent check — revoking the Membership alone leaves any session
+  // already issued for this account still resolving (session.revokedAt is a separate column).
+  await tx
+    .update(session)
+    .set({ revokedAt: new Date() })
+    .where(and(eq(session.accountId, target.accountId), isNull(session.revokedAt)));
 
-    await recordActivityEvent(tx, {
-      householdId: context.householdId,
-      eventType,
-      subjectType: "membership",
-      subjectId: target.id,
-      actorAccountId: actor.accountId,
-      actorProfileId: actor.profileId,
-      payload: {},
-    });
+  await recordActivityEvent(tx, {
+    householdId: context.householdId,
+    eventType,
+    subjectType: "membership",
+    subjectId: target.id,
+    actorAccountId: actor.accountId,
+    actorProfileId: actor.profileId,
+    payload: {},
   });
 }
 
@@ -409,7 +428,12 @@ export async function removeMember(
   await assertIsAdministrationOrModerator(context, actingAccountId);
   const actor: Actor = { accountId: actingAccountId, profileId: null };
 
-  const residentProfileId = await withSessionContext(context, async (tx) => {
+  // speckit-bug-fix identity-moveout-session-revocation-not-atomic: the lookup/confirmation
+  // check, the status transition, and the membership/session revocation now share one
+  // transaction — previously each was its own withSessionContext call, so a failure between them
+  // (e.g. while revoking the session) could leave a `moved_out` profile with a still-usable
+  // session, violating V-3.
+  await withSessionContext(context, async (tx) => {
     const [row] = await tx.select().from(membership).where(eq(membership.accountId, targetAccountId));
     if (!row) throw new Error(`Membership not found for account ${targetAccountId}`);
     if (!row.residentProfileId) throw new Error("Cannot remove an account with no resident profile");
@@ -423,13 +447,11 @@ export async function removeMember(
       throw new DisplayNameConfirmationMismatchError();
     }
 
-    return profile.id;
+    // Goes through the declared transition table (ADR-002) like every other status change, not a
+    // raw UPDATE — active/prepared -> moved_out are both already-declared transitions.
+    await transitionResidentProfileStatusTx(tx, profile.id, "moved_out", actor);
+    await revokeMembershipForProfileTx(tx, context, profile.id, "membership.removed_as_intruder", actor);
   });
-
-  // Goes through the declared transition table (ADR-002) like every other status change, not a
-  // raw UPDATE — active/prepared -> moved_out are both already-declared transitions.
-  await transitionResidentProfileStatus(context, residentProfileId, "moved_out", actor);
-  await revokeMembershipForProfile(context, residentProfileId, "membership.removed_as_intruder", actor);
 }
 
 // FR-1.26 soft tier ("moved_out"): the regular path for an actual move-out — votes/history stay
@@ -442,15 +464,17 @@ export async function setMovedOut(
   await assertIsAdministrationOrModerator(context, actingAccountId);
   const actor: Actor = { accountId: actingAccountId, profileId: null };
 
-  const target = await withSessionContext(context, async (tx) => {
+  // speckit-bug-fix identity-moveout-session-revocation-not-atomic: one shared transaction — see
+  // removeMember above for why (V-3 requires the status change and the revocation to commit or
+  // roll back together).
+  await withSessionContext(context, async (tx) => {
     const [row] = await tx.select().from(membership).where(eq(membership.accountId, targetAccountId));
     if (!row) throw new Error(`Membership not found for account ${targetAccountId}`);
     if (!row.residentProfileId) throw new Error("Cannot set moved_out on an account with no resident profile");
-    return row;
-  });
 
-  await transitionResidentProfileStatus(context, target.residentProfileId!, "moved_out", actor);
-  await revokeMembershipForProfile(context, target.residentProfileId!, "membership.revoked", actor);
+    await transitionResidentProfileStatusTx(tx, row.residentProfileId, "moved_out", actor);
+    await revokeMembershipForProfileTx(tx, context, row.residentProfileId, "membership.revoked", actor);
+  });
 }
 
 // Reverses either removal tier: restores ResidentProfile to `active` (via the declared
