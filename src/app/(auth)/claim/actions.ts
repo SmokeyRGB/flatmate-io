@@ -10,7 +10,7 @@ import {
   signIn,
 } from "@/modules/identity/auth";
 import { setSessionCookie } from "@/modules/identity/session-cookie";
-import type { SessionContext } from "@/db/session-context";
+import { isUuid, type SessionContext } from "@/db/session-context";
 
 export interface ClaimFormState {
   error: string | null;
@@ -30,6 +30,14 @@ export async function claimResidentProfileAction(
 
   if (!householdId || !displayName || !password) {
     return { error: "Household, name, and password are all required." };
+  }
+
+  // householdId reaches findPreparedResidentProfile -> withSessionContext's assertUuid below,
+  // whose plain (non-ClaimError) Error would otherwise escape this action's catch block uncaught
+  // for a non-empty, non-UUID value — fail closed here instead (isUuid is exported from
+  // session-context.ts for exactly this: untrusted input reaching a session-context boundary).
+  if (!isUuid(householdId)) {
+    return { error: "That household link looks invalid." };
   }
 
   try {
