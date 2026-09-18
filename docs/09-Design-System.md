@@ -1,5 +1,9 @@
 ## Design System
 
+> Tokens below bind colors, typography, spacing and component selection (`README.md` §6). The
+> implementation library that renders them — Tailwind CSS + shadcn/ui — is decided in
+> [`adr/0015-styling-tailwind-shadcn.md`](adr/0015-styling-tailwind-shadcn.md), not here.
+
 Overall direction: A warm, paper-like "apartment notebook" aesthetic — cream paper surfaces, deep ink-brown text, terracotta as the single brand accent. Clean, card-based layout with generous rounding and very soft shadows; mobile-first, calm and tactile rather than techy.
 
 Color Palette — Light theme (default)

@@ -7,7 +7,7 @@
 
 ---
 
-## Die vierzehn Records
+## Die fünfzehn Records
 
 | # | Entscheidung | Status |
 |---|---|---|
@@ -25,8 +25,9 @@
 | [0012](0012-deutsch-dokumente-englisch-code.md) | Deutsch in Dokumenten, Englisch im Code | ✅ Bestätigt |
 | [0013](0013-zwei-account-typen-feste-identitaet.md) | Zwei Account-Typen, eine feste Identität je Sitzung — der Wechsel verlangt Abmelden und neue Anmeldung | ✅ Bestätigt |
 | [0014](0014-haushalts-account-sieht-runden-ohne-bewerbungsdaten.md) | Der Haushalts-Account sieht Runden in Identität und Lebenszyklus, aber nichts aus `Application` — auch keine Zahlen | ✅ Bestätigt |
+| [0015](0015-styling-tailwind-shadcn.md) | Styling: Tailwind CSS + shadcn/ui (Radix-Primitives) | ✅ Bestätigt |
 
-**9 bestätigt · 5 Vorschlag · 0 angenommen.**
+**10 bestätigt · 5 Vorschlag · 0 angenommen.**
 
 ---
 
