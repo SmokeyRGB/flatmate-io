@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHmac, randomUUID } from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
 import { and, eq, ne } from "drizzle-orm";
 import { withSessionContext, type SessionContext } from "@/db/session-context";
@@ -215,6 +215,18 @@ export async function claimResidentProfile(
   });
 }
 
+// docs/GUARDRAILS.md:108 / Session.token_hash's documented "nur der Hash" contract: this column
+// must never hold token material, only a one-way digest of it. Keyed (HMAC) rather than plain
+// SHA-256 so the same digest can later back a lookup-by-token (revocation, session listing)
+// without a leaked digest alone being usable to search for a matching token — that requires the
+// server-side secret too. Exported so future lookup/revocation code hashes with this exact
+// function, keeping write and read consistent.
+export function hashSessionToken(accessToken: string): string {
+  const secret = process.env.SESSION_TOKEN_HASH_SECRET;
+  if (!secret) throw new Error("SESSION_TOKEN_HASH_SECRET is not configured");
+  return createHmac("sha256", secret).update(accessToken).digest("hex");
+}
+
 export class SignInError extends Error {}
 
 export interface SignInResult {
@@ -299,12 +311,9 @@ export async function signIn(
       .insert(session)
       .values({
         householdId,
-        tokenHash: data.session!.access_token.slice(-32), // a fixed-length reference to the
-        // Supabase Auth session, not itself a secret store — Supabase's own JWT remains the bearer
-        // credential; this column exists so this app's own Session row can be looked up/revoked
-        // per identity.md's Session entity, matching Session.token_hash's documented "hash only"
-        // shape (a real HMAC of the token would be the production version; out of F1's acceptance
-        // scope, which only requires the row and its immutability guarantee to exist, T016/T017).
+        tokenHash: hashSessionToken(data.session!.access_token), // HMAC digest, not the token
+        // itself — Supabase's own JWT remains the bearer credential; this column exists so this
+        // app's own Session row can be looked up/revoked per identity.md's Session entity.
         accountId,
         actingProfileId,
         rememberMe: true,
