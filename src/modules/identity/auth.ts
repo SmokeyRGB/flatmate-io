@@ -108,6 +108,35 @@ export async function registerHousehold(email: string, password: string) {
   });
 }
 
+// speckit-bug-fix register-action-not-atomic-with-signin: compensating cleanup for a registration
+// whose subsequent signIn/session-setup step failed, mirroring undoClaimResidentProfile below —
+// registerHousehold's DB transaction cannot simply be deferred until after signIn for the same
+// reason: signIn requires the Auth user (and its password) to already exist. Undoes exactly what
+// registerHousehold just committed for THIS householdId/accountId (never a broader lookup), so a
+// retry with the same email doesn't hit Supabase Auth's "already registered" on createUser.
+export async function undoRegisterHousehold(
+  context: SessionContext,
+  householdId: string,
+  accountId: string,
+): Promise<void> {
+  await withSessionContext(context, async (tx) => {
+    await tx.delete(membership).where(eq(membership.householdId, householdId));
+    await tx.delete(account).where(eq(account.id, accountId));
+    await tx.delete(householdSettings).where(eq(householdSettings.householdId, householdId));
+    await tx.delete(household).where(eq(household.id, householdId));
+  });
+
+  // Best-effort, same reasoning as undoClaimResidentProfile: the DB rollback above is what
+  // actually gates a clean retry (registerHousehold's own createUser call is what would otherwise
+  // fail as a duplicate), so a failure deleting the Auth user must not mask the original
+  // session-setup error or crash the request.
+  try {
+    await supabaseAdmin().auth.admin.deleteUser(accountId);
+  } catch {
+    // ponytail: best-effort external cleanup, no retry loop — see comment above.
+  }
+}
+
 // FR-1.5: the household account creates a resident profile for the person operating it, including
 // itself — but never occupies it (ADR-013). This function only creates the ResidentProfile row
 // (identity/repository.ts's createResidentProfile); granting it its own Account/Membership happens
@@ -213,6 +242,39 @@ export async function claimResidentProfile(
 
     return { accountId, membership: membershipRow };
   });
+}
+
+// speckit-bug-fix claim-action-not-atomic-with-session-setup: compensating cleanup for a claim
+// whose subsequent signIn/session-setup step failed. claimResidentProfile's DB transaction cannot
+// simply be deferred until after signIn — signIn requires the Auth user (and its password) to
+// already exist, so the two steps are inherently ordered. Instead this undoes exactly what
+// claimResidentProfile just committed for THIS accountId/residentProfileId (never a broader
+// lookup), so a retry of the claim form finds the profile `prepared` again.
+export async function undoClaimResidentProfile(
+  context: SessionContext,
+  residentProfileId: string,
+  accountId: string,
+): Promise<void> {
+  await withSessionContext(context, async (tx) => {
+    await tx.delete(membership).where(eq(membership.accountId, accountId));
+    await tx.delete(account).where(eq(account.id, accountId));
+    await tx
+      .update(residentProfile)
+      .set({ status: "prepared", movedInOn: null })
+      .where(eq(residentProfile.id, residentProfileId));
+  });
+
+  // Best-effort: this DB rollback above is what actually gates a retry (findPreparedResidentProfile
+  // only checks ResidentProfile.status), so a failure deleting the Auth user must not mask the
+  // original session-setup error or crash the request. An orphaned, password-set-but-unlinked Auth
+  // user is harmless — deriveResidentEmail's address is deterministic, so a retry's createUser call
+  // will simply fail with "already registered" if this delete didn't go through, surfacing as an
+  // ordinary ClaimError rather than a stuck or crashed request.
+  try {
+    await supabaseAdmin().auth.admin.deleteUser(accountId);
+  } catch {
+    // ponytail: best-effort external cleanup, no retry loop — see comment above.
+  }
 }
 
 // docs/GUARDRAILS.md:108 / Session.token_hash's documented "nur der Hash" contract: this column

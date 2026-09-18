@@ -8,6 +8,7 @@ import {
   claimResidentProfile,
   findPreparedResidentProfile,
   signIn,
+  undoClaimResidentProfile,
 } from "@/modules/identity/auth";
 import { setSessionCookie } from "@/modules/identity/session-cookie";
 import { isUuid, type SessionContext } from "@/db/session-context";
@@ -47,12 +48,25 @@ export async function claimResidentProfileAction(
     }
 
     const context: SessionContext = { accountId: randomUUID(), householdId, profileId: null };
-    await claimResidentProfile(context, profile.id, password);
+    const claimed = await claimResidentProfile(context, profile.id, password);
 
-    const result = await signIn({ kind: "resident", householdId, displayName, password });
-    await setSessionCookie(result.session.id, result.context.householdId);
+    // speckit-bug-fix claim-action-not-atomic-with-session-setup: claimResidentProfile already
+    // committed (Auth user + Account + Membership + status: "active"). signIn requires that
+    // committed Auth user to exist, so it cannot run first — instead, any failure past this point
+    // (including a plain Error, e.g. hashSessionToken's missing-secret case, which isn't a
+    // SignInError) triggers compensating cleanup so a retry finds the profile `prepared` again.
+    try {
+      const result = await signIn({ kind: "resident", householdId, displayName, password });
+      await setSessionCookie(result.session.id, result.context.householdId);
+    } catch (sessionErr) {
+      await undoClaimResidentProfile(context, profile.id, claimed.accountId);
+      if (sessionErr instanceof SignInError) {
+        return { error: sessionErr.message };
+      }
+      return { error: "Something went wrong completing sign-in. Please try again." };
+    }
   } catch (err) {
-    if (err instanceof ClaimError || err instanceof SignInError) {
+    if (err instanceof ClaimError) {
       return { error: err.message };
     }
     throw err;

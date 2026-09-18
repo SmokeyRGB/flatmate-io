@@ -1,7 +1,13 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { RegistrationError, SignInError, registerHousehold, signIn } from "@/modules/identity/auth";
+import {
+  RegistrationError,
+  SignInError,
+  registerHousehold,
+  signIn,
+  undoRegisterHousehold,
+} from "@/modules/identity/auth";
 import { setSessionCookie } from "@/modules/identity/session-cookie";
 
 export interface RegisterFormState {
@@ -23,11 +29,26 @@ export async function registerHouseholdAction(
   if (!password) return { error: "Password is required.", fieldError: "password" };
 
   try {
-    await registerHousehold(email, password);
-    const result = await signIn({ kind: "household", email, password });
-    await setSessionCookie(result.session.id, result.context.householdId);
+    const registered = await registerHousehold(email, password);
+
+    // speckit-bug-fix register-action-not-atomic-with-signin: registerHousehold already committed
+    // (Auth user + Household + HouseholdSettings + Account + Membership). signIn requires that
+    // committed Auth user to exist, so it cannot run first — instead, any failure past this point
+    // (including a plain Error, e.g. hashSessionToken's missing-secret case, which isn't a
+    // SignInError) triggers compensating cleanup so a retry with the same email doesn't fail as a
+    // duplicate registration.
+    try {
+      const result = await signIn({ kind: "household", email, password });
+      await setSessionCookie(result.session.id, result.context.householdId);
+    } catch (sessionErr) {
+      await undoRegisterHousehold(registered.context, registered.context.householdId, registered.context.accountId);
+      if (sessionErr instanceof SignInError) {
+        return { error: sessionErr.message, fieldError: null };
+      }
+      return { error: "Something went wrong completing sign-in. Please try again.", fieldError: null };
+    }
   } catch (err) {
-    if (err instanceof RegistrationError || err instanceof SignInError) {
+    if (err instanceof RegistrationError) {
       return { error: err.message, fieldError: null };
     }
     throw err;
