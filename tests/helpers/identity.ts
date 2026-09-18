@@ -10,6 +10,7 @@ import {
   residentProfile,
   session,
 } from "@/modules/identity/schema";
+import { application, castingRound, room, roundParticipation } from "@/modules/casting/schema";
 import { uuid } from "./uuid";
 
 function adminClient() {
@@ -41,12 +42,26 @@ export async function registerTestHousehold(): Promise<TestHousehold> {
 
   const cleanup = async () => {
     await withSessionContext(context, async (tx) => {
+      // Casting-owned rows first. These carry household_id as a bare uuid with **no foreign key**
+      // to household (casting/schema.ts), so deleting the household below succeeds silently and
+      // orphans them — which is how the production project accumulated 1.9k rooms and 1.5k rounds
+      // before this was noticed. round_participation goes before casting_round only for
+      // readability; there is no FK to order them either.
+      await tx.delete(roundParticipation).where(eq(roundParticipation.householdId, context.householdId));
+      await tx.delete(castingRound).where(eq(castingRound.householdId, context.householdId));
+      await tx.delete(room).where(eq(room.householdId, context.householdId));
+      await tx.delete(application).where(eq(application.householdId, context.householdId));
+
       await tx.delete(residentProfile).where(eq(residentProfile.householdId, context.householdId));
       await tx.delete(membership).where(eq(membership.householdId, context.householdId));
       await tx.delete(session).where(eq(session.householdId, context.householdId));
       await tx.delete(account).where(eq(account.householdId, context.householdId));
       await tx.delete(householdSettings).where(eq(householdSettings.householdId, context.householdId));
       await tx.delete(household).where(eq(household.id, context.householdId));
+
+      // activity_event is deliberately NOT deleted: FR-0.13 makes it append-only, enforced by
+      // RESTRICTIVE policies plus FORCE ROW LEVEL SECURITY, so even this transaction cannot remove
+      // it. Audit rows accumulating in the dev project is the intended trade-off.
     });
     await adminClient().auth.admin.deleteUser(context.accountId);
   };

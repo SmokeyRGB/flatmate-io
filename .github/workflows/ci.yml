@@ -44,16 +44,24 @@ jobs:
       - run: npm run build
 
       # eslint + the four custom guardrail checks + the full test suite. The integration tests
-      # talk to the real Supabase project (transaction-mode pooler) and, since F1, to Supabase
+      # talk to a real Supabase project (transaction-mode pooler) and, since F1, to Supabase
       # Auth's admin API — so this needs DATABASE_URL plus the three Supabase env vars.
+      #
+      # Since 2026-09-18 this is the **flatmate-io-dev** project, not production. The suite
+      # creates real households and Auth users and its cleanup is best-effort, so CI was steadily
+      # writing rows into production that nothing could remove (activity_event is append-only).
+      # tests/setup.ts now refuses to run if these point back at the production ref.
       - run: npm run verify
         env:
+          # Must now be the flatmate-io-dev pooler string (app_runtime, port 6543). Update it at
+          # Settings > Secrets and variables > Actions; a stale production value makes the run
+          # fail fast in tests/setup.ts rather than writing to production.
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           # Project URL and anon/publishable key are not secret — NEXT_PUBLIC_* is meant to ship
           # in the browser bundle, so hardcoding them here (rather than as repo secrets) is
-          # correct, not a shortcut. flatmate-io project (cjinhzzvjryojvhngjjn), eu-west-1.
-          NEXT_PUBLIC_SUPABASE_URL: "https://cjinhzzvjryojvhngjjn.supabase.co"
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNqaW5oenp2anJ5b2p2aG5nampuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk0ODg5NzUsImV4cCI6MjEwNTA2NDk3NX0.ac1SbuP5Is9PYW2mgKrVeDzoZ_7huOsuxf82HIs0NH8" # gitleaks:allow — anon key, public by design
+          # correct, not a shortcut. flatmate-io-dev project (jrhkhjeybtkqpkggssif), eu-west-1.
+          NEXT_PUBLIC_SUPABASE_URL: "https://jrhkhjeybtkqpkggssif.supabase.co"
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpyaGtoamV5YnRrcXBrZ2dzc2lmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk3MjI3MTYsImV4cCI6MjEwNTI5ODcxNn0.bu3JShx9rXq2DKy9_W2XHAxsrWb8Ce4Vymx0_oBfREM" # gitleaks:allow — anon key, public by design
           # This one IS a real secret (bypasses RLS entirely) — add it via GitHub: Settings >
           # Secrets and variables > Actions > New repository secret, name
           # SUPABASE_SERVICE_ROLE_KEY. Never hardcode it here the way the two values above are.
