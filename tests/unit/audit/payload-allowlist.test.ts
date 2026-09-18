@@ -1,5 +1,5 @@
 import { eq } from "drizzle-orm";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { withSessionContext } from "@/db/session-context";
 import { activityEvent } from "@/modules/audit/schema";
 import { application } from "@/modules/casting/schema";
@@ -47,8 +47,23 @@ describe("ActivityEvent payload allowlist (FR-0.14, EC-0.5, G-D7)", () => {
 // originally asserted the payload became `{}` entirely, which was the bug, not the spec — see
 // src/modules/audit/repository.ts's REDACTABLE_KEYS comment for the full history.
 describe("ActivityEvent retention redaction (FR-0.13, EC-0.6, G-D8)", () => {
+  // These households are invented uuids that no Household row backs, so registerTestHousehold's
+  // cleanup() never covered them and each run leaked two Applications. The ActivityEvents these
+  // tests assert on are append-only (FR-0.13) and stay by design.
+  const seededHouseholds: string[] = [];
+
+  afterEach(async () => {
+    for (const householdId of seededHouseholds) {
+      await withSessionContext({ accountId: uuid(), householdId, profileId: null }, (tx) =>
+        tx.delete(application).where(eq(application.householdId, householdId)),
+      );
+    }
+    seededHouseholds.length = 0;
+  });
+
   it("leaves application.state_changed's payload untouched — fromState/toState are state names, not personal data, so nothing is classified sensitive for this event_type", async () => {
     const householdId = uuid();
+    seededHouseholds.push(householdId);
     const profileId = uuid();
     const pastDate = new Date(Date.now() - 200 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
@@ -103,6 +118,7 @@ describe("ActivityEvent retention redaction (FR-0.13, EC-0.6, G-D8)", () => {
 
   it("does not touch events referencing an Application whose retention has not yet expired", async () => {
     const householdId = uuid();
+    seededHouseholds.push(householdId);
     const profileId = uuid();
     const futureDate = new Date(Date.now() + 200 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 

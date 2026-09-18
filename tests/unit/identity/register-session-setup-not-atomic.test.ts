@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import { withSessionContext } from "@/db/session-context";
-import { account, household, householdSettings, membership } from "@/modules/identity/schema";
+import { account, household, householdSettings, membership, session } from "@/modules/identity/schema";
 import { registerHousehold, signIn, undoRegisterHousehold } from "@/modules/identity/auth";
 import { deleteTestAccount, testEmail } from "../../helpers/identity";
 
@@ -62,6 +62,10 @@ describe("register: compensating cleanup when session setup fails", () => {
 
     // Cleanup the successful retry's rows (registerTestHousehold's own cleanup shape).
     await withSessionContext(retried.context, async (tx) => {
+      // The signIn above created a Session row. This list omitted it until 2026-09-18, so every
+      // run left one orphaned session behind — an inline copy of cleanup() that had drifted from
+      // the original, the same way the casting-table deletes were missing from cleanup() itself.
+      await tx.delete(session).where(eq(session.householdId, retried.context.householdId));
       await tx.delete(membership).where(eq(membership.householdId, retried.context.householdId));
       await tx.delete(account).where(eq(account.id, retried.context.accountId));
       await tx.delete(householdSettings).where(eq(householdSettings.householdId, retried.context.householdId));
