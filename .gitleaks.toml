@@ -7,11 +7,12 @@ title = "flatmate-io"
 useDefault = true
 
 [allowlist]
-description = "Files that must contain placeholder-shaped values by design (G-A2)"
-paths = [
-  # G-A2: the only file allowed to hold connection-string/key *shapes* in the repo — every value
-  # in it must already be a placeholder, never a real credential. Scanning it for "real-looking"
-  # secrets is definitionally never useful, and a well-formed placeholder can still resemble a
-  # real key shape closely enough to false-positive.
-  '''(^|/)\.env\.example$''',
+description = "Placeholder tokens (G-A2), not whole files — a well-formed [YOUR-...] placeholder"
+# can resemble a real key shape closely enough to false-positive, but only the placeholder text
+# itself should be exempt. regexTarget = "match" means these regexes are compared against the
+# matched secret substring, not the whole line/file, so a real credential pasted into
+# .env.example (replacing a placeholder) is still caught instead of being silently ignored.
+regexTarget = "match"
+regexes = [
+  '''^\[YOUR-[A-Z0-9-]+\]$''',
 ]
