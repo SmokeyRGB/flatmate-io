@@ -19,8 +19,11 @@ jobs:
         with:
           fetch-depth: 0 # full history — gitleaks scans commits, not just the working tree
 
+      # Pinned to a released version, not :latest — a future image update must not be able to
+      # change scan rules/behavior without a deliberate bump of this line. Bump by editing the
+      # tag after checking https://github.com/gitleaks/gitleaks/releases.
       - name: Gitleaks scan
-        uses: docker://ghcr.io/gitleaks/gitleaks:latest
+        uses: docker://ghcr.io/gitleaks/gitleaks:v8.30.1
         with:
           args: detect --redact --verbose
 
