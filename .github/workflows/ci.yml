@@ -58,5 +58,10 @@ jobs:
           # Secrets and variables > Actions > New repository secret, name
           # SUPABASE_SERVICE_ROLE_KEY. Never hardcode it here the way the two values above are.
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          # HMAC key for Session.token_hash (src/modules/identity/auth.ts, hashSessionToken) —
+          # add via the same Settings > Secrets and variables > Actions path, name
+          # SESSION_TOKEN_HASH_SECRET. A random value generated once for CI is fine; it never
+          # needs to match any other environment's secret.
+          SESSION_TOKEN_HASH_SECRET: ${{ secrets.SESSION_TOKEN_HASH_SECRET }}
 
       - run: bash tools/check-refs.sh --quiet
