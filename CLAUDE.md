@@ -87,8 +87,13 @@ bun run format    # prettier --write .
   `tests/integration/policy/` and `tests/integration/raw-sql/` — the two-sided RLS check G-C7
   demands. `test/guarded.manifest.json` tracks which G-D invariants have real test coverage;
   update it in the same commit as the test, never mark `implemented` speculatively. Tests hit a
-  real Supabase instance (no mocking DB/auth calls per F0 precedent) — expect real network latency
-  (`testTimeout: 20000`).
+  real Supabase instance (no mocking DB/auth calls per F0 precedent) — specifically
+  **`flatmate-io-dev`**, never production; `tests/setup.ts` throws if `DATABASE_URL` or
+  `NEXT_PUBLIC_SUPABASE_URL` names the production ref. Expect real network latency: the suite runs
+  ~45s locally but 260–350s in CI, so `testTimeout` and `hookTimeout` are both `60000`. Teardown
+  belongs in `afterEach`, not in a `finally` inside the test — a timeout aborts before `finally`
+  runs, which used to orphan households — and `tests/setup.ts` adds a global sweep as a net
+  beneath each file's own cleanup, never as a replacement for it.
 - **`drizzle/`**: generated migrations from `drizzle.config.ts`, which points at the three modules'
   `schema.ts` files as the source of truth.
 - **`openspec/`**: the delivery workflow. `config.yaml` carries the project context and per-artifact
