@@ -245,7 +245,22 @@ export async function createRound(context: SessionContext, title: string, roomId
   return withSessionContext(context, (tx) => insertDraftRoundTx(tx, context, title, roomIds, actor));
 }
 
-export class RoundOpenPreconditionError extends Error {}
+// german-ui-vocabulary: not one of design.md Decision 4's named classes (tasks.md's error-code
+// tasks enumerate RegistrationError/ClaimError/SignInError only), but this class's message reaches
+// the same form as those — rounds/new/actions.ts's `return { error: err.message }` — with four
+// distinct conditions, one of which carries a raw round id. Given the same code-discriminant
+// treatment for the same reason (design.md Decision 4); see the implementation report.
+export type RoundOpenPreconditionErrorCode =
+  | "not_in_draft"
+  | "no_rooms_selected"
+  | "rooms_unavailable"
+  | "no_eligible_residents";
+
+export class RoundOpenPreconditionError extends Error {
+  constructor(message: string, readonly code: RoundOpenPreconditionErrorCode) {
+    super(message);
+  }
+}
 
 const LOCKED_ROOM_STATUSES: ReadonlySet<RoomStatus> = new Set(["occupied", "not_available"]);
 
@@ -261,12 +276,12 @@ async function openRoundTx(tx: Tx, context: SessionContext, roundId: string, act
   const [round] = await tx.select().from(castingRound).where(eq(castingRound.id, roundId)).for("update");
   if (!round) throw new Error(`CastingRound not found: ${roundId}`);
   if (round.status !== "draft") {
-    throw new RoundOpenPreconditionError(`Round ${roundId} is not in draft`);
+    throw new RoundOpenPreconditionError(`Round ${roundId} is not in draft`, "not_in_draft");
   }
 
   // EC-1.1: no rooms selected.
   if (round.roomIds.length === 0) {
-    throw new RoundOpenPreconditionError("This round has no rooms selected");
+    throw new RoundOpenPreconditionError("This round has no rooms selected", "no_rooms_selected");
   }
 
   // EC-1.2: every covered room is already occupied/not_available.
@@ -275,6 +290,7 @@ async function openRoundTx(tx: Tx, context: SessionContext, roundId: string, act
   if (!hasAvailableRoom) {
     throw new RoundOpenPreconditionError(
       "Every room this round covers is already occupied or not available",
+      "rooms_unavailable",
     );
   }
 
@@ -296,7 +312,7 @@ async function openRoundTx(tx: Tx, context: SessionContext, roundId: string, act
     );
   if (eligibleProfiles.length === 0) {
     // EC-1.4: exactly one eligible resident is fine — only zero is refused.
-    throw new RoundOpenPreconditionError("There are no eligible residents to snapshot");
+    throw new RoundOpenPreconditionError("There are no eligible residents to snapshot", "no_eligible_residents");
   }
 
   const [settings] = await tx

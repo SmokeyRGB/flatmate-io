@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { updateHouseholdSettingsWithProcedureLock } from "@/modules/casting/repository";
 import { getCurrentSession } from "@/modules/identity/session-cookie";
+import { de } from "@/ui/strings";
 
 export interface SettingsFormState {
   error: string | null;
@@ -22,7 +23,16 @@ export async function updateSettingsAction(
   try {
     await updateHouseholdSettingsWithProcedureLock(current.context, { quorumShare }, actor);
   } catch (err) {
-    if (err instanceof Error) return { error: err.message };
+    // german-ui-vocabulary: this used to pass `err.message` straight through. That leaks
+    // ProcedureLockedError's raw text (a round id and field names) and PermissionDeniedError's
+    // raw permission slug to the resident — both are neither coded (tasks.md 2.3/2.4) nor
+    // English-literal-free. Mapped to one generic key instead; the real message still reaches the
+    // log (design.md Decision 6's reasoning, applied here too — see the implementation report for
+    // why this class needed it despite not being named in tasks.md).
+    if (err instanceof Error) {
+      console.error(err);
+      return { error: de.settings.errors.genericSaveFailure };
+    }
     throw err;
   }
 

@@ -4,7 +4,10 @@ import { redirect } from "next/navigation";
 import { f1TargetStatusesFor } from "@/modules/casting/room-transitions";
 import { listRooms } from "@/modules/casting/repository";
 import { getCurrentSession } from "@/modules/identity/session-cookie";
+import { de } from "@/ui/strings";
 import { createRoomAction, removeRoomAction, renameRoomAction, transitionRoomAction } from "./actions";
+
+const t = de.rooms;
 
 // Screen O14. FR-1.9–FR-1.11: create/rename/remove rooms; each room's state is its own.
 export default async function RoomsPage() {
@@ -16,14 +19,14 @@ export default async function RoomsPage() {
   return (
     <div className="mx-auto max-w-2xl space-y-6 p-6">
       <Link href="/dashboard" className="back-link">
-        <ArrowLeft className="size-4" /> Dashboard
+        <ArrowLeft className="size-4" /> {de.nav.organisation}
       </Link>
-      <h1 className="font-serif text-2xl font-semibold">Rooms</h1>
+      <h1 className="font-serif text-2xl font-semibold">{t.heading}</h1>
 
       <form action={createRoomAction} className="flex gap-2">
-        <input name="label" placeholder="Room label" className="field-input flex-1" />
+        <input name="label" placeholder={t.addPlaceholder} className="field-input flex-1" />
         <button type="submit" className="btn btn-primary shrink-0">
-          Add room
+          {t.addSubmit}
         </button>
       </form>
 
@@ -32,7 +35,7 @@ export default async function RoomsPage() {
           <li key={r.id} className="card">
             <div className="flex items-center justify-between">
               <span className="font-medium">{r.label}</span>
-              <span className="badge">{r.status}</span>
+              <span className="badge">{de.status.room[r.status]}</span>
             </div>
 
             <div className="mt-3 flex flex-wrap gap-2">
@@ -40,7 +43,7 @@ export default async function RoomsPage() {
                 <input type="hidden" name="roomId" value={r.id} />
                 <input name="label" defaultValue={r.label} className="field-input py-1 text-sm" />
                 <button type="submit" className="btn-link shrink-0">
-                  Rename
+                  {de.common.rename}
                 </button>
               </form>
 
@@ -51,19 +54,19 @@ export default async function RoomsPage() {
                       every F1-reachable target across all rooms — see f1TargetStatusesFor. */}
                   {f1TargetStatusesFor(r.status).map((s) => (
                     <option key={s} value={s}>
-                      {s}
+                      {de.status.room[s]}
                     </option>
                   ))}
                 </select>
                 <button type="submit" className="btn-link shrink-0">
-                  Change state
+                  {t.changeState}
                 </button>
               </form>
 
               <form action={removeRoomAction}>
                 <input type="hidden" name="roomId" value={r.id} />
                 <button type="submit" className="btn-link text-destructive">
-                  Remove
+                  {t.remove}
                 </button>
               </form>
             </div>

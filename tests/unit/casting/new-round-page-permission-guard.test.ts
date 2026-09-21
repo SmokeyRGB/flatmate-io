@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
+import { de } from "@/ui/strings";
 
 // page.tsx pulls in session-cookie.ts (server-only + next/headers) and next/navigation via its
 // import chain; none of that runs before the permission guard fires, but it must resolve for the
@@ -41,7 +42,10 @@ describe("NewRoundPage close_round permission guard", () => {
     const element = await NewRoundPage();
     const html = renderToStaticMarkup(element);
 
-    expect(html).toContain("don&#x27;t have permission");
+    // german-ui-vocabulary (design.md Decision 8): asserts through src/ui/strings, never a German
+    // literal copied into the test — the table's value can change and this test still passes as
+    // long as the key does, but it fails if the page stops rendering that key's text at all.
+    expect(html).toContain(de.rounds.new.permissionDenied);
     expect(listRooms).not.toHaveBeenCalled();
   });
 });

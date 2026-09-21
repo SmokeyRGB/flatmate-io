@@ -2,9 +2,11 @@
 
 import { Lock } from "lucide-react";
 import { useActionState } from "react";
+import { de } from "@/ui/strings";
 import { updateSettingsAction, type SettingsFormState } from "./actions";
 
 const initialState: SettingsFormState = { error: null };
+const t = de.settings;
 
 export function SettingsForm({
   quorumShare,
@@ -20,8 +22,7 @@ export function SettingsForm({
       {openRoundTitle && (
         <div className="callout callout-caution">
           <Lock className="size-4" />
-          While &quot;{openRoundTitle}&quot; is open, these settings stay unchanged (FR-1.21).
-          Close the round to change them here.
+          {t.lockedWhileRoundOpen(openRoundTitle)}
         </div>
       )}
 
@@ -29,7 +30,7 @@ export function SettingsForm({
         <fieldset disabled={Boolean(openRoundTitle)} className="space-y-4 disabled:opacity-60">
           <div>
             <label htmlFor="quorumShare" className="field-label">
-              Quorum share
+              {t.quorumShareLabel}
             </label>
             <input id="quorumShare" name="quorumShare" defaultValue={quorumShare} className="field-input" />
           </div>
@@ -37,7 +38,7 @@ export function SettingsForm({
           {state.error && <p className="field-error">{state.error}</p>}
 
           <button type="submit" disabled={pending} className="btn btn-primary">
-            {pending ? "Saving…" : "Save"}
+            {pending ? t.savePending : t.save}
           </button>
         </fieldset>
       </form>

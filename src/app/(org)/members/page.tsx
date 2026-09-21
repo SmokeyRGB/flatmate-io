@@ -3,6 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { PermissionDeniedError, getHousehold, getResidentList } from "@/modules/identity/repository";
 import { getCurrentSession } from "@/modules/identity/session-cookie";
+import { de } from "@/ui/strings";
 import {
   createResidentProfileAction,
   reactivateMemberAction,
@@ -11,6 +12,8 @@ import {
   setMovedOutAction,
 } from "./actions";
 import { RemoveMemberForm } from "./remove-member-form";
+
+const t = de.members;
 
 // Screen O16. FR-1.25–FR-1.29 (revised 2026-09-17, U-30): full parity for administration AND a
 // moderator; leads with the join-code action when administration is the only member. The
@@ -30,11 +33,11 @@ export default async function MembersPage() {
     if (err instanceof PermissionDeniedError) {
       return (
         <div className="mx-auto max-w-md space-y-4 p-6">
-          <h1 className="font-serif text-2xl font-semibold">Members</h1>
+          <h1 className="font-serif text-2xl font-semibold">{t.heading}</h1>
           <p className="text-sm text-muted-foreground">
-            This list is for administration and moderators. If you want to see who lives here, use{" "}
+            {t.accessDeniedBody} {t.accessDeniedLinkPrefix}{" "}
             <a href="/who-lives-here" className="btn-link">
-              Who lives here
+              {de.org.dashboard.whoLivesHereLink}
             </a>
             .
           </p>
@@ -49,22 +52,21 @@ export default async function MembersPage() {
   const createResidentForm = isAdmin ? (
     <div className="card space-y-2">
       <form action={createResidentProfileAction} className="flex gap-2">
-        <input name="displayName" placeholder="New resident's display name" className="field-input flex-1" />
+        <input name="displayName" placeholder={t.addResidentPlaceholder} className="field-input flex-1" />
         <button type="submit" className="btn btn-primary shrink-0">
-          Add resident
+          {t.addResidentSubmit}
         </button>
       </form>
       <p className="field-helper">
-        After adding them, tell them your household id (
-        <span className="font-mono">{household?.id}</span>) and the display name you chose — they
-        set their own password at <span className="font-mono">/claim</span>.
+        {t.addResidentHelperHouseholdIdPrefix} <span className="font-mono">{household?.id}</span>.{" "}
+        {t.addResidentHelperClaimNote} <span className="font-mono">/claim</span>.
       </p>
     </div>
   ) : null;
 
   const backLink = (
     <Link href="/dashboard" className="back-link">
-      <ArrowLeft className="size-4" /> Dashboard
+      <ArrowLeft className="size-4" /> {de.nav.organisation}
     </Link>
   );
 
@@ -72,14 +74,12 @@ export default async function MembersPage() {
     return (
       <div className="mx-auto max-w-md space-y-4 p-6">
         {backLink}
-        <h1 className="font-serif text-2xl font-semibold">Members</h1>
-        <p className="text-sm text-muted-foreground">
-          No one has joined yet — share your join code to invite the first resident.
-        </p>
+        <h1 className="font-serif text-2xl font-semibold">{t.heading}</h1>
+        <p className="text-sm text-muted-foreground">{t.noOneJoinedYet}</p>
         <p className="code-block font-mono text-sm">{household?.joinCode}</p>
         <form action={rotateJoinCodeAction}>
           <button type="submit" className="btn btn-primary">
-            Rotate join code
+            {t.rotateJoinCode}
           </button>
         </form>
         {createResidentForm}
@@ -90,7 +90,7 @@ export default async function MembersPage() {
   return (
     <div className="mx-auto max-w-2xl space-y-6 p-6">
       {backLink}
-      <h1 className="font-serif text-2xl font-semibold">Members</h1>
+      <h1 className="font-serif text-2xl font-semibold">{t.heading}</h1>
 
       {createResidentForm}
 
@@ -102,12 +102,12 @@ export default async function MembersPage() {
                 <span className="font-medium">{m.displayName}</span>
                 {m.role === "moderator" && (
                   <span className="badge badge-role">
-                    <ShieldCheck className="size-3" /> Moderation
+                    <ShieldCheck className="size-3" /> {t.moderationBadge}
                   </span>
                 )}
                 {m.status === "moved_out" && (
                   <span className="badge">
-                    <DoorOpen className="size-3" /> moved out
+                    <DoorOpen className="size-3" /> {de.status.movedOut}
                   </span>
                 )}
               </div>
@@ -128,7 +128,7 @@ export default async function MembersPage() {
                         <input type="hidden" name="accountId" value={m.accountId} />
                         <input type="hidden" name="toRole" value="moderator" />
                         <button type="submit" className="btn btn-secondary">
-                          Make moderator
+                          {t.makeModerator}
                         </button>
                       </form>
                     )}
@@ -137,7 +137,7 @@ export default async function MembersPage() {
                         <input type="hidden" name="accountId" value={m.accountId} />
                         <input type="hidden" name="toRole" value="member" />
                         <button type="submit" className="btn btn-secondary">
-                          Make member
+                          {t.makeMember}
                         </button>
                       </form>
                     )}
@@ -147,7 +147,7 @@ export default async function MembersPage() {
                     <form action={setMovedOutAction}>
                       <input type="hidden" name="accountId" value={m.accountId} />
                       <button type="submit" className="btn btn-secondary">
-                        <UserMinus className="size-4" /> Moved out
+                        <UserMinus className="size-4" /> {t.markMovedOut}
                       </button>
                     </form>
                   </div>
@@ -156,7 +156,7 @@ export default async function MembersPage() {
                     <form action={reactivateMemberAction}>
                       <input type="hidden" name="accountId" value={m.accountId} />
                       <button type="submit" className="btn btn-secondary">
-                        <UserPlus className="size-4" /> Reactivate
+                        <UserPlus className="size-4" /> {de.common.reactivate}
                       </button>
                     </form>
                   </div>
@@ -172,11 +172,11 @@ export default async function MembersPage() {
           {/* FR-1.26: "share or rotate" — the code itself must be visible to share, not just a
               blind rotate action. Deliberately NOT styled like a member row (card) — that shape
               reads as "a person," which this isn't. */}
-          <p className="eyebrow">Join code</p>
+          <p className="eyebrow">{t.joinCodeEyebrow}</p>
           <p className="code-block font-mono text-sm">{household?.joinCode}</p>
           <form action={rotateJoinCodeAction}>
             <button type="submit" className="btn-link">
-              Rotate join code
+              {t.rotateJoinCode}
             </button>
           </form>
         </div>

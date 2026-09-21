@@ -7,6 +7,7 @@ import {
   hasProcedureChangedNotice,
 } from "@/modules/casting/repository";
 import { getCurrentSession } from "@/modules/identity/session-cookie";
+import { de } from "@/ui/strings";
 
 // Convergence T084/T085: the round-detail screen FR-1.19 (participant names) and FR-1.22 (the
 // "procedure changed" notice) both need — `getRoundParticipants`/`hasProcedureChangedNotice`
@@ -27,18 +28,18 @@ export default async function RoundDetailPage({ params }: { params: Promise<{ id
   return (
     <div className="mx-auto max-w-2xl space-y-6 p-6">
       <Link href="/dashboard" className="back-link">
-        <ArrowLeft className="size-4" /> Dashboard
+        <ArrowLeft className="size-4" /> {de.nav.organisation}
       </Link>
 
       <div>
         <h1 className="font-serif text-2xl font-semibold">{round.title}</h1>
-        <span className="badge mt-1">{round.status}</span>
+        <span className="badge mt-1">{de.status.round[round.status as keyof typeof de.status.round]}</span>
       </div>
 
       {procedureChanged && (
         <div role="alert" className="callout callout-caution">
           <TriangleAlert className="size-4" />
-          A voting-rule setting was changed while this round was open (FR-1.22).
+          {de.rounds.detail.procedureChangedNotice}
         </div>
       )}
 
@@ -48,7 +49,7 @@ export default async function RoundDetailPage({ params }: { params: Promise<{ id
         // Everything below is scoped to this specific round — the larger-radius tinted panel
         // groups it visually, distinct from a plain card (09-Design-System.md).
         <div className="panel-round">
-          <h2 className="font-serif text-lg font-medium">Participants</h2>
+          <h2 className="font-serif text-lg font-medium">{de.rounds.detail.participantsHeading}</h2>
           {/* FR-1.19/FR-1.28: names only — no join date, contact detail, or action controls. */}
           <ul className="mt-3 space-y-2">
             {participants.map((p, i) => (

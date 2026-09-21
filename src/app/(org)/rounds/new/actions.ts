@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { assertHasPermission, PermissionDeniedError } from "@/modules/identity/repository";
 import { getCurrentSession } from "@/modules/identity/session-cookie";
 import { createAndOpenRound, RoundOpenPreconditionError } from "@/modules/casting/repository";
+import { de } from "@/ui/strings";
 
 export interface CreateRoundFormState {
   error: string | null;
@@ -35,8 +36,30 @@ export async function createAndOpenRoundAction(
     await assertHasPermission(current.context, current.context.accountId, "close_round");
     await createAndOpenRound(current.context, title, roomIds, actor);
   } catch (err) {
-    if (err instanceof RoundOpenPreconditionError || err instanceof PermissionDeniedError) {
-      return { error: err.message };
+    if (err instanceof RoundOpenPreconditionError) {
+      switch (err.code) {
+        case "no_rooms_selected":
+          return { error: de.rounds.errors.noRoomsSelected };
+        case "rooms_unavailable":
+          return { error: de.rounds.errors.roomsUnavailable };
+        case "no_eligible_residents":
+          return { error: de.rounds.errors.noEligibleResidents };
+        case "not_in_draft":
+          // Carries a raw round id in its `message` — never shown, only logged (spec.md "No
+          // model term reaches a resident untranslated").
+          console.error(err);
+          return { error: de.rounds.errors.genericPreconditionFailure };
+        default: {
+          const _exhaustive: never = err.code;
+          return _exhaustive;
+        }
+      }
+    }
+    if (err instanceof PermissionDeniedError) {
+      // Left uncoded (tasks.md 2.3) — every call site resolves to the same "not allowed" outcome
+      // for the user; mapped by class to one generic key instead of the raw `Missing permission:
+      // …` message, which would otherwise leak a permission slug (a model term).
+      return { error: de.rounds.errors.permissionDenied };
     }
     throw err;
   }

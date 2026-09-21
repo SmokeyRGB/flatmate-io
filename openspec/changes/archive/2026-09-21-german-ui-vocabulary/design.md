@@ -112,6 +112,26 @@ their present shape; nothing displays them.
 **Alternative considered: give every error class a code.** Rejected as scope — a class whose message
 never reaches a screen has nothing to discriminate for.
 
+> **Corrected during apply (2026-09-21), because this decision named the wrong set.** The paragraph
+> above says "the classes whose messages currently reach a form", then lists only the three in
+> `identity/auth.ts`. Two classes were missed, and both were found by following the actual call
+> paths rather than the list:
+>
+> - **`RoundOpenPreconditionError`** (`casting/repository.ts:248`) reaches `rounds/new/actions.ts`
+>   exactly as the three named ones do, and one of its branches carried a raw round id to the
+>   screen. It was **given a code** on the same reasoning, so the set is now four classes, not
+>   three.
+> - **`ProcedureLockedError`** (`casting/repository.ts:490`) is listed in `tasks.md` 2.4 among the
+>   classes "no screen displays" — **which is false.** `settings/actions.ts` catches it through a
+>   generic `err instanceof Error` and returns `err.message` raw, so a resident sees a round id and
+>   a set of field names. It was **not** given a code, to keep the apply inside its stated scope;
+>   instead that catch now maps to one generic key, which stops the leak without pre-empting the
+>   decision. **The class still carries several distinct meanings under one type, and the next
+>   change to touch settings should give it a code.** Recorded here rather than fixed quietly.
+>
+> Both are the same authoring mistake: the list was assembled by reading `instanceof` in the seven
+> `actions.ts` files, which misses anything caught by a generic `catch`.
+
 ### 5 · Two sign-in conditions converge on one key
 
 `"No such resident in this household"` and `"Invalid credentials"` become the single code

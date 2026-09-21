@@ -4,6 +4,9 @@ import { redirect } from "next/navigation";
 import { listRoundsForSession } from "@/modules/casting/repository";
 import { getMembershipForAccount } from "@/modules/identity/repository";
 import { getCurrentSession } from "@/modules/identity/session-cookie";
+import { de } from "@/ui/strings";
+
+const t = de.org.dashboard;
 
 // Screen O1. EC-1.5: exactly one round is presented as "active"; the rest are reachable only via
 // the list below it, never surfaced as if several were simultaneously live.
@@ -25,28 +28,26 @@ export default async function DashboardPage() {
 
   return (
     <div className="mx-auto max-w-2xl space-y-6 p-6">
-      <h1 className="font-serif text-2xl font-semibold">Organisation</h1>
+      <h1 className="font-serif text-2xl font-semibold">{t.heading}</h1>
 
       {active ? (
         <Link href={`/rounds/${active.id}`} className="card block transition hover:shadow-none">
-          <p className="eyebrow">Active round</p>
+          <p className="eyebrow">{t.activeRoundEyebrow}</p>
           <p className="mt-1 text-lg font-medium">{active.title}</p>
-          <span className="badge mt-2">{active.status}</span>
+          <span className="badge mt-2">{de.status.round[active.status as keyof typeof de.status.round]}</span>
         </Link>
       ) : (
         // The single most important prompt on this page when nothing else is going on yet —
         // the "banded" featured-card variant (09-Design-System.md), not a quiet one.
         <div className="card card-featured">
           <div className="card-band">
-            <p className="eyebrow">As next</p>
+            <p className="eyebrow">{t.asNextEyebrow}</p>
           </div>
           <div className="card-featured-body space-y-3">
-            <p className="text-lg font-semibold">Open your first casting round</p>
-            <p className="text-sm text-muted-foreground">
-              Nothing is running yet — open a round once you have rooms to cast for.
-            </p>
+            <p className="text-lg font-semibold">{t.openFirstRoundHeading}</p>
+            <p className="text-sm text-muted-foreground">{t.openFirstRoundBody}</p>
             <Link href="/rounds/new" className="btn btn-primary">
-              Open a new round <ArrowRight className="size-4" />
+              {t.openNewRound} <ArrowRight className="size-4" />
             </Link>
           </div>
         </div>
@@ -54,18 +55,18 @@ export default async function DashboardPage() {
 
       {active && (
         <Link href="/rounds/new" className="btn-link">
-          Open another round
+          {t.openAnotherRound}
         </Link>
       )}
 
       {rest.length > 0 && (
         <div>
-          <p className="text-sm font-medium">Other rounds</p>
+          <p className="text-sm font-medium">{t.otherRoundsHeading}</p>
           <ul className="mt-2 space-y-1">
             {rest.map((r: { id: string; title: string; status: string }) => (
               <li key={r.id} className="text-sm text-muted-foreground">
                 <Link href={`/rounds/${r.id}`} className="btn-link">
-                  {r.title} — {r.status}
+                  {r.title} — {de.status.round[r.status as keyof typeof de.status.round]}
                 </Link>
               </li>
             ))}
@@ -75,19 +76,19 @@ export default async function DashboardPage() {
 
       <div className="flex flex-wrap gap-4 border-t border-border pt-4 text-sm">
         <Link href="/rooms" className="btn-link">
-          Rooms
+          {t.roomsLink}
         </Link>
         {canSeeMembersList && (
           <Link href="/members" className="btn-link">
-            Members
+            {t.membersLink}
           </Link>
         )}
         <Link href="/settings" className="btn-link">
-          Settings
+          {t.settingsLink}
         </Link>
         {current.context.profileId !== null && (
           <Link href="/who-lives-here" className="btn-link">
-            Who lives here
+            {t.whoLivesHereLink}
           </Link>
         )}
       </div>

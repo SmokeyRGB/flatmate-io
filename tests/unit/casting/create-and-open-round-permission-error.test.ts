@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { de } from "@/ui/strings";
 
 // actions.ts pulls in session-cookie.ts (server-only + next/headers) and next/navigation via its
 // import chain, plus @/modules/identity/repository and @/modules/casting/repository for the DB
@@ -13,7 +14,6 @@ vi.mock("@/modules/identity/session-cookie", () => ({
   })),
 }));
 
-const { PermissionDeniedError } = await import("@/modules/identity/repository");
 vi.mock("@/modules/identity/repository", async () => {
   const actual = await vi.importActual<typeof import("@/modules/identity/repository")>(
     "@/modules/identity/repository",
@@ -46,6 +46,9 @@ describe("createAndOpenRoundAction close_round permission handling", () => {
     const result = await createAndOpenRoundAction(prevState, formData);
 
     expect(result.error).toBeTruthy();
-    expect(result.error).toBe(new PermissionDeniedError("close_round").message);
+    // german-ui-vocabulary: the action no longer passes PermissionDeniedError's raw `.message`
+    // through (it contains a raw permission slug, a model term) — it maps to one generic
+    // translated key instead (tasks.md 2.3; see the implementation report).
+    expect(result.error).toBe(de.rounds.errors.permissionDenied);
   });
 });

@@ -11,6 +11,7 @@ import {
   setMovedOut,
 } from "@/modules/identity/repository";
 import { getCurrentSession } from "@/modules/identity/session-cookie";
+import { de } from "@/ui/strings";
 
 export interface RemoveMemberFormState {
   error: string | null;
@@ -50,7 +51,8 @@ export async function removeMemberAction(
     await removeMember(current.context, current.context.accountId, targetAccountId, confirmDisplayName);
   } catch (err) {
     if (err instanceof DisplayNameConfirmationMismatchError) {
-      return { error: err.message };
+      // One throw site, one message (tasks.md 2.3) — mapped by class to a fixed key.
+      return { error: de.members.errors.nameMismatch };
     }
     // FR-008 / spec.md's Edge Cases (003-remove-resident-modal): unlike this action's siblings,
     // the remove dialog explicitly promises an inline error for ANY failure — including the
@@ -58,9 +60,7 @@ export async function removeMemberAction(
     // already acted on it) — never Next's default crash screen. Deliberately generic (not
     // err.message): the underlying errors are internal repository messages (e.g. "Membership
     // not found for account <uuid>"), not written for a moderator to read.
-    return {
-      error: "Could not remove this member — their details may have changed. Refresh and try again.",
-    };
+    return { error: de.members.errors.genericRemoveFailure };
   }
 
   revalidatePath("/members");

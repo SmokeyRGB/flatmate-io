@@ -9,6 +9,7 @@ import {
   undoRegisterHousehold,
 } from "@/modules/identity/auth";
 import { setSessionCookie } from "@/modules/identity/session-cookie";
+import { de } from "@/ui/strings";
 
 export interface RegisterFormState {
   error: string | null;
@@ -25,8 +26,8 @@ export async function registerHouseholdAction(
   const email = String(formData.get("email") ?? "").trim();
   const password = String(formData.get("password") ?? "");
 
-  if (!email) return { error: "Email is required.", fieldError: "email" };
-  if (!password) return { error: "Password is required.", fieldError: "password" };
+  if (!email) return { error: de.auth.errors.register.missingEmail, fieldError: "email" };
+  if (!password) return { error: de.auth.errors.register.missingPassword, fieldError: "password" };
 
   try {
     const registered = await registerHousehold(email, password);
@@ -43,13 +44,45 @@ export async function registerHouseholdAction(
     } catch (sessionErr) {
       await undoRegisterHousehold(registered.context, registered.context.householdId, registered.context.accountId);
       if (sessionErr instanceof SignInError) {
-        return { error: sessionErr.message, fieldError: null };
+        // Exhaustive switch (design.md Decision 4): a missed code is a compile error.
+        const code = sessionErr.code;
+        switch (code) {
+          case "missing_fields":
+            return { error: de.auth.errors.signIn.missingFields, fieldError: null };
+          case "invalid_household":
+            return { error: de.auth.errors.signIn.invalidHousehold, fieldError: null };
+          case "invalid_credentials":
+            return { error: de.auth.errors.signIn.invalidCredentials, fieldError: null };
+          case "no_household":
+            return { error: de.auth.errors.signIn.noHousehold, fieldError: null };
+          case "no_membership":
+            return { error: de.auth.errors.signIn.noMembership, fieldError: null };
+          default: {
+            const _exhaustive: never = code;
+            return _exhaustive;
+          }
+        }
       }
-      return { error: "Something went wrong completing sign-in. Please try again.", fieldError: null };
+      // Decision 6: an unanticipated failure (e.g. hashSessionToken's missing-secret case) never
+      // shows its own message — only a generic key. The original still reaches the log.
+      console.error(sessionErr);
+      return { error: de.auth.errors.genericSignInFailure, fieldError: null };
     }
   } catch (err) {
     if (err instanceof RegistrationError) {
-      return { error: err.message, fieldError: null };
+      switch (err.code) {
+        case "missing_email":
+          return { error: de.auth.errors.register.missingEmail, fieldError: "email" };
+        case "missing_password":
+          return { error: de.auth.errors.register.missingPassword, fieldError: "password" };
+        case "signup_failed":
+          console.error(err);
+          return { error: de.auth.errors.register.signupFailed, fieldError: null };
+        default: {
+          const _exhaustive: never = err.code;
+          return _exhaustive;
+        }
+      }
     }
     throw err;
   }

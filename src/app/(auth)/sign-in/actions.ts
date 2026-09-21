@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { SignInError, signIn } from "@/modules/identity/auth";
 import { setSessionCookie } from "@/modules/identity/session-cookie";
+import { de } from "@/ui/strings";
 
 export interface SignInFormState {
   error: string | null;
@@ -34,7 +35,24 @@ export async function signInAction(
     await setSessionCookie(result.session.id, result.context.householdId);
   } catch (err) {
     if (err instanceof SignInError) {
-      return { error: err.message };
+      // Exhaustive switch (design.md Decision 4): a missed code is a compile error.
+      const code = err.code;
+      switch (code) {
+        case "missing_fields":
+          return { error: de.auth.errors.signIn.missingFields };
+        case "invalid_household":
+          return { error: de.auth.errors.signIn.invalidHousehold };
+        case "invalid_credentials":
+          return { error: de.auth.errors.signIn.invalidCredentials };
+        case "no_household":
+          return { error: de.auth.errors.signIn.noHousehold };
+        case "no_membership":
+          return { error: de.auth.errors.signIn.noMembership };
+        default: {
+          const _exhaustive: never = code;
+          return _exhaustive;
+        }
+      }
     }
     throw err;
   }

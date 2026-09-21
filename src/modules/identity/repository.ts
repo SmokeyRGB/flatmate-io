@@ -218,17 +218,25 @@ export async function getMembershipForAccount(context: SessionContext, accountId
 
 // AC-1.6: "the interface states which identity I am signed in as." A household-account session
 // (profileId null) states the household's name; a resident session states their display name.
-export async function getIdentityLabel(context: SessionContext): Promise<string> {
+//
+// german-ui-vocabulary: returns structured data rather than a composed display string — the
+// caller (currently only (org)/layout.tsx) resolves the German label from src/ui/strings, since a
+// German literal may only live there, never in this module (tasks.md's sweep rule).
+export type IdentityLabel =
+  | { kind: "household"; householdName: string | null }
+  | { kind: "resident"; displayName: string | null };
+
+export async function getIdentityLabel(context: SessionContext): Promise<IdentityLabel> {
   if (context.profileId === null) {
     const householdRow = await getHousehold(context);
-    return householdRow ? `${householdRow.name} (administration)` : "Household administration";
+    return { kind: "household", householdName: householdRow?.name ?? null };
   }
   return withSessionContext(context, async (tx) => {
     const [profile] = await tx
       .select({ displayName: residentProfile.displayName })
       .from(residentProfile)
       .where(eq(residentProfile.id, context.profileId as string));
-    return profile?.displayName ?? "Resident";
+    return { kind: "resident", displayName: profile?.displayName ?? null };
   });
 }
 
