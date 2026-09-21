@@ -1,4 +1,5 @@
 import { config } from "dotenv";
+import { afterEach } from "vitest";
 
 // `quiet: true` suppresses dotenv's own stdout "tip" advertisements (confirmed in its source,
 // node_modules/dotenv/lib/main.js) — not a security concern, just noise in test output.
@@ -28,3 +29,19 @@ for (const [name, value] of [
     );
   }
 }
+
+// A net beneath each file's own afterEach, not a replacement for it: Vitest resolves
+// sequence.hooks to "stack" (node_modules/vitest/dist/chunks/index.DzobfTyw.js:14599), which runs
+// afterEach hooks in reverse registration order. This file is evaluated before any test file, so
+// this hook is registered first and therefore runs last — after a test file's own teardown has
+// already run. It only catches a household whose registerTestHousehold() call is still in flight
+// when its test is abandoned (proposal.md) — a registration a test's own afterEach has already
+// cleaned up is deregistered and this is a no-op for it (design.md D2).
+//
+// Imported dynamically, after config() above has run: a static top-of-file import would execute
+// before this file's own body, pulling in ./helpers/identity.ts and, through it, src/db/client.ts
+// — which reads process.env.DATABASE_URL at module load — before dotenv has populated it.
+afterEach(async () => {
+  const { sweepAbandonedHouseholds } = await import("./helpers/identity");
+  await sweepAbandonedHouseholds();
+});

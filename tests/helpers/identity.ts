@@ -23,15 +23,75 @@ export interface TestHousehold {
   cleanup: () => Promise<void>;
 }
 
-// Registers a real household (real Supabase Auth user + real rows) so integration tests exercise
-// the actual code path, then hands back a cleanup function that removes all of it — auth user
-// included, so repeated test runs don't accumulate rows in Supabase Auth's own user table.
-export async function registerTestHousehold(): Promise<TestHousehold> {
+// Households whose registration is still in flight, keyed by their own promise. A test that times
+// out while awaiting registerTestHousehold() leaves no binding for its own afterEach to find —
+// this set is how tests/setup.ts's sweep finds it anyway. Populated synchronously, before any
+// await, so it holds the promise for the whole window a hook could observe it (design.md D1).
+const inFlightHouseholds = new Set<Promise<TestHousehold>>();
+
+async function registerTestHouseholdInner(deregister: () => void): Promise<TestHousehold> {
   const email = testEmail();
   const password = "test-password-not-real-1234";
   const { household: householdRow, context } = await registerHousehold(email, password);
 
-  const cleanup = async () => {
+  return {
+    context,
+    accountId: context.accountId,
+    householdId: householdRow.id,
+    email,
+    cleanup: makeCleanup(context, deregister),
+  };
+}
+
+// Registers a real household (real Supabase Auth user + real rows) so integration tests exercise
+// the actual code path, then hands back a cleanup function that removes all of it — auth user
+// included, so repeated test runs don't accumulate rows in Supabase Auth's own user table.
+export function registerTestHousehold(): Promise<TestHousehold> {
+  const promise: Promise<TestHousehold> = registerTestHouseholdInner(() =>
+    inFlightHouseholds.delete(promise),
+  );
+  inFlightHouseholds.add(promise);
+  // A rejected registration created no household, so there is nothing for the sweep to clean —
+  // just stop it from surfacing as an unhandled rejection while it sits in the set. A rejected
+  // entry is removed the next time sweepAbandonedHouseholds drains the set (it drains
+  // unconditionally), so no explicit removal is needed here.
+  promise.catch(() => {});
+  return promise;
+}
+
+// Drains the in-flight set and cleans every household whose registration resolved after its own
+// test had already ended (design.md D3/D4) — the net beneath each file's own afterEach.
+export async function sweepAbandonedHouseholds(): Promise<void> {
+  const pending = Array.from(inFlightHouseholds);
+  inFlightHouseholds.clear();
+  const results = await Promise.allSettled(pending);
+  const cleanups = results
+    .filter((r): r is PromiseFulfilledResult<TestHousehold> => r.status === "fulfilled")
+    .map((r) => r.value.cleanup());
+  try {
+    await cleanupAll(...cleanups);
+  } catch (error) {
+    if (error instanceof AggregateError) {
+      throw new AggregateError(error.errors, `sweepAbandonedHouseholds: ${error.message}`);
+    }
+    throw error;
+  }
+}
+
+function makeCleanup(context: SessionContext, deregister: () => void): () => Promise<void> {
+  let cleaned = false;
+
+  return async () => {
+    // Deregistration and idempotence both matter here, for different reasons (design.md D2): once
+    // a test's own afterEach has cleaned a household, the sweep must not find its (already
+    // deregistered) promise; and if the sweep and a test's own teardown ever race for the same
+    // household, a second call must be a harmless no-op rather than a failing
+    // auth.admin.deleteUser call on an already-deleted user — which cleanupAll would report as an
+    // AggregateError on an otherwise well-behaved test.
+    if (cleaned) return;
+    cleaned = true;
+    deregister();
+
     const id = context.householdId;
 
     // One statement, one round trip. Every table here carries household_id as a bare uuid with
@@ -64,8 +124,6 @@ export async function registerTestHousehold(): Promise<TestHousehold> {
     });
     await adminClient().auth.admin.deleteUser(context.accountId);
   };
-
-  return { context, accountId: context.accountId, householdId: householdRow.id, email, cleanup };
 }
 
 // Cleans up a resident account created via claimResidentProfile (a separate Auth user from the
