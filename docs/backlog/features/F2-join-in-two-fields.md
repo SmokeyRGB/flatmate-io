@@ -110,11 +110,16 @@ unverified addresses.
 **S-49 — the link is the only access control left.** Since S-03 dropped the mandatory email and
 **U-22** removed the resident-visible member list and the right to remove members, nothing else
 guards entry. **U-30** (2026-09-17) gave residents a reduced "who lives here" view back, which
-restores recognition but no removal right — the link stays the control. `join_code_expires_at`
-(7 days suggested), `join_code_max_uses` (**default 1, a single-use link**, since O-15 on
-2026-09-16 *replaced* the earlier "number of residents still missing" rather than supplementing
-it) and the share-page warning are therefore *"Voraussetzung, nicht Verbesserung"*. Existing
-rotation (**G-A5**) stays; this adds to it.
+restores recognition but no removal right — the link stays the control. An expiry (7 days
+suggested), a usage cap (**default 1, a single-use link**, since O-15 on 2026-09-16 *replaced*
+the earlier "number of residents still missing" rather than supplementing it) and the
+share-page warning are therefore *"Voraussetzung, nicht Verbesserung"*.
+
+**Amended 2026-09-21 (O-18 resolved):** both limits belong to **each issued link**
+(`JoinCodeIssuance.expires_at` / `.max_uses`), not to the household — a household can have
+several links open at once, each deletable on its own, all of them kept in a history so O16 can
+answer *"who joined through which link"*. Rotation as a separate mechanism falls away: deleting
+every live link does what it did. **G-A5** is unchanged in substance.
 
 **Never log the join code** and never put it in a query string (**G-A5**).
 

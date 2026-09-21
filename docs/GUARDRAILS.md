@@ -129,10 +129,20 @@ Absicherung ist, dass Agenten **keinen Zugriff auf Produktions-Secrets** erhalte
 
 ### G-A5 — Der Beitrittscode verlässt niemals das System
 
-**Regel.** `Household.join_code` erscheint **niemals** in einem Log — auch nicht im Zugriffslog —
+**Regel.** Der Beitrittscode erscheint **niemals** in einem Log — auch nicht im Zugriffslog —
 und **niemals in einem Query-String**. Der Code wandert ausschließlich im Pfad des Einladungslinks
-und im Anfragekörper. Er ist durch die organisierende Person **rotierbar**; die Rotation entwertet
-ausstehende Einladungen.
+und im Anfragekörper. Er ist durch die organisierende Person **entwertbar**; das Entwerten
+entwertet ausstehende Einladungen.
+
+> **Nachtrag 2026-09-21 (O-18 aufgelöst), zwei Präzisierungen, keine Lockerung.** Der Code sitzt
+> nicht mehr auf `Household.join_code`, sondern auf `JoinCodeIssuance.code` — ein Haushalt stellt
+> mehrere Links aus (`domain/identity.md` §2.1). Die Regel gilt unverändert jedem einzelnen davon.
+> Und das **Entwerten** hieß hier bis dahin „Rotation", weil ein Haushalt nur einen Code trug;
+> heute wird ein Link gelöscht, und wer alle löscht, erreicht genau das, was Rotation erzwang.
+>
+> **Der Anfragekörper ist seit F2 kein Randfall mehr.** **FR-2.27** verlangt eine Eingabe des Codes
+> von Hand (P-1), also kommt er regulär per POST an, nicht nur über den Pfad. Beide Wege sind hier
+> schon abgedeckt; die Formularroute braucht dieselbe Redaktion wie die Einladungsroute.
 
 **Begründung.** Der Code identifiziert einen Haushalt, keine Person — er steht deshalb in der
 TOM-Liste, nicht im Art.-30-Verzeichnis
