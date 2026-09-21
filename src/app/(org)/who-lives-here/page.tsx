@@ -3,6 +3,9 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getCurrentHouseholdMembers } from "@/modules/identity/repository";
 import { getCurrentSession } from "@/modules/identity/session-cookie";
+import { de } from "@/ui/strings";
+
+const t = de.whoLivesHere;
 
 // Screen B5 (docs/screens/B-start.md), FR-1.31/U-30. Distinct from O16 (administration, full
 // parity for admin+moderator) and from the round participant list (FR-1.19) — no actions, no
@@ -14,7 +17,7 @@ export default async function WhoLivesHerePage() {
 
   const backLink = (
     <Link href="/dashboard" className="back-link">
-      <ArrowLeft className="size-4" /> Dashboard
+      <ArrowLeft className="size-4" /> {de.nav.organisation}
     </Link>
   );
 
@@ -24,10 +27,8 @@ export default async function WhoLivesHerePage() {
     return (
       <div className="mx-auto max-w-md space-y-4 p-6">
         {backLink}
-        <h1 className="font-serif text-2xl font-semibold">Who lives here</h1>
-        <p className="text-sm text-muted-foreground">
-          This view is for residents. Administration sees the full member list under Members.
-        </p>
+        <h1 className="font-serif text-2xl font-semibold">{t.heading}</h1>
+        <p className="text-sm text-muted-foreground">{t.householdAccountNotice}</p>
       </div>
     );
   }
@@ -37,10 +38,10 @@ export default async function WhoLivesHerePage() {
   return (
     <div className="mx-auto max-w-md space-y-4 p-6">
       {backLink}
-      <h1 className="font-serif text-2xl font-semibold">Who lives here</h1>
+      <h1 className="font-serif text-2xl font-semibold">{t.heading}</h1>
       <div className="callout callout-info">
         <TriangleAlert className="size-4" />
-        If you don&apos;t recognize someone on this list, let a moderator know — outside the app.
+        {t.strangerNotice}
       </div>
       <ul className="space-y-2">
         {members.map((m, i) => (

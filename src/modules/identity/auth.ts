@@ -25,7 +25,15 @@ export function deriveResidentEmail(residentProfileId: string): string {
   return `resident-${residentProfileId}@accounts.flatmate.invalid`;
 }
 
-export class RegistrationError extends Error {}
+// german-ui-vocabulary (design.md Decision 4): a `code` discriminant, not `message`, is what an
+// action switches on — `message` stays exactly as it was (English, developer-facing, log-only).
+export type RegistrationErrorCode = "missing_email" | "missing_password" | "signup_failed";
+
+export class RegistrationError extends Error {
+  constructor(message: string, readonly code: RegistrationErrorCode) {
+    super(message);
+  }
+}
 
 // FR-1.1/FR-1.2: register a household from an email + password, both required. Creates the
 // Supabase Auth user, then the Household/HouseholdSettings/Account/Membership rows in one DB
@@ -33,8 +41,8 @@ export class RegistrationError extends Error {}
 // set to the new household's id BEFORE the first insert — every new row's household_id must equal
 // current_setting('app.household_id') to satisfy each table's RLS WITH CHECK.
 export async function registerHousehold(email: string, password: string) {
-  if (!email) throw new RegistrationError("email is required");
-  if (!password) throw new RegistrationError("password is required");
+  if (!email) throw new RegistrationError("email is required", "missing_email");
+  if (!password) throw new RegistrationError("password is required", "missing_password");
 
   const { data, error } = await supabaseAdmin().auth.admin.createUser({
     email,
@@ -48,7 +56,7 @@ export async function registerHousehold(email: string, password: string) {
     email_confirm: true,
   });
   if (error || !data.user) {
-    throw new RegistrationError(error?.message ?? "Supabase Auth did not return a user");
+    throw new RegistrationError(error?.message ?? "Supabase Auth did not return a user", "signup_failed");
   }
 
   const householdId = randomUUID();
@@ -141,7 +149,14 @@ export async function undoRegisterHousehold(
 // itself — but never occupies it (ADR-013). This function only creates the ResidentProfile row
 // (identity/repository.ts's createResidentProfile); granting it its own Account/Membership happens
 // via claimResidentProfile below, a separate, later step.
-export class ClaimError extends Error {}
+// german-ui-vocabulary (design.md Decision 4).
+export type ClaimErrorCode = "not_found" | "not_prepared" | "signup_failed";
+
+export class ClaimError extends Error {
+  constructor(message: string, readonly code: ClaimErrorCode) {
+    super(message);
+  }
+}
 
 // Convergence T082: resolves (household, display_name) to a `prepared` ResidentProfile ready to
 // be claimed — the lookup a claim UI needs before it can call claimResidentProfile below.
@@ -182,9 +197,9 @@ export async function claimResidentProfile(
       .select()
       .from(residentProfile)
       .where(eq(residentProfile.id, residentProfileId));
-    if (!profile) throw new ClaimError(`ResidentProfile not found: ${residentProfileId}`);
+    if (!profile) throw new ClaimError(`ResidentProfile not found: ${residentProfileId}`, "not_found");
     if (profile.status !== "prepared") {
-      throw new ClaimError(`ResidentProfile ${residentProfileId} is not prepared for claiming`);
+      throw new ClaimError(`ResidentProfile ${residentProfileId} is not prepared for claiming`, "not_prepared");
     }
 
     const derivedEmail = deriveResidentEmail(residentProfileId);
@@ -195,7 +210,7 @@ export async function claimResidentProfile(
       // precondition for the sign-in path, not a claim about a real mailbox.
     });
     if (error || !data.user) {
-      throw new ClaimError(error?.message ?? "Supabase Auth did not return a user");
+      throw new ClaimError(error?.message ?? "Supabase Auth did not return a user", "signup_failed");
     }
 
     const accountId = data.user.id;
@@ -289,7 +304,22 @@ export function hashSessionToken(accessToken: string): string {
   return createHmac("sha256", secret).update(accessToken).digest("hex");
 }
 
-export class SignInError extends Error {}
+// german-ui-vocabulary (design.md Decision 4). Six throw sites converge to five codes: Decision
+// 5 / proposal.md Assumption 6 merges "No such resident in this household" and "Invalid
+// credentials" into `invalid_credentials` — telling the two apart would let an unauthenticated
+// visitor learn whether a display name exists in the household.
+export type SignInErrorCode =
+  | "missing_fields"
+  | "invalid_household"
+  | "invalid_credentials"
+  | "no_household"
+  | "no_membership";
+
+export class SignInError extends Error {
+  constructor(message: string, readonly code: SignInErrorCode) {
+    super(message);
+  }
+}
 
 export interface SignInResult {
   session: typeof session.$inferSelect;
@@ -317,13 +347,13 @@ export async function signIn(
     // `noValidate`) — reject before householdId hits withSessionContext's assertUuid, whose plain
     // Error isn't a SignInError and would otherwise surface as an unhandled crash.
     if (!input.householdId.trim() || !input.displayName.trim()) {
-      throw new SignInError("Household and name are required");
+      throw new SignInError("Household and name are required", "missing_fields");
     }
     // A non-blank but non-UUID-shaped householdId (e.g. "not-a-uuid") would otherwise still reach
     // withSessionContext's assertUuid below and throw a plain Error there instead — same isUuid
     // shape check the claim action and cookie parser already use for this exact input.
     if (!isUuid(input.householdId)) {
-      throw new SignInError("Invalid household");
+      throw new SignInError("Invalid household", "invalid_household");
     }
 
     // Resolve display_name -> ResidentProfile.id within the already-known household. This read
@@ -346,7 +376,10 @@ export async function signIn(
           ),
         ),
     );
-    if (!profile) throw new SignInError("No such resident in this household");
+    // design.md Decision 5 / proposal.md Assumption 6: converges with the "Invalid credentials"
+    // throw below on the single code `invalid_credentials` — this is the change's one
+    // user-visible behaviour change (tasks.md 2.2).
+    if (!profile) throw new SignInError("No such resident in this household", "invalid_credentials");
     email = deriveResidentEmail(profile.id);
   }
 
@@ -355,7 +388,7 @@ export async function signIn(
     password: input.password,
   });
   if (error || !data.user || !data.session) {
-    throw new SignInError("Invalid credentials");
+    throw new SignInError("Invalid credentials", "invalid_credentials");
   }
 
   const accountId = data.user.id;
@@ -363,13 +396,13 @@ export async function signIn(
   // The ONE deliberate RLS bootstrap hole (drizzle/0005_*.sql): account_id is already verified by
   // Supabase Auth above; this resolves it to the household_id RLS needs for everything after.
   const householdId = await resolveAccountHousehold(accountId);
-  if (!householdId) throw new SignInError("Account has no household");
+  if (!householdId) throw new SignInError("Account has no household", "no_household");
 
   const context: SessionContext = { accountId, householdId, profileId: null };
 
   return withSessionContext(context, async (tx) => {
     const [membershipRow] = await tx.select().from(membership).where(eq(membership.accountId, accountId));
-    if (!membershipRow) throw new SignInError("Account has no membership");
+    if (!membershipRow) throw new SignInError("Account has no membership", "no_membership");
 
     // ADR-013/G-D14: acting_profile_id is set here, once, and never written again. `null` for a
     // household account (is_resident = false); the profile id for a resident account.

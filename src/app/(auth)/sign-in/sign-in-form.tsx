@@ -2,9 +2,11 @@
 
 import Link from "next/link";
 import { useActionState, useState } from "react";
+import { de } from "@/ui/strings";
 import { signInAction, type SignInFormState } from "./actions";
 
 const initialState: SignInFormState = { error: null };
+const t = de.auth.signIn;
 
 // AC-1.6: two entry modes, household (email+password) and resident (household, display_name,
 // password) — ADR-013's fixed-identity model means picking a mode here IS choosing the identity
@@ -15,7 +17,7 @@ export function SignInForm() {
 
   return (
     <div className="mx-auto max-w-md space-y-6 p-6">
-      <h1 className="font-serif text-2xl font-semibold">Sign in</h1>
+      <h1 className="font-serif text-2xl font-semibold">{t.heading}</h1>
 
       {/* Tab switcher, not a choice selector — active tab is a raised cream sub-pill, not a
           solid-color fill (09-Design-System.md distinguishes the two explicitly). */}
@@ -25,14 +27,14 @@ export function SignInForm() {
           onClick={() => setMode("household")}
           className={`tab-item ${mode === "household" ? "tab-item-active" : ""}`}
         >
-          Household
+          {t.tabHousehold}
         </button>
         <button
           type="button"
           onClick={() => setMode("resident")}
           className={`tab-item ${mode === "resident" ? "tab-item-active" : ""}`}
         >
-          Resident
+          {t.tabResident}
         </button>
       </div>
 
@@ -42,7 +44,7 @@ export function SignInForm() {
         {mode === "household" ? (
           <div>
             <label htmlFor="email" className="field-label">
-              Email
+              {t.emailLabel}
             </label>
             <input id="email" name="email" type="email" required className="field-input" />
           </div>
@@ -50,20 +52,20 @@ export function SignInForm() {
           <>
             <div>
               <label htmlFor="householdId" className="field-label">
-                Household
+                {t.householdLabel}
               </label>
               <input
                 id="householdId"
                 name="householdId"
                 type="text"
                 required
-                placeholder="remembered on this device after joining"
+                placeholder={t.householdPlaceholder}
                 className="field-input"
               />
             </div>
             <div>
               <label htmlFor="displayName" className="field-label">
-                Your name
+                {t.nameLabel}
               </label>
               <input
                 id="displayName"
@@ -74,9 +76,9 @@ export function SignInForm() {
               />
             </div>
             <p className="field-helper">
-              Not signed up yet?{" "}
+              {t.notClaimedYet}{" "}
               <Link href="/claim" className="btn-link">
-                Claim your resident profile
+                {t.claimLink}
               </Link>
               .
             </p>
@@ -85,7 +87,7 @@ export function SignInForm() {
 
         <div>
           <label htmlFor="password" className="field-label">
-            Password
+            {t.passwordLabel}
           </label>
           <input
             id="password"
@@ -99,7 +101,7 @@ export function SignInForm() {
         {state.error && <p className="field-error">{state.error}</p>}
 
         <button type="submit" disabled={pending} className="btn btn-primary w-full">
-          {pending ? "Signing in…" : "Sign in"}
+          {pending ? t.submitPending : t.submit}
         </button>
       </form>
     </div>

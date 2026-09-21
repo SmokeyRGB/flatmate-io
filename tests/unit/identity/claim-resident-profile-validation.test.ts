@@ -9,6 +9,7 @@ vi.mock("next/navigation", () => ({ redirect: vi.fn() }));
 
 const { claimResidentProfileAction } = await import("@/app/(auth)/claim/actions");
 import type { ClaimFormState } from "@/app/(auth)/claim/actions";
+import { de } from "@/ui/strings";
 
 // A non-empty but non-UUID householdId must fail as a ClaimFormState.error (returned, not thrown)
 // before reaching findPreparedResidentProfile -> withSessionContext's assertUuid, whose plain
@@ -35,6 +36,6 @@ describe("claimResidentProfileAction householdId validation", () => {
 
     const result = await claimResidentProfileAction(prevState, formData);
 
-    expect(result.error).toBe("Household, name, and password are all required.");
+    expect(result.error).toBe(de.auth.errors.claim.householdRequired);
   });
 });

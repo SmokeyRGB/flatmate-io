@@ -2,9 +2,11 @@
 
 import { Trash2, TriangleAlert } from "lucide-react";
 import { useActionState, useEffect, useRef, useState } from "react";
+import { de } from "@/ui/strings";
 import { removeMemberAction, type RemoveMemberFormState } from "./actions";
 
 const initialState: RemoveMemberFormState = { error: null };
+const t = de.members.remove;
 
 // FR-1.26/U-27 hard tier: requires typing the exact display name, not a plain click. Presented as
 // a modal dialog per docs/09-Design-System.md's "Dialogs & confirmations" — title, consequence
@@ -33,8 +35,8 @@ export function RemoveMemberForm({ accountId, displayName }: { accountId: string
       <button
         type="button"
         onClick={() => dialogRef.current?.showModal()}
-        aria-label={`Remove ${displayName}`}
-        title="Remove"
+        aria-label={t.ariaLabel(displayName)}
+        title={t.buttonLabel}
         className="shrink-0 rounded-full p-1.5 text-destructive transition hover:bg-destructive/10"
       >
         <Trash2 className="size-5" />
@@ -43,25 +45,19 @@ export function RemoveMemberForm({ accountId, displayName }: { accountId: string
       {/* Resetting on `close` covers both the Cancel button below and the native Escape-dismiss
           gesture (which fires `close` too) — one handler, no separate case needed. */}
       <dialog ref={dialogRef} className="dialog" onClose={() => setTypedName("")}>
-        <h2 className="font-serif text-lg font-semibold">Remove {displayName}?</h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Their access is revoked immediately. This cannot be undone.
-        </p>
+        <h2 className="font-serif text-lg font-semibold">{t.dialogHeading(displayName)}</h2>
+        <p className="mt-1 text-sm text-muted-foreground">{t.consequence}</p>
 
         <div className="callout callout-caution mt-3">
           <TriangleAlert className="size-4" />
-          <p>
-            Use this only for someone who joined via the join code but doesn&apos;t actually live
-            here. For an actual move-out, use &quot;Moved out&quot; instead — it keeps their
-            history and can be reversed with Reactivate.
-          </p>
+          <p>{t.caution}</p>
         </div>
 
         <form action={formAction} className="mt-4 space-y-3">
           <input type="hidden" name="accountId" value={accountId} />
           <div>
             <label htmlFor={`confirm-${accountId}`} className="field-label">
-              Type &quot;{displayName}&quot; to confirm
+              {t.confirmLabel(displayName)}
             </label>
             <input
               id={`confirm-${accountId}`}
@@ -79,10 +75,10 @@ export function RemoveMemberForm({ accountId, displayName }: { accountId: string
               disabled={pending || typedName !== displayName}
               className="btn btn-destructive"
             >
-              {pending ? "Removing…" : "Remove"}
+              {pending ? t.submitPending : t.submit}
             </button>
             <button type="button" onClick={() => dialogRef.current?.close()} className="btn-link">
-              Cancel
+              {t.cancel}
             </button>
           </div>
         </form>

@@ -12,6 +12,7 @@ import {
 } from "@/modules/identity/auth";
 import { setSessionCookie } from "@/modules/identity/session-cookie";
 import { isUuid, type SessionContext } from "@/db/session-context";
+import { de } from "@/ui/strings";
 
 export interface ClaimFormState {
   error: string | null;
@@ -30,7 +31,7 @@ export async function claimResidentProfileAction(
   const password = String(formData.get("password") ?? "");
 
   if (!householdId || !displayName || !password) {
-    return { error: "Household, name, and password are all required." };
+    return { error: de.auth.errors.claim.householdRequired };
   }
 
   // householdId reaches findPreparedResidentProfile -> withSessionContext's assertUuid below,
@@ -38,13 +39,13 @@ export async function claimResidentProfileAction(
   // for a non-empty, non-UUID value — fail closed here instead (isUuid is exported from
   // session-context.ts for exactly this: untrusted input reaching a session-context boundary).
   if (!isUuid(householdId)) {
-    return { error: "That household link looks invalid." };
+    return { error: de.auth.errors.claim.invalidHousehold };
   }
 
   try {
     const profile = await findPreparedResidentProfile(householdId, displayName);
     if (!profile) {
-      return { error: "No profile with that name is waiting to be claimed in this household." };
+      return { error: de.auth.errors.claim.noProfileWaiting };
     }
 
     const context: SessionContext = { accountId: randomUUID(), householdId, profileId: null };
@@ -61,13 +62,45 @@ export async function claimResidentProfileAction(
     } catch (sessionErr) {
       await undoClaimResidentProfile(context, profile.id, claimed.accountId);
       if (sessionErr instanceof SignInError) {
-        return { error: sessionErr.message };
+        // Exhaustive switch (design.md Decision 4): a missed code is a compile error.
+        const code = sessionErr.code;
+        switch (code) {
+          case "missing_fields":
+            return { error: de.auth.errors.signIn.missingFields };
+          case "invalid_household":
+            return { error: de.auth.errors.signIn.invalidHousehold };
+          case "invalid_credentials":
+            return { error: de.auth.errors.signIn.invalidCredentials };
+          case "no_household":
+            return { error: de.auth.errors.signIn.noHousehold };
+          case "no_membership":
+            return { error: de.auth.errors.signIn.noMembership };
+          default: {
+            const _exhaustive: never = code;
+            return _exhaustive;
+          }
+        }
       }
-      return { error: "Something went wrong completing sign-in. Please try again." };
+      // Decision 6: an unanticipated failure never shows its own message — only a generic key.
+      console.error(sessionErr);
+      return { error: de.auth.errors.genericSignInFailure };
     }
   } catch (err) {
     if (err instanceof ClaimError) {
-      return { error: err.message };
+      switch (err.code) {
+        case "not_found":
+          console.error(err);
+          return { error: de.auth.errors.claim.notFound };
+        case "not_prepared":
+          return { error: de.auth.errors.claim.alreadyClaimed };
+        case "signup_failed":
+          console.error(err);
+          return { error: de.auth.errors.claim.signupFailed };
+        default: {
+          const _exhaustive: never = err.code;
+          return _exhaustive;
+        }
+      }
     }
     throw err;
   }
