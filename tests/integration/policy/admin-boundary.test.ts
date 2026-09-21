@@ -1,7 +1,14 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { assertHasResidentProfile, PermissionDeniedError } from "@/modules/identity/repository";
 import { registerTestHousehold, type TestHousehold } from "../../helpers/identity";
 import { uuid } from "../../helpers/uuid";
+
+let household: TestHousehold | undefined;
+
+afterEach(async () => {
+  if (household) await household.cleanup();
+  household = undefined;
+});
 
 // AC-1.16/FR-1.23: a profile-less session is refused any route that requires an active resident
 // profile. F1 builds no Application/Vote/Slot/Appointment/CastingNote table yet (F3-F5); this
@@ -14,13 +21,8 @@ describe("Administration boundary (FR-1.23)", () => {
   });
 
   it("permits a resident session", async () => {
-    let household: TestHousehold | undefined;
-    try {
-      household = await registerTestHousehold();
-      const residentContext = { ...household.context, profileId: uuid() };
-      expect(() => assertHasResidentProfile(residentContext)).not.toThrow();
-    } finally {
-      if (household) await household.cleanup();
-    }
+    household = await registerTestHousehold();
+    const residentContext = { ...household.context, profileId: uuid() };
+    expect(() => assertHasResidentProfile(residentContext)).not.toThrow();
   });
 });

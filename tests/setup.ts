@@ -1,4 +1,5 @@
 import { config } from "dotenv";
+import { afterEach } from "vitest";
 
 // `quiet: true` suppresses dotenv's own stdout "tip" advertisements (confirmed in its source,
 // node_modules/dotenv/lib/main.js) — not a security concern, just noise in test output.
@@ -28,3 +29,21 @@ for (const [name, value] of [
     );
   }
 }
+
+// A net beneath each file's own afterEach, not a replacement for it. If this ever ran before a
+// test file's own teardown instead of after, nothing would leak — cleanup() deregisters and is
+// idempotent — but every per-file afterEach would become a dead no-op and cleanup failures would
+// be misattributed to the sweep instead of the test that caused them. The assertion in
+// tests/integration/policy/sweep-abandoned-household.test.ts ("the sweep is a net, not the
+// primary cleanup path") detects that directly, rather than this comment asserting an ordering as
+// an unverified fact. It only catches a household whose registerTestHousehold() call is still in
+// flight when its test is abandoned (proposal.md) — a registration a test's own afterEach has
+// already cleaned up is deregistered and this is a no-op for it (design.md D2).
+//
+// Imported dynamically, after config() above has run: a static top-of-file import would execute
+// before this file's own body, pulling in ./helpers/identity.ts and, through it, src/db/client.ts
+// — which reads process.env.DATABASE_URL at module load — before dotenv has populated it.
+afterEach(async () => {
+  const { sweepAbandonedHouseholds } = await import("./helpers/identity");
+  await sweepAbandonedHouseholds();
+});

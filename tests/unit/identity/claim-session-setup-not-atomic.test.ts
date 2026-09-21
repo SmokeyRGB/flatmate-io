@@ -3,7 +3,12 @@ import { and, eq } from "drizzle-orm";
 import { withSessionContext } from "@/db/session-context";
 import { account, membership, residentProfile } from "@/modules/identity/schema";
 import { createResidentProfile } from "@/modules/identity/repository";
-import { deleteTestAccount, registerTestHousehold, type TestHousehold } from "../../helpers/identity";
+import {
+  cleanupAll,
+  deleteTestAccount,
+  registerTestHousehold,
+  type TestHousehold,
+} from "../../helpers/identity";
 
 // claimResidentProfileAction pulls in session-cookie.ts (server-only + next/headers) and
 // next/navigation via its import chain, mirroring claim-resident-profile-validation.test.ts.
@@ -37,9 +42,8 @@ describe("claim action: compensating cleanup when session setup fails", () => {
     } else {
       process.env.SESSION_TOKEN_HASH_SECRET = originalSecret;
     }
-    for (const id of accountIds) await deleteTestAccount(id);
+    await cleanupAll(...accountIds.map(deleteTestAccount), hh?.cleanup());
     accountIds.length = 0;
-    if (hh) await hh.cleanup();
     hh = undefined;
   });
 
