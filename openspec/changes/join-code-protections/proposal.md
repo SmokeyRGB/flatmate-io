@@ -1,125 +1,124 @@
 # Proposal
 
+> **Rewritten 2026-09-21.** An earlier version of these four artifacts planned this change against
+> a single rotating `Household.join_code`. That model was superseded before any code was written —
+> **O-18** was resolved in favour of an issuance history (PR #13), and `domain/identity.md` §2.1 now
+> carries `JoinCodeIssuance`. The superseded artifacts are in this branch's history at `2cc4f78`.
+
 ## Why
 
-The household join code is today an unbounded credential. `Household.join_code` is generated at
-registration and rotated on demand, and that is all: it never expires, it can be redeemed any
-number of times, and nothing counts its use. `docs/backlog/requirements/F2-requirements.md` C-2.4
-states why that is not survivable once F2 ships a self-service join path:
+The household join code is an unbounded credential, and it is the only one the product has left.
+`docs/backlog/requirements/F2-requirements.md` C-2.4:
 
 > The join link is the **only remaining access control**, because S-03 removed the mandatory email
 > and **U-22** removed the resident-visible member list and the right to remove members. […] The
 > protections stay a precondition, not an enhancement.
 
-`domain/identity.md` §2.1 puts the same point at the model layer: since `Account.email` became
-nullable for resident accounts and the join form's email requirement fell away, *„gibt es **keine
-zweite Zugangskontrolle** mehr […] Der Code trägt die gesamte Absicherung allein, und ein Code ohne
-Ablauf ist dann ein Passwortäquivalent ohne Verfallsdatum."*
+`domain/identity.md` §2.1 says the same at the model layer: since `Account.email` became nullable
+for resident accounts, *„gibt es **keine zweite Zugangskontrolle** mehr […] Der Code trägt die
+gesamte Absicherung allein, und ein Code ohne Ablauf ist dann ein Passwortäquivalent ohne
+Verfallsdatum."*
 
-This is change 1 of F2's four. It is deliberately first because it has no dependency on the join
-UI: the columns, the validation and the moderator controls can land and be tested before any
-stranger can reach a join form. Building the join path first would mean shipping the unbounded
-code to the public.
+Today `household.join_code` is a `randomUUID()` generated at registration, rotatable and nothing
+else: no expiry, no cap on redemptions, no count, and nothing anywhere reads a code back.
+
+This is change 1 of F2's four, first because it has no dependency on the join UI: the table, the
+validation and the moderator controls can land and be tested before any stranger can reach a join
+form. Building the join path first would mean shipping the unbounded code to the public.
 
 ## What Changes
 
-- **Three columns on `household`**, named exactly as `domain/identity.md` §2.1 declares them:
-  - `join_code_expires_at` — FR-2.3: *"The join code shall have an expiry timestamp, changeable by
-    the household, defaulting to 7 days from issue."*
-  - `join_code_max_uses` — FR-2.4: the default is **1**, a single-use link.
-  - `join_code_uses` — FR-2.6: *"Every successful join shall increment the code's use count."*
-    Reset to 0 on rotation, because a rotated code is a new value.
-- **All three declared in `data-inventory.yml`** beside the existing `join_code` entry. Not
-  optional and not a follow-up: C-2.11 and **G-F1** make an undeclared column a build failure,
-  *„es gibt keinen stillen Default"*.
-- **Resolution of a code to its household** — a query that does not exist anywhere today. The code
-  is displayed and rotatable; nothing has ever read it back.
-- **One validation outcome, not three.** FR-2.7 names three rejection causes (expired, cap reached,
-  rotated); FR-2.8 as corrected on 2026-09-21 requires *"exactly **one** message that does not
-  distinguish between FR-2.7's three reasons"*. The function therefore returns a household or a
-  single `invalid`, with no reason attached — the reason cannot leak through a type that never
-  carried it. EC-2.8 (a cap of 0 means "closed") then needs no code of its own: the cap predicate
-  is already false at zero.
-- **Atomic consumption.** EC-2.1 is no longer an edge case. With a default cap of 1, *every*
-  ordinary invitation is a race of one, so the count is claimed by a single conditional statement
-  that both decides and counts, never by a read followed by a write.
-- **Screen O16 (`(org)/members/`)** gains the controls S-49 requires: the warning where the link is
-  copied (FR-2.2), an expiry control, a max-uses control, the full invite URL beside the raw code,
-  and the invalidate action relabelled **"Löschen"**.
+- **A new table, `join_code_issuance`**, replacing five columns on `household`. Per
+  `domain/identity.md` §2.1: `code` (unique across all households), `expires_at`, `max_uses`
+  (default **1**, `0` meaning closed), `uses` (default 0, never reset), `created_by_account_id`,
+  `deleted_at`. A household holds **several links at once** (FR-2.1 as amended), each with its own
+  limits and its own end.
+- **`household.join_code`, `join_code_rotated_at` and the three columns PR #13 moved off the
+  entity are dropped**, and each existing household's current code migrates into one issuance row.
+  This is not an additive migration — F1 shipped these columns, a `rotateJoinCode` function and an
+  O16 UI that renders them.
+- **`membership.joined_via_code` becomes `joined_via_issuance_id`** — declared since F1, never
+  written. A reference, not a copy: storing the code on that row would undercut G-A5. It is what
+  answers *"who joined through which link"* (AC-2.26).
+- **Codes become short and hand-typeable** — `UAMPN-QACVZ`, not a UUID (FR-2.26). **P-1
+  Kanalneutralität** requires anything arriving by link to be enterable by hand.
+- **Rotation is replaced by issue / extend / delete**, per FR-2.5 as amended. Deleting every live
+  link does what rotation did; deleting one leaves the others alone and leaves the memberships it
+  created untouched.
+- **One validation outcome.** FR-2.7 names three rejection causes; FR-2.8 requires *"exactly
+  **one** message that does not distinguish between FR-2.7's three reasons"*. EC-2.8 (a cap of 0)
+  then needs no code of its own.
+- **Atomic consumption.** EC-2.1 is the ordinary case, not an edge case: with a default cap of 1,
+  every normal invitation is a race for the only redemption a link has.
+- **Screen O16** gets what `screens/O-organisation.md` O16 now describes: the warning, a *create*
+  form, and the list of links — live and dead — each with its remaining validity, its count, `+7
+  Tage`, `Löschen`, the code, the full URL and the stacked copy pair.
 
-Not in this change: the join route, the join form, and any caller of the validation function.
-Those are changes 2 and 3. This change builds the mechanism and tests it directly.
+Not in this change: the join route, the join form, manual code entry, and rate limiting. Those are
+changes 2 and 3.
 
 ## Capabilities
 
 ### New Capabilities
 
-- `identity/join-code`: the lifecycle of the household join code — its expiry, its usage cap and
-  count, how a code resolves to a household, what makes a redemption attempt valid, how a
-  redemption is claimed atomically, and what the moderating person can see and change about it.
-
-`openspec/specs/` is empty by design: the governance decision recorded in `CLAUDE.md` is that a
-capability spec is written on first touch, describing implemented behaviour and citing its
-`FR-n.m`, never by copying `docs/backlog/requirements/` prose. This is the first change to seed it.
+- `identity/join-code`: the lifecycle of a household's join links — what makes one valid, how a
+  code resolves to a household, how a redemption is claimed atomically, what a moderating person
+  can see and change, and what the history of dead links preserves.
 
 ### Modified Capabilities
 
-None — there are no existing specs to modify.
+None. `openspec/specs/` holds only `ui/vocabulary`, seeded by change 0.
 
 ## Impact
 
-**Guardrails this change touches**, named plainly:
+**Guardrails this change touches:**
 
-- **G-A5** — *„Der Beitrittscode verlässt niemals das System"*. Two new surfaces make this live
-  rather than theoretical: O16 renders the full invite URL, and the validation function takes the
-  code as an argument. Neither may reach a log, and the code may never be assembled into a query
-  string. The invite URL carries the code as a **path segment** for exactly this reason.
-- **G-F1** — the three new columns break the build unless declared in `data-inventory.yml`.
-- **G-C1** — the raw Postgres/Drizzle client stays inside `src/modules/identity/repository.ts`;
-  the server actions call exported functions.
-- **G-C7** — `household` is RLS-scoped, so the new columns need tests on both sides: through the
-  policy layer and via raw SQL bypassing it.
+- **G-A5** — *„Der Beitrittscode verlässt niemals das System"*. Live rather than theoretical here:
+  O16 renders the full invite URL, and the validation function takes a code as an argument. Neither
+  may reach a log, and the code may never be assembled into a query string. It travels as a **path
+  segment**.
+- **G-F1** — every column of the new table must be declared in `data-inventory.yml` or the build
+  fails. Note `created_by_account_id` is 🟠, not ⚙️ like the rest: it names a person.
+- **G-C1** — the raw Postgres/Drizzle client stays inside `src/modules/identity/repository.ts`.
+- **G-C7** — a new household-scoped table needs tests on both sides: through the policy layer and
+  via raw SQL bypassing it.
 - **G-C8** — unchanged; session context still comes only from `src/db/session-context.ts`.
-- **G-D** — **no guarded test is touched, and none closes.** `test/guarded.manifest.json` stays
-  byte-identical. G-D12, the nearest-looking entry, is the v0.2 `ApplicationInviteToken` (*"Du bist
-  bereits als Bewohner:in registriert"*), not the household join code — a different token with a
-  different lifecycle.
-- **G-L / P-5** — not touched; nothing here decides anything.
+- **G-D** — **no guarded test is touched and none closes.** `test/guarded.manifest.json` stays
+  byte-identical. G-D12, the nearest-looking entry, is the v0.2 `ApplicationInviteToken`, a
+  different token with a different lifecycle.
+- **G-L / P-5** — not in play; nothing here decides anything.
 
-**Code:** `src/modules/identity/schema.ts` (three columns), `src/modules/identity/repository.ts`
-(resolution, validation, atomic consume; `rotateJoinCode` gains the reset), `drizzle/` (one
-generated migration), `data-inventory.yml`, `src/app/(org)/members/page.tsx` and
-`.../actions.ts`, `src/app/globals.css` (the stacked copy-button pair, which does not exist yet).
+**Code:** `src/modules/identity/schema.ts`, `repository.ts`, `auth.ts`; `drizzle/` (one migration);
+`data-inventory.yml`; `src/app/(org)/members/page.tsx` and `actions.ts`; `src/ui/strings/de.ts`;
+`src/app/globals.css`.
 
-**Compliance:** the three columns are `⚙️` like `join_code` itself — the code identifies a
-household, not a person (`domain/identity.md` §2.1, O-9), so they belong on the TOM list rather
-than in the Art. 30 register. C-2.5 still binds every string on O16: these protections are
-**social visibility, not hardening**, and must never be presented as security.
+**Compliance:** the code identifies a household, not a person (`domain/identity.md` §2.1, O-9), so
+the issuance columns are ⚙️ and belong on the TOM list rather than in the Art. 30 register —
+except `created_by_account_id`. C-2.5 binds every string on O16: these protections are **social
+visibility, not hardening**, and must never be presented as security.
 
 ## Assumptions
 
-Recorded rather than silently resolved, per this project's proposal rules.
-
-1. **The invite URL is `/join/<code>`, a path segment, and it 404s until change 2 lands.** The
-   shape is forced by G-A5 (never a query string) and is fixed here rather than discovered later,
-   because O16 must render the whole URL to satisfy S-49's "warning where the link is copied". The
-   consequence is named rather than hidden: between this change and change 2, a copied link leads
-   nowhere. That is acceptable only because O16 is a moderator surface behind authentication, and
-   no resident is invited to use it yet.
-2. **"Löschen" relabels the existing rotation action; it does not add a second one.** `join_code`
-   is `NOT NULL`, and the model carries one rotating code rather than a history of issued links
-   (**O-18**, open). So "delete this link" and "replace this link" are one operation, and
-   `screens/rahmenwerk.md` §8.6 governs only what it is called: **"Löschen"**, never
-   *„Widerrufen"* and never *„Zurückziehen"*.
-3. **Existing households migrate to `join_code_max_uses = null`, meaning unlimited — not to 1.**
-   This follows `domain/identity.md` §2.1 verbatim (*„`null` = unbegrenzt (Default für
-   Bestandshaushalte bei Migration)"*). Defaulting them to 1 would retroactively invalidate links
-   already in flight, which is a behaviour change no requirement asks for.
-4. **Rotation resets both counters**: `join_code_uses` to 0, and `join_code_expires_at` re-based on
-   the rotation time, per `domain/identity.md` §2.1 (*„Vorschlag `join_code_rotated_at + 7 Tage`"*)
-   and its note that the use counter *„setzt sich bei Rotation zurück"*.
-5. **FR-2.4's founding-link exception is not built.** FR-2.4 pre-fills the founding link with the
-   number of expected residents; no such number is captured anywhere, and the decision of
-   2026-09-21 in `review-log.md` §Offene-Punkte-Register defers that prefill for v0.1 rather than
-   abolishing it. Every code, including the founding one, therefore defaults to 1, and whoever
-   shares a link into a group chat raises the cap by hand on O16.
+1. **The short code ships here; its attempt limit ships in change 2, and C-2.12 is not violated.**
+   C-2.12 says FR-2.26 and FR-2.28 are one decision that cannot be split. The reason is that a
+   shorter code is an oracle against the whole estate — but **the oracle is the public redemption
+   route, and that route does not exist until change 2.** Nothing in this change lets an
+   unauthenticated party test a code at all. The pair therefore reaches the public together, which
+   is what C-2.12 protects. **If change 2 ships without FR-2.28, that is the violation** — named
+   here so the obligation is carried rather than lost between two changes.
+2. **Existing households keep working.** Each household's current `join_code` migrates into one
+   issuance row with `max_uses = null` (no limit) and no expiry, which is exactly what it is today.
+   Defaulting them to 1 would retroactively invalidate links already sent.
+3. **The invitation URL is `/join/<code>` and 404s until change 2.** The shape is decided
+   (PR #13); the route arrives with the join path. Named rather than hidden: between this change
+   and change 2 a copied link leads nowhere. Acceptable only because O16 sits behind
+   authentication and nobody is invited to use it yet.
+4. **Issuing and deleting a link get their own audit event types.** `household.join_code_rotated`
+   is registered today and its action is disappearing. Rather than leave a dead type or stretch it
+   over two different actions, `household.join_code_issued` and `household.join_code_deleted` are
+   registered with empty payloads, and the old type stays registered because historical rows carry
+   it. **The code never enters a payload** (G-A5).
+5. **No `status` column on the new table.** A link's state is derivable from `deleted_at`,
+   `expires_at` and `uses < max_uses`, and `domain/identity.md` §2.1 says so explicitly — *„Bewusst
+   kein `status`-Enum: die drei Gründe sind aus den Daten ablesbar, und ein zusätzliches Feld
+   könnte ihnen widersprechen."*
