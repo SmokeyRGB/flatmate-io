@@ -59,15 +59,28 @@ export function registerTestHousehold(): Promise<TestHousehold> {
   return promise;
 }
 
+// The most recent sweep's count only — no history, no household ids. The sweep for test N runs
+// after test N ends (tests/setup.ts's afterEach), so only test N+1 can observe it; this is how
+// that observation crosses the gap (design.md D2).
+let lastSweepCount = 0;
+
+export function getLastSweepCount(): number {
+  return lastSweepCount;
+}
+
 // Drains the in-flight set and cleans every household whose registration resolved after its own
-// test had already ended (design.md D3/D4) — the net beneath each file's own afterEach.
-export async function sweepAbandonedHouseholds(): Promise<void> {
+// test had already ended (design.md D3/D4) — the net beneath each file's own afterEach. Returns
+// the number of households actually cleaned (fulfilled registrations only — a rejected
+// registration created nothing to clean).
+export async function sweepAbandonedHouseholds(): Promise<number> {
   const pending = Array.from(inFlightHouseholds);
   inFlightHouseholds.clear();
   const results = await Promise.allSettled(pending);
   const cleanups = results
     .filter((r): r is PromiseFulfilledResult<TestHousehold> => r.status === "fulfilled")
     .map((r) => r.value.cleanup());
+  // Recorded before cleanupAll can throw, so a failing cleanup does not leave a stale count.
+  lastSweepCount = cleanups.length;
   try {
     await cleanupAll(...cleanups);
   } catch (error) {
@@ -76,6 +89,7 @@ export async function sweepAbandonedHouseholds(): Promise<void> {
     }
     throw error;
   }
+  return lastSweepCount;
 }
 
 function makeCleanup(context: SessionContext, deregister: () => void): () => Promise<void> {

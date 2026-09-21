@@ -30,13 +30,15 @@ for (const [name, value] of [
   }
 }
 
-// A net beneath each file's own afterEach, not a replacement for it: Vitest resolves
-// sequence.hooks to "stack" (node_modules/vitest/dist/chunks/index.DzobfTyw.js:14599), which runs
-// afterEach hooks in reverse registration order. This file is evaluated before any test file, so
-// this hook is registered first and therefore runs last — after a test file's own teardown has
-// already run. It only catches a household whose registerTestHousehold() call is still in flight
-// when its test is abandoned (proposal.md) — a registration a test's own afterEach has already
-// cleaned up is deregistered and this is a no-op for it (design.md D2).
+// A net beneath each file's own afterEach, not a replacement for it. If this ever ran before a
+// test file's own teardown instead of after, nothing would leak — cleanup() deregisters and is
+// idempotent — but every per-file afterEach would become a dead no-op and cleanup failures would
+// be misattributed to the sweep instead of the test that caused them. The assertion in
+// tests/integration/policy/sweep-abandoned-household.test.ts ("the sweep is a net, not the
+// primary cleanup path") detects that directly, rather than this comment asserting an ordering as
+// an unverified fact. It only catches a household whose registerTestHousehold() call is still in
+// flight when its test is abandoned (proposal.md) — a registration a test's own afterEach has
+// already cleaned up is deregistered and this is a no-op for it (design.md D2).
 //
 // Imported dynamically, after config() above has run: a static top-of-file import would execute
 // before this file's own body, pulling in ./helpers/identity.ts and, through it, src/db/client.ts
