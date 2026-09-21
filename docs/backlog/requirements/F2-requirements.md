@@ -52,7 +52,7 @@ invite token (that is S-42, v0.2).
 - **FR-2.1** Each household shall have exactly one join code, shared as a link. There shall be no per-person codes.
 - **FR-2.2** The share screen shall display the warning: share this link only directly with flatmates; whoever holds it can vote.
 - **FR-2.3** The join code shall have an expiry timestamp, changeable by the household, defaulting to 7 days from issue.
-- **FR-2.4** The join code shall have a maximum use count, changeable by the household, pre-filled with the number of residents the household still expects.
+- **FR-2.4** *(corrected 2026-09-21)* The join code shall have a maximum use count, changeable by the household. The default shall be **1** — a single-use link — with exactly one exception: the **founding link**, issued immediately after household registration (screen `A1`), shall be pre-filled with the number of expected residents given at founding, because it is shared once into the household's group chat so that every founding member joins through it. Every later link, including the regular invitation after an acceptance, is single-use. Source: **O-15** (`domain/offene-punkte.md` §10.2, updated 2026-09-16), which **replaced** the earlier "number of residents the household still expects" default rather than supplementing it; carried into `08-UX-Entscheidungen.md` U-12 and `domain/identity.md` §2.1.
 - **FR-2.5** The join code shall remain rotatable, and rotating it shall invalidate the previous code.
 - **FR-2.6** Every successful join shall increment the code's use count.
 - **FR-2.7** The system shall reject a join attempt when the code is expired, when its use count has reached its maximum, or when it has been rotated.
@@ -172,7 +172,7 @@ Given a resident profile with `moved_out_on` set, when that account attempts to 
 | ID | Case | Required behaviour |
 |---|---|---|
 | **EC-2.1** | Two people open the last remaining use of a code simultaneously | Exactly one join succeeds; the other is refused with the usage-cap reason |
-| **EC-2.2** | A resident joins while a round is open | They become a household member but are **not** added to the open round's participant snapshot; a moderator must add them explicitly (F1 FR-1.18). The counter's denominator is unchanged |
+| **EC-2.2** *(corrected 2026-09-21)* | A resident joins while a round is open | They become a household member **and are added to every currently open round automatically**, marked `joined_after_open` rather than as part of the opening snapshot. The counter's denominator grows accordingly. A moderator may still add someone by hand (`added_manually`) as a correction path for cases the automatic route missed. Source: F1 **FR-1.18**, revised 2026-09-17. The previous wording here — not added, moderator must add explicitly, denominator unchanged — cited FR-1.18 as it read *before* that revision, and contradicted the behaviour already enforced by the `membership_auto_join_open_rounds` trigger |
 | **EC-2.3** | A resident joins when no round is open | Join succeeds; Start shows that no round is running |
 | **EC-2.4** | An already-registered, signed-in resident of this household opens the join link | No second account or profile is created; they are taken to Start with a note that they are already a member |
 | **EC-2.5** | An already-registered resident of a **different** household opens the link | Refused, with an explanation. One account per household membership is the slice's assumption (A-2.4) |
@@ -213,15 +213,18 @@ Given a resident profile with `moved_out_on` set, when that account attempts to 
 **Still MVP-sized?** Yes. This is the smallest feature of the five by requirement count, and
 deliberately so — its whole purpose is the absence of steps.
 
-**Anything unclear or missing?** One genuine blocker and one gap:
+**Anything unclear or missing?** *(reviewed 2026-09-21 — both items below were recorded here as
+open; both had been decided in the register, which is the only place a status lives. Corrected
+rather than deleted, per the register's own rule 1.)*
 
-1. **P-O-08 — how long does "stay signed in" last?** Still open in `03-PRD.md` §8, and it needs
-   an answer before this ships, because FR-2.12 pre-selects the checkbox. Recommendation: a
-   long-lived device-bound session with server-side revocation, so that C-2.9 is satisfied by
-   revocation rather than by a short lifetime. **Not decided here** — it is a product decision.
-2. **The number pre-filled into the usage cap** (FR-2.4) requires the household to have stated
-   how many residents it expects, and no scope line says where that number is captured.
-   Recommendation: ask for it once during F1's household registration.
+1. ~~**P-O-08 — how long does "stay signed in" last?**~~ **Closed.** 90 days, sliding; ends on
+   password change, on an admin reset, and on `moved_out_on`. Maßgeblich: `04-Domaenenmodell.md`
+   §10.2 (**O-13**). `Session.remember_me` already carries it. Not a blocker for this slice.
+2. **The number pre-filled into the usage cap** — narrowed, not closed. Since **O-15**
+   (2026-09-16) the general default is a single-use link, so the expected-resident count is
+   needed **only** for the founding link (FR-2.4). Nothing captures that number today: F1's
+   household registration does not ask for it. Recommendation stands — ask for it once during
+   registration — but it now blocks only the founding-link prefill, not every code.
 
 **Too complex?** No, but note that FR-2.24's precedence rule does almost nothing in this slice:
 with only one open task type it always falls through to the fixed order. It is specified in full
