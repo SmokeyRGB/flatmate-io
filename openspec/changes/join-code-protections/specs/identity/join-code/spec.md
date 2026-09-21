@@ -58,9 +58,11 @@ and it would defeat the counter, the history and the cap together. Where a house
 people to use one link, it raises that link's maximum — a number it chose, not the absence of
 one.
 
-#### Scenario: A new link is single-use by default
-- **WHEN** a link is issued without a maximum being chosen
-- **THEN** it permits one redemption and records none
+#### Scenario: The suggested maximum is one
+- **WHEN** a link is issued and the moderating person leaves the maximum at the value the form
+  suggests
+- **THEN** the link is stored with a maximum of one and a count of zero, so it permits exactly one
+  redemption
 
 #### Scenario: The count rises and stops at the maximum
 - **WHEN** a link reaches its maximum through successful redemptions
@@ -70,9 +72,10 @@ one.
 - **WHEN** a link is issued with a maximum of zero
 - **THEN** every attempt on it is refused, and the household's other links are unaffected
 
-#### Scenario: No link can be issued without a maximum
+#### Scenario: Every link is stored with a maximum, on every path
 - **WHEN** a link is created by any path, including the founding link at household registration
-- **THEN** it carries a maximum, and no value of that field means "no limit"
+- **THEN** it is stored with a maximum, and no value of that field — absent, null or otherwise —
+  means "no limit"
 
 ### Requirement: A code resolves to at most one household
 
