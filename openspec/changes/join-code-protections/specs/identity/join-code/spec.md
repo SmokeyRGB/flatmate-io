@@ -51,9 +51,12 @@ exactly one per successful redemption and SHALL NOT be reset. A link SHALL be re
 count has reached its maximum. A maximum of **zero** SHALL mean the link is closed. Source: FR-2.4,
 FR-2.6, FR-2.7.
 
-A link whose maximum is absent SHALL be unlimited. This is the state links carried over from before
-this capability existed are in, so that invitations already in circulation are not invalidated
-retroactively.
+**There SHALL be no such thing as an unlimited link.** Every link carries a maximum, always; the
+field admits no absent value. A link that could be redeemed without end is the password-equivalent
+without an expiry date that `domain/identity.md` §2.1 names as the reason these limits exist at all,
+and it would defeat the counter, the history and the cap together. Where a household wants many
+people to use one link, it raises that link's maximum — a number it chose, not the absence of
+one.
 
 #### Scenario: A new link is single-use by default
 - **WHEN** a link is issued without a maximum being chosen
@@ -66,6 +69,10 @@ retroactively.
 #### Scenario: A maximum of zero closes the link on arrival
 - **WHEN** a link is issued with a maximum of zero
 - **THEN** every attempt on it is refused, and the household's other links are unaffected
+
+#### Scenario: No link can be issued without a maximum
+- **WHEN** a link is created by any path, including the founding link at household registration
+- **THEN** it carries a maximum, and no value of that field means "no limit"
 
 ### Requirement: A code resolves to at most one household
 

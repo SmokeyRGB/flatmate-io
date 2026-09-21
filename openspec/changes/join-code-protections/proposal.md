@@ -29,8 +29,9 @@ form. Building the join path first would mean shipping the unbounded code to the
 ## What Changes
 
 - **A new table, `join_code_issuance`**, replacing five columns on `household`. Per
-  `domain/identity.md` §2.1: `code` (unique across all households), `expires_at`, `max_uses`
-  (default **1**, `0` meaning closed), `uses` (default 0, never reset), `created_by_account_id`,
+  `domain/identity.md` §2.1: `code` (unique across all households), `expires_at` and `max_uses`
+  (**both `NOT NULL`** — there is no unlimited link and no link without an end; default **1**,
+  with `0` meaning closed), `uses` (default 0, never reset), `created_by_account_id`,
   `deleted_at`. A household holds **several links at once** (FR-2.1 as amended), each with its own
   limits and its own end.
 - **`household.join_code`, `join_code_rotated_at` and the three columns PR #13 moved off the
@@ -106,9 +107,18 @@ visibility, not hardening**, and must never be presented as security.
    unauthenticated party test a code at all. The pair therefore reaches the public together, which
    is what C-2.12 protects. **If change 2 ships without FR-2.28, that is the violation** — named
    here so the obligation is carried rather than lost between two changes.
-2. **Existing households keep working.** Each household's current `join_code` migrates into one
-   issuance row with `max_uses = null` (no limit) and no expiry, which is exactly what it is today.
-   Defaulting them to 1 would retroactively invalidate links already sent.
+2. **Existing households migrate to a real single-use link, not to an unlimited one.** Each
+   household's current `join_code` becomes one issuance row keeping the same code value, with
+   `max_uses = 1`, `uses = 0` and an expiry seven days out. **There is deliberately no
+   "unlimited" state to migrate into**: `domain/identity.md` §2.1 declares both columns
+   `NOT NULL`, and a link redeemable without end is the thing these limits exist to prevent. An
+   earlier draft of this proposal carried `null = unbegrenzt` over from the superseded
+   `Household.join_code_max_uses`, which survives only in the frozen V0.4 snapshot; that was an
+   error, not a decision.
+   This tightens existing links rather than loosening them, and `uses = 0` is the honest value
+   because the old model never counted — nobody knows how many times those codes were used. On
+   `flatmate-io-dev`, the only deployment, there are no invitations in flight for this to
+   disturb.
 3. **The invitation URL is `/join/<code>` and 404s until change 2.** The shape is decided
    (PR #13); the route arrives with the join path. Named rather than hidden: between this change
    and change 2 a copied link leads nowhere. Acceptable only because O16 sits behind

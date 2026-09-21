@@ -12,14 +12,15 @@ query string or an audit payload (**G-A5**). `test/guarded.manifest.json` is not
 ## 1. Schema and migration
 
 - [ ] 1.1 Add `joinCodeIssuance` to `src/modules/identity/schema.ts` per `domain/identity.md` §2.1:
-      `id`, `householdId`, `code` (**unique across all households**), `expiresAt`, `maxUses`
-      (nullable — `null` is unlimited), `uses` (`NOT NULL DEFAULT 0`), `createdAt`,
-      `createdByAccountId` (`NOT NULL`), `deletedAt`. Add the `HOUSEHOLD_MATCH` RLS policy and a
+      `id`, `householdId`, `code` (**unique across all households**), `expiresAt`
+      (**`NOT NULL`**), `maxUses` (**`NOT NULL`** — there is no unlimited link; `0` means closed),
+      `uses` (`NOT NULL DEFAULT 0`), `createdAt`, `createdByAccountId` (`NOT NULL`), `deletedAt`. Add the `HOUSEHOLD_MATCH` RLS policy and a
       `household_id` index, matching the neighbouring tables. **No `status` column** — §2.1 forbids
       it by name. Verify `npx tsc --noEmit`.
 - [ ] 1.2 Write the migration in `drizzle/` as the five ordered steps of `design.md` Decision 4:
-      create the table; **copy each household's current `join_code` into one issuance row with no
-      maximum and no expiry**; rename and retype `membership.joined_via_code` →
+      create the table; **copy each household's current `join_code` into one issuance row that is
+      single-use and expires in seven days** (both columns are `NOT NULL`, so there is no unlimited
+      state to migrate into — this tightens existing links, which is intended); rename and retype `membership.joined_via_code` →
       `joined_via_issuance_id` (`uuid`); drop `household.join_code` and `join_code_rotated_at`;
       add the two functions from task 1.3. Step 2 must precede step 4 **in the same migration** or
       a deploy between them leaves a household with no link. Put the rollback warning from
@@ -104,9 +105,10 @@ query string or an audit payload (**G-A5**). `test/guarded.manifest.json` is not
 - [ ] 4.1 `join-code-validation.test.ts`: a valid link resolves; an expired one, a used-up one, a
       deleted one and a code belonging to no link all return `null`, and the four are
       indistinguishable. Covers FR-2.3, FR-2.7, FR-2.8.
-- [ ] 4.2 Same file: a maximum of `0` refuses on arrival (EC-2.8); a `null` maximum permits
-      redemption past any count (the migrated state); `resolveJoinCode` **never** increments,
-      however often it is called (FR-2.9 must not spend a use).
+- [ ] 4.2 Same file: a maximum of `0` refuses on arrival (EC-2.8); **no link can exist without a
+      maximum** — assert the column rejects a null rather than treating it as unlimited;
+      `resolveJoinCode` **never** increments, however often it is called (FR-2.9 must not spend a
+      use).
 - [ ] 4.3 `join-code-issuance.test.ts`: two links coexist with different limits and neither affects
       the other's count (AC-2.22); deleting one refuses it, leaves the other working and leaves its
       memberships untouched (AC-2.23); extending adds seven days and changes nothing else.

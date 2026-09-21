@@ -49,7 +49,7 @@ UPDATE join_code_issuance
  WHERE code = p_code
    AND deleted_at IS NULL
    AND expires_at > now()
-   AND (max_uses IS NULL OR uses < max_uses)
+   AND uses < max_uses
 RETURNING household_id, id;
 ```
 
@@ -117,10 +117,12 @@ One migration, in order:
 
 1. `CREATE TABLE join_code_issuance` with its RLS policy, keyed on `household_id` like every other
    household-scoped table.
-2. `INSERT INTO join_code_issuance (…) SELECT id, join_code, NULL, NULL, 0, owner_account_id, …
-   FROM household WHERE deleted_at IS NULL` — one row per household, carrying its current code,
-   **no maximum and no expiry**, which is precisely what that code is today
-   (`proposal.md` Assumption 2).
+2. `INSERT INTO join_code_issuance (…) SELECT id, join_code, now() + interval '7 days', 1, 0,
+   owner_account_id, … FROM household WHERE deleted_at IS NULL` — one row per household, keeping
+   its current code value but **bounded**: single-use, expiring in seven days. Both columns are
+   `NOT NULL`, so there is no unlimited state to migrate into, by design
+   (`proposal.md` Assumption 2). This tightens every existing link; `uses = 0` is the only honest
+   starting value, because the old model never counted.
 3. `ALTER TABLE membership RENAME COLUMN joined_via_code TO joined_via_issuance_id` and retype to
    `uuid`. It has never been written, so there is no data to convert.
 4. `ALTER TABLE household DROP COLUMN join_code, DROP COLUMN join_code_rotated_at`.
