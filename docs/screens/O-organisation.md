@@ -370,7 +370,7 @@ Prozess vs. Person, nicht bei „beschreibend vs. empfehlend".
 |---|---|---|
 | Zweck | Information — wer gehört zu dieser Runde | Verwaltung — wer gehört zum Haushalt |
 | Inhalt | nur Namen | Namen, Beitrittsdatum, Kontakt, Status |
-| Handlungen | keine | entfernen, `moved_out`, reaktivieren, Beitrittscode erzeugen/löschen |
+| Handlungen | keine | entfernen, `moved_out`, reaktivieren, Einladungslinks erzeugen/verlängern/löschen |
 | Verwaltung | — | voll |
 | Moderator | ja | **voll (Parität mit Verwaltung, U-30, 2026-09-17 — vormals lesend)** |
 | Bewohnende | ja | **nein, aber eigene reduzierte „Wer wohnt hier"-Ansicht (B5, U-30)** |
@@ -381,21 +381,39 @@ Prozess vs. Person, nicht bei „beschreibend vs. empfehlend".
 - **Kontakt ist eine Datenspalte, kein Button.** Die Mitgliederliste zeigt hinterlegte
   Kontaktdaten an; es gibt keine eigene „Kontakt"-Handlung (im Prototyp beobachteter Fehler,
   2026-09-16 — dort erschien pro Mitglied ein zusätzlicher „Kontakt"-Button ohne Spec-Basis)
-- **Beitrittscode teilen** — mit den drei Auflagen aus S-49:
-  1. Warnhinweis dort, wo der Link kopiert wird: „Teile diesen Link nur direkt mit deinen
-     Mitbewohnenden — niemals öffentlich. Wer ihn hat, kann mitstimmen."
-  2. Ablauf (`join_code_expires_at`, Vorschlag 7 Tage, mit einem Tippen verlängerbar)
-  3. Nutzungsgrenze (`join_code_max_uses`, vorbelegt mit **1** — Ausnahme: der Gründungs-Link
-     direkt nach `A1 Registrierung`, vorbelegt mit der Zahl der erwarteten Bewohnenden; O-15,
-     aktualisiert 2026-09-16)
-  4. Löschen des Codes heißt **„Löschen"**, nicht „Widerrufen" und nicht „Zurückziehen" (UI-Vokabular
-     `rahmenwerk.md` §8.6) — ein bereits verwendeter Link wird gelöscht, ohne dass das etwas an den
-     darüber bereits beigetretenen Mitgliedschaften ändert
-- **Offener Punkt:** das Datenmodell trägt aktuell nur einen einzelnen, rotierenden `join_code`
-  mit Zähler (`domain/identity.md`), keine Historie einzelner Ausstellungen. Eine Ansicht, die
-  mehrere vergangene Links samt „wer hat sich darüber registriert" zeigt, verlangt eine Erweiterung
-  dieses Modells — siehe `review-log.md` §Offene-Punkte-Register, nicht hier vorweggenommen, weil
-  sie das gefrorene `04-Domaenenmodell.md` beträfe
+- **Einladungslinks** — *(neu gefasst 2026-09-21, O-18 aufgelöst: ein Haushalt stellt **mehrere**
+  Links aus, jeder mit eigener Frist, eigener Grenze und eigenem Zähler; `domain/identity.md`
+  §2.1 `JoinCodeIssuance`)*. Der Abschnitt hat drei Teile in dieser Reihenfolge:
+
+  **1. Der Warnhinweis**, bevor irgendetwas anderes kommt — dort, wo der Link kopiert wird, nicht
+  anderswo auf der Seite (S-49): „Teile diesen Link nur direkt mit deinen Mitbewohnenden — niemals
+  öffentlich. Wer ihn hat, kann mitstimmen."
+
+  **2. Ein neuer Link wird erzeugt, nicht bearbeitet.** Zwei Felder nebeneinander — „Gültig für
+  (Tage)", vorbelegt **7**, und „Höchstens nutzbar", vorbelegt **1** — und darunter eine Handlung
+  „Neuen Link erzeugen". Die Felder beschreiben **den nächsten** Link, nicht den bestehenden: ein
+  ausgestellter Link ist ein Versprechen an die Person, die ihn bekommen hat, und wird nachträglich
+  nicht umgeschrieben. Unter der Nutzungsgrenze steht ihre Begründung im Klartext: „Standard: ein
+  Link für eine Person. Erhöhe das nur, wenn mehrere denselben Link nutzen sollen." Das ist die
+  Stelle, an der O-15's Standard **1** erklärt wird, statt nur zu gelten.
+
+  **3. Die Liste der Links**, lebende und tote (FR-2.29). Je Link: die Restfrist („gültig bis
+  22.9.2026"), der Zähler gegen seine Grenze („0 von 1 genutzt"), zwei Handlungen — **„+7 Tage"**
+  (O-15's *„mit einem Tippen verlängerbar"*, als Handlung statt als Datumsfeld) und **„Löschen"** —
+  und darunter der Code selbst in Monospace als kleine Überschrift, die vollständige URL gegedämpft
+  darunter, dann das **gestapelte Paar Kopier-Schaltflächen** aus `../09-Design-System.md`:
+  „Link kopieren" ganzbreit und gefüllt oben, „Nur den Code kopieren" leiser darunter. Die zweite
+  ist kein Beiwerk — sie ist der Kanal für **FR-2.27**, die Eingabe von Hand.
+
+  Ein toter Link verschwindet nicht: er bleibt mit seinem Endstand stehen und nennt, wer über ihn
+  hereinkam (`Membership.joined_via_issuance_id`). Genau das war O-18's Anliegen.
+
+  **„Löschen"**, nicht „Widerrufen" und nicht „Zurückziehen" (UI-Vokabular `rahmenwerk.md` §8.6) —
+  und Löschen berührt die Mitgliedschaften nicht, die über diesen Link entstanden sind.
+
+  **Was hier nicht steht:** kein Schloss-Symbol, kein „sicher", kein „geschützt". Diese Grenzen sind
+  soziale Sichtbarkeit, keine Härtung (C-2.5), und die Oberfläche darf sie nicht als etwas anderes
+  ausgeben.
 - Mitglied entfernen, `moved_out` setzen, reaktivieren
 - **Zweistufiges Entfernen (U-27, entschieden 2026-09-16):** „Ausgezogen" (`moved_out` setzen) ist
   der reguläre Weg für tatsächliche Auszüge — Stimmen und Historie bleiben erhalten. „Entfernen"

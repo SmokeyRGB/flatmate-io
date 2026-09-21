@@ -1249,7 +1249,7 @@ aber **nie** auf dem primären-CTA-Platz und **nie** über einer Aufgabe mit ges
 **Akzeptanzkriterien §4.3**
 
 - [ ] Der Warnhinweis auf der Teilen-Seite erscheint bei jedem Kopieren oder Anzeigen des Beitrittscodes, nicht nur beim ersten Erzeugen
-- [ ] `join_code_expires_at` und `join_code_max_uses` sind in Organisation → Haushalt einstellbar; nach Ablauf oder Erreichen der Nutzungsgrenze ist der Code ungültig und ein neuer muss erzeugt werden
+- [ ] **Korrigiert 2026-09-21 (O-18 aufgelöst):** Frist und Nutzungsgrenze werden **beim Erzeugen eines Links** festgelegt, auf **O16 Mitglieder** — nicht in Organisation → Haushalt, wo sie nie lagen, und nicht nachträglich am ausgestellten Link, der ein Versprechen an die Person ist, die ihn bekommen hat. Die Felder heißen `JoinCodeIssuance.expires_at` und `.max_uses` (`domain/identity.md` §2.1). Nach Ablauf oder Erreichen der Grenze ist **dieser Link** ungültig, während andere Links desselben Haushalts weiterlaufen; eine Verlängerung um sieben Tage ist eine eigene Handlung am Link
 - [ ] Keiner der drei Sicherungspunkte (Warnhinweis, Ablauf, Nutzungsgrenze) erscheint auf dem Beitrittsweg der beitretenden Person (§4.1.1)
 - [ ] Löst ein Konto ohne `ResidentProfile` „Datenauskunft erzeugen" aus, liefert die Anwendung eine Exportdatei, zeigt aber an keiner Stelle der Bedienoberfläche den Inhalt der `Application` an dieses Konto
 - [ ] Bei offener `CastingRound` sind alle Einstellungen des Bereichs „Abstimmung" nicht änderbar, und der Grund wird benannt

@@ -120,10 +120,14 @@ V0.3 aus dieser Liste herausgefallen**, weil `contact_email` und
 >    kostet eine Zeile, und sie auszulassen wäre falsch gewesen.
 > 2. **`Household.join_code`: ⚙️, TOM-Liste statt Art.-30-Verzeichnis** — Vorschlag von V0.1
 >    angenommen. Der Code identifiziert einen Haushalt, keine Person. Dazu seit V0.4 **fünf
->    Auflagen** (rotierbar, niemals in einem Log inklusive Zugriffslog, niemals in einem
->    Query-String, dazu neu Ablauf und Nutzungsgrenze, S-49) — ausgeführt in §2.1 und als
->    überprüfbare Regel an `GUARDRAILS.md` gemeldet. `join_code_expires_at`,
->    `join_code_max_uses` und `join_code_uses` bleiben aus demselben Grund ⚙️: sie identifizieren
->    den Code, nicht eine Person.
+>    Auflagen** (entwertbar, niemals in einem Log inklusive Zugriffslog, niemals in einem
+>    Query-String, dazu neu Ablauf und Nutzungsgrenze, S-49), seit 2026-09-21 **sechs** (von Hand
+>    eingebbar, P-1, mitsamt der daraus folgenden Versuchsbegrenzung) — ausgeführt in §2.1 und als
+>    überprüfbare Regel an `GUARDRAILS.md` gemeldet. `JoinCodeIssuance.expires_at`, `.max_uses`
+>    und `.uses` bleiben aus demselben Grund ⚙️: sie identifizieren den Link, nicht eine Person.
+>    *(Bis 2026-09-21 hießen sie `join_code_expires_at`, `join_code_max_uses` und `join_code_uses`
+>    und lagen am `Household`; O-18 hat sie auf die eigene Entität verschoben.)* Neu hinzu kommt
+>    **`JoinCodeIssuance.created_by_account_id`** — 🟠, weil es eine Person benennt, nämlich die,
+>    die den Link ausgestellt hat.
 
 ---

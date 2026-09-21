@@ -197,15 +197,17 @@ Neutral gegenüber WG, Wohnprojekt, Haus und Vermieter-Objekt. UI-Label in v1 du
 | `privacy_notice_version` | `int` | ⚙️ | jede Veröffentlichung erhöht die Version; frühere Fassungen bleiben nachweisbar |
 | `privacy_notice_published_at` | `timestamptz?` | ⚙️ | |
 | `privacy_notice_published_by_account_id` | `uuid?` | 🟠 | **wer veröffentlicht hat** — die Erklärung wird im Namen des Verantwortlichen abgegeben, also braucht sie einen Urheber |
-| `join_code` | `text` | ⚙️ | **ein Code für den ganzen Haushalt**, nicht pro Person. Fünf Auflagen, siehe Kasten unten |
-| `join_code_rotated_at` | `timestamptz?` | ⚙️ | |
-| `join_code_expires_at` | `timestamptz?` | ⚙️ | **Neu (S-49).** Vorschlag `join_code_rotated_at + 7 Tage`, mit einem Tippen verlängerbar (O-15). Abgelaufen ⇒ Code lehnt jeden Beitritt ab, unabhängig von `join_code_max_uses` |
-| `join_code_max_uses` | `int?` | ⚙️ | **Neu (S-49).** `null` = unbegrenzt (Default für Bestandshaushalte bei Migration). Für neue Haushalte vorbelegt mit **1** (Einmal-Code, aktualisiert O-15 2026-09-16) — Ausnahme: der Gründungs-Link direkt nach `A1 Registrierung`, vorbelegt mit der Zahl der bei der Gründung erwarteten Bewohnenden |
-| `join_code_uses` | `int` | ⚙️ | **Neu (S-49).** Zähler, hochgesetzt bei jedem erfolgreichen Beitritt über diesen Code. Setzt sich bei Rotation zurück, weil ein rotierter Code ohnehin ein neuer Wert ist |
-| `entity_label` | `enum(wg, wohnprojekt, haus, objekt)` | ⚙️ | in v1 fest `wg`, später pro Objekt wählbar |
 | `entity_label` | `enum(wg, wohnprojekt, haus, objekt)` | ⚙️ | in v1 fest `wg`, später pro Objekt wählbar |
 | `created_at` | `timestamptz` | ⚙️ | |
 | `deleted_at` | `timestamptz?` | ⚙️ | |
+
+> **Geändert 2026-09-21 (O-18 aufgelöst) — fünf Felder haben diese Tabelle verlassen.**
+> `join_code`, `join_code_rotated_at`, `join_code_expires_at`, `join_code_max_uses` und
+> `join_code_uses` standen bis dahin hier, weil ein Haushalt genau einen rotierenden Code trug.
+> Ein Haushalt stellt seither **mehrere** Einladungslinks aus, jeder mit eigener Frist, eigener
+> Grenze und eigenem Zähler — sie liegen an der neuen Entität **`JoinCodeIssuance`** weiter
+> unten. *(Bei der Gelegenheit entfernt: `entity_label` stand seit V0.4 doppelt in dieser
+> Tabelle.)*
 
 > **Klarstellung, die im Modell sichtbar bleiben muss.** Jede bewohnende Person kann sich
 > theoretisch im Haushalts-Account anmelden, wenn E-Mail und Passwort bekannt sind. Die Trennung
@@ -258,28 +260,51 @@ Neutral gegenüber WG, Wohnprojekt, Haus und Vermieter-Objekt. UI-Label in v1 du
 > `privacy_notice_version` ist dabei kein Zierrat: der Nachweis, **welche Fassung** einer bewerbenden
 > Person zu einem Zeitpunkt gezeigt wurde, ist genau das, was im Streitfall zählt.
 
-> **`join_code`: fünf Auflagen, keine Empfehlungen** (drei entschieden in der Querprüfung, O-9
-> Grenzfall 2; zwei neu, S-49). Der Code identifiziert einen **Haushalt, keine Person** — deshalb ⚙️
-> und keine Zeile im Art.-30-Verzeichnis. Er gehört stattdessen in die **TOM-Liste**, denn wer ihn
-> hat, kommt an Beratungsinhalte. Daraus folgt:
+> **`JoinCodeIssuance.code`: fünf Auflagen, keine Empfehlungen** (drei entschieden in der
+> Querprüfung, O-9 Grenzfall 2; zwei neu, S-49). Der Code identifiziert einen **Haushalt, keine
+> Person** — deshalb ⚙️ und keine Zeile im Art.-30-Verzeichnis. Er gehört stattdessen in die
+> **TOM-Liste**, denn wer ihn hat, kommt an Beratungsinhalte. Die Auflagen galten bis 2026-09-21
+> dem einen `Household.join_code` und gelten seither unverändert **jedem einzelnen ausgestellten
+> Link**. Daraus folgt:
 >
-> 1. **Rotierbar** durch die organisierende Person. Rotation **entwertet ausstehende Einladungen** —
->    das ist der ganze Zweck.
+> 1. **Entwertbar** durch die organisierende Person, jederzeit und je Link. Das Entwerten
+>    **entwertet ausstehende Einladungen** — das ist der ganze Zweck. *(Geändert 2026-09-21: bis
+>    dahin hieß dieser Punkt „Rotierbar", weil ein Haushalt nur einen Code trug und ein neuer
+>    Wert den alten überschrieb. Mit `JoinCodeIssuance` ist das Entwerten eines Links von der
+>    Ausstellung eines neuen unabhängig; wer alle aktiven Links löscht, erreicht genau das, was
+>    Rotation früher erzwang. **G-A5** bleibt in der Sache unverändert.)*
 > 2. **Niemals in einem Log**, auch nicht im Zugriffslog. Der Einladungslink trägt den Code im
 >    **Pfad**, also braucht genau diese Route **Pfad-Redaktion** im Zugriffslog.
 > 3. **Niemals in einem Query-String.**
-> 4. **Ablauf** (`join_code_expires_at`). **Neu und keine Zugabe:** Seit `Account.email` bei
+> 4. **Ablauf** (`JoinCodeIssuance.expires_at`). **Neu und keine Zugabe:** Seit `Account.email` bei
 >    Resident-Accounts nullable ist und die E-Mail-Pflicht im Beitrittsformular entfällt (S-03), gibt
 >    es **keine zweite Zugangskontrolle** mehr — weder E-Mail-Verifikation noch ein zweiter Faktor.
 >    Der Code trägt die gesamte Absicherung allein, und ein Code ohne Ablauf ist dann ein
 >    Passwortäquivalent ohne Verfallsdatum.
-> 5. **Nutzungsgrenze** (`join_code_max_uses`/`join_code_uses`). Derselbe Grund wie 4: ohne Grenze
+> 5. **Nutzungsgrenze** (`JoinCodeIssuance.max_uses`/`.uses`). Derselbe Grund wie 4: ohne Grenze
 >    kann derselbe Code beliebig oft eingelöst werden, auch nachdem alle erwarteten Bewohnenden
->    bereits beigetreten sind. Standard seit O-15 (aktualisiert 2026-09-16): **1**, mit der
->    Gründungs-Link-Ausnahme.
+>    bereits beigetreten sind. Standard seit O-15 (aktualisiert 2026-09-16): **1**. *(Die
+>    Gründungs-Link-Ausnahme bleibt als Vorschlagswert bestehen, wird in v0.1 aber nicht gebaut —
+>    niemand erhebt die Zahl der erwarteten Bewohnenden. Entscheidung vom 2026-09-21,
+>    `review-log.md` §Offene-Punkte-Register.)*
 >
-> **Ergänzung, entschieden 2026-09-16 — Speicherformat.** Die fünf Auflagen legen Umgang, nicht
-> Speicherformat fest. Entscheidung: `join_code` darf **im Klartext gespeichert und dauerhaft
+> **Sechste Auflage, neu 2026-09-21 — der Code muss von Hand eingebbar sein.** **P-1
+> (Kanalneutralität)** verlangt, dass alles, was per Link ankommen kann, auch von Hand eingegeben
+> werden kann. Ein `uuid` genügt dem nicht: niemand tippt 36 Zeichen von einem Zettel ab. Der Code
+> ist deshalb **kurz, großgeschrieben, in zwei Gruppen gesetzt und aus einem verwechslungsarmen
+> Alphabet gezogen** (Bauform: `UAMPN-QACVZ`). Das ist keine Kosmetik, sondern die Bedingung dafür,
+> dass der Link auch am Telefon oder auf einem Zettel funktioniert.
+>
+> **Und die Auflage, die unmittelbar daraus folgt: Versuchsbegrenzung.** Ein kurzer Code hat
+> weniger Entropie als ein `uuid`, und die Prüfung eines Codes ist ein **Orakel für den gesamten
+> Bestand** — ein Rateversuch wird gegen alle lebenden Links geprüft, nicht gegen einen. Der
+> Suchraum teilt sich damit durch die Zahl der ausgestellten Links. Bei einem Haushalt ist das
+> belanglos, bei zehntausend nicht mehr. Die Einlöseroute braucht deshalb eine Begrenzung der
+> Versuche je Quelle. Sie ist Teil der Entscheidung, den Code zu kürzen — nicht ein späterer
+> Zusatz, den man auch weglassen könnte.
+>
+> **Ergänzung, entschieden 2026-09-16 — Speicherformat.** Die Auflagen oben legen Umgang, nicht
+> Speicherformat fest. Entscheidung: `JoinCodeIssuance.code` darf **im Klartext gespeichert und dauerhaft
 > (nicht nur einmalig) angezeigt werden**, lesbar ausschließlich für Moderation und
 > Haushalts-Account desselben Haushalts. Begründung: wer diese Ansicht erreicht, ist bereits
 > authentifiziertes Mitglied mit entsprechenden Rechten — dauerhafte Klartext-Lesbarkeit erhöht
@@ -292,8 +317,54 @@ Neutral gegenüber WG, Wohnprojekt, Haus und Vermieter-Objekt. UI-Label in v1 du
 > als überprüfbare Regel in `GUARDRAILS.md`, nicht als Hinweis.
 >
 > **Was Punkt 4/5 ausdrücklich nicht ersetzen** (G-A5 bleibt gültig, siehe Plan „Nicht angefasst"):
-> sie **ergänzen** die Rotation, sie **ersetzen** sie nicht — eine organisierende Person, die einen
-> falsch verschickten Link sofort entwerten will, rotiert weiterhin, statt auf den Ablauf zu warten.
+> sie **ergänzen** das Entwerten, sie **ersetzen** es nicht — eine organisierende Person, die einen
+> falsch verschickten Link sofort entwerten will, **löscht ihn**, statt auf den Ablauf zu warten.
+> *(Bis 2026-09-21 stand hier „rotiert weiterhin"; Rotation als eigener Mechanismus ist mit
+> `JoinCodeIssuance` entfallen.)*
+
+#### `JoinCodeIssuance` — ein einzelner ausgestellter Einladungslink
+
+**Neu 2026-09-21**, löst **O-18** auf. Bis dahin trug `Household` genau einen rotierenden Code mit
+einem Zähler. Das Modell konnte damit zwei Fragen nicht beantworten, die die Moderationsfläche
+(O16) stellt: *„welche Links sind gerade offen"* und *„wer hat sich über diesen Link registriert"*.
+Ein Haushalt stellt deshalb **mehrere** Links aus — jeder mit eigener Frist, eigener Nutzungsgrenze,
+eigenem Zähler und eigenem Lebensende.
+
+| Feld | Typ | Klasse | Erläuterung |
+|---|---|:--:|---|
+| `id` | `uuid` | ⚙️ | |
+| `household_id` | `uuid` | ⚙️ | |
+| `code` | `text` | ⚙️ | der Code selbst. **Über alle Haushalte eindeutig**, denn die Einlösung kennt beim Nachschlagen noch keinen Haushalt — der Code ist die einzige Eingabe. Sechs Auflagen, Kasten oben bei `Household` |
+| `expires_at` | `timestamptz` | ⚙️ | Vorschlag: Ausstellung + 7 Tage. **Mit einem Tippen um weitere 7 Tage verlängerbar** (O-15) — auf O16 als eine Handlung, nicht als Datumsfeld |
+| `max_uses` | `int` | ⚙️ | wie oft dieser Link eingelöst werden darf. Default **1** (O-15, aktualisiert 2026-09-16). `0` ist erlaubt und bedeutet „geschlossen" |
+| `uses` | `int` | ⚙️ | Default `0`, hochgesetzt bei jedem erfolgreichen Beitritt über **diesen** Link. Wird nie zurückgesetzt — ein neuer Link ist eine neue Zeile, kein zurückgedrehter Zähler |
+| `created_at` | `timestamptz` | ⚙️ | |
+| `created_by_account_id` | `uuid` | 🟠 | wer den Link ausgestellt hat. **`NOT NULL`**, dieselbe Begründung wie bei **O-17**: „kein Wert" und „vom System" dürfen nicht gleich aussehen |
+| `deleted_at` | `timestamptz?` | ⚙️ | gesetzt durch **„Löschen"** auf O16. Sofort ungültig, bleibt aber in der Historie sichtbar — das ist der Unterschied zwischen „entwerten" und „vergessen" |
+
+> **Vier Zustände, und nur einer davon ist ein Zustandsfeld.** Ein Link ist **aktiv**, wenn
+> `deleted_at` leer ist, `expires_at` in der Zukunft liegt und `uses < max_uses` gilt. Er ist
+> **abgelaufen**, **aufgebraucht** oder **gelöscht**, sobald eine dieser drei Bedingungen kippt.
+> Bewusst kein `status`-Enum: die drei Gründe sind aus den Daten ablesbar, und ein zusätzliches
+> Feld könnte ihnen widersprechen. Die Oberfläche darf den Grund nennen — die **Einlösung nicht**,
+> siehe `F2-requirements.md` **FR-2.8**.
+>
+> **Löschen berührt keine Mitgliedschaft.** Wer über einen Link beigetreten ist, bleibt Mitglied,
+> wenn der Link gelöscht wird — `screens/O-organisation.md` O16 sagt das ausdrücklich. Der Link ist
+> eine Eintrittskarte, kein Aufenthaltstitel.
+>
+> **Warum die Historie bleibt und nicht aufgeräumt wird.** Sie ist der Grund, aus dem es diese
+> Entität gibt: der Prototyp-Test wollte je aufgebrauchtem Link sehen, wer darüber hereinkam. Das
+> beantwortet `Membership.joined_via_issuance_id`. Eine gelöschte Zeile würde die Antwort mit
+> löschen. Aufbewahrung folgt dem Haushalt, nicht einer eigenen Frist — der Code ist ⚙️, keine
+> personenbezogene Angabe (O-9).
+>
+> **Was diese Entität ausdrücklich nicht ist: eine Einladung pro Person.** **FR-2.1** verbietet,
+> dass das System einen Code je Person *verlangt*; es verbietet der organisierenden Person nicht,
+> mehrere Links auszustellen. Der Unterschied ist der Zweck von **US-2.1**: niemand soll gezwungen
+> sein, Codes zu verwalten — ein einziger Link für den Gruppenchat muss immer genügen. Die
+> personengebundene Einladung einer **zugesagten Bewerbung** ist etwas anderes und liegt in v0.2:
+> `ApplicationInviteToken`, S-42.
 
 #### `HouseholdSettings` — Verfahrensregeln des Haushalts
 
@@ -380,7 +451,7 @@ die sie nicht passen — der Vermieter-Fall (Objekt ohne eigenes Bewohner-Profil
 | `role` | `enum(household_admin, moderator, member)` | 🟠 | orthogonal zu `is_resident`. **In V0.2 von ⚙️ auf 🟠 umklassifiziert** — siehe Kasten |
 | `permissions` | `text[]` | 🟠 | **einzeln vergebbar**, Werte siehe unten. Ebenfalls 🟠 |
 | `notification_event_mask` | `jsonb?` | ⚙️ | persönliche Ebene; überschreibt die Haushalts-Ebene |
-| `joined_via_code` | `text?` | ⚙️ | welcher `join_code` verwendet wurde — speist den Feed |
+| `joined_via_issuance_id` | `uuid?` | ⚙️ | **welcher ausgestellte Link verwendet wurde** — speist den Feed und beantwortet auf O16 „wer hat sich über diesen Link registriert". *(Geändert 2026-09-21, O-18: hieß `joined_via_code` und trug den Code als Text. Ein Verweis statt einer Kopie — sonst trüge diese Zeile den Code selbst, was Auflage 2/3 unterläuft. `null` bei Mitgliedschaften, die nicht über einen Link entstanden sind: Gründung und von der Verwaltung angelegte Profile)* |
 | `joined_at` | `timestamptz` | ⚙️ | Beitritte erscheinen im Aktivitäts-Feed (struktureller Duplikatsschutz). Zweiter Zweck: ein von `became_resident_id` unabhängiges Kriterium für moderierende Sichtbarkeit, z. B. Zugriff auf die Rundenhistorie zu Auditzwecken |
 | `revoked_at` | `timestamptz?` | ⚙️ | **Korrigiert (U-22):** nicht mehr „jedes Mitglied kann entfernen" — das galt für den durch E-06 vorausgesetzten strukturellen Schutz, der mit der getrennten Bewohnerliste entfällt (§10.2). Setzbar nur über `manage_members`; die genaue Rechteabstufung zwischen Verwaltung und Moderator ist Sache der Rechtematrix in `03-PRD.md` |
 
