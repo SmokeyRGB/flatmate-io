@@ -3,6 +3,7 @@ import {
   boolean,
   date,
   index,
+  integer,
   jsonb,
   numeric,
   pgEnum,
@@ -101,6 +102,9 @@ export const session = pgTable(
 );
 
 // data-model.md "Household" — the tenant root. RLS keys off `id` itself, not `household_id`.
+// join-code-protections (O-18): join_code/join_code_rotated_at moved off this table to the new
+// JoinCodeIssuance entity below — a household issues several links now, not one rotating code
+// (domain/identity.md §2.1).
 export const household = pgTable(
   "household",
   {
@@ -109,8 +113,6 @@ export const household = pgTable(
     // "keine Sicherheitsgrenze, nur Zuordnung" (C-1.4) — the account that registered.
     ownerAccountId: uuid("owner_account_id").notNull(),
     contactEmail: text("contact_email").notNull(),
-    joinCode: text("join_code").notNull(),
-    joinCodeRotatedAt: timestamp("join_code_rotated_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     deletedAt: timestamp("deleted_at", { withTimezone: true }),
   },
@@ -196,7 +198,10 @@ export const membership = pgTable(
       .array()
       .notNull()
       .default(sql`'{}'::text[]`),
-    joinedViaCode: text("joined_via_code"),
+    // join-code-protections: renamed from joined_via_code (text, declared since F1, never
+    // written) and retyped to uuid — a reference to the JoinCodeIssuance row, not a copy of the
+    // code itself (G-A5: storing the code on this row would let it leak from a second place).
+    joinedViaIssuanceId: uuid("joined_via_issuance_id"),
     joinedAt: timestamp("joined_at", { withTimezone: true }).notNull().defaultNow(),
     revokedAt: timestamp("revoked_at", { withTimezone: true }),
   },
@@ -204,6 +209,49 @@ export const membership = pgTable(
     index("membership_household_id_idx").on(t.householdId),
     index("membership_account_id_idx").on(t.accountId),
     pgPolicy("membership_household_isolation", {
+      as: "permissive",
+      for: "all",
+      using: HOUSEHOLD_MATCH,
+      withCheck: HOUSEHOLD_MATCH,
+    }),
+  ],
+);
+
+// domain/identity.md §2.1 "JoinCodeIssuance" — a single issued invite link (O-18). Replaces the
+// five join_code* columns that used to live on Household: a household issues several links at
+// once, each with its own expiry, cap and count. No `status` column by design (§2.1: "die drei
+// Gründe sind aus den Daten ablesbar, und ein zusätzliches Feld könnte ihnen widersprechen") — a
+// link is live iff deleted_at IS NULL, expires_at > now(), and uses < max_uses.
+export const joinCodeIssuance = pgTable(
+  "join_code_issuance",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    householdId: uuid("household_id").notNull(),
+    // Unique ACROSS ALL households, not per-household: resolving a presented code is the only
+    // input a stranger supplies (no household_id known yet), so the code alone must be enough to
+    // find at most one row (§2.1, FR-2.9).
+    code: text("code").notNull(),
+    // Both expiresAt and maxUses are NOT NULL, always — proposal.md Assumption 2 / spec.md "There
+    // SHALL be no such thing as an unlimited link": the field admits no absent value, on any path
+    // including the founding link at registration.
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    // Default 1 (O-15, updated 2026-09-16). 0 is a valid, deliberate value meaning "closed"
+    // (EC-2.8) — never treated as "unlimited".
+    maxUses: integer("max_uses").notNull().default(1),
+    // Never reset — a new link is a new row, not a rewound counter (§2.1).
+    uses: integer("uses").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    // 🟠 not ⚙️ (data-inventory.yml) — names the person who issued the link, unlike every other
+    // column on this table.
+    createdByAccountId: uuid("created_by_account_id").notNull(),
+    // Set by "Löschen" on O16. Immediately invalid, stays visible in history — "entwerten" vs.
+    // "vergessen" (§2.1).
+    deletedAt: timestamp("deleted_at", { withTimezone: true }),
+  },
+  (t) => [
+    index("join_code_issuance_household_id_idx").on(t.householdId),
+    uniqueIndex("join_code_issuance_code_idx").on(t.code),
+    pgPolicy("join_code_issuance_household_isolation", {
       as: "permissive",
       for: "all",
       using: HOUSEHOLD_MATCH,

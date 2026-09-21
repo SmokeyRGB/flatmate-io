@@ -283,6 +283,19 @@ h3 {
     padding: 0.625rem;
   }
 
+  /* Stacked copy-button pair (09-Design-System.md line 84, join-code-protections/O16): a
+     full-width solid primary "copy the whole thing" action on top, a quieter secondary "copy just
+     the short value" option beneath — .btn-secondary's own paper-tint fill already reads as
+     quieter than .btn-primary, so this wrapper only needs to stack and full-width both. */
+  .copy-button-pair {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  .copy-button-pair .btn {
+    width: 100%;
+  }
+
   /* Back affordance on sub-pages — plain text, no button chrome. */
   .back-link {
     display: inline-flex;

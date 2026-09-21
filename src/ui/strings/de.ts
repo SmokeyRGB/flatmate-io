@@ -155,9 +155,44 @@ export const de = {
     addResidentHelperHouseholdIdPrefix: "Eure Haushalts-ID:",
     addResidentHelperClaimNote: "Mit dem gewählten Namen legt die Person ihr eigenes Passwort fest, unter",
     noOneJoinedYet: "Noch niemand ist beigetreten — teile deinen Einladungslink, um die erste Person einzuladen.",
-    // §8.6: `join_code` → „Einladungslink" / „Beitrittscode".
-    joinCodeEyebrow: "Einladungslink",
-    rotateJoinCode: "Einladungslink erneuern",
+    // join-code-protections (O-18, 2026-09-21): O16 now lists several issued links rather than
+    // one rotating code — screens/O-organisation.md O16, in the order warning / create form /
+    // list. §8.6 fixes „Einladungslink" and „Löschen" (reused from `common.delete` below, never a
+    // synonym); everything else here is new copy for this change.
+    joinCode: {
+      heading: "Einladungslinks",
+      // S-49/FR-2.2: sits beside the links, visible without interaction — never presented as
+      // security (C-2.5), just social visibility.
+      warning:
+        "Teile diesen Link nur direkt mit deinen Mitbewohnenden — niemals öffentlich. Wer ihn hat, kann mitstimmen.",
+      create: {
+        validDaysLabel: "Gültig für (Tage)",
+        maxUsesLabel: "Höchstens nutzbar",
+        // O-15's default of 1 explained in plain text, not just applied silently.
+        maxUsesHelper:
+          "Standard: ein Link für eine Person. Erhöhe das nur, wenn mehrere denselben Link nutzen sollen.",
+        submit: "Neuen Link erzeugen",
+      },
+      usageCount: (uses: number, maxUses: number) => `${uses} von ${maxUses} genutzt`,
+      validUntil: (date: string) => `Gültig bis ${date}`,
+      expiredOn: (date: string) => `Abgelaufen am ${date}`,
+      usedUp: "Aufgebraucht",
+      deletedOn: (date: string) => `Gelöscht am ${date}`,
+      // O-15: "mit einem Tippen verlängerbar" — one action, not a date field.
+      extend: "+7 Tage",
+      copyFullLink: "Link kopieren",
+      // FR-2.27: the channel for hand entry (P-1 Kanalneutralität) — not a lesser convenience.
+      copyCodeOnly: "Nur den Code kopieren",
+      copiedFullLink: "Link kopiert",
+      copiedCodeOnly: "Code kopiert",
+      deleteAriaLabel: (code: string) => `Link ${code} löschen`,
+      deleteDialog: {
+        heading: "Link löschen?",
+        consequence:
+          "Der Link wird sofort ungültig. Bereits über ihn beigetretene Personen bleiben Mitglied.",
+      },
+      empty: "Noch kein Link erzeugt.",
+    },
     moderationBadge: "Moderation",
     makeModerator: "Zur Moderation ernennen",
     makeMember: "Zum Mitglied machen",

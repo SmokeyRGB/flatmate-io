@@ -132,7 +132,11 @@ function makeCleanup(context: SessionContext, deregister: () => void): () => Pro
           d_membership    as (delete from membership          where household_id = ${id}),
           d_session       as (delete from session             where household_id = ${id}),
           d_account       as (delete from account             where household_id = ${id}),
-          d_settings      as (delete from household_settings  where household_id = ${id})
+          d_settings      as (delete from household_settings  where household_id = ${id}),
+          -- join-code-protections (O-18): registerHousehold now mints a founding
+          -- join_code_issuance row for every test household — without this, every call to
+          -- registerTestHousehold() would leave one orphaned row per test run.
+          d_join_code     as (delete from join_code_issuance  where household_id = ${id})
         delete from household where id = ${id}
       `);
     });

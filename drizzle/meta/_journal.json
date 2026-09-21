@@ -92,6 +92,13 @@
       "when": 1789680146328,
       "tag": "0012_auto_join_open_rounds_idempotent",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1790014252746,
+      "tag": "0013_join_code_issuance",
+      "breakpoints": true
     }
   ]
 }

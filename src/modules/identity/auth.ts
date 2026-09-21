@@ -3,7 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { and, eq, ne } from "drizzle-orm";
 import { isUuid, withSessionContext, type SessionContext } from "@/db/session-context";
 import { recordActivityEvent } from "@/modules/audit/repository";
-import { resolveAccountHousehold } from "./repository";
+import { issueJoinCodeTx, resolveAccountHousehold } from "./repository";
 import { account, household, householdSettings, membership, residentProfile, session } from "./schema";
 
 // Admin-only client (research.md §2) — uses the service-role key, never the anon key. Server-only:
@@ -71,7 +71,6 @@ export async function registerHousehold(email: string, password: string) {
         name: "WG",
         ownerAccountId: accountId,
         contactEmail: email,
-        joinCode: randomUUID(),
       })
       .returning();
 
@@ -79,6 +78,13 @@ export async function registerHousehold(email: string, password: string) {
       householdId,
       updatedByAccountId: accountId,
     });
+
+    // join-code-protections (O-18): the founding link, minted through the same generation/retry
+    // path issueJoinCode uses (issueJoinCodeTx), not a separate randomUUID() on the Household row
+    // itself — proposal.md's 2026-09-21 register decision: FR-2.4's founding-link usage-count
+    // prefill ("expected resident count") is not built in v0.1 (nobody collects that number), so
+    // the founding link takes the same default any other issued link would: 7 days, max 1 use.
+    await issueJoinCodeTx(tx, householdId, accountId, { validDays: 7, maxUses: 1 });
 
     await tx.insert(account).values({
       id: accountId,

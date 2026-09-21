@@ -1,5 +1,5 @@
-import { randomUUID } from "node:crypto";
-import { and, eq, gt, isNull, ne, sql } from "drizzle-orm";
+import { randomInt, randomUUID } from "node:crypto";
+import { and, desc, eq, gt, isNull, ne, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { withSessionContext, type SessionContext } from "@/db/session-context";
 
@@ -9,7 +9,15 @@ import { withSessionContext, type SessionContext } from "@/db/session-context";
 // identity-moveout-session-revocation-not-atomic).
 type Tx = Parameters<Parameters<typeof withSessionContext>[1]>[0];
 import { recordActivityEvent } from "@/modules/audit/repository";
-import { account, household, householdSettings, membership, residentProfile, session } from "./schema";
+import {
+  account,
+  household,
+  householdSettings,
+  joinCodeIssuance,
+  membership,
+  residentProfile,
+  session,
+} from "./schema";
 import {
   assertResidentProfileTransitionAllowed,
   type ResidentProfileStatus,
@@ -155,6 +163,42 @@ export async function resolveAccountHousehold(accountId: string): Promise<string
     sql`SELECT resolve_account_household(${accountId}::uuid)`,
   );
   return rows[0]?.resolve_account_household ?? null;
+}
+
+// join-code-protections (O-18) design.md Decision 3: the refusal type cannot carry a reason. A
+// discriminated union of causes plus a rule that every caller collapse it makes correctness a
+// matter of discipline at each call site; a type that never held the cause cannot leak it at any
+// of them (FR-2.8). `null` is the only failure value on both functions below — no reason, no
+// error subclass.
+export type JoinCodeResolution = { householdId: string; issuanceId: string; householdName: string } | null;
+
+type JoinCodeFunctionRow = { household_id: string; issuance_id: string; household_name: string };
+
+function toJoinCodeResolution(rows: JoinCodeFunctionRow[]): JoinCodeResolution {
+  const row = rows[0];
+  if (!row) return null;
+  return { householdId: row.household_id, issuanceId: row.issuance_id, householdName: row.household_name };
+}
+
+// The second deliberate RLS-bootstrap exception, alongside resolveAccountHousehold above: a
+// stranger presenting a join code has no session yet — discovering the household IS what
+// resolving the code is for. `resolve_join_code` (drizzle/0013_join_code_issuance.sql) is
+// STABLE and non-consuming: FR-2.9 requires the household's name before any input is requested, so
+// merely looking at a link must not spend one of its uses. Its comment carries the load-bearing
+// caveat this call site cannot enforce itself: it is defensible only because FR-2.28's attempt
+// limit (change 2) exists before any public route can reach it.
+export async function resolveJoinCode(code: string): Promise<JoinCodeResolution> {
+  const rows = await db.execute<JoinCodeFunctionRow>(sql`SELECT * FROM resolve_join_code(${code})`);
+  return toJoinCodeResolution(rows);
+}
+
+// EC-2.1: the atomic claim. `claim_join_code` wraps design.md Decision 1's single conditional
+// `UPDATE ... RETURNING` — one statement decides and counts, so of two concurrent calls on a
+// single-use link exactly one succeeds; the loser gets the same `null` every other refusal
+// produces (Decision 3).
+export async function claimJoinCode(code: string): Promise<JoinCodeResolution> {
+  const rows = await db.execute<JoinCodeFunctionRow>(sql`SELECT * FROM claim_join_code(${code})`);
+  return toJoinCodeResolution(rows);
 }
 
 export class HouseholdAccountCannotVoteError extends Error {
@@ -539,28 +583,191 @@ export async function getCurrentHouseholdMembers(context: SessionContext): Promi
   );
 }
 
-// FR-1.26: share/rotate the join code — full parity, administration or moderator (FR-1.27/U-30).
-export async function rotateJoinCode(context: SessionContext, actingAccountId: string) {
+// FR-2.26 / domain/identity.md §2.1's sixth condition on the code: short, upper case, two groups
+// of five, drawn from an alphabet without easily confused characters (no I/O/0/1) — P-1
+// Kanalneutralität requires that anything arriving by link can also be entered by hand.
+const JOIN_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+const JOIN_CODE_GROUP_LENGTH = 5;
+
+function randomJoinCodeGroup(): string {
+  let group = "";
+  for (let i = 0; i < JOIN_CODE_GROUP_LENGTH; i++) {
+    group += JOIN_CODE_ALPHABET[randomInt(JOIN_CODE_ALPHABET.length)];
+  }
+  return group;
+}
+
+export function generateJoinCode(): string {
+  return `${randomJoinCodeGroup()}-${randomJoinCodeGroup()}`;
+}
+
+const POSTGRES_UNIQUE_VIOLATION = "23505";
+
+function isUniqueViolation(err: unknown): boolean {
+  return typeof err === "object" && err !== null && "code" in err && (err as { code?: unknown }).code === POSTGRES_UNIQUE_VIOLATION;
+}
+
+export interface IssueJoinCodeOptions {
+  validDays: number;
+  maxUses: number;
+}
+
+// Tx-scoped core of issueJoinCode below, factored out so registerHousehold (auth.ts) can mint the
+// founding link through the SAME code path — generation, the retry-on-collision loop, and the
+// audit write — inside its own already-open transaction, rather than reaching for the public
+// issueJoinCode function. That function opens its own transaction and requires an existing
+// Membership (assertIsAdministrationOrModerator), neither of which holds yet at the point in
+// registerHousehold's transaction where the founding link is created (the household_admin
+// Membership row hasn't been inserted yet, and a second nested withSessionContext transaction
+// would not see this transaction's uncommitted rows anyway). Uniqueness comes from the table's own
+// UNIQUE constraint plus retry on violation (design.md Decision 7), never a pre-check — a
+// read-then-insert has the same race as the read-then-update Decision 1 rejected for claiming. A
+// SAVEPOINT (not a fresh transaction) is what lets a collision retry without aborting the rest of
+// the caller's transaction.
+export async function issueJoinCodeTx(
+  tx: Tx,
+  householdId: string,
+  actingAccountId: string,
+  options: IssueJoinCodeOptions,
+): Promise<typeof joinCodeIssuance.$inferSelect> {
+  const expiresAt = new Date(Date.now() + options.validDays * 24 * 60 * 60 * 1000);
+
+  for (;;) {
+    const code = generateJoinCode();
+    await tx.execute(sql`SAVEPOINT join_code_issue`);
+    try {
+      const [row] = await tx
+        .insert(joinCodeIssuance)
+        .values({
+          householdId,
+          code,
+          expiresAt,
+          maxUses: options.maxUses,
+          createdByAccountId: actingAccountId,
+        })
+        .returning();
+      await tx.execute(sql`RELEASE SAVEPOINT join_code_issue`);
+
+      // household.join_code_issued (audit/repository.ts PAYLOAD_ALLOWLIST): empty payload — the
+      // code itself must never enter one (G-A5).
+      await recordActivityEvent(tx, {
+        householdId,
+        eventType: "household.join_code_issued",
+        subjectType: "join_code_issuance",
+        subjectId: row.id,
+        actorAccountId: actingAccountId,
+        actorProfileId: null,
+        payload: {},
+      });
+
+      return row;
+    } catch (err) {
+      if (isUniqueViolation(err)) {
+        await tx.execute(sql`ROLLBACK TO SAVEPOINT join_code_issue`);
+        continue; // collide -> mint a fresh code, retry
+      }
+      throw err;
+    }
+  }
+}
+
+// FR-2.1/FR-2.3/FR-2.4/FR-2.26/FR-1.27 (U-30 parity): mints and stores a new link — issuing never
+// edits an existing one (design.md Decision 6: "ein ausgestellter Link ... wird nachträglich nicht
+// umgeschrieben").
+export async function issueJoinCode(
+  context: SessionContext,
+  actingAccountId: string,
+  options: IssueJoinCodeOptions,
+): Promise<typeof joinCodeIssuance.$inferSelect> {
+  await assertIsAdministrationOrModerator(context, actingAccountId);
+  return withSessionContext(context, (tx) =>
+    issueJoinCodeTx(tx, context.householdId, actingAccountId, options),
+  );
+}
+
+export class JoinCodeIssuanceNotFoundError extends Error {
+  constructor(issuanceId: string) {
+    super(`JoinCodeIssuance not found: ${issuanceId}`);
+    this.name = "JoinCodeIssuanceNotFoundError";
+  }
+}
+
+const EXTEND_JOIN_CODE_MS = 7 * 24 * 60 * 60 * 1000;
+
+// O-15 ("mit einem Tippen verlängerbar"): one action, not a date field. Adds seven days to the
+// link's OWN current expiry (not to `now()`), so extending twice compounds correctly, and changes
+// nothing else about the link. Deliberately not audited (design.md Decision 5) — it changes no
+// one's access, only defers an expiry.
+export async function extendJoinCode(
+  context: SessionContext,
+  actingAccountId: string,
+  issuanceId: string,
+): Promise<typeof joinCodeIssuance.$inferSelect> {
   await assertIsAdministrationOrModerator(context, actingAccountId);
   return withSessionContext(context, async (tx) => {
+    const [current] = await tx
+      .select()
+      .from(joinCodeIssuance)
+      .where(and(eq(joinCodeIssuance.id, issuanceId), eq(joinCodeIssuance.householdId, context.householdId)));
+    if (!current) throw new JoinCodeIssuanceNotFoundError(issuanceId);
+
     const [updated] = await tx
-      .update(household)
-      .set({ joinCode: randomUUID(), joinCodeRotatedAt: new Date() })
-      .where(eq(household.id, context.householdId))
+      .update(joinCodeIssuance)
+      .set({ expiresAt: new Date(current.expiresAt.getTime() + EXTEND_JOIN_CODE_MS) })
+      .where(eq(joinCodeIssuance.id, issuanceId))
       .returning();
+
+    return updated;
+  });
+}
+
+// FR-2.5 as amended: deletion invalidates the link immediately (every subsequent presentation is
+// refused, via resolve_join_code/claim_join_code's own `deleted_at IS NULL` clause), leaves the
+// household's other links usable, and leaves memberships already created through it untouched —
+// this only ever sets deleted_at, never deletes the row or touches membership. Deleting every live
+// link achieves what rotating the old single code used to (design.md Decision 5).
+export async function deleteJoinCode(
+  context: SessionContext,
+  actingAccountId: string,
+  issuanceId: string,
+): Promise<void> {
+  await assertIsAdministrationOrModerator(context, actingAccountId);
+  await withSessionContext(context, async (tx) => {
+    const [current] = await tx
+      .select()
+      .from(joinCodeIssuance)
+      .where(and(eq(joinCodeIssuance.id, issuanceId), eq(joinCodeIssuance.householdId, context.householdId)));
+    if (!current) throw new JoinCodeIssuanceNotFoundError(issuanceId);
+
+    await tx.update(joinCodeIssuance).set({ deletedAt: new Date() }).where(eq(joinCodeIssuance.id, issuanceId));
 
     await recordActivityEvent(tx, {
       householdId: context.householdId,
-      eventType: "household.join_code_rotated",
-      subjectType: "household",
-      subjectId: context.householdId,
+      eventType: "household.join_code_deleted",
+      subjectType: "join_code_issuance",
+      subjectId: issuanceId,
       actorAccountId: actingAccountId,
       actorProfileId: null,
       payload: {},
     });
-
-    return updated;
   });
+}
+
+// FR-2.29: O16 lists live AND dead links, most recent first — a dead link is never hidden, only
+// marked (design.md's "Dead links are never cleaned up, by design"). FR-1.27/U-30 parity: refused
+// entirely to anyone but administration or a moderator.
+export async function listJoinCodeIssuances(
+  context: SessionContext,
+  actingAccountId: string,
+): Promise<(typeof joinCodeIssuance.$inferSelect)[]> {
+  await assertIsAdministrationOrModerator(context, actingAccountId);
+  return withSessionContext(context, (tx) =>
+    tx
+      .select()
+      .from(joinCodeIssuance)
+      .where(eq(joinCodeIssuance.householdId, context.householdId))
+      .orderBy(desc(joinCodeIssuance.createdAt)),
+  );
 }
 
 export class CannotChangeAdminRoleError extends Error {
@@ -633,4 +840,4 @@ export async function revokeSession(context: SessionContext, sessionId: string):
   );
 }
 
-export { account, household, householdSettings, membership, residentProfile, session };
+export { account, household, householdSettings, joinCodeIssuance, membership, residentProfile, session };
