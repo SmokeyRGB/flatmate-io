@@ -56,7 +56,7 @@ invite token (that is S-42, v0.2).
 - **FR-2.5** The join code shall remain rotatable, and rotating it shall invalidate the previous code.
 - **FR-2.6** Every successful join shall increment the code's use count.
 - **FR-2.7** The system shall reject a join attempt when the code is expired, when its use count has reached its maximum, or when it has been rotated.
-- **FR-2.8** A rejected join attempt shall state which of the three reasons applies and shall direct the visitor to ask a flatmate for a current link.
+- **FR-2.8** *(corrected 2026-09-21)* A rejected join attempt shall show exactly **one** message that does not distinguish between FR-2.7's three reasons — the link is not valid — and shall direct the visitor to ask a flatmate for a current link. Naming the reason would disclose whether a code ever existed and whether it was merely used up; and "replaced by rotation" cannot be told apart from "never existed" at all without a join-code issuance history, which the model does not have (**O-18**, open). Decision recorded in `review-log.md` §Offene-Punkte-Register.
 
 ### Registration
 
@@ -65,7 +65,7 @@ invite token (that is S-42, v0.2).
 - **FR-2.10a** Where the password field enforces any requirement (length, character classes), that requirement shall be visible in or beside the field before or while the resident types — never enforced silently with no visible reason for a rejection.
 - **FR-2.11** The join form shall offer an email field that is visibly optional and may be submitted empty.
 - **FR-2.12** The join form shall include a "stay signed in on this device" checkbox, pre-selected and clearable.
-- **FR-2.13** The system shall not display an app-install prompt or an email request in the join form, nor on any screen between joining and the resident's first vote.
+- **FR-2.13** *(corrected 2026-09-21)* The system shall not display an app-install prompt, nor any element that **asks for** an email address, in the join form or on any screen between joining and the resident's first vote. The optional field of FR-2.11 is not such an element: a field that is visibly optional and may be submitted empty makes no request of anyone. Source: `03-PRD.md` §4.1.1, which already draws exactly this line („weder das PWA-Install-Banner noch die Resident-E-Mail-**Nachfrage**") and carries the optional field as an acceptance criterion of its own. The earlier wording read as forbidding the field itself, and so contradicted FR-2.11.
 - **FR-2.14** The system shall not offer passkey registration during joining.
 - **FR-2.15** Where an email address is present, verification shall be deferred and shall never prevent voting.
 - **FR-2.16** The system shall not send deliberation-related content to an unverified email address, and shall not deliver notifications to one.
@@ -77,7 +77,7 @@ invite token (that is S-42, v0.2).
 
 - **FR-2.20** The Start screen shall display exactly one primary action at a time.
 - **FR-2.21** The primary action shall be accompanied by the reason it is first.
-- **FR-2.22** Where a round is open, the Start screen shall display how many eligible residents have cast at least one vote, against the round's participant count.
+- **FR-2.22** *(corrected 2026-09-21)* Where a round is open, the Start screen shall display how many eligible residents have cast at least one vote, against the **quorum denominator**: participations with `removed_at = null` **and** `can_vote = true` **and** profile `status = 'active'`. Not the round's raw participant count — a participant with `can_vote = false` never belonged in it, and a resident who moves out mid-round leaves both sides of the fraction rather than one. Source: `domain/invarianten.md` §5.3 **V-3**, part (b) (`quorum_denominator`, `quorum_numerator`), and **S-32**: „die Person fällt aber aus **Zähler und Nenner**". Reducing the denominator alone lets the participation rate exceed 100 %, which §5.3 rejects by name.
 - **FR-2.23** Where no action is open for this resident, the Start screen shall display the round's current standing and shall not display an empty surface.
 - **FR-2.24** The system shall select the primary action by exactly one precedence rule: actions with a real due date first, ordered by that date; actions without a due date after them, in a fixed order.
 - **FR-2.25** No promotional or install-related element shall occupy the primary action position, and none shall be ordered above an action that has a due date.
@@ -104,20 +104,20 @@ Given the join form, when it is displayed, then no passkey enrolment is offered.
 **AC-2.6 — Stay signed in is pre-selected**
 Given the join form, when it is displayed, then the "stay signed in on this device" checkbox is selected and can be cleared.
 
-**AC-2.7 — Expired code is refused with its reason**
-Given a join code whose expiry has passed, when I open its link, then joining is refused, the reason given is expiry, and I am told to ask a flatmate for a current link.
+**AC-2.7 — An expired code is refused** *(corrected 2026-09-21)*
+Given a join code whose expiry has passed, when I open its link, then joining is refused with FR-2.8's single invalid-link message, no reason is named, and I am told to ask a flatmate for a current link.
 
-**AC-2.8 — Usage cap is enforced**
-Given a join code with a maximum of 3 uses and 3 successful joins, when a fourth person opens the link, then joining is refused and the reason given is the usage cap.
+**AC-2.8 — The usage cap is enforced** *(corrected 2026-09-21)*
+Given a join code with a maximum of 3 uses and 3 successful joins, when a fourth person opens the link, then joining is refused, and what they read is character-for-character what AC-2.7 produces.
 
-**AC-2.9 — Rotation invalidates the old link**
-Given a join code that has been rotated, when someone opens the previous link, then joining is refused and the reason given is that the link was replaced.
+**AC-2.9 — Rotation invalidates the old link** *(corrected 2026-09-21)*
+Given a join code that has been rotated, when someone opens the previous link, then joining is refused with that same single message. It does not say the link was replaced: that wording confirms the link was once real, and telling a rotated code apart from one that never existed needs an issuance history (**O-18**, open).
 
 **AC-2.10 — Verification never blocks voting**
 Given I joined with an email address that I have not verified, when a round is open and it is my turn, then I can cast a vote.
 
-**AC-2.11 — Unverified addresses receive nothing**
-Given a resident with an unverified email address, when the system would send them anything, then nothing is delivered to that address.
+**AC-2.11 — Unverified addresses receive no deliberation content and no notifications** *(corrected 2026-09-21)*
+Given a resident with an unverified email address, when the system would send deliberation-related content or deliver a notification, then nothing reaches that address. The verification mail itself is outside this scope and must stay deliverable — "anything" forbade that too, which made FR-2.17 (adding an address later) unimplementable: an address can never become verified if nothing may be sent to it. Scope taken from FR-2.16, which names these two things and no others.
 
 **AC-2.12 — Exactly one primary action**
 Given I am a resident with an open vote and any number of other pending items, when I open Start, then exactly one primary action is displayed.
@@ -146,8 +146,8 @@ Given a successful join, when the audit record is inspected, then it names the n
 **AC-2.20 — Password requirements are visible, not silently enforced**
 Given the join form enforces a password requirement, when I start typing a password, then the requirement is visible without needing to submit first and without needing to fail once to see it.
 
-**AC-2.21 — A moved-out account cannot authenticate**
-Given a resident profile with `moved_out_on` set, when that account attempts to sign in, then authentication is refused and any pre-existing session for that profile has already been revoked (V-3). This restates V-3 here as a redundant tripwire in the requirements package the login flow is actually built against, per the two-layer testing principle already applied to visibility invariants (G-C7).
+**AC-2.21 — A moved-out account cannot authenticate** *(citation corrected 2026-09-21)*
+Given a resident profile with `moved_out_on` set, when that account attempts to sign in, then authentication is refused and any pre-existing session for that profile has already been revoked. **Two sources, not one.** The access half is `domain/invarianten.md` §5.3 **V-3** (a): `status = 'moved_out'` makes `can_see_round` and `can_vote` false for every round, immediately. The session half is `domain/identity.md` §2.1, `Session.revoked_at`, whose third named trigger is „`ResidentProfile.moved_out_on` wird gesetzt". V-3 says nothing about authentication, so the earlier lone citation pointed at a rule that does not carry this criterion. Both are restated here as a redundant tripwire in the requirements package the login flow is actually built against, per the two-layer testing principle already applied to visibility invariants (G-C7).
 
 ---
 
@@ -156,12 +156,12 @@ Given a resident profile with `moved_out_on` set, when that account attempts to 
 - **C-2.1** Exactly two required fields. Adding a third — including a "confirm password" — contradicts S-03 and the reason it exists. Source: S-03, decision 1 of the check-in.
 - **C-2.2** The install prompt and the email request must not appear in the join path. `03-PRD.md` §4.1.1 carries this as an acceptance criterion; `02-SRD.md` S-45 was reworded to match. Source: S-45 as corrected, PRD §4.1.1.
 - **C-2.3** The join code must never be written to a log and never appear in a query string. Source: `GUARDRAILS.md` **G-A5**.
-- **C-2.4** The join link is the **only remaining access control**, because S-03 removed the mandatory email and **U-22** removed the resident-visible member list and the right to remove members. Its protections are therefore a precondition, not an enhancement. Source: S-49.
+- **C-2.4** *(premise corrected 2026-09-21)* The join link is the **only remaining access control**, because S-03 removed the mandatory email and **U-22** removed the resident-visible member list and the right to remove members. **U-30** (2026-09-17) has since given residents a reduced „Wer wohnt hier" view back (screen `B5`), so the visibility half of that premise no longer holds — but the conclusion does, and O16 says so in as many words: B5 is „eine Erkennungshilfe für Bewohnende, kein Ersatz für die Ablauf-/Nutzungsgrenze", and it restores no removal right. The protections stay a precondition, not an enhancement. Source: S-49, `08-UX-Entscheidungen.md` U-30, `screens/O-organisation.md` O16.
 - **C-2.5** These protections are **social visibility, not hardening**, and must never be presented as security. Source: `06-Compliance-Anhang.md` §10.3, S-05.
-- **C-2.6** Display name doubles as the login handle and must be unique per household among profiles that are not `moved_out`. Source: `04-Domaenenmodell.md` (`ResidentProfile.display_name`).
+- **C-2.6** Display name doubles as the login handle and must be unique per household among profiles that are not `moved_out`. Source: `domain/identity.md` §2.1 (`ResidentProfile.display_name`) — the living authority. *(Citation corrected 2026-09-21: this pointed at `04-Domaenenmodell.md`, which is the frozen snapshot.)*
 - **C-2.7** Password is the primary and universal authentication method; passkey is an optional add-on that may be removed without losing access. Source: S-03, `ADR-007`.
 - **C-2.8** Exactly one precedence rule governs the primary action. No second heuristic, no learned or AI-assisted prioritisation. Source: S-48, and **P-5** for the AI half.
-- **C-2.9** Access must end the day a resident moves out, which constrains how long "stay signed in" can outlive membership. Source: S-32.
+- **C-2.9** *(corrected 2026-09-21)* Access must end **the moment** a resident moves out — „sofort, auf alle Runden, ohne Übergangsfrist" — not at the end of that day. That is what constrains "stay signed in", and it is satisfied only by server-side revocation (`Session.revoked_at`), never by waiting for a session to expire: a 90-day session outlives any same-day deadline. Source: **S-32** (`02-SRD.md` §5.3: „`moved_out` entzieht sofort den Zugriff"), `domain/invarianten.md` §5.3 **V-3** (a), `domain/identity.md` §2.1 `Session.revoked_at`.
 - **C-2.10** Authorization enforced independently of the client and verified through both the policy layer and direct data access. Source: S-36, `ADR-004`, **G-C7**.
 - **C-2.11** Every personal-data field declared in `data-inventory.yml` or the build fails. Source: S-37, `ADR-010`.
 
@@ -171,17 +171,17 @@ Given a resident profile with `moved_out_on` set, when that account attempts to 
 
 | ID | Case | Required behaviour |
 |---|---|---|
-| **EC-2.1** | Two people open the last remaining use of a code simultaneously | Exactly one join succeeds; the other is refused with the usage-cap reason |
+| **EC-2.1** *(message corrected 2026-09-21)* | Two people open the last remaining use of a code simultaneously | Exactly one join succeeds; the other is refused with FR-2.8's single invalid-link message. With `join_code_max_uses` defaulting to **1**, this is the ordinary invitation rather than a rarity, so the increment has to be one conditional statement that both decides and counts, never a read followed by a write |
 | **EC-2.2** *(corrected 2026-09-21)* | A resident joins while a round is open | They become a household member **and are added to every currently open round automatically**, marked `joined_after_open` rather than as part of the opening snapshot. The counter's denominator grows accordingly. A moderator may still add someone by hand (`added_manually`) as a correction path for cases the automatic route missed. Source: F1 **FR-1.18**, revised 2026-09-17. The previous wording here — not added, moderator must add explicitly, denominator unchanged — cited FR-1.18 as it read *before* that revision, and contradicted the behaviour already enforced by the `membership_auto_join_open_rounds` trigger |
 | **EC-2.3** | A resident joins when no round is open | Join succeeds; Start shows that no round is running |
 | **EC-2.4** | An already-registered, signed-in resident of this household opens the join link | No second account or profile is created; they are taken to Start with a note that they are already a member |
 | **EC-2.5** | An already-registered resident of a **different** household opens the link | Refused, with an explanation. One account per household membership is the slice's assumption (A-2.4) |
 | **EC-2.6** | A resident loses their password and never added an email | Recovery is impossible; a moderator must create a fresh profile. Stated plainly rather than hidden — the reason the email pitch exists at all |
-| **EC-2.7** | Expiry and usage cap are both exhausted | One reason is shown, not two; expiry takes precedence in the message |
-| **EC-2.8** | The household sets the usage cap to 0 | Treated as "closed": every join attempt is refused with the usage-cap reason |
-| **EC-2.9** | A moderator rotates the code while a resident is mid-registration | The in-flight registration is refused on submit with the replaced-link reason |
-| **EC-2.10** | A resident clears the "stay signed in" checkbox | The session ends with the browser session; they can sign in again with name and password |
-| **EC-2.11** | Display name differing only by surrounding whitespace or letter case | Treated as a collision; refused per AC-2.17 |
+| **EC-2.7** *(corrected 2026-09-21)* | Expiry and usage cap are both exhausted | No reason is shown at all — the same single invalid-link message as every other refusal (FR-2.8). The case needs no precedence rule between the two reasons, because the message never held one |
+| **EC-2.8** *(message corrected 2026-09-21)* | The household sets the usage cap to 0 | Treated as "closed": every join attempt is refused with FR-2.8's single invalid-link message. This needs no separate code path — `join_code_uses < join_code_max_uses` is already false at zero |
+| **EC-2.9** *(message corrected 2026-09-21)* | A moderator rotates the code while a resident is mid-registration | The in-flight registration is refused on submit, with FR-2.8's single invalid-link message rather than a replaced-link reason. Validation therefore runs at submit, not only when the link is opened |
+| **EC-2.10** *(corrected 2026-09-21)* | A resident clears the "stay signed in" checkbox | `Session.remember_me` is stored as `false` and `Session.expires_at` becomes a **short server-side** lifetime — 12 h — instead of 90 days; they can sign in again with name and password. Not "ends with the browser session": a session cookie has no server-side expiry, so closing the browser would discard the cookie while leaving the session row valid for anyone holding the token. Source: `domain/identity.md` §2.1, `Session.expires_at` |
+| **EC-2.11** *(corrected 2026-09-21)* | Display name differing only by surrounding **whitespace** | Trimmed first, then treated as a collision and refused per AC-2.17. **Letter case is deliberately not part of this rule:** no authoritative source asks for case-folding, and neither the uniqueness index nor the existing duplicate check folds case, so the edge case described behaviour nobody had specified. Making "jonas" collide with "Jonas" would be a new decision, not an edge case — and it belongs in `domain/identity.md` beside `ResidentProfile.display_name`, not here |
 | **EC-2.12** | A round is open but this resident has no eligibility to vote | Start shows the round's standing, not a vote action |
 
 ---
@@ -220,11 +220,24 @@ rather than deleted, per the register's own rule 1.)*
 1. ~~**P-O-08 — how long does "stay signed in" last?**~~ **Closed.** 90 days, sliding; ends on
    password change, on an admin reset, and on `moved_out_on`. Maßgeblich: `04-Domaenenmodell.md`
    §10.2 (**O-13**). `Session.remember_me` already carries it. Not a blocker for this slice.
-2. **The number pre-filled into the usage cap** — narrowed, not closed. Since **O-15**
-   (2026-09-16) the general default is a single-use link, so the expected-resident count is
-   needed **only** for the founding link (FR-2.4). Nothing captures that number today: F1's
-   household registration does not ask for it. Recommendation stands — ask for it once during
-   registration — but it now blocks only the founding-link prefill, not every code.
+2. ~~**The number pre-filled into the usage cap**~~ **Settled for v0.1 (2026-09-21): the
+   founding-link prefill is deferred, not built.** Since **O-15** (2026-09-16) the general
+   default is a single-use link, so the expected-resident count is needed **only** for the
+   founding link (FR-2.4), and nothing captures it today — F1's household registration does not
+   ask for it. F2 does not add a household-level "expected residents" field either: a join code
+   carries `join_code_max_uses` and nothing else, and whoever shares a link into a group chat
+   raises that number by hand on O16. That meets O-15's intent — a link should not be redeemable
+   by more people than were meant to use it — without a field whose only reader would be one
+   prefill. What it costs is named rather than hidden: the **suggested value** in
+   `domain/identity.md` §2.1 and `screens/O-organisation.md` O16 stays a suggestion with no
+   source in v0.1. Maßgeblich: `review-log.md` §Offene-Punkte-Register.
+3. **O-18 — the join code has no issuance history** (`domain/offene-punkte.md`, open). The model
+   carries one rotating code with a counter, not a record per issued link. Two things in this
+   packet rest on that: FR-2.8's single message is partly *forced* by it — a rotated code and a
+   code that never existed are indistinguishable without a history — and O16 cannot show
+   "who joined through which link". Not a blocker for F2, which is why FR-2.8 was decided in a
+   way that does not need it, but it is the third open item and belongs in this list. Status
+   lives in `review-log.md` §Offene-Punkte-Register, not here.
 
 **Too complex?** No, but note that FR-2.24's precedence rule does almost nothing in this slice:
 with only one open task type it always falls through to the fixed order. It is specified in full
