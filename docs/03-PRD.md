@@ -396,8 +396,14 @@ Kontrollkästchen **„Auf diesem Gerät angemeldet bleiben"**, vorbelegt an.
   Komfort angeboten und ist jederzeit abschaltbar
 - Wird eine E-Mail-Adresse angegeben, läuft ihre Verifikation nachgelagert und blockiert die
   erste Abstimmung nicht; wird keine angegeben, entfällt dieser Schritt einfach
-- Direkt nach dem Beitritt führt der Weg **in den Screening-Durchlauf**, nicht in ein
-  Profil oder eine Übersicht — es sei denn, es gibt keine offene Bewerbung
+- **Korrigiert 2026-09-21:** Direkt nach dem Beitritt führt der Weg **auf Start (B1)**, nicht
+  in den Screening-Durchlauf und ebenso wenig in ein Profil oder eine Übersicht. Wartet eine
+  offene Bewerbung, trägt Start **eine** Karte, die nach C1 führt — einen Tipp entfernt,
+  nicht automatisch. Die frühere Fassung (C1 zuerst, Start nur ohne offene Bewerbung)
+  widersprach **FR-2.18** des F2-Pakets, und FR-2.18 ist die richtige Seite: Start ist der
+  Ort, an dem die Vorrangregel lebt (§4.1.2), also würde ein Sprung darüber hinweg das
+  Aufgabenmodell auf genau dem Bildschirm umgehen, für den es existiert. Beleg und
+  Begründung: `review-log.md` §Offene-Punkte-Register
 - **Das PWA-Install-Banner und die Resident-E-Mail-Nachfrage gehören nicht in diesen Pfad.**
   Beide sind Dashboard-Elemente und erscheinen erst danach auf dem Start-Bildschirm
   (§4.1.13) — nicht als zusätzlicher Bildschirm oder zusätzliches Feld zwischen Beitritt und
@@ -424,7 +430,7 @@ Kontrollkästchen **„Auf diesem Gerät angemeldet bleiben"**, vorbelegt an.
 - [ ] Der Beitritt verlangt keine Angabe, die für die Stimmabgabe nicht benötigt wird
 - [ ] Das Beitrittsformular verlangt ausschließlich Name und Passwort; das E-Mail-Feld ist als optional erkennbar und lässt sich leer abschicken
 - [ ] Das Kontrollkästchen „Auf diesem Gerät angemeldet bleiben" ist vorbelegt und abwählbar
-- [ ] Ein abgelaufener oder widerrufener Code zeigt einen Zustand, der benennt, wen die Person kontaktieren soll — nicht „ungültig"
+- [ ] **Korrigiert 2026-09-21:** Ein abgelaufener, aufgebrauchter oder rotierter Code zeigt **eine einzige** Meldung, die den Grund **nicht** nennt, und benennt, wen die Person kontaktieren soll. Was dieses Kriterium schützt, ist der Weg zurück, nicht das Wort: eine Sackgasse ohne Ausweg bleibt verboten, während die Aufschlüsselung nach Grund verrät, ob es den Code je gab. F2 **FR-2.8**
 - [ ] Passkey wird nie während der Registrierung angeboten
 - [ ] Weder das PWA-Install-Banner noch die Resident-E-Mail-Nachfrage erscheinen im Beitrittsformular oder auf einem Zwischenbildschirm davor
 - [ ] **Geändert ggü. V0.5 (U-22):** Die Bewohnerliste ist für ein frisch beigetretenes Bewohner-Profil auf keinem Weg erreichbar. Erreichbar ist die **Teilnehmendenliste** (nur Namen der Runden-Teilnehmenden, keine Handlungen) über den Beteiligungsstand auf dem Start-Bildschirm — nicht unmittelbar nach dem Beitritt als eigener Schritt

@@ -62,7 +62,11 @@
 
 **Kernelemente**
 
-- **Ein** Bildschirm, **zwei** Pflichtfelder: Name und Passwort. E-Mail entfällt vollständig (S-03)
+- **Ein** Bildschirm, **zwei** Pflichtfelder: Name und Passwort. Die E-Mail entfällt als
+  **Pflichtfeld** (S-03) — sie bleibt als sichtbar freiwilliges, leer abschickbares Feld mit
+  einer Zeile Begründung darunter stehen (FR-2.11, `../03-PRD.md` §4.1.1). *(Korrigiert
+  2026-09-21: „entfällt vollständig" widersprach FR-2.11. Verboten ist die **Nachfrage**,
+  nicht das Feld — ein sichtbar freiwilliges Feld fragt niemanden etwas ab.)*
 - Falls das Passwort-Feld eine Anforderung durchsetzt (Länge, Zeichenklassen), steht diese sichtbar
   am Feld, bevor oder während getippt wird — nie eine stille Ablehnung ohne sichtbaren Grund
   (FR-2.10a)
@@ -72,13 +76,20 @@
 - Kein Passkey während der Registrierung, keine Verifikation, kein Zwischenbildschirm
 - Anlegt: `ResidentProfile` + `Membership` (`is_resident = true`); **keine** Verknüpfung zu einer
   Bewerbung
-- Direkt danach: Screening-Durchlauf (C1), falls eine offene Bewerbung wartet — sonst Start (B1)
+- Direkt danach: **immer Start (B1)**, nie unmittelbar der Screening-Durchlauf. Wartet eine
+  offene Bewerbung, trägt Start genau **eine** Karte, die nach C1 führt — einen Tipp entfernt,
+  nicht automatisch. *(Korrigiert 2026-09-21: die vorherige Fassung — C1 zuerst, Start nur als
+  Rückfallebene — widersprach **FR-2.18**, und FR-2.18 ist die richtige Seite. Start ist der
+  Ort, an dem die Vorrangregel FR-2.24 lebt; ein Sprung darüber hinweg umginge das
+  Aufgabenmodell auf genau dem Bildschirm, für den es existiert, und machte EC-2.3 — Beitritt
+  ohne offene Runde — zum Sonderfall statt zum selben Weg. Beleg und Begründung:
+  `../review-log.md` §Offene-Punkte-Register.)*
 
 **Abweichende Zustände**
 
 | Zustand | Verhalten |
 |---|---|
-| Fehler — Code abgelaufen | „Dieser Beitrittscode ist abgelaufen." + Hinweis, im Haushalt nach einem neuen zu fragen |
+| Fehler — Link nicht gültig | **Eine** Meldung für alle drei Gründe aus FR-2.7 (abgelaufen, Nutzungsgrenze erreicht, rotiert): „Dieser Einladungslink ist nicht gültig." + „Frag in der WG nach einem aktuellen Link." Der Grund wird **nicht** genannt. *(Korrigiert 2026-09-21, FR-2.8: die frühere Fassung nannte den Ablauf und verriet damit, dass es den Code gab. Der Weg zurück bleibt — im Usability-Test des Prototyps war genau dieser fehlende Ausweg der Befund.)* |
 
 ---
 

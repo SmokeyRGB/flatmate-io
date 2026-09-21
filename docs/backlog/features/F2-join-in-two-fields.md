@@ -1,6 +1,6 @@
 # F2 — Join in two fields, and land on the one thing to do next
 
-> **Band:** `v0.1` · **Scope lines:** S-03, S-49, S-50, S-48
+> **Band:** `v0.1` · **Scope lines:** S-03, S-49, S-48
 > **Screens:** **A3 Join by code ⚡** · **B1 Start ⚡** · O16 Members (where the link is shared)
 
 ---
@@ -109,9 +109,12 @@ unverified addresses.
 
 **S-49 — the link is the only access control left.** Since S-03 dropped the mandatory email and
 **U-22** removed the resident-visible member list and the right to remove members, nothing else
-guards entry. `join_code_expires_at` (7 days suggested), `join_code_max_uses` (pre-filled with
-the number of residents still missing) and the share-page warning are therefore
-*"Voraussetzung, nicht Verbesserung"*. Existing rotation (**G-A5**) stays; this adds to it.
+guards entry. **U-30** (2026-09-17) gave residents a reduced "who lives here" view back, which
+restores recognition but no removal right — the link stays the control. `join_code_expires_at`
+(7 days suggested), `join_code_max_uses` (**default 1, a single-use link**, since O-15 on
+2026-09-16 *replaced* the earlier "number of residents still missing" rather than supplementing
+it) and the share-page warning are therefore *"Voraussetzung, nicht Verbesserung"*. Existing
+rotation (**G-A5**) stays; this adds to it.
 
 **Never log the join code** and never put it in a query string (**G-A5**).
 
@@ -122,12 +125,19 @@ what v0.2 extends. The PWA banner is **never** part of this sorting.
 
 ---
 
-## Open question this feature will hit
+## The open question this feature used to hit — now closed
 
-**P-O-08 — how long does "stay signed in" last?** Still open in `03-PRD.md` §8. It needs an
-answer before this ships, because the checkbox is pre-checked. A defensible default: a long-lived
-session bound to the device with server-side revocation on `moved_out`, since **S-32** requires
-access to end the day someone moves out.
+~~**P-O-08 — how long does "stay signed in" last?**~~ **Closed 2026-09-09**, and it had in fact
+been answered on the day it was raised. **90 days, sliding**, ending on a password change, on an
+administrative reset, and on `moved_out_on`; cleared, it is a short server-side session of 12 h.
+Maßgeblich: `domain/offene-punkte.md` §10.2 (**O-13**), carried in `domain/identity.md` §2.1
+(`Session.remember_me`, `Session.expires_at`). Status lives in `review-log.md`
+§Offene-Punkte-Register — `03-PRD.md` §8 is not a status source and no longer claims to be.
+
+What survives of the question is a constraint, not an unknown: **S-32** requires access to end
+*immediately* when someone moves out — *„sofort, auf alle Runden, ohne Übergangsfrist"* — so a
+90-day session has to be revoked server-side (`Session.revoked_at`), never merely allowed to
+lapse.
 
 ---
 
