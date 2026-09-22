@@ -612,6 +612,27 @@ export interface IssueJoinCodeOptions {
   maxUses: number;
 }
 
+// ⚠ THIS FUNCTION PERFORMS NO AUTHORIZATION. Do not call it from anything reachable by a request.
+//
+// Use `issueJoinCode` (below) for that — it is the entry point that runs
+// assertIsAdministrationOrModerator, and FR-1.27/U-30 give administration and moderation parity
+// over join links and nobody else any access at all. Calling this one from a route or a server
+// action is an authorization bypass (G-C), and it will look like perfectly ordinary code.
+//
+// The one legitimate caller is `registerHousehold` (auth.ts), and it is legitimate for a reason
+// that does not generalise: at the point it mints the founding link there is nobody to authorize.
+// The Membership row does not exist yet (it is inserted a few lines later), the Account row does
+// not either, and the caller *is* the code creating the household. Asking "does this account have
+// rights in a household that does not exist yet?" is a category error, not a security check —
+// which is why this function omits the check rather than being handed a weaker one.
+//
+// Note also that of the five `*Tx` primitives in this codebase, this is the ONLY exported one —
+// transitionResidentProfileStatusTx, revokeMembershipForProfileTx, insertDraftRoundTx and
+// openRoundTx all stay file-private, because each is composed only by functions sharing its file.
+// This one is exported solely because `registerHousehold` lives in auth.ts, and that export is the
+// entire risk the warning above is about. If a future refactor lets registerHousehold reach the
+// authorized path instead, delete the export rather than keeping it "just in case".
+//
 // Tx-scoped core of issueJoinCode below, factored out so registerHousehold (auth.ts) can mint the
 // founding link through the SAME code path — generation, the retry-on-collision loop, and the
 // audit write — inside its own already-open transaction, rather than reaching for the public
