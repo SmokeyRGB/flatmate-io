@@ -647,10 +647,35 @@ export async function joinHousehold(
       // (claimResidentProfile's old logic, folded in here per task 12.10) instead of inserting a
       // second one. Neutral: unchanged, insert a brand-new active profile.
       if (claimed.boundResidentProfile) {
-        await tx
+        // The `prepared` predicate is the invariant, not a belt-and-braces check (third review of
+        // PR #17). Issuing a SECOND link for a still-prepared profile is legitimate — a moderator
+        // re-sending an invitation — so the rule cannot live at issue time; it has to be decided
+        // here, where the profile is actually taken over. Conditional UPDATE rather than
+        // read-then-write, for the same reason claim_join_code is one statement: the row lock this
+        // takes serializes two concurrent bound claims, and the loser matches zero rows.
+        //
+        // Until this predicate existed the outcome was prevented only by accident:
+        // deriveResidentEmail is derived from the PROFILE id, so a second redemption produced the
+        // same Auth address and Supabase refused it — which meant the visitor met a generic
+        // `signup_failed` instead of a refusal, and the guarantee rested on an address scheme
+        // nothing declares as its guardian.
+        //
+        // Refused as `invalid_link`, FR-2.8's single message: from the visitor's side a link whose
+        // profile is already claimed is simply a link that does not work, and they have not earned
+        // the reason.
+        const activated = await tx
           .update(residentProfile)
           .set({ status: "active", movedInOn: new Date().toISOString().slice(0, 10) })
-          .where(eq(residentProfile.id, claimed.boundResidentProfile.id));
+          .where(
+            and(
+              eq(residentProfile.id, claimed.boundResidentProfile.id),
+              eq(residentProfile.status, "prepared"),
+            ),
+          )
+          .returning({ id: residentProfile.id });
+        if (activated.length === 0) {
+          throw new JoinError("Bound profile is no longer claimable", "invalid_link");
+        }
       } else {
         await tx.insert(residentProfile).values({
           id: residentProfileId,

@@ -8,7 +8,7 @@ import {
   deleteJoinCode,
   issueJoinCode,
 } from "@/modules/identity/repository";
-import { residentProfile } from "@/modules/identity/schema";
+import { membership, residentProfile } from "@/modules/identity/schema";
 import { cleanupAll, deleteTestAccount, registerTestHousehold, type TestHousehold } from "../../helpers/identity";
 
 let hh: TestHousehold | undefined;
@@ -50,6 +50,52 @@ describe("A bound join link claims the named profile (design.md Decision 13)", (
     );
     expect(profiles).toHaveLength(1);
     expect(profiles[0]!.status).toBe("active");
+  });
+
+  // Third review of PR #17. Issuing a SECOND link for a still-prepared profile is legitimate — a
+  // moderator re-sending an invitation — so nothing stops two live links naming the same person.
+  // The rule therefore has to hold at REDEMPTION: the first one claims the profile, the second
+  // finds it no longer `prepared` and is refused.
+  //
+  // Before the conditional UPDATE this did not produce a second membership either, but only by
+  // accident: deriveResidentEmail is built from the PROFILE id, so the second redemption asked
+  // Supabase Auth for an address that already existed and died there — the visitor met a generic
+  // `signup_failed`, and the invariant rested on an address scheme nothing names as its guardian.
+  // This test pins the outcome AND the code, which is what distinguishes the fix from the accident.
+  it("a second link for the same profile is refused once the first has claimed it", async () => {
+    hh = await registerTestHousehold();
+    const adminActor = { accountId: hh.accountId, profileId: null };
+    const prepared = await createResidentProfile(hh.context, "Sam", adminActor);
+
+    const first = await issueJoinCode(hh.context, hh.accountId, {
+      validDays: 7,
+      maxUses: 1,
+      residentProfileId: prepared.id,
+    });
+    const second = await issueJoinCode(hh.context, hh.accountId, {
+      validDays: 7,
+      maxUses: 1,
+      residentProfileId: prepared.id,
+    });
+    expect(second.id).not.toBe(first.id); // both were issued: that is not what is refused
+
+    const claimed = await joinHousehold(first.code, { password: "test-password-not-real-1234" });
+    accountIds.push(claimed.context.accountId);
+
+    // FR-2.8's single message, not a reason: from the visitor's side the link simply does not work.
+    await expect(
+      joinHousehold(second.code, { password: "test-password-not-real-1234" }),
+    ).rejects.toMatchObject({ code: "invalid_link" });
+
+    // One profile, still one membership, and the claim did not run twice.
+    const profiles = await withSessionContext(hh.context, (tx) =>
+      tx.select().from(residentProfile).where(eq(residentProfile.householdId, hh!.householdId)),
+    );
+    expect(profiles).toHaveLength(1);
+    const memberships = await withSessionContext(hh.context, (tx) =>
+      tx.select().from(membership).where(eq(membership.residentProfileId, prepared.id)),
+    );
+    expect(memberships).toHaveLength(1);
   });
 
   it("a neutral link still creates a new profile, exactly as before this change", async () => {

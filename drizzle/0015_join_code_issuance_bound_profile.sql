@@ -66,6 +66,18 @@ LANGUAGE sql SECURITY DEFINER SET search_path = public STABLE AS $$
     AND jci.expires_at > now()
     AND jci.uses < jci.max_uses
     AND h.deleted_at IS NULL
+    -- A BOUND link is valid only while the profile it names is still claimable, in its own
+    -- household (third review of PR #17). Two live links may legitimately name the same prepared
+    -- profile — a moderator re-sending an invitation — so the rule cannot live at issue time; it
+    -- belongs here, where a link is judged. Once the first is redeemed the profile is `active` and
+    -- every other link naming it goes dead, which is also the honest outcome for the visitor: the
+    -- page refuses on open instead of greeting them by name and failing at submit.
+    --
+    -- `rp.id IS NOT NULL` additionally makes a CORRUPT binding (one pointing outside this
+    -- household, which the join above already refuses to match) kill the link outright rather than
+    -- letting it behave as a neutral one — a link meant for a named person must never silently
+    -- become an open invitation.
+    AND (jci.resident_profile_id IS NULL OR (rp.id IS NOT NULL AND rp.status = 'prepared'))
 $$;
 --> statement-breakpoint
 REVOKE ALL ON FUNCTION resolve_join_code(text) FROM PUBLIC;
@@ -96,6 +108,23 @@ LANGUAGE sql SECURITY DEFINER SET search_path = public VOLATILE AS $$
        AND deleted_at IS NULL
        AND expires_at > now()
        AND uses < max_uses
+       -- Same rule as resolve_join_code, evaluated in the SAME statement as the increment so a
+       -- bound link whose profile is already claimed cannot be spent. This does NOT by itself
+       -- settle two links racing for one profile: they update DIFFERENT issuance rows, so nothing
+       -- serializes them here and both EXISTS checks can still see `prepared`. The conditional
+       -- UPDATE on resident_profile in joinHousehold's bound branch is what decides that case — it
+       -- takes a row lock on the profile, so the loser matches zero rows and its whole transaction,
+       -- this increment included, rolls back.
+       AND (
+         resident_profile_id IS NULL
+         OR EXISTS (
+           SELECT 1
+           FROM "resident_profile" rp
+           WHERE rp.id = "join_code_issuance".resident_profile_id
+             AND rp.household_id = "join_code_issuance".household_id
+             AND rp.status = 'prepared'
+         )
+       )
     RETURNING household_id, id AS issuance_id, resident_profile_id
   )
   SELECT h.id, claimed.issuance_id, h.name, rp.id, rp.display_name

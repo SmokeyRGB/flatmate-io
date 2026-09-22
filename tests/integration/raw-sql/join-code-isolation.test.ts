@@ -68,12 +68,11 @@ describe("Join code issuance household isolation — raw SQL (C-2.10)", () => {
       tx.execute<Record<string, unknown>>(sql`SELECT * FROM resolve_join_code(${linkA.code})`),
     );
 
-    expect(rows).toHaveLength(1);
-    expect(rows[0].bound_resident_profile_id).toBeNull();
-    expect(rows[0].bound_resident_display_name).toBeNull();
-    // And nothing of B's profile reached the caller by any other column either.
-    expect(Object.values(rows[0])).not.toContain(profileB.id);
-    expect(Object.values(rows[0])).not.toContain("Eindringling");
+    // Strengthened by the third review: the corrupt link resolves to NOTHING, rather than
+    // resolving with the bound columns nulled. The weaker behaviour disclosed nothing either, but
+    // it let a link issued FOR A NAMED PERSON quietly degrade into an open invitation that creates
+    // a new profile. A link whose binding cannot be honoured is simply not a valid link.
+    expect(rows).toHaveLength(0);
   });
 
   // design.md Decision 2: resolve_join_code/claim_join_code are the one deliberate hole in the RLS
