@@ -29,10 +29,10 @@ export interface TestHousehold {
 // await, so it holds the promise for the whole window a hook could observe it (design.md D1).
 const inFlightHouseholds = new Set<Promise<TestHousehold>>();
 
-async function registerTestHouseholdInner(deregister: () => void): Promise<TestHousehold> {
+async function registerTestHouseholdInner(deregister: () => void, name: string): Promise<TestHousehold> {
   const email = testEmail();
   const password = "test-password-not-real-1234";
-  const { household: householdRow, context } = await registerHousehold(email, password);
+  const { household: householdRow, context } = await registerHousehold(email, password, name);
 
   return {
     context,
@@ -46,9 +46,16 @@ async function registerTestHouseholdInner(deregister: () => void): Promise<TestH
 // Registers a real household (real Supabase Auth user + real rows) so integration tests exercise
 // the actual code path, then hands back a cleanup function that removes all of it — auth user
 // included, so repeated test runs don't accumulate rows in Supabase Auth's own user table.
-export function registerTestHousehold(): Promise<TestHousehold> {
-  const promise: Promise<TestHousehold> = registerTestHouseholdInner(() =>
-    inFlightHouseholds.delete(promise),
+//
+// "WG" is the default `name` — a synthetic test fixture value, not a production default. Several
+// existing tests assert resolveJoinCode's returned householdName equals it (e.g.
+// join-code-validation.test.ts, join-code-isolation.test.ts's raw-SQL test), so the default stays
+// "WG" for callers that don't care what the name is; a test that DOES care (e.g. FR-2.9's own
+// household-name-required test) passes its own.
+export function registerTestHousehold(name = "WG"): Promise<TestHousehold> {
+  const promise: Promise<TestHousehold> = registerTestHouseholdInner(
+    () => inFlightHouseholds.delete(promise),
+    name,
   );
   inFlightHouseholds.add(promise);
   // A rejected registration created no household, so there is nothing for the sweep to clean —
@@ -121,6 +128,14 @@ function makeCleanup(context: SessionContext, deregister: () => void): () => Pro
     //
     // activity_event is deliberately absent: FR-0.13 makes it append-only, enforced by RESTRICTIVE
     // policies plus FORCE ROW LEVEL SECURITY, so this transaction could not delete it anyway.
+    //
+    // join_attempt is ALSO deliberately absent, for the opposite reason: it carries no
+    // household_id at all (design.md Decision 3, join-by-link), so it has nothing to key this
+    // CTE's `where household_id = ${id}` on — and app_runtime (the role this whole transaction
+    // runs as) has no DELETE access to it regardless, RLS-enabled with zero policies. A test that
+    // calls recordJoinAttempt owns its own teardown via the Supabase service-role client; see
+    // identity/schema.ts's joinAttempt table comment and
+    // tests/integration/policy/join-rate-limit.test.ts.
     await withSessionContext(context, async (tx) => {
       await tx.execute(sql`
         with

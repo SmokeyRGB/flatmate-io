@@ -40,6 +40,10 @@ const PAYLOAD_ALLOWLIST: Readonly<Record<string, readonly string[]>> = {
   "household.join_code_issued": [],
   "household.join_code_deleted": [],
   "membership.role_changed": ["fromRole", "toRole"], // EC-1.7's "appoint it moderator" (Convergence)
+  // join-by-link (FR-2.19/AC-2.19, design.md Decision 8): empty — the issuance is the
+  // membership.joined_via_issuance_id COLUMN, never a second copy here (a second copy would be a
+  // second thing to redact, G-D8, for no added answer), and the code never enters a payload (G-A5).
+  "membership.joined": [],
 };
 
 export class PayloadValidationError extends Error {}

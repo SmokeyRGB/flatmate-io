@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import {
   PermissionDeniedError,
+  buildJoinUrl,
   getResidentList,
   listJoinCodeIssuances,
 } from "@/modules/identity/repository";
@@ -13,6 +14,7 @@ import {
   createResidentProfileAction,
   extendJoinCodeAction,
   issueJoinCodeAction,
+  issueJoinCodeForProfileAction,
   reactivateMemberAction,
   setMemberRoleAction,
   setMovedOutAction,
@@ -82,6 +84,17 @@ export default async function MembersPage() {
   // — a copied link 404s until then, named and bounded behind authentication.
   const host = (await headers()).get("host");
 
+  // join-by-link design.md Decision 13 / task 12.8: group bound issuances by the profile they
+  // name, most-recent first (listJoinCodeIssuances already orders desc by createdAt) — a prepared
+  // profile's own row renders its most recent bound issuance beside the "issue an invitation"
+  // action, so the link is reachable without hunting through the general list below.
+  const boundIssuancesByProfile = new Map<string, JoinCodeIssuanceRow>();
+  for (const issuance of joinCodeIssuances) {
+    if (issuance.residentProfileId && !boundIssuancesByProfile.has(issuance.residentProfileId)) {
+      boundIssuancesByProfile.set(issuance.residentProfileId, issuance);
+    }
+  }
+
   const createResidentForm = isAdmin ? (
     <div className="card space-y-2">
       <form action={createResidentProfileAction} className="flex gap-2">
@@ -90,10 +103,7 @@ export default async function MembersPage() {
           {t.addResidentSubmit}
         </button>
       </form>
-      <p className="field-helper">
-        {t.addResidentHelperHouseholdIdPrefix} <span className="font-mono">{current.context.householdId}</span>.{" "}
-        {t.addResidentHelperClaimNote} <span className="font-mono">/claim</span>.
-      </p>
+      <p className="field-helper">{t.addResidentHelperInviteNote}</p>
     </div>
   ) : null;
 
@@ -161,7 +171,7 @@ export default async function MembersPage() {
         <ul className="space-y-3">
           {joinCodeIssuances.map((issuance) => {
             const isDeleted = issuance.deletedAt !== null;
-            const url = host ? `https://${host}/join/${issuance.code}` : `/join/${issuance.code}`;
+            const url = buildJoinUrl(host, issuance.code);
             return (
               <li key={issuance.id} className="card space-y-2">
                 <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
@@ -186,6 +196,14 @@ export default async function MembersPage() {
                 <p className="font-mono text-sm font-semibold">{issuance.code}</p>
                 <p className="text-xs text-muted-foreground break-all">{url}</p>
                 <JoinCodeCopyButtons code={issuance.code} url={url} />
+
+                {/* AC-2.26: every link names who joined through it — live, used-up, or deleted
+                    alike — and a link nobody used names nobody rather than rendering nothing. */}
+                <p className="text-xs text-muted-foreground">
+                  {issuance.joinedResidentNames.length > 0
+                    ? t.joinCode.joinedNames(issuance.joinedResidentNames)
+                    : t.joinCode.joinedNoneYet}
+                </p>
               </li>
             );
           })}
@@ -214,7 +232,13 @@ export default async function MembersPage() {
       {createResidentForm}
 
       <ul className="space-y-3">
-        {members.map((m) => (
+        {members.map((m) => {
+          // join-by-link design.md Decision 13: only a `prepared` profile (no account, never
+          // claimed) can be bound to a link at all — an active/moved_out profile keeps whatever
+          // issuance history it has, but issuing a NEW one for it makes no sense (issueJoinCodeTx
+          // would refuse it anyway, ResidentProfileNotEligibleForBindingError).
+          const boundIssuance = !m.accountId ? boundIssuancesByProfile.get(m.id) : undefined;
+          return (
           <li key={m.id} className="card">
             <div className="flex items-start justify-between gap-2">
               <div className="flex flex-wrap items-center gap-2">
@@ -282,8 +306,34 @@ export default async function MembersPage() {
                 )}
               </div>
             )}
+
+            {/* join-by-link design.md Decision 13 / task 12.8: the one place a bound invitation
+                is issued — without this the feature is unreachable outside tests. Administration
+                /moderator parity, same as every other join-code control. */}
+            {canAct && !m.accountId && m.status === "prepared" && (
+              <div className="mt-3 space-y-2">
+                <form action={issueJoinCodeForProfileAction}>
+                  <input type="hidden" name="residentProfileId" value={m.id} />
+                  <button type="submit" className="btn btn-secondary">
+                    {t.joinCode.issueForProfile}
+                  </button>
+                </form>
+                {boundIssuance && (
+                  <div className="space-y-1">
+                    <p className="field-helper">{t.joinCode.issuedForProfileHeading}</p>
+                    <p className="text-xs text-muted-foreground">{joinCodeStatusLabel(boundIssuance)}</p>
+                    <p className="font-mono text-sm font-semibold">{boundIssuance.code}</p>
+                    <JoinCodeCopyButtons
+                      code={boundIssuance.code}
+                      url={buildJoinUrl(host, boundIssuance.code)}
+                    />
+                  </div>
+                )}
+              </div>
+            )}
           </li>
-        ))}
+          );
+        })}
       </ul>
 
       {canAct && <div className="border-t border-border pt-4">{joinCodeSection}</div>}

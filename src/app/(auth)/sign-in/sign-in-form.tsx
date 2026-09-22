@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useActionState, useState } from "react";
 import { de } from "@/ui/strings";
 import { signInAction, type SignInFormState } from "./actions";
@@ -75,13 +74,6 @@ export function SignInForm() {
                 className="field-input"
               />
             </div>
-            <p className="field-helper">
-              {t.notClaimedYet}{" "}
-              <Link href="/claim" className="btn-link">
-                {t.claimLink}
-              </Link>
-              .
-            </p>
           </>
         )}
 

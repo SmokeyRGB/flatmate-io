@@ -241,7 +241,11 @@ score, and the participant snapshot feeds every quorum display.
 
 1. **Who may open a round** is expressed as a grantable permission (FR-1.8) but the default
    assignment is not specified anywhere in the spec chain. Recommend: the household account's own
-   resident profile holds it initially, and it is grantable from there.
+   resident profile holds it initially, and it is grantable from there. **Resolved (human decision,
+   2026-09-22):** superseded by a role default instead of this recommendation — `close_round` is
+   now held by every `household_admin` and every `moderator` membership, the same shape as
+   `manage_rooms`. See `docs/domain/identity.md` §2.1 and `docs/review-log.md`
+   §Offene-Punkte-Register.
 2. **Room renaming after votes exist** is not addressed by any scope line. Recommend permitting
    it — a room is a label here, not a scoring input — but it needs a decision rather than an
    assumption.

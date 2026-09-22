@@ -61,8 +61,6 @@ export const de = {
       householdPlaceholder: "wird nach dem Beitritt auf diesem Gerät gemerkt",
       nameLabel: "Dein Name",
       passwordLabel: "Passwort",
-      notClaimedYet: "Noch keinen Zugang?",
-      claimLink: "Profil einrichten",
       submit: "Anmelden",
       submitPending: "Wird angemeldet…",
     },
@@ -71,19 +69,17 @@ export const de = {
       emailVisibleNotice: "Diese E-Mail-Adresse ist für alle sichtbar, die deiner WG beitreten.",
       emailLabel: "E-Mail",
       passwordLabel: "Passwort",
+      // design.md Decision 6: a second step of the same form, revealed client-side, one submit —
+      // not a second route. Step 1 keeps A1's exact two fields (email, password); step 2 asks for
+      // the household name, with an example rather than an empty box (its whole job is to be
+      // recognised by somebody opening a join link).
+      next: "Weiter",
+      back: "Zurück",
+      householdNameHeading: "Wie soll dein Haushalt heißen?",
+      householdNameLabel: "Haushaltsname",
+      householdNamePlaceholder: "z. B. WG Hauptstraße 12",
       submit: "WG gründen",
       submitPending: "WG wird gegründet…",
-    },
-    claim: {
-      heading: "Profil einrichten",
-      description:
-        "Frag die Person, die eure WG registriert hat, nach der Haushalts-ID und dem Namen, den " +
-        "sie für dich angelegt hat. Leg hier dein eigenes Passwort fest.",
-      householdLabel: "Haushalt",
-      nameLabel: "Dein Name",
-      passwordLabel: "Passwort wählen",
-      submit: "Profil einrichten",
-      submitPending: "Profil wird eingerichtet…",
     },
     // Decision 4/6: a domain error class is not one message, and a third-party or unexpected
     // failure never shows its own wording. These are the resolved texts an action's exhaustive
@@ -94,15 +90,10 @@ export const de = {
         // the same copy appears whether the field check fires client-side-early or server-side.
         missingEmail: "E-Mail-Adresse ist erforderlich.",
         missingPassword: "Passwort ist erforderlich.", // auth.ts:37
+        // join-by-link (FR-2.9/AC-2.1): registerHousehold's third required field — a whitespace-only
+        // name is refused with this same text (auth.ts trims before checking).
+        missingName: "Haushaltsname ist erforderlich.",
         signupFailed: "Registrierung ist fehlgeschlagen. Bitte versuche es erneut.", // auth.ts:51
-      },
-      claim: {
-        householdRequired: "Haushalt, Name und Passwort sind alle erforderlich.",
-        invalidHousehold: "Diese Haushalts-ID sieht ungültig aus.",
-        noProfileWaiting: "Für diesen Namen wartet in diesem Haushalt kein Profil auf die Einrichtung.",
-        notFound: "Dieses Profil konnte nicht gefunden werden.", // auth.ts:185 — never the raw id
-        alreadyClaimed: "Dieses Profil wurde bereits übernommen oder ist nicht mehr verfügbar.", // auth.ts:187
-        signupFailed: "Einrichtung ist fehlgeschlagen. Bitte versuche es erneut.", // auth.ts:198
       },
       signIn: {
         missingFields: "Haushalt und Name sind erforderlich.", // auth.ts:320
@@ -149,11 +140,10 @@ export const de = {
     accessDeniedLinkPrefix: "Wenn du sehen willst, wer hier wohnt, nutze",
     addResidentPlaceholder: "Anzeigename",
     addResidentSubmit: "Bewohner:in hinzufügen",
-    // Split around the two monospaced fragments (household id, "/claim") so the component can
-    // keep their styling — see the implementation report for why this isn't one interpolated
-    // sentence like design.md Decision 2's `quorum` example.
-    addResidentHelperHouseholdIdPrefix: "Eure Haushalts-ID:",
-    addResidentHelperClaimNote: "Mit dem gewählten Namen legt die Person ihr eigenes Passwort fest, unter",
+    // join-by-link design.md Decision 13: `/claim` is gone — a prepared profile is claimed only
+    // through a link bound to it (task 12.8's per-profile "Einladung erzeugen" action, rendered
+    // below in this same list once the profile exists).
+    addResidentHelperInviteNote: "Erzeuge anschließend unten in der Liste eine Einladung für diese Person.",
     noOneJoinedYet: "Noch niemand ist beigetreten — teile deinen Einladungslink, um die erste Person einzuladen.",
     // join-code-protections (O-18, 2026-09-21): O16 now lists several issued links rather than
     // one rotating code — screens/O-organisation.md O16, in the order warning / create form /
@@ -178,6 +168,9 @@ export const de = {
       expiredOn: (date: string) => `Abgelaufen am ${date}`,
       usedUp: "Aufgebraucht",
       deletedOn: (date: string) => `Gelöscht am ${date}`,
+      // AC-2.26 (join-by-link): each link names who joined through it — live and dead alike.
+      joinedNames: (names: string[]) => `Beigetreten: ${names.join(", ")}`,
+      joinedNoneYet: "Noch niemand über diesen Link beigetreten.",
       // O-15: "mit einem Tippen verlängerbar" — one action, not a date field.
       extend: "+7 Tage",
       copyFullLink: "Link kopieren",
@@ -192,6 +185,11 @@ export const de = {
           "Der Link wird sofort ungültig. Bereits über ihn beigetretene Personen bleiben Mitglied.",
       },
       empty: "Noch kein Link erzeugt.",
+      // join-by-link design.md Decision 13 / task 12.8: an invitation bound to one prepared
+      // profile — issued beside that profile's own row, not from the general create form above
+      // (which always issues a neutral link).
+      issueForProfile: "Einladung für dieses Profil erzeugen",
+      issuedForProfileHeading: "Ausgestellte Einladung für dieses Profil:",
     },
     moderationBadge: "Moderation",
     makeModerator: "Zur Moderation ernennen",
@@ -277,6 +275,54 @@ export const de = {
       // report for why this contradicts design.md's stated premise that no screen displays it.
       genericSaveFailure: "Diese Änderung konnte nicht gespeichert werden.",
     },
+  },
+  // join-by-link (FR-2.9–FR-2.28): the /join/[code] route. Functional and plain in this change
+  // (proposal Assumption 6 — screen A3's four mandatory states and dressing are change 3's work);
+  // the invalid-link message and the "stay signed in" checkbox label are already-decided copy,
+  // quoted verbatim from `screens/A-zugang.md` A3 rather than invented here.
+  join: {
+    // `screens/A-zugang.md` A3: "Du trittst *WG Hauptstraße 12* bei" — FR-2.9/AC-2.1's household
+    // name shown before any field is requested.
+    heading: (householdName: string) => `Du trittst ${householdName} bei`,
+    // join-by-link design.md Decision 13: a BOUND link greets by the prepared profile's own name
+    // — design.md's own quoted example, „Hi Sam! Du wurdest eingeladen, der Demo-WG beizutreten."
+    boundHeading: (displayName: string, householdName: string) =>
+      `Hi ${displayName}! Du wurdest eingeladen, ${householdName} beizutreten.`,
+    nameLabel: "Name",
+    passwordLabel: "Passwort",
+    // FR-2.10a/AC-2.20: the requirement is stated, not discovered by failing once.
+    passwordRequirement: (minLength: number) => `Mindestens ${minLength} Zeichen.`,
+    emailLabel: "E-Mail (freiwillig)",
+    // FR-2.11/C-2.2: a visibly optional, emptily-submittable field — one line of reason, never a
+    // request. Matches domain/identity.md §2.1's own rationale for asking at all (self-recovery).
+    emailHelper:
+      "Optional. Mit einer E-Mail-Adresse kannst du dein Passwort später selbst zurücksetzen.",
+    // `screens/A-zugang.md` A3: "Auf diesem Gerät angemeldet bleiben" — pre-selected, clearable
+    // (FR-2.12/EC-2.10).
+    rememberMeLabel: "Auf diesem Gerät angemeldet bleiben",
+    submit: "Beitreten",
+    submitPending: "Wird beigetreten…",
+    errors: {
+      // `screens/A-zugang.md` A3, corrected 2026-09-21 against FR-2.8: one message for all four
+      // causes (expired, used up, deleted, never existed), naming none of them, plus the way back.
+      invalidLink: "Dieser Einladungslink ist nicht gültig. Frag in der WG nach einem aktuellen Link.",
+      // proposal.md Assumption 3: distinguishable from the invalid-link message — a rate-limited
+      // refusal is not a statement about any link (FR-2.8 is about the three link-refusal
+      // reasons, not about this).
+      rateLimited: "Von hier kamen zuletzt zu viele Versuche. Bitte versuche es in Kürze erneut.",
+      missingFields: "Name und Passwort sind erforderlich.",
+      passwordTooShort: (minLength: number) => `Das Passwort muss mindestens ${minLength} Zeichen haben.`,
+      // AC-2.17/EC-2.11: inline, with a way forward — never a dead end.
+      nameTaken: (displayName: string) =>
+        `Der Name "${displayName}" ist in dieser WG bereits vergeben. Wähle einen anderen.`,
+      // EC-2.5/A-2.4: deliberately NOT the invalid-link message — the link is fine.
+      otherHousehold:
+        "Du bist bei einem anderen Haushalt angemeldet. Melde dich ab, um diesem Haushalt beizutreten.",
+      genericFailure: "Der Beitritt ist fehlgeschlagen. Bitte versuche es erneut.",
+    },
+    // EC-2.4: rendered on the dashboard (task 8.5) when the join redirect carries the note —
+    // "taken to Start with a note", the temporary /dashboard landing target (proposal Assumption 4).
+    alreadyMemberNote: "Du bist bereits Mitglied dieses Haushalts.",
   },
   whoLivesHere: {
     heading: "Wer hier wohnt",

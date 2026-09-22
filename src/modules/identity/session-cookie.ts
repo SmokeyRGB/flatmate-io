@@ -9,14 +9,28 @@ const COOKIE_NAME = "flatmate_session";
 // Sicherheitsgrenze, nur Zuordnung"), so storing it in plain cookie text costs nothing; the actual
 // bearer credential is sessionId, which only resolves to a live context via a DB row that must be
 // unrevoked and unexpired (identity/repository.ts's resolveSessionContext).
-export async function setSessionCookie(sessionId: string, householdId: string): Promise<void> {
+//
+// join-by-link design.md Decision 5 (FR-2.12/EC-2.10): `maxAge` (seconds) is now a required
+// argument, not a hardcoded 90-day constant — the cookie must never outlive the Session row it
+// points at. Every caller passes the lifetime of the row it just created (typically
+// `Math.floor((session.expiresAt.getTime() - Date.now()) / 1000)`), so the two can never drift
+// apart. A cookie that outlived its row would be harmless (resolveSessionContext still checks
+// `expires_at`), but one shorter than its row would sign someone out while their session is still
+// technically valid — EC-2.10's point is a SHORT row for the cleared case, not a short cookie.
+// One place computes the cookie's maxAge from a Session row's own expiresAt, so every caller
+// derives it the same way instead of re-deriving (or worse, re-hardcoding) the duration.
+export function sessionCookieMaxAge(expiresAt: Date): number {
+  return Math.max(0, Math.floor((expiresAt.getTime() - Date.now()) / 1000));
+}
+
+export async function setSessionCookie(sessionId: string, householdId: string, maxAge: number): Promise<void> {
   const store = await cookies();
   store.set(COOKIE_NAME, `${sessionId}.${householdId}`, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
     path: "/",
-    maxAge: 60 * 60 * 24 * 90, // matches Session.expiresAt's long-lived default (research.md-adjacent)
+    maxAge,
   });
 }
 

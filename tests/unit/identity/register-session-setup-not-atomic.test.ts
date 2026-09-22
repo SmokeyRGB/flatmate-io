@@ -34,7 +34,7 @@ describe("register: compensating cleanup when session setup fails", () => {
     const email = testEmail();
     const password = "test-password-not-real-1234";
 
-    const registered = await registerHousehold(email, password);
+    const registered = await registerHousehold(email, password, "Test-WG");
     const { context } = registered;
 
     delete process.env.SESSION_TOKEN_HASH_SECRET;
@@ -66,7 +66,7 @@ describe("register: compensating cleanup when session setup fails", () => {
     // Retry with the same email, this time with signIn able to succeed.
     process.env.SESSION_TOKEN_HASH_SECRET = originalSecret ?? "test-secret-for-register-retry";
 
-    const retried = await registerHousehold(email, password);
+    const retried = await registerHousehold(email, password, "Test-WG");
     accountIds.push(retried.context.accountId);
     expect(retried.household.contactEmail).toBe(email);
 

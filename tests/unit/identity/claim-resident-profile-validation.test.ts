@@ -1,41 +1,42 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
+import { joinHousehold } from "@/modules/identity/auth";
 
-// actions.ts pulls in session-cookie.ts (server-only + next/headers) and next/navigation via its
-// import chain; none of that runs before the UUID guard fires, but it must resolve for the module
-// to import at all under vitest (no Next server runtime present here).
-vi.mock("server-only", () => ({}));
-vi.mock("next/headers", () => ({ cookies: vi.fn() }));
-vi.mock("next/navigation", () => ({ redirect: vi.fn() }));
-
-const { claimResidentProfileAction } = await import("@/app/(auth)/claim/actions");
-import type { ClaimFormState } from "@/app/(auth)/claim/actions";
-import { de } from "@/ui/strings";
-
-// A non-empty but non-UUID householdId must fail as a ClaimFormState.error (returned, not thrown)
-// before reaching findPreparedResidentProfile -> withSessionContext's assertUuid, whose plain
-// Error is not a ClaimError/SignInError and previously surfaced as an unhandled runtime crash.
-describe("claimResidentProfileAction householdId validation", () => {
-  const prevState: ClaimFormState = { error: null };
-
-  it("rejects a non-UUID householdId without throwing", async () => {
-    const formData = new FormData();
-    formData.set("householdId", "not-a-uuid");
-    formData.set("displayName", "Jonas");
-    formData.set("password", "correct horse battery staple");
-
-    const result = await claimResidentProfileAction(prevState, formData);
-
-    expect(result.error).toBeTruthy();
+// join-by-link design.md Decision 13: `/claim` is deleted — its own action used to take a raw
+// `householdId` typed by hand and reach `withSessionContext`'s `assertUuid`, whose plain Error
+// (not a ClaimError) previously surfaced as an unhandled crash for a non-UUID value. G-G1: this
+// file is REWRITTEN, not deleted — the behaviour it protected (untrusted stranger input reaching
+// this app's public identity-creation surface must never crash the action, only ever refuse
+// cleanly) still exists, just on a different field. The join route has no household-id field at
+// all any more (the household is identified by the LINK, never typed); its one untrusted string
+// is the `code` itself, so this file now exercises that input against `joinHousehold` directly —
+// the same layer join-atomicity.test.ts/join-name-collision.test.ts already call, and one that
+// (unlike the action) does not touch the rate limiter, so this stays a fast, no-write test.
+describe("joinHousehold: a malformed/unknown code never crashes", () => {
+  it("refuses a garbage, wrong-shaped code with invalid_link — never an unhandled crash", async () => {
+    // normalizeJoinCode/resolveJoinCode never throw on a malformed input (design.md Decision 4):
+    // it is normalised and simply matches nothing. This is the direct equivalent of the old
+    // test's "a non-UUID householdId must fail as an error, not a crash".
+    await expect(
+      joinHousehold("definitely not a real join code!! %$#", {
+        displayName: "Someone",
+        password: "correct horse battery staple",
+      }),
+    ).rejects.toMatchObject({ code: "invalid_link" });
   });
 
-  it("still requires the non-emptiness fields first", async () => {
-    const formData = new FormData();
-    formData.set("householdId", "");
-    formData.set("displayName", "");
-    formData.set("password", "");
+  it("still requires a password, checked before any code lookup", async () => {
+    await expect(
+      joinHousehold("NEVER-EXISTS-CODE-CHECK", { displayName: "Someone", password: "" }),
+    ).rejects.toMatchObject({ code: "missing_fields" });
+  });
 
-    const result = await claimResidentProfileAction(prevState, formData);
-
-    expect(result.error).toBe(de.auth.errors.claim.householdRequired);
+  it("does not require a display name field at all — a bound link's caller never sends one", async () => {
+    // design.md Decision 13: join-form.tsx renders no name field for a BOUND link, so the caller
+    // omits `displayName` entirely (`undefined`, never `""`). Against a code that cannot resolve,
+    // the refusal is still invalid_link — the missing-name check (which only applies to a NEUTRAL
+    // link) never even gets a chance to fire first.
+    await expect(
+      joinHousehold("NEVER-EXISTS-CODE-CHECK", { password: "correct horse battery staple" }),
+    ).rejects.toMatchObject({ code: "invalid_link" });
   });
 });

@@ -82,6 +82,13 @@ tables:
     created_at: { category: "⚙️" }
     created_by_account_id: { category: "🟠", purpose: "wer den Link ausgestellt hat", legal_basis: "Art. 6(1)(f) DSGVO", retention: "bis JoinCodeIssuance-Löschung" }
     deleted_at: { category: "⚙️" }
+    resident_profile_id: { category: "🟠", purpose: "join-by-link Decision 13 (2026-09-22): benennt die Person, für die ein gebundener Link ausgestellt wurde — anders als jede andere Spalte dieser Tabelle ein Verweis auf eine benannte Person, nicht nur auf den Haushalt", legal_basis: "Art. 6(1)(f) DSGVO", retention: "bis JoinCodeIssuance-Löschung" }
+
+  # --- join-by-link (FR-2.28, 2026-09-22): the join route's attempt limit ---
+  join_attempt:
+    id: { category: "⚙️" }
+    source_hash: { category: "🟠", purpose: "pseudonymisierte Quellkennung (HMAC der Client-IP) für die Versuchsbegrenzung auf der Beitrittsroute (FR-2.28/EC-2.14) — die erste Spalte dieser Codebasis über eine Besuchsperson statt ein Mitglied", legal_basis: "Art. 6(1)(f) DSGVO", retention: "24 Stunden, durchgesetzt vom Schreibpfad selbst (record_join_attempt)" }
+    attempted_at: { category: "⚙️" }
 
   household_settings:
     household_id: { category: "⚙️" }

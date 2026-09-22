@@ -10,7 +10,17 @@ const t = de.org.dashboard;
 
 // Screen O1. EC-1.5: exactly one round is presented as "active"; the rest are reachable only via
 // the list below it, never surfaced as if several were simultaneously live.
-export default async function DashboardPage() {
+//
+// join-by-link EC-2.4: a visitor who opens a join link while already a member of this household
+// is redirected here (the temporary Start stand-in, proposal Assumption 4) with `?note=` carrying
+// which note to show — no code involved (G-A5 has nothing to say about it). `searchParams` is a
+// Promise in this Next version, same as `params` (src/app/(org)/rounds/[id]/page.tsx).
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ note?: string }>;
+}) {
+  const { note } = await searchParams;
   const current = await getCurrentSession();
   if (!current) redirect("/sign-in");
 
@@ -29,6 +39,12 @@ export default async function DashboardPage() {
   return (
     <div className="mx-auto max-w-2xl space-y-6 p-6">
       <h1 className="font-serif text-2xl font-semibold">{t.heading}</h1>
+
+      {note === "already_member" && (
+        <div role="note" className="callout callout-info">
+          {de.join.alreadyMemberNote}
+        </div>
+      )}
 
       {active ? (
         <Link href={`/rounds/${active.id}`} className="card block transition hover:shadow-none">

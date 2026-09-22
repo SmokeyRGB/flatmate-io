@@ -82,6 +82,12 @@ Presenting a code SHALL identify at most one household. A code matching no link 
 exactly as a code matching a link that fails its limits. Source: FR-2.9 needs the household's name
 before any input is requested, so this resolution SHALL be possible without consuming a redemption.
 
+A presented code SHALL be normalised before it is looked up: upper-cased, stripped of whitespace,
+and with the separator optional. A code that must be readable aloud and typeable from a note
+(FR-2.26) cannot also demand exactness, so the forms a person actually produces resolve to the same
+link as the one carried in the invitation URL. This is the one place casing is folded deliberately;
+display names still do not fold case (EC-2.11). Sources: EC-2.15, AC-2.24, **P-1**.
+
 #### Scenario: Looking at a link does not spend it
 - **WHEN** a valid link is resolved any number of times without a join completing
 - **THEN** its count is unchanged
@@ -89,6 +95,15 @@ before any input is requested, so this resolution SHALL be possible without cons
 #### Scenario: An unknown code is refused
 - **WHEN** a code belonging to no link is presented
 - **THEN** the attempt is refused, indistinguishably from a code that once existed
+
+#### Scenario: A code read off a note resolves
+- **WHEN** a code is presented in lower case, with a space in it and no separator
+- **THEN** it resolves to the same link as the code in the invitation URL
+
+#### Scenario: Normalisation does not invent matches
+- **WHEN** a normalised code corresponds to no link
+- **THEN** it is refused like any other unknown code, and normalisation never maps two different
+  issued codes onto one another
 
 ### Requirement: A refusal discloses no reason
 
@@ -164,8 +179,10 @@ The screen where links are shared SHALL display the warning that whoever holds a
 that it belongs only in direct messages to flatmates; SHALL let a moderating person issue a new
 link, choosing its validity and its maximum; and SHALL list the household's links — live and dead —
 each showing its remaining validity, its count against its maximum, its code, the full invitation
-URL, a way to extend it and a way to delete it. Administration and moderation SHALL have equal
-access. Sources: FR-2.2, FR-2.3, FR-2.4, FR-2.5, FR-2.29; S-49; U-30 for the parity.
+URL, a way to extend it and a way to delete it. Each link SHALL also name the residents who joined
+through it, so the history answers *who came in through what* and not only *how many* (AC-2.26).
+Administration and moderation SHALL have equal access. Sources: FR-2.2, FR-2.3, FR-2.4, FR-2.5,
+FR-2.6, FR-2.29; AC-2.26; S-49; U-30 for the parity.
 
 The action that invalidates a link SHALL read **"Löschen"** — never *„Widerrufen"*, never
 *„Zurückziehen"* (`screens/rahmenwerk.md` §8.6). Nothing on the screen SHALL present these limits as
@@ -190,6 +207,14 @@ security: they are social visibility (C-2.5).
 #### Scenario: A resident cannot reach any of it
 - **WHEN** an account that is neither administration nor moderator requests the screen
 - **THEN** no link, code or control is disclosed
+
+#### Scenario: A used-up link still names who came through it
+- **WHEN** two residents joined through a link that is now used up
+- **THEN** the link is still listed, shows two of two used, and names both residents
+
+#### Scenario: A link nobody used names nobody
+- **WHEN** a link has never been redeemed
+- **THEN** it is listed with a count of zero and names no resident
 
 ### Requirement: The join code never enters a log or a query string
 
@@ -217,3 +242,33 @@ independently of the client. Source: C-2.10, **G-C7**.
 #### Scenario: Another household cannot change them
 - **WHEN** a session for one household attempts to delete or extend another household's link
 - **THEN** nothing changes
+
+### Requirement: A link may name the person it was issued for
+
+A join link SHALL optionally name one prepared resident profile of its own household. A link that
+names none SHALL behave exactly as every link did before. A link that names one SHALL be issued for
+exactly that person, SHALL carry a maximum of one redemption, and SHALL be refused once it has been
+spent, like any other exhausted link. Naming a profile SHALL NOT change anything else about a link:
+its expiry, its cap, its count, its deletion and its refusal all behave identically. Sources: the
+human decision of 2026-09-22; C-2.4; FR-2.5, FR-2.7.
+
+A link is the only way a prepared profile can be claimed, which is what makes the household's link
+its access control in fact and not only in principle.
+
+#### Scenario: A moderating person issues an invitation for a prepared profile
+- **WHEN** a prepared profile exists and an invitation is issued for it
+- **THEN** a link is created naming that profile, valid for one redemption
+
+#### Scenario: A named link is refused like any other once spent
+- **WHEN** a link naming a profile has been redeemed
+- **THEN** further attempts on it produce the same refusal as an exhausted neutral link, naming no
+  cause
+
+#### Scenario: Deleting a named link leaves its profile alone
+- **WHEN** a link naming a prepared profile is deleted before anyone redeems it
+- **THEN** the profile is still prepared and a new invitation can be issued for it
+
+#### Scenario: A link names a profile of its own household only
+- **WHEN** a link is issued naming a profile
+- **THEN** that profile belongs to the same household as the link, and no link can name a profile
+  of another household
