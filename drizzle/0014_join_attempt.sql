@@ -58,6 +58,19 @@ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public VOLATILE AS $$
 DECLARE
   v_count int;
 BEGIN
+  -- Serialize per source for the rest of this transaction. Without it the insert and the count
+  -- are not atomic together: two callers arriving at 19 attempts each insert, then each counts
+  -- a READ COMMITTED snapshot that does not contain the other's uncommitted row, so both see 20
+  -- and both are allowed. The overshoot is bounded by concurrency rather than unbounded, but
+  -- this limit is what C-2.12 says makes the shortened code defensible, so it should be exactly
+  -- right. Found in the second review of PR #17.
+  --
+  -- Advisory rather than a row lock: there is no row to lock before the first attempt from a
+  -- source exists. hashtextextended gives a 64-bit key; a collision between two different
+  -- sources costs an unnecessary wait and nothing else. Transaction-scoped, so it is released
+  -- when this function's implicit transaction ends.
+  PERFORM pg_advisory_xact_lock(hashtextextended(p_source_hash, 0));
+
   DELETE FROM "join_attempt" WHERE attempted_at < now() - interval '24 hours';
 
   INSERT INTO "join_attempt" (source_hash) VALUES (p_source_hash);

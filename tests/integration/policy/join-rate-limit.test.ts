@@ -35,6 +35,34 @@ afterEach(async () => {
 // households count against the very same limit, because the function's key is the SOURCE, never a
 // link or a household.
 describe("Join route attempt limit (FR-2.28/AC-2.25/EC-2.14)", () => {
+  // Second review of PR #17: the insert and the count are only atomic together if calls for one
+  // source are serialized. Without record_join_attempt's advisory lock, two callers arriving at the
+  // boundary each insert and then each counts a READ COMMITTED snapshot that lacks the other's
+  // uncommitted row, so both are allowed and the cap is exceeded.
+  //
+  // *** THIS TEST DID NOT REPRODUCE THAT, AND IS NOT EVIDENCE THE LOCK WORKS. *** Probed against
+  // the unfixed function at 40, 100 and 200 concurrent calls: allowed was exactly 20 every time.
+  // The Supavisor transaction-mode pooler (src/db/client.ts) appears to serialize these one-
+  // statement transactions onto its server connections, which closes the window by accident. That
+  // is a property of today's deployment topology, not a guarantee — session-mode pooling or direct
+  // connections would reopen it — so the lock stays as the guarantee and this test stays as an
+  // invariant guard. Read it as "the cap holds under concurrency", never as a regression test
+  // proven to fail without the fix.
+  it("never allows more than the limit, even when every attempt arrives at the same moment", async () => {
+    const sourceHash = `test-rate-limit-concurrent-${randomUUID()}`;
+    sourceHashesToClean.push(sourceHash);
+
+    // Well past the limit and all in flight together: without serialization the allowed count
+    // drifts above 20 by roughly the concurrency, which is exactly the overshoot being closed.
+    const results = await Promise.all(
+      Array.from({ length: 40 }, () => recordJoinAttempt(sourceHash)),
+    );
+
+    const allowed = results.filter(Boolean).length;
+    expect(allowed).toBe(20);
+    expect(results.filter((r) => !r)).toHaveLength(20);
+  });
+
   it("allows the first 20 attempts from one source and refuses the 21st, structurally without a link lookup", async () => {
     // A unique per-test sourceHash — not joinAttemptSourceHash(ip) — so this test cannot collide
     // with another test's or a previous run's window.
