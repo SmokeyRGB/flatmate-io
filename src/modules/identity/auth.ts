@@ -4,7 +4,15 @@ import { and, eq, ne } from "drizzle-orm";
 import { isUuid, withSessionContext, type SessionContext } from "@/db/session-context";
 import { recordActivityEvent } from "@/modules/audit/repository";
 import { issueJoinCodeTx, resolveAccountHousehold } from "./repository";
-import { account, household, householdSettings, membership, residentProfile, session } from "./schema";
+import {
+  account,
+  household,
+  householdSettings,
+  joinCodeIssuance,
+  membership,
+  residentProfile,
+  session,
+} from "./schema";
 
 // Admin-only client (research.md §2) — uses the service-role key, never the anon key. Server-only:
 // this module must never be imported from a client component (the service-role key would end up
@@ -137,6 +145,13 @@ export async function undoRegisterHousehold(
     await tx.delete(membership).where(eq(membership.householdId, householdId));
     await tx.delete(account).where(eq(account.id, accountId));
     await tx.delete(householdSettings).where(eq(householdSettings.householdId, householdId));
+    // join-code-protections (O-18): registerHousehold mints a founding join_code_issuance row, so
+    // undoing a registration must remove it too. There are **no foreign keys** in this schema
+    // (the two-Supabase-project split), so deleting the household does not cascade — the row would
+    // simply survive its household. That is the same silent-orphan failure that let the production
+    // project accumulate 1.9k rooms and 1.5k rounds before anyone noticed, and it was caught here
+    // by two leftover rows after a suite run.
+    await tx.delete(joinCodeIssuance).where(eq(joinCodeIssuance.householdId, householdId));
     await tx.delete(household).where(eq(household.id, householdId));
   });
 

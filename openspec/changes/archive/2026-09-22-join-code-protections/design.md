@@ -68,9 +68,12 @@ held row lock on a path a stranger can trigger. Its **test** is still the model 
 
 `drizzle/00NN_join_code_issuance.sql` adds:
 
-- `resolve_join_code(p_code text) RETURNS TABLE (household_id uuid, household_name text)` —
-  `STABLE`, non-consuming. FR-2.9 requires the household's name before any input is requested, so
-  *looking* at a link must not spend one of its uses.
+- `resolve_join_code(p_code text) RETURNS TABLE (household_id uuid, issuance_id uuid, household_name text)`
+  — `STABLE`, non-consuming. FR-2.9 requires the household's name before any input is requested,
+  so *looking* at a link must not spend one of its uses. *(Corrected during apply: this bullet
+  said two columns while the Risks paragraph below, `tasks.md` 5.4 and Decision 3's single
+  `JoinCodeResolution` type all said three. Three is right — both functions return the same shape,
+  which is what lets the repository expose one type that cannot branch on a reason.)*
 - `claim_join_code(p_code text) RETURNS TABLE (household_id uuid, issuance_id uuid, household_name text)`
   — `VOLATILE`, Decision 1's statement. It returns the issuance id because change 2 must write
   `membership.joined_via_issuance_id`.
