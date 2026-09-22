@@ -13,13 +13,20 @@
 -- design (24h retention, enforced by the function itself, not a separate job).
 
 -- Step 1: the table itself.
-CREATE TABLE "join_attempt" (
+CREATE TABLE IF NOT EXISTS "join_attempt" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"source_hash" text NOT NULL,
 	"attempted_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-CREATE INDEX "join_attempt_source_hash_attempted_at_idx" ON "join_attempt" USING btree ("source_hash","attempted_at");
+CREATE INDEX IF NOT EXISTS "join_attempt_source_hash_attempted_at_idx" ON "join_attempt" USING btree ("source_hash","attempted_at");
+--> statement-breakpoint
+-- A second, attempted_at-only index for the retention prune. The composite index above leads
+-- on source_hash, so it cannot serve `WHERE attempted_at < ...` — and record_join_attempt
+-- prunes on EVERY call, which without this index is a sequential scan per request. That
+-- degrades exactly when the table is large, i.e. under the guessing attack the limit exists to
+-- stop: the rate limiter would become its own amplifier.
+CREATE INDEX IF NOT EXISTS "join_attempt_attempted_at_idx" ON "join_attempt" USING btree ("attempted_at");
 --> statement-breakpoint
 
 -- Step 2: RLS enabled, deliberately with NO policy — this table has no tenant to key a policy on
@@ -40,6 +47,12 @@ ALTER TABLE "join_attempt" ENABLE ROW LEVEL SECURITY;
 -- rolls off. Retention (rows older than 24h) is pruned on every call, as a side effect of the
 -- only write path — the table stays small enough for that to be cheap, and a pruning rule that
 -- runs here cannot rot the way a scheduled job nobody scheduled does.
+-- Drop-then-create, and IF NOT EXISTS above, so the whole file is re-runnable: the agent
+-- applying this migration gets the ordinary statements through and has the function refused,
+-- so a human runs the file afterwards and must not meet "already exists" on a line that
+-- already succeeded.
+DROP FUNCTION IF EXISTS record_join_attempt(text, int, int);
+--> statement-breakpoint
 CREATE FUNCTION record_join_attempt(p_source_hash text, p_window_seconds int, p_limit int) RETURNS boolean
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = public VOLATILE AS $$
 DECLARE

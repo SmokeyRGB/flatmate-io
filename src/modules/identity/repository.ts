@@ -948,7 +948,12 @@ export async function listJoinCodeIssuances(
       .innerJoin(residentProfile, eq(residentProfile.id, membership.residentProfileId))
       .where(
         and(eq(membership.householdId, context.householdId), isNotNull(membership.joinedViaIssuanceId)),
-      );
+      )
+      // Without an ORDER BY the planner may return these rows in any order, so each link's
+      // joinedResidentNames would be nondeterministic across runs — unstable for the reader of O16
+      // and a latent flake for any test asserting the array. joinedAt is both stable and the order
+      // a person expects: who came through this link, in the order they came.
+      .orderBy(membership.joinedAt);
 
     const namesByIssuance = new Map<string, string[]>();
     for (const joiner of joiners) {

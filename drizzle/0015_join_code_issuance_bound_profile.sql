@@ -51,7 +51,16 @@ LANGUAGE sql SECURITY DEFINER SET search_path = public STABLE AS $$
   SELECT h.id, jci.id, h.name, rp.id, rp.display_name
   FROM "join_code_issuance" jci
   JOIN "household" h ON h.id = jci.household_id
-  LEFT JOIN "resident_profile" rp ON rp.id = jci.resident_profile_id
+  -- The household predicate is NOT redundant with issueJoinCodeTx's check. This function is
+  -- SECURITY DEFINER, so it runs past RLS, and it answers an UNAUTHENTICATED caller; there are
+  -- no foreign keys in this schema, so nothing but application code keeps this column honest.
+  -- Were a binding ever wrong — a bug, a hand-edited row, a bad backfill — the two output
+  -- columns would disclose another household's profile id and display name to a stranger
+  -- holding a code. With the predicate they come back null instead, which is the same outcome
+  -- as a neutral link. ADR-004's rule applies here as much as to the session trigger: an
+  -- invariant that holds only while the application is right is not the invariant G-C asks for.
+  LEFT JOIN "resident_profile" rp
+    ON rp.id = jci.resident_profile_id AND rp.household_id = jci.household_id
   WHERE jci.code = p_code
     AND jci.deleted_at IS NULL
     AND jci.expires_at > now()
@@ -92,7 +101,9 @@ LANGUAGE sql SECURITY DEFINER SET search_path = public VOLATILE AS $$
   SELECT h.id, claimed.issuance_id, h.name, rp.id, rp.display_name
   FROM claimed
   JOIN "household" h ON h.id = claimed.household_id
-  LEFT JOIN "resident_profile" rp ON rp.id = claimed.resident_profile_id
+  -- Same household predicate, same reasoning as resolve_join_code above.
+  LEFT JOIN "resident_profile" rp
+    ON rp.id = claimed.resident_profile_id AND rp.household_id = claimed.household_id
   WHERE h.deleted_at IS NULL
 $$;
 --> statement-breakpoint

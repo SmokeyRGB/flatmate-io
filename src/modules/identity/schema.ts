@@ -298,5 +298,11 @@ export const joinAttempt = pgTable(
     sourceHash: text("source_hash").notNull(),
     attemptedAt: timestamp("attempted_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [index("join_attempt_source_hash_attempted_at_idx").on(t.sourceHash, t.attemptedAt)],
+  (t) => [
+    index("join_attempt_source_hash_attempted_at_idx").on(t.sourceHash, t.attemptedAt),
+    // Separate attempted_at-only index for record_join_attempt's retention prune: the
+    // composite index leads on source_hash and so cannot serve `attempted_at < ...`, and the
+    // prune runs on every call (drizzle/0014).
+    index("join_attempt_attempted_at_idx").on(t.attemptedAt),
+  ],
 );
