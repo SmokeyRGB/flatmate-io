@@ -2,7 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { SignInError, signIn } from "@/modules/identity/auth";
-import { setSessionCookie } from "@/modules/identity/session-cookie";
+import { sessionCookieMaxAge, setSessionCookie } from "@/modules/identity/session-cookie";
 import { de } from "@/ui/strings";
 
 export interface SignInFormState {
@@ -32,7 +32,11 @@ export async function signInAction(
             password: String(formData.get("password") ?? ""),
           });
 
-    await setSessionCookie(result.session.id, result.context.householdId);
+    await setSessionCookie(
+      result.session.id,
+      result.context.householdId,
+      sessionCookieMaxAge(result.session.expiresAt),
+    );
   } catch (err) {
     if (err instanceof SignInError) {
       // Exhaustive switch (design.md Decision 4): a missed code is a compile error.

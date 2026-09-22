@@ -1,6 +1,11 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { claimResidentProfile } from "@/modules/identity/auth";
-import { createResidentProfile } from "@/modules/identity/repository";
+import {
+  PermissionDeniedError,
+  assertHasPermission,
+  createResidentProfile,
+  setMemberRole,
+} from "@/modules/identity/repository";
 import {
   cleanupAll,
   deleteTestAccount,
@@ -23,10 +28,12 @@ afterEach(async () => {
   hh = undefined;
 });
 
-// spec.md Assumptions: the household account's own (first) resident profile holds close_round
-// initially; a later profile does not get it by default.
-describe("Founding resident's default close_round permission", () => {
-  it("grants close_round to the first claimed resident profile, not to a later one", async () => {
+// Human decision, 2026-09-22 (docs/domain/identity.md §2.1's close_round note): close_round is a
+// role default, the same shape as manage_rooms — held by household_admin and moderator, not
+// inferred from being the first claimed resident membership. This replaces the old rule this file
+// used to test (the FIRST claimed resident profile got close_round automatically).
+describe("close_round is a role default (identity/permissions capability), not a founding grant", () => {
+  it("gives the first AND the second claimed resident membership no permissions at all", async () => {
     hh = await registerTestHousehold();
     const actor = { accountId: hh.accountId, profileId: null };
 
@@ -37,7 +44,8 @@ describe("Founding resident's default close_round permission", () => {
       "test-password-not-real-1234",
     );
     firstAccountId = firstAcc;
-    expect(firstMembership.permissions).toContain("close_round");
+    expect(firstMembership.permissions).not.toContain("close_round");
+    expect(firstMembership.permissions).toEqual([]);
 
     const second = await createResidentProfile(hh.context, "SecondResident", actor);
     const { accountId: secondAcc, membership: secondMembership } = await claimResidentProfile(
@@ -47,5 +55,30 @@ describe("Founding resident's default close_round permission", () => {
     );
     secondAccountId = secondAcc;
     expect(secondMembership.permissions).not.toContain("close_round");
+    expect(secondMembership.permissions).toEqual([]);
+  });
+
+  it("a plain member cannot close_round, but appointing it moderator grants close_round with no individual grant", async () => {
+    hh = await registerTestHousehold();
+    const actor = { accountId: hh.accountId, profileId: null };
+
+    const profile = await createResidentProfile(hh.context, "Resident", actor);
+    const { accountId, membership: memberMembership } = await claimResidentProfile(
+      hh.context,
+      profile.id,
+      "test-password-not-real-1234",
+    );
+    firstAccountId = accountId;
+    expect(memberMembership.permissions).toEqual([]);
+
+    // A plain member: close_round is refused, and nothing in its own permissions array grants it.
+    await expect(assertHasPermission(hh.context, accountId, "close_round")).rejects.toThrow(
+      PermissionDeniedError,
+    );
+
+    // Appointed moderator: close_round now passes via MODERATOR_DEFAULT_PERMISSIONS — the
+    // permissions array itself is still empty, nothing was granted to it individually.
+    await setMemberRole(hh.context, hh.accountId, accountId, "moderator");
+    await expect(assertHasPermission(hh.context, accountId, "close_round")).resolves.toBeUndefined();
   });
 });

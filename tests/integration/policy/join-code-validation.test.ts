@@ -19,12 +19,18 @@ async function insertIssuance(
   household: TestHousehold,
   overrides: Partial<typeof joinCodeIssuance.$inferInsert>,
 ) {
+  // join-by-link (EC-2.15/AC-2.24): normalizeJoinCode re-inserts the hyphen at position 5 for any
+  // 10-character input, so a fixture code must already carry it in the canonical shape (like a
+  // real generateJoinCode() output) or resolveJoinCode's normalisation step will no longer match
+  // what's actually stored — normalisation "corrects" a hyphen-less 10-char code, it doesn't skip it.
+  const raw = `TEST${Math.random().toString(36).slice(2, 8).toUpperCase()}`; // 10 chars
+  const canonicalCode = `${raw.slice(0, 5)}-${raw.slice(5)}`;
   return withSessionContext(household.context, async (tx) => {
     const [row] = await tx
       .insert(joinCodeIssuance)
       .values({
         householdId: household.householdId,
-        code: `TEST${Math.random().toString(36).slice(2, 8).toUpperCase()}`,
+        code: canonicalCode,
         expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
         maxUses: 1,
         uses: 0,
@@ -133,5 +139,18 @@ describe("Join code validation (FR-2.3/FR-2.7/FR-2.8)", () => {
       tx.select().from(joinCodeIssuance).where(eq(joinCodeIssuance.id, issuance.id)),
     );
     expect(row.uses).toBe(0);
+  });
+
+  // AC-2.24/EC-2.15: a live link's code, presented lower-case with a space and without the
+  // hyphen, still resolves to that link — normalisation happens inside resolveJoinCode itself.
+  it("resolves a live link's code presented lower-case, spaced, and without the hyphen (AC-2.24)", async () => {
+    hh = await registerTestHousehold();
+    const issuance = await insertIssuance(hh, {});
+    const [group1, group2] = issuance.code.split("-");
+
+    const resolved = await resolveJoinCode(` ${group1.toLowerCase()} ${group2.toLowerCase()}`);
+    expect(resolved).not.toBeNull();
+    expect(resolved?.householdId).toBe(hh.householdId);
+    expect(resolved?.issuanceId).toBe(issuance.id);
   });
 });

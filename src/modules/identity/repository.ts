@@ -1,5 +1,5 @@
 import { randomInt, randomUUID } from "node:crypto";
-import { and, desc, eq, gt, isNull, ne, sql } from "drizzle-orm";
+import { and, desc, eq, gt, isNotNull, isNull, ne, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { withSessionContext, type SessionContext } from "@/db/session-context";
 
@@ -170,14 +170,38 @@ export async function resolveAccountHousehold(accountId: string): Promise<string
 // matter of discipline at each call site; a type that never held the cause cannot leak it at any
 // of them (FR-2.8). `null` is the only failure value on both functions below — no reason, no
 // error subclass.
-export type JoinCodeResolution = { householdId: string; issuanceId: string; householdName: string } | null;
+//
+// join-by-link design.md Decision 13: `boundResidentProfile` carries the bound profile's id and
+// display name when the resolved/claimed link names one, `null` for a neutral link — never a
+// second lookup, since drizzle/0015's resolve_join_code/claim_join_code already LEFT JOIN
+// resident_profile and return both columns in the same row.
+export type JoinCodeResolution = {
+  householdId: string;
+  issuanceId: string;
+  householdName: string;
+  boundResidentProfile: { id: string; displayName: string } | null;
+} | null;
 
-type JoinCodeFunctionRow = { household_id: string; issuance_id: string; household_name: string };
+type JoinCodeFunctionRow = {
+  household_id: string;
+  issuance_id: string;
+  household_name: string;
+  bound_resident_profile_id: string | null;
+  bound_resident_display_name: string | null;
+};
 
 function toJoinCodeResolution(rows: JoinCodeFunctionRow[]): JoinCodeResolution {
   const row = rows[0];
   if (!row) return null;
-  return { householdId: row.household_id, issuanceId: row.issuance_id, householdName: row.household_name };
+  return {
+    householdId: row.household_id,
+    issuanceId: row.issuance_id,
+    householdName: row.household_name,
+    boundResidentProfile:
+      row.bound_resident_profile_id && row.bound_resident_display_name
+        ? { id: row.bound_resident_profile_id, displayName: row.bound_resident_display_name }
+        : null,
+  };
 }
 
 // The second deliberate RLS-bootstrap exception, alongside resolveAccountHousehold above: a
@@ -188,7 +212,9 @@ function toJoinCodeResolution(rows: JoinCodeFunctionRow[]): JoinCodeResolution {
 // caveat this call site cannot enforce itself: it is defensible only because FR-2.28's attempt
 // limit (change 2) exists before any public route can reach it.
 export async function resolveJoinCode(code: string): Promise<JoinCodeResolution> {
-  const rows = await db.execute<JoinCodeFunctionRow>(sql`SELECT * FROM resolve_join_code(${code})`);
+  const rows = await db.execute<JoinCodeFunctionRow>(
+    sql`SELECT * FROM resolve_join_code(${normalizeJoinCode(code)})`,
+  );
   return toJoinCodeResolution(rows);
 }
 
@@ -196,9 +222,57 @@ export async function resolveJoinCode(code: string): Promise<JoinCodeResolution>
 // `UPDATE ... RETURNING` — one statement decides and counts, so of two concurrent calls on a
 // single-use link exactly one succeeds; the loser gets the same `null` every other refusal
 // produces (Decision 3).
+//
+// join-by-link design.md Decision 2: after this change, nothing under `src/` calls this
+// standalone version — `joinHousehold` (auth.ts) uses `claimJoinCodeTx` below instead, so the
+// claim runs inside the same transaction as the resident it creates. This one stays only for the
+// three join-code tests that need a standalone statement — `join-code-atomicity.test.ts` races
+// concurrent claims against each other, which is precisely what a Tx-scoped variant cannot do
+// from outside its own (single) transaction.
 export async function claimJoinCode(code: string): Promise<JoinCodeResolution> {
-  const rows = await db.execute<JoinCodeFunctionRow>(sql`SELECT * FROM claim_join_code(${code})`);
+  const rows = await db.execute<JoinCodeFunctionRow>(
+    sql`SELECT * FROM claim_join_code(${normalizeJoinCode(code)})`,
+  );
   return toJoinCodeResolution(rows);
+}
+
+// join-by-link design.md Decision 2: the Tx-scoped claim — runs `claim_join_code` on the caller's
+// OWN transaction (not a fresh one), so a join's claim and its resident-creating inserts commit or
+// roll back together. This is the SECOND exported `*Tx` primitive in this codebase, after
+// `issueJoinCodeTx` below.
+//
+// ⚠ THIS FUNCTION PERFORMS NO AUTHORIZATION, and that is correct — do not "fix" it by adding one.
+// A stranger presenting a join code with no session at all is this call's entire purpose; the
+// control on it is the route's attempt limit (recordJoinAttempt), checked BEFORE any code lookup
+// (AC-2.25), not an identity check here. Adding an assert here would be tautological: there is no
+// identity yet to assert against.
+export async function claimJoinCodeTx(tx: Tx, code: string): Promise<JoinCodeResolution> {
+  const rows = await tx.execute<JoinCodeFunctionRow>(
+    sql`SELECT * FROM claim_join_code(${normalizeJoinCode(code)})`,
+  );
+  return toJoinCodeResolution(rows);
+}
+
+// design.md Decision 3 (FR-2.28/EC-2.14): the join route's attempt limit. 15 minutes / 20
+// attempts — generous enough that several flatmates behind one carrier NAT, each opening a link
+// more than once, plus a hand-typed code mistyped a few times, never reach it; strict enough that
+// a 10-character code over a 32-character alphabet (~1.1×10^15 codes) stays hopeless to guess even
+// against 10,000 live links at once. Retention (24h) is enforced by record_join_attempt itself,
+// not a separate job — see drizzle/0014_join_attempt.sql.
+const JOIN_ATTEMPT_WINDOW_SECONDS = 15 * 60;
+const JOIN_ATTEMPT_LIMIT = 20;
+
+// The third deliberate RLS-bootstrap exception (after resolveAccountHousehold and
+// resolveJoinCode/claimJoinCode above): a stranger presenting a code has no session, and rate
+// limiting the attempt is the check that must run BEFORE any code lookup (AC-2.25 — "refused
+// without being checked against any link"), so it cannot depend on one either.
+// `record_join_attempt` (drizzle/0014_join_attempt.sql) prunes, records, counts and decides in one
+// call — every attempt is recorded, including refused ones (design.md Decision 3).
+export async function recordJoinAttempt(sourceHash: string): Promise<boolean> {
+  const rows = await db.execute<{ record_join_attempt: boolean }>(
+    sql`SELECT record_join_attempt(${sourceHash}, ${JOIN_ATTEMPT_WINDOW_SECONDS}, ${JOIN_ATTEMPT_LIMIT})`,
+  );
+  return rows[0]?.record_join_attempt ?? false;
 }
 
 export class HouseholdAccountCannotVoteError extends Error {
@@ -226,12 +300,16 @@ export class PermissionDeniedError extends Error {
   }
 }
 
-// docs/domain/identity.md §2.1: manage_rooms is "vorbelegt bei household_admin und moderator" —
-// the one permission with a documented role-based default. Every other permission is
-// individually grantable only (C-1.3: orthogonal, no role hierarchy/presets) — household_admin
-// implicitly has every permission regardless (it's the account that registered, C-1.4, not a
-// security boundary), but a moderator otherwise needs a permission explicitly in the array.
-const MODERATOR_DEFAULT_PERMISSIONS = new Set(["manage_rooms"]);
+// docs/domain/identity.md §2.1: manage_rooms and close_round are "vorbelegt bei household_admin
+// und moderator" — the two permissions with a documented role-based default (close_round joined
+// manage_rooms here by human decision, 2026-09-22, replacing the old first-resident inference in
+// auth.ts's claimResidentProfile). Every other permission is individually grantable only (C-1.3:
+// orthogonal, no role hierarchy/presets) — household_admin implicitly has every permission
+// regardless (it's the account that registered, C-1.4, not a security boundary), but a moderator
+// otherwise needs a permission explicitly in the array. A third role-assigned default would make
+// this a template system (S-04 excludes `Berechtigungsvorlagen`) — see the abandonment condition
+// in domain/identity.md §2.1's close_round note before adding one.
+const MODERATOR_DEFAULT_PERMISSIONS = new Set(["manage_rooms", "close_round"]);
 
 export async function assertHasPermission(
   context: SessionContext,
@@ -601,6 +679,27 @@ export function generateJoinCode(): string {
   return `${randomJoinCodeGroup()}-${randomJoinCodeGroup()}`;
 }
 
+// G-A5/AC-2.18: the code is a URL PATH SEGMENT, never a query parameter, on EVERY route that
+// builds an invite link — a pure function so the shape is directly testable
+// (join-code-never-in-query-or-log.test.ts) without rendering the members screen that calls it.
+export function buildJoinUrl(host: string | null, code: string): string {
+  return host ? `https://${host}/join/${code}` : `/join/${code}`;
+}
+
+// design.md Decision 4 (EC-2.15/AC-2.24): upper-case, strip every whitespace character and every
+// "-", then re-insert the separator between the two groups of five so the result matches the
+// stored shape exactly — applied inside resolveJoinCode/claimJoinCodeTx so both entry paths (the
+// URL and the form body) normalise identically and no call site can forget. Injective over
+// JOIN_CODE_ALPHABET: that alphabet already excludes I/O/0/1, so there is no confusable pair to
+// fold and upper-casing/stripping separators cannot map two distinct issued codes onto one
+// another. NEVER throws — a wrong-length input is normalised and simply matches nothing at lookup
+// (FR-2.8's single refusal, not a second observable outcome).
+export function normalizeJoinCode(input: string): string {
+  const stripped = input.toUpperCase().replace(/[\s-]/g, "");
+  if (stripped.length !== JOIN_CODE_GROUP_LENGTH * 2) return stripped;
+  return `${stripped.slice(0, JOIN_CODE_GROUP_LENGTH)}-${stripped.slice(JOIN_CODE_GROUP_LENGTH)}`;
+}
+
 const POSTGRES_UNIQUE_VIOLATION = "23505";
 
 function isUniqueViolation(err: unknown): boolean {
@@ -610,6 +709,20 @@ function isUniqueViolation(err: unknown): boolean {
 export interface IssueJoinCodeOptions {
   validDays: number;
   maxUses: number;
+  // join-by-link design.md Decision 13: names one prepared resident profile of the SAME household
+  // to bind the link to — omitted or undefined for an ordinary neutral link. issueJoinCodeTx
+  // verifies both conditions (same household, status "prepared") before it ever reaches the
+  // insert; a bound link is always issued with maxUses forced to 1 regardless of what is passed.
+  residentProfileId?: string;
+}
+
+export class ResidentProfileNotEligibleForBindingError extends Error {
+  constructor(residentProfileId: string) {
+    super(
+      `ResidentProfile ${residentProfileId} cannot be bound to a join link: not found in this household, or not "prepared"`,
+    );
+    this.name = "ResidentProfileNotEligibleForBindingError";
+  }
 }
 
 // ⚠ THIS FUNCTION PERFORMS NO AUTHORIZATION. Do not call it from anything reachable by a request.
@@ -653,6 +766,30 @@ export async function issueJoinCodeTx(
 ): Promise<typeof joinCodeIssuance.$inferSelect> {
   const expiresAt = new Date(Date.now() + options.validDays * 24 * 60 * 60 * 1000);
 
+  // join-by-link design.md Decision 13: a bound link names one prepared profile of THIS
+  // household — verified here, before any row is written, rather than trusted from the caller.
+  // "belongs to this household" and "is prepared" are both checked in one read: a profile of
+  // another household, an already-active/moved-out profile, or an id that doesn't exist at all
+  // all fail the same way (ResidentProfileNotEligibleForBindingError), never a distinguishable
+  // reason — nothing downstream of this function needs to tell them apart. A bound link is
+  // ALWAYS single-use (spec.md "A link may name the person it was issued for": "SHALL carry a
+  // maximum of one redemption"), regardless of what options.maxUses says.
+  let maxUses = options.maxUses;
+  if (options.residentProfileId) {
+    const [profile] = await tx
+      .select({ id: residentProfile.id })
+      .from(residentProfile)
+      .where(
+        and(
+          eq(residentProfile.id, options.residentProfileId),
+          eq(residentProfile.householdId, householdId),
+          eq(residentProfile.status, "prepared"),
+        ),
+      );
+    if (!profile) throw new ResidentProfileNotEligibleForBindingError(options.residentProfileId);
+    maxUses = 1;
+  }
+
   for (;;) {
     const code = generateJoinCode();
     await tx.execute(sql`SAVEPOINT join_code_issue`);
@@ -663,8 +800,9 @@ export async function issueJoinCodeTx(
           householdId,
           code,
           expiresAt,
-          maxUses: options.maxUses,
+          maxUses,
           createdByAccountId: actingAccountId,
+          residentProfileId: options.residentProfileId ?? null,
         })
         .returning();
       await tx.execute(sql`RELEASE SAVEPOINT join_code_issue`);
@@ -774,21 +912,57 @@ export async function deleteJoinCode(
   });
 }
 
+export type JoinCodeIssuanceWithJoiners = (typeof joinCodeIssuance.$inferSelect) & {
+  // AC-2.26: who came in through this link — a used-up or deleted link still names them
+  // ("Löschen berührt keine Mitgliedschaft", domain/identity.md §2.1). A link nobody has
+  // redeemed yet names nobody — an empty array, not an absent field.
+  joinedResidentNames: string[];
+};
+
 // FR-2.29: O16 lists live AND dead links, most recent first — a dead link is never hidden, only
 // marked (design.md's "Dead links are never cleaned up, by design"). FR-1.27/U-30 parity: refused
 // entirely to anyone but administration or a moderator.
+//
+// AC-2.26 (join-by-link): extended to also name each link's joiners, joining `membership` on
+// `joined_via_issuance_id` and `resident_profile` for the display name. Two queries rather than
+// one join-and-aggregate, so an issuance with zero joiners still appears (an INNER/LEFT JOIN
+// aggregate would need its own empty-array handling either way, and this keeps each query simple).
 export async function listJoinCodeIssuances(
   context: SessionContext,
   actingAccountId: string,
-): Promise<(typeof joinCodeIssuance.$inferSelect)[]> {
+): Promise<JoinCodeIssuanceWithJoiners[]> {
   await assertIsAdministrationOrModerator(context, actingAccountId);
-  return withSessionContext(context, (tx) =>
-    tx
+  return withSessionContext(context, async (tx) => {
+    const issuances = await tx
       .select()
       .from(joinCodeIssuance)
       .where(eq(joinCodeIssuance.householdId, context.householdId))
-      .orderBy(desc(joinCodeIssuance.createdAt)),
-  );
+      .orderBy(desc(joinCodeIssuance.createdAt));
+
+    const joiners = await tx
+      .select({
+        issuanceId: membership.joinedViaIssuanceId,
+        displayName: residentProfile.displayName,
+      })
+      .from(membership)
+      .innerJoin(residentProfile, eq(residentProfile.id, membership.residentProfileId))
+      .where(
+        and(eq(membership.householdId, context.householdId), isNotNull(membership.joinedViaIssuanceId)),
+      );
+
+    const namesByIssuance = new Map<string, string[]>();
+    for (const joiner of joiners) {
+      if (!joiner.issuanceId) continue; // isNotNull above narrows this at the SQL level only
+      const names = namesByIssuance.get(joiner.issuanceId) ?? [];
+      names.push(joiner.displayName);
+      namesByIssuance.set(joiner.issuanceId, names);
+    }
+
+    return issuances.map((issuance) => ({
+      ...issuance,
+      joinedResidentNames: namesByIssuance.get(issuance.id) ?? [],
+    }));
+  });
 }
 
 export class CannotChangeAdminRoleError extends Error {

@@ -247,6 +247,16 @@ export const joinCodeIssuance = pgTable(
     // Set by "Löschen" on O16. Immediately invalid, stays visible in history — "entwerten" vs.
     // "vergessen" (§2.1).
     deletedAt: timestamp("deleted_at", { withTimezone: true }),
+    // join-by-link design.md Decision 13 (human decision, 2026-09-22): nullable — splits a link
+    // into two kinds without adding a second entity. `null` is a NEUTRAL link (redeeming it
+    // CREATES a new resident profile, the behaviour this table always had). Set, it BINDS the
+    // link to one already-`prepared` resident profile of the SAME household (enforced by
+    // issueJoinCodeTx in repository.ts, not by a DB constraint — there are no foreign keys in
+    // this schema); redeeming it CLAIMS that profile instead of creating a second one. Naming a
+    // profile changes nothing else about the link — its expiry, its cap, its count, its deletion
+    // and its refusal all behave identically (spec.md identity/join-code "A link may name the
+    // person it was issued for").
+    residentProfileId: uuid("resident_profile_id"),
   },
   (t) => [
     index("join_code_issuance_household_id_idx").on(t.householdId),
@@ -258,4 +268,35 @@ export const joinCodeIssuance = pgTable(
       withCheck: HOUSEHOLD_MATCH,
     }),
   ],
+);
+
+// design.md Decision 3 (FR-2.28): the join route's attempt limit. Deliberately carries NO
+// household_id and therefore NO pgPolicy — this is the first table in this codebase with no
+// tenant to key an RLS policy on. EC-2.14 requires the limit to be on the ROUTE, not on any one
+// household's links ("a guess is tested against every live link at once"); a per-household limit
+// would divide by exactly the number an attacker's guess multiplies by. The table gets
+// `ENABLE ROW LEVEL SECURITY` with ZERO policies instead (drizzle/0014_join_attempt.sql) — that
+// denies every row to `app_runtime` directly — and exactly one `SECURITY DEFINER` function
+// (`record_join_attempt`) as its only door. This is intentional, not an omission
+// scripts/lint/rls-coverage.ts should flag: that lint only fires when a table declares
+// household_id without a pgPolicy in the same file, and this table declares neither.
+//
+// task 10.10: for exactly the same reason, this table CANNOT go in
+// tests/helpers/identity.ts's cleanup() CTE — that CTE deletes by household_id, which this table
+// has none of, AND app_runtime (the role every test runs as) has no DELETE access to it anyway
+// (RLS enabled, zero policies — see above). Tests that call recordJoinAttempt own their own
+// teardown, via the Supabase service-role client (bypasses RLS as Postgres role `service_role`),
+// exactly like Auth-user cleanup elsewhere in this suite — see
+// tests/integration/policy/join-rate-limit.test.ts. If a future table also has no household_id,
+// read this comment before assuming its exclusion from cleanup() is a bug to fix.
+export const joinAttempt = pgTable(
+  "join_attempt",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    // HMAC of the client's IP (auth.ts's joinAttemptSourceHash) — never the IP itself. 🟠 in
+    // data-inventory.yml: a pseudonymised network identifier about a visitor, not a member.
+    sourceHash: text("source_hash").notNull(),
+    attemptedAt: timestamp("attempted_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("join_attempt_source_hash_attempted_at_idx").on(t.sourceHash, t.attemptedAt)],
 );

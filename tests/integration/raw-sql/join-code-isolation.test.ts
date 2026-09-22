@@ -35,31 +35,46 @@ describe("Join code issuance household isolation — raw SQL (C-2.10)", () => {
   });
 
   // design.md Decision 2: resolve_join_code/claim_join_code are the one deliberate hole in the RLS
-  // wall for this capability — this asserts they leak nothing beyond their declared three columns,
+  // wall for this capability — this asserts they leak nothing beyond their declared five columns,
   // even called for a code belonging to a household the caller's own session isn't scoped to
   // (the functions are SECURITY DEFINER precisely because a code-presenting caller has no
   // session/household yet at all).
   describe("resolve_join_code / claim_join_code leak nothing beyond their declared columns (Decision 2)", () => {
-    it("resolve_join_code returns exactly (household_id, issuance_id, household_name)", async () => {
+    it("resolve_join_code returns exactly its five declared columns, bound ones null for a neutral link", async () => {
       hhA = await registerTestHousehold();
       const link = await issueJoinCode(hhA.context, hhA.accountId, { validDays: 7, maxUses: 1 });
 
       // A session for an unrelated household (or no real session at all) can still call the
       // function — that is the point of the bootstrap exception — but must get back only the
-      // three declared columns, nothing else about the household or the row.
+      // declared columns, nothing else about the household or the row.
+      //
+      // join-by-link Decision 13 widened the declared set from three to five: a link may be BOUND
+      // to a prepared profile, and a bound link's resolution carries that profile's id and display
+      // name. The exactness of this assertion is the point of the test, so it tracks the new set
+      // rather than being loosened to "contains" — and the link issued here is NEUTRAL, so both new
+      // columns must come back null. A neutral link disclosing a profile would be the leak this
+      // test exists to catch.
       hhB = await registerTestHousehold();
       const rows = await withSessionContext(hhB.context, (tx) =>
         tx.execute<Record<string, unknown>>(sql`SELECT * FROM resolve_join_code(${link.code})`),
       );
 
       expect(rows).toHaveLength(1);
-      expect(Object.keys(rows[0]).sort()).toEqual(["household_id", "household_name", "issuance_id"]);
+      expect(Object.keys(rows[0]).sort()).toEqual([
+        "bound_resident_display_name",
+        "bound_resident_profile_id",
+        "household_id",
+        "household_name",
+        "issuance_id",
+      ]);
+      expect(rows[0].bound_resident_profile_id).toBeNull();
+      expect(rows[0].bound_resident_display_name).toBeNull();
       expect(rows[0].household_id).toBe(hhA.householdId);
       expect(rows[0].issuance_id).toBe(link.id);
       expect(rows[0].household_name).toBe("WG");
     });
 
-    it("claim_join_code returns exactly (household_id, issuance_id, household_name)", async () => {
+    it("claim_join_code returns exactly its five declared columns, bound ones null for a neutral link", async () => {
       hhA = await registerTestHousehold();
       const link = await issueJoinCode(hhA.context, hhA.accountId, { validDays: 7, maxUses: 1 });
 
@@ -69,7 +84,15 @@ describe("Join code issuance household isolation — raw SQL (C-2.10)", () => {
       );
 
       expect(rows).toHaveLength(1);
-      expect(Object.keys(rows[0]).sort()).toEqual(["household_id", "household_name", "issuance_id"]);
+      expect(Object.keys(rows[0]).sort()).toEqual([
+        "bound_resident_display_name",
+        "bound_resident_profile_id",
+        "household_id",
+        "household_name",
+        "issuance_id",
+      ]);
+      expect(rows[0].bound_resident_profile_id).toBeNull();
+      expect(rows[0].bound_resident_display_name).toBeNull();
       expect(rows[0].household_id).toBe(hhA.householdId);
       expect(rows[0].issuance_id).toBe(link.id);
     });

@@ -39,6 +39,16 @@ describe("ActivityEvent payload allowlist (FR-0.14, EC-0.5, G-D7)", () => {
       PayloadValidationError,
     );
   });
+
+  // join-by-link (FR-2.19/AC-2.19, design.md Decision 8): membership.joined is registered with an
+  // EMPTY key list — the issuance is the joinedViaIssuanceId column, never a second copy here, and
+  // the code (G-A5) never enters a payload at all.
+  it("accepts an empty payload for membership.joined but rejects any key at all", () => {
+    expect(() => assertPayloadAllowed("membership.joined", {})).not.toThrow();
+    expect(() => assertPayloadAllowed("membership.joined", { issuanceId: "x" })).toThrow(
+      PayloadValidationError,
+    );
+  });
 });
 
 // FR-0.13/G-D8: end-of-retention redaction nulls only the 🔴/⚫-classified payload keys for an

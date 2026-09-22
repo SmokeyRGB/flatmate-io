@@ -341,6 +341,7 @@ eigenem Zähler und eigenem Lebensende.
 | `created_at` | `timestamptz` | ⚙️ | |
 | `created_by_account_id` | `uuid` | 🟠 | wer den Link ausgestellt hat. **`NOT NULL`**, dieselbe Begründung wie bei **O-17**: „kein Wert" und „vom System" dürfen nicht gleich aussehen |
 | `deleted_at` | `timestamptz?` | ⚙️ | gesetzt durch **„Löschen"** auf O16. Sofort ungültig, bleibt aber in der Historie sichtbar — das ist der Unterschied zwischen „entwerten" und „vergessen" |
+| `resident_profile_id` | `uuid?` | 🟠 | **Neu (menschliche Entscheidung, 2026-09-22).** `null` ist der gewöhnliche Link, wie oben beschrieben — seine Einlösung **erzeugt** ein neues `ResidentProfile`. Ein gesetzter Wert **bindet** den Link an ein bereits vorbereitetes (`prepared`) `ResidentProfile` desselben Haushalts; seine Einlösung **übernimmt** dieses Profil, statt ein zweites anzulegen, und die besuchende Person wird namentlich begrüßt statt den Namen selbst zu wählen. Sonst ändert sich an einem Link nichts: Frist, Nutzungsgrenze, Zähler, Löschbarkeit und die einzige Ablehnungsmeldung (FR-2.8) gelten unverändert für beide Arten |
 
 > **Vier Zustände, und nur einer davon ist ein Zustandsfeld.** Ein Link ist **aktiv**, wenn
 > `deleted_at` leer ist, `expires_at` in der Zukunft liegt und `uses < max_uses` gilt. Er ist
@@ -474,6 +475,21 @@ Vergebbare Werte in `permissions` (Vorschlag, erweiterbar):
 > **Nicht** von `manage_rooms` gedeckt: `promised` und `occupied` samt Rückwegen — die sind Folge
 > einer Bewerbung und hängen an `change_application_state` — sowie `occupied → open` beim Auszug,
 > das an `manage_members` hängt.
+
+> **`close_round` ist die zweite Rolle-Vorbelegung (menschliche Entscheidung, 2026-09-22).** Bis
+> dahin erhielt sie stattdessen automatisch die **erste beigetretene Bewohner-Mitgliedschaft** eines
+> Haushalts (`claimResidentProfile`) — eine Annäherung an die Empfehlung aus
+> `backlog/requirements/F1-requirements.md` §8 Punkt 1 (*„the household account's own resident
+> profile holds it initially"*), die daneben lag, sobald eine Mitbewohnerin vor der registrierenden
+> Person selbst beitrat, und die einem Profil eine für alle anderen unsichtbare Sonderstellung gab.
+> Jetzt gilt dasselbe Muster wie bei `manage_rooms` oben: **Vorbelegt bei `household_admin` und
+> `moderator`.** Wer eine Runde eröffnen, öffnen oder schließen will, muss dafür zur Moderation
+> ernannt werden — das ist sichtbar und nachvollziehbar, der frühere Automatismus war es nicht.
+>
+> **Abgabebedingung, in dieser Notiz selbst getragen:** zwei benannte Rolle-Vorbelegungen sind noch
+> kein Vorlagensystem — der **dritte** wäre es. Bevor ein weiteres Recht auf diese Weise vorbelegt
+> wird, muss **S-04**s Ausschluss von `Berechtigungsvorlagen` (`02-SRD.md` §5.3) neu aufgemacht
+> werden, statt ein weiteres Mal gedehnt zu werden.
 
 > **`role` und `permissions` sind 🟠, nicht ⚙️** — entschieden in der Querprüfung gegen
 > `06-Compliance-Anhang.md` (O-9 Grenzfall 1), **gegen** den ursprünglichen Vorschlag dieses

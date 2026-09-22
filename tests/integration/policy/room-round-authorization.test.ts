@@ -48,9 +48,9 @@ describe("Room and round mutations require their documented permission", () => {
     const adminActor = { accountId: hh.accountId, profileId: null };
     const room = await createRoom(hh.context, "Room A", adminActor);
     const round = await createRound(hh.context, "Round", [room.id], adminActor);
-    // auth.ts's claimResidentProfile grants `close_round` to a household's FIRST claimed
-    // resident only (spec.md Assumptions). Claim a first one to consume that default, then
-    // test against the second — a genuinely permission-less plain resident.
+    // close_round is a role default (household_admin/moderator, docs/domain/identity.md §2.1) —
+    // no claimed resident membership gets it, first or otherwise. Two residents are claimed here
+    // only to keep this test's shape close to the room-mutation test above it.
     const first = await claim(hh, "Resident1");
     accountIds.push(first.accountId);
     const resident = await claim(hh, "Resident2");

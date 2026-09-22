@@ -20,8 +20,9 @@ export interface RemoveMemberFormState {
 }
 
 // FR-1.3/FR-1.5: the household account creates a resident profile (including one for the person
-// operating it) — a person then claims it via `/claim` (Convergence T082) to actually sign in as
-// that resident. A duplicate display name (FR-1.4) surfaces via Next's error boundary, same as
+// operating it). The person then claims it by opening an invitation issued **for that profile**
+// (join-by-link design.md Decision 13) — `/claim` is deleted, and a link is now the only route to
+// a prepared profile. A duplicate display name (FR-1.4) surfaces via Next's error boundary, same as
 // every other unhandled repository error this form's siblings (setMovedOutAction etc.) leave
 // uncaught — not worth a client-component reducer just for this one message.
 export async function createResidentProfileAction(formData: FormData): Promise<void> {
@@ -117,6 +118,27 @@ export async function issueJoinCodeAction(formData: FormData): Promise<void> {
   const maxUses = Number.isFinite(rawMaxUses) && rawMaxUses >= 0 ? Math.trunc(rawMaxUses) : 1;
 
   await issueJoinCode(current.context, current.context.accountId, { validDays, maxUses });
+  revalidatePath("/members");
+}
+
+// join-by-link design.md Decision 13 / task 12.8: the one place a bound link is issued — without
+// this action the feature is unreachable outside tests. No permission check here (same as
+// issueJoinCodeAction above): assertIsAdministrationOrModerator lives in issueJoinCode itself
+// (issueJoinCodeTx also verifies the named profile belongs to THIS household and is `prepared`
+// before it ever writes a row). Always 7 days / effectively single-use — issueJoinCodeTx forces
+// maxUses to 1 for a bound link regardless of what is passed, so there is no maxUses field on this
+// form to begin with.
+export async function issueJoinCodeForProfileAction(formData: FormData): Promise<void> {
+  const current = await getCurrentSession();
+  if (!current) throw new Error("Not signed in");
+  const residentProfileId = String(formData.get("residentProfileId") ?? "");
+  if (!residentProfileId) return;
+
+  await issueJoinCode(current.context, current.context.accountId, {
+    validDays: 7,
+    maxUses: 1,
+    residentProfileId,
+  });
   revalidatePath("/members");
 }
 
