@@ -4,9 +4,11 @@ import { revalidatePath } from "next/cache";
 import {
   DisplayNameConfirmationMismatchError,
   createResidentProfile,
+  deleteJoinCode,
+  extendJoinCode,
+  issueJoinCode,
   reactivateMember,
   removeMember,
-  rotateJoinCode,
   setMemberRole,
   setMovedOut,
 } from "@/modules/identity/repository";
@@ -98,9 +100,40 @@ export async function setMemberRoleAction(formData: FormData): Promise<void> {
   revalidatePath("/members");
 }
 
-export async function rotateJoinCodeAction(): Promise<void> {
+// design.md Decision 6: the create form parameterises the NEXT link, not an existing one — two
+// fields, one action. No permission check here (task 3.2) — assertIsAdministrationOrModerator
+// lives in the repository (2.3), the one place FR-1.27's "not reachable at all" boundary is
+// enforced.
+export async function issueJoinCodeAction(formData: FormData): Promise<void> {
   const current = await getCurrentSession();
   if (!current) throw new Error("Not signed in");
-  await rotateJoinCode(current.context, current.context.accountId);
+  const rawValidDays = Number(formData.get("validDays"));
+  const rawMaxUses = Number(formData.get("maxUses"));
+  // O-15's defaults (7 days, max 1) stand in for anything the form didn't send a sane number for
+  // — a blank/garbled field must not silently mint an instantly-dead or unbounded-looking link.
+  const validDays = Number.isFinite(rawValidDays) && rawValidDays >= 1 ? Math.trunc(rawValidDays) : 7;
+  // 0 is a deliberate, valid value (EC-2.8: "geschlossen") — only reject NaN/negative, never treat
+  // an absent value as unlimited (spec.md "There SHALL be no such thing as an unlimited link").
+  const maxUses = Number.isFinite(rawMaxUses) && rawMaxUses >= 0 ? Math.trunc(rawMaxUses) : 1;
+
+  await issueJoinCode(current.context, current.context.accountId, { validDays, maxUses });
+  revalidatePath("/members");
+}
+
+export async function extendJoinCodeAction(formData: FormData): Promise<void> {
+  const current = await getCurrentSession();
+  if (!current) throw new Error("Not signed in");
+  const issuanceId = String(formData.get("issuanceId") ?? "");
+  if (!issuanceId) return;
+  await extendJoinCode(current.context, current.context.accountId, issuanceId);
+  revalidatePath("/members");
+}
+
+export async function deleteJoinCodeAction(formData: FormData): Promise<void> {
+  const current = await getCurrentSession();
+  if (!current) throw new Error("Not signed in");
+  const issuanceId = String(formData.get("issuanceId") ?? "");
+  if (!issuanceId) return;
+  await deleteJoinCode(current.context, current.context.accountId, issuanceId);
   revalidatePath("/members");
 }

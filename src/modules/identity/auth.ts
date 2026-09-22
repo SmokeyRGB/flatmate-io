@@ -3,8 +3,16 @@ import { createClient } from "@supabase/supabase-js";
 import { and, eq, ne } from "drizzle-orm";
 import { isUuid, withSessionContext, type SessionContext } from "@/db/session-context";
 import { recordActivityEvent } from "@/modules/audit/repository";
-import { resolveAccountHousehold } from "./repository";
-import { account, household, householdSettings, membership, residentProfile, session } from "./schema";
+import { issueJoinCodeTx, resolveAccountHousehold } from "./repository";
+import {
+  account,
+  household,
+  householdSettings,
+  joinCodeIssuance,
+  membership,
+  residentProfile,
+  session,
+} from "./schema";
 
 // Admin-only client (research.md §2) — uses the service-role key, never the anon key. Server-only:
 // this module must never be imported from a client component (the service-role key would end up
@@ -71,7 +79,6 @@ export async function registerHousehold(email: string, password: string) {
         name: "WG",
         ownerAccountId: accountId,
         contactEmail: email,
-        joinCode: randomUUID(),
       })
       .returning();
 
@@ -79,6 +86,13 @@ export async function registerHousehold(email: string, password: string) {
       householdId,
       updatedByAccountId: accountId,
     });
+
+    // join-code-protections (O-18): the founding link, minted through the same generation/retry
+    // path issueJoinCode uses (issueJoinCodeTx), not a separate randomUUID() on the Household row
+    // itself — proposal.md's 2026-09-21 register decision: FR-2.4's founding-link usage-count
+    // prefill ("expected resident count") is not built in v0.1 (nobody collects that number), so
+    // the founding link takes the same default any other issued link would: 7 days, max 1 use.
+    await issueJoinCodeTx(tx, householdId, accountId, { validDays: 7, maxUses: 1 });
 
     await tx.insert(account).values({
       id: accountId,
@@ -131,6 +145,13 @@ export async function undoRegisterHousehold(
     await tx.delete(membership).where(eq(membership.householdId, householdId));
     await tx.delete(account).where(eq(account.id, accountId));
     await tx.delete(householdSettings).where(eq(householdSettings.householdId, householdId));
+    // join-code-protections (O-18): registerHousehold mints a founding join_code_issuance row, so
+    // undoing a registration must remove it too. There are **no foreign keys** in this schema
+    // (the two-Supabase-project split), so deleting the household does not cascade — the row would
+    // simply survive its household. That is the same silent-orphan failure that let the production
+    // project accumulate 1.9k rooms and 1.5k rounds before anyone noticed, and it was caught here
+    // by two leftover rows after a suite run.
+    await tx.delete(joinCodeIssuance).where(eq(joinCodeIssuance.householdId, householdId));
     await tx.delete(household).where(eq(household.id, householdId));
   });
 

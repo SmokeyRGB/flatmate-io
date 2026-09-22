@@ -66,9 +66,21 @@ tables:
     name: { category: "⚙️" }
     owner_account_id: { category: "🟠", purpose: "Zuordnung, keine Sicherheitsgrenze (C-1.4)", legal_basis: "Art. 6(1)(f) DSGVO", retention: "bis Household-Löschung" }
     contact_email: { category: "🟠", purpose: "Art. 13(1)(a)-Kontaktangabe an Bewerbende", legal_basis: "Art. 6(1)(f) DSGVO", retention: "bis Household-Löschung" }
-    join_code: { category: "⚙️", purpose: "identifiziert einen Haushalt, keine Person (G-A5) — TOM-Liste statt Art.-30" }
-    join_code_rotated_at: { category: "⚙️" }
     created_at: { category: "⚙️" }
+    deleted_at: { category: "⚙️" }
+    # join_code / join_code_rotated_at left this table 2026-09-21 (join-code-protections, O-18) —
+    # see join_code_issuance below, the entity they moved to.
+
+  # --- join-code-protections (O-18, 2026-09-21): domain/identity.md §2.1 "JoinCodeIssuance" ---
+  join_code_issuance:
+    id: { category: "⚙️" }
+    household_id: { category: "⚙️", purpose: "RLS-Anker" }
+    code: { category: "⚙️", purpose: "identifiziert einen Haushalt, keine Person (G-A5) — TOM-Liste statt Art.-30", legal_basis: "n/a — nicht personenbezogen" }
+    expires_at: { category: "⚙️" }
+    max_uses: { category: "⚙️" }
+    uses: { category: "⚙️" }
+    created_at: { category: "⚙️" }
+    created_by_account_id: { category: "🟠", purpose: "wer den Link ausgestellt hat", legal_basis: "Art. 6(1)(f) DSGVO", retention: "bis JoinCodeIssuance-Löschung" }
     deleted_at: { category: "⚙️" }
 
   household_settings:
@@ -98,7 +110,7 @@ tables:
     is_resident: { category: "⚙️" }
     role: { category: "🟠", purpose: "\"X ist Moderator\" ist eine Aussage über eine identifizierte Person (Art. 4 Nr. 1 DSGVO)", legal_basis: "Art. 6(1)(f) DSGVO", retention: "bis Membership-Löschung; auf Auskunftsverlangen offenzulegen" }
     permissions: { category: "🟠", purpose: "wie role", legal_basis: "Art. 6(1)(f) DSGVO", retention: "bis Membership-Löschung; auf Auskunftsverlangen offenzulegen" }
-    joined_via_code: { category: "⚙️" }
+    joined_via_issuance_id: { category: "⚙️", purpose: "Referenz auf join_code_issuance, nicht der Code selbst (G-A5) — join-code-protections, renamed from joined_via_code" }
     joined_at: { category: "⚙️" }
     revoked_at: { category: "⚙️" }
 

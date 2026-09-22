@@ -28,7 +28,17 @@ const PAYLOAD_ALLOWLIST: Readonly<Record<string, readonly string[]>> = {
   "membership.reactivated": [],
   "membership.removed_as_intruder": [], // U-27's hard-removal tier — distinct event type from
   // membership.revoked so the audit trail preserves *why*, even though no other field differs yet
+  // join-code-protections (O-18, 2026-09-21): rotateJoinCode/household.join_code_rotated is
+  // gone (replaced by issue/extend/delete against JoinCodeIssuance), but the type stays
+  // registered — historical rows still carry it, and the allowlist is what makes them readable
+  // as valid rather than throwing PayloadValidationError on read-time replay. Nothing writes it
+  // any more.
   "household.join_code_rotated": [],
+  // Both empty — the join code itself must never enter a payload (G-A5). Extending a link is
+  // deliberately NOT audited (design.md Decision 5): it changes no one's access, only defers an
+  // expiry.
+  "household.join_code_issued": [],
+  "household.join_code_deleted": [],
   "membership.role_changed": ["fromRole", "toRole"], // EC-1.7's "appoint it moderator" (Convergence)
 };
 

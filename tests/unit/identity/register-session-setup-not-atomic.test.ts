@@ -1,7 +1,14 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import { withSessionContext } from "@/db/session-context";
-import { account, household, householdSettings, membership, session } from "@/modules/identity/schema";
+import {
+  account,
+  household,
+  householdSettings,
+  joinCodeIssuance,
+  membership,
+  session,
+} from "@/modules/identity/schema";
 import { registerHousehold, signIn, undoRegisterHousehold } from "@/modules/identity/auth";
 import { cleanupAll, deleteTestAccount, testEmail } from "../../helpers/identity";
 
@@ -35,20 +42,26 @@ describe("register: compensating cleanup when session setup fails", () => {
 
     await undoRegisterHousehold(context, context.householdId, context.accountId);
 
-    // Rolled back: no Household/HouseholdSettings/Account/Membership left for this id.
-    const [householdRows, settingsRows, accountRows, membershipRows] = await withSessionContext(
+    // Rolled back: no Household/HouseholdSettings/Account/Membership left for this id — and, since
+    // join-code-protections (O-18), no founding join_code_issuance row either. That last one is not
+    // hypothetical: the change shipped without it and left one orphan per failed registration,
+    // found as two stray rows on flatmate-io-dev after a green suite. The schema has **no foreign
+    // keys**, so deleting the household cascades to nothing.
+    const [householdRows, settingsRows, accountRows, membershipRows, issuanceRows] = await withSessionContext(
       context,
       async (tx) => [
         await tx.select().from(household).where(eq(household.id, context.householdId)),
         await tx.select().from(householdSettings).where(eq(householdSettings.householdId, context.householdId)),
         await tx.select().from(account).where(eq(account.id, context.accountId)),
         await tx.select().from(membership).where(eq(membership.householdId, context.householdId)),
+        await tx.select().from(joinCodeIssuance).where(eq(joinCodeIssuance.householdId, context.householdId)),
       ],
     );
     expect(householdRows).toHaveLength(0);
     expect(settingsRows).toHaveLength(0);
     expect(accountRows).toHaveLength(0);
     expect(membershipRows).toHaveLength(0);
+    expect(issuanceRows).toHaveLength(0);
 
     // Retry with the same email, this time with signIn able to succeed.
     process.env.SESSION_TOKEN_HASH_SECRET = originalSecret ?? "test-secret-for-register-retry";
@@ -65,10 +78,17 @@ describe("register: compensating cleanup when session setup fails", () => {
       // The signIn above created a Session row. This list omitted it until 2026-09-18, so every
       // run left one orphaned session behind — an inline copy of cleanup() that had drifted from
       // the original, the same way the casting-table deletes were missing from cleanup() itself.
+      //
+      // **It drifted again on 2026-09-22**, and the comment above did not prevent it:
+      // join-code-protections gave registerHousehold a founding join_code_issuance row, cleanup()
+      // was updated and this copy was not, so the retry below left a second orphan. Two recurrences
+      // is a pattern, not bad luck — see the finding filed against this file: the durable fix is for
+      // cleanup() to expose its delete set so there is nothing left to copy.
       await tx.delete(session).where(eq(session.householdId, retried.context.householdId));
       await tx.delete(membership).where(eq(membership.householdId, retried.context.householdId));
       await tx.delete(account).where(eq(account.id, retried.context.accountId));
       await tx.delete(householdSettings).where(eq(householdSettings.householdId, retried.context.householdId));
+      await tx.delete(joinCodeIssuance).where(eq(joinCodeIssuance.householdId, retried.context.householdId));
       await tx.delete(household).where(eq(household.id, retried.context.householdId));
     });
   });
