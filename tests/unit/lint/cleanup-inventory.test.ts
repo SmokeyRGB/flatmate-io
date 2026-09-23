@@ -134,6 +134,31 @@ function varNameToTableName(varName: string, tables: ParsedTable[]): string | un
   return tables.find((t) => t.varName === varName)?.name;
 }
 
+// Explicit map of `<name>Tx(` helpers registerHousehold is known to call, to the household-scoped
+// tables each one inserts into on registerHousehold's behalf. A static, textual parse of auth.ts
+// alone cannot see into another function's body (issueJoinCodeTx lives in identity/repository.ts
+// and itself does `tx.insert(joinCodeIssuance)`, currently ~line 824) — this map is what makes
+// that knowledge visible to the test, hand-kept rather than derived. Deliberately NOT a silent
+// allowlist: findUnknownTxHelperCalls below fails the moment registerHousehold calls a `*Tx(`
+// helper this map doesn't name, rather than that helper's inserts just vanishing from
+// expectedTables the way join_code_issuance did (twice: 4a9724f, 29792fa) before this file existed.
+const TX_HELPER_INSERTS: Record<string, string[]> = {
+  issueJoinCodeTx: ["join_code_issuance"],
+};
+
+/** Every distinct `<name>Tx(` call in a function body, in first-seen order. */
+function findTxHelperCalls(body: string): string[] {
+  return [...new Set([...body.matchAll(/\b(\w+Tx)\(/g)].map((m) => m[1]))];
+}
+
+function unknownTxHelperCalls(body: string): string[] {
+  return findTxHelperCalls(body).filter((name) => !(name in TX_HELPER_INSERTS));
+}
+
+function transitiveInsertTablesFor(body: string): string[] {
+  return findTxHelperCalls(body).flatMap((name) => TX_HELPER_INSERTS[name] ?? []);
+}
+
 describe("cleanup-inventory lint (M2/P6): registerHousehold vs. undoRegisterHousehold", () => {
   const authSource = readFileSync(AUTH_FILE, "utf8");
   const tables = parseSchemaTables();
@@ -147,16 +172,7 @@ describe("cleanup-inventory lint (M2/P6): registerHousehold vs. undoRegisterHous
     .map((v) => varNameToTableName(v, tables))
     .filter((t): t is string => t !== undefined);
 
-  // What a static, textual parse of THIS file cannot see: registerHousehold also calls
-  // issueJoinCodeTx(tx, householdId, accountId, ...) (identity/repository.ts), which itself
-  // inserts into join_code_issuance — a table this parse has no way to discover without following
-  // the call into another file's AST. Verified by reading issueJoinCodeTx directly (repository.ts,
-  // `tx.insert(joinCodeIssuance)`, currently ~line 824); recorded here by hand rather than derived,
-  // so if issueJoinCodeTx's own inserts ever change, this line is what goes stale, not what this
-  // test discovers on its own.
-  const CALLS_ISSUE_JOIN_CODE_TX = /issueJoinCodeTx\(/.test(registerBody);
-  const transitiveInsertTables = CALLS_ISSUE_JOIN_CODE_TX ? ["join_code_issuance"] : [];
-
+  const transitiveInsertTables = transitiveInsertTablesFor(registerBody);
   const expectedTables = [...new Set([...directInsertTables, ...transitiveInsertTables])].sort();
 
   const deleteVars = [...undoBody.matchAll(/\.delete\((\w+)\)/g)].map((m) => m[1]);
@@ -164,16 +180,33 @@ describe("cleanup-inventory lint (M2/P6): registerHousehold vs. undoRegisterHous
     ...new Set(deleteVars.map((v) => varNameToTableName(v, tables)).filter((t): t is string => t !== undefined)),
   ].sort();
 
-  it("parse sanity: found registerHousehold's direct inserts and issueJoinCodeTx call", () => {
+  it("parse sanity: found registerHousehold's direct inserts and its issueJoinCodeTx call", () => {
     expect(directInsertTables).toEqual(
       expect.arrayContaining(["household", "household_settings", "account", "membership"]),
     );
-    expect(CALLS_ISSUE_JOIN_CODE_TX).toBe(true);
+    expect(findTxHelperCalls(registerBody)).toContain("issueJoinCodeTx");
+  });
+
+  it("registerHousehold calls no *Tx( helper that TX_HELPER_INSERTS doesn't declare", () => {
+    const unknown = unknownTxHelperCalls(registerBody);
+    expect(
+      unknown,
+      `registerHousehold now calls ${unknown.join(", ")} — add it to TX_HELPER_INSERTS above, ` +
+        "declaring the household-scoped table(s) it inserts into, before this can pass",
+    ).toEqual([]);
   });
 
   it("undoRegisterHousehold deletes exactly the tables registerHousehold writes", () => {
     expect(undoDeletedTables, "undoRegisterHousehold is missing a delete for a table registerHousehold inserts").toEqual(
       expectedTables,
     );
+  });
+
+  // Proves the previous test isn't vacuous, without touching auth.ts: parse a FIXTURE string — the
+  // real registerBody plus one fabricated `fooTx(tx);` call — through the same
+  // unknownTxHelperCalls() the real test uses, and confirm it actually notices.
+  it("catches an undeclared Tx helper (fixture: a fabricated fooTx(tx) call)", () => {
+    const fixtureBody = `${registerBody}\n    await fooTx(tx);\n`;
+    expect(unknownTxHelperCalls(fixtureBody)).toEqual(["fooTx"]);
   });
 });

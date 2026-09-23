@@ -6,18 +6,33 @@
 //       DEFINER function is a well-known hijack vector — a caller-controlled search_path can make
 //       the function resolve an unqualified name to an attacker's own object instead of the
 //       intended one);
-//   (b) the function's name is exercised by at least one test under tests/integration/raw-sql/ —
-//       the G-C7 raw-SQL half, which is the only place a leak PAST the TypeScript layer would ever
-//       be caught (a policy-layer test alone calls through the app's own repository functions and
-//       would never notice a SECURITY DEFINER hole).
+//   (b) the function's name is exercised by at least one real SQL call under
+//       tests/integration/raw-sql/ — the G-C7 raw-SQL half, which is the only place a leak PAST
+//       the TypeScript layer would ever be caught (a policy-layer test alone calls through the
+//       app's own repository functions and would never notice a SECURITY DEFINER hole). A name
+//       merely MENTIONED (e.g. in a comment) does not count — see stripJsComments below.
 //
 // "Latest definition of a name wins": drizzle/*.sql is scanned in file order (numeric prefix), and
 // a later `DROP FUNCTION` with no following `CREATE FUNCTION` of the same name removes it from
 // consideration — this project's migrations legitimately DROP-then-CREATE the same name within one
 // file (drizzle/0015 widens resolve_join_code/claim_join_code this way), which must not be
 // mistaken for removal.
+//
+// Each migration file is split into real top-level statements via splitSqlStatements
+// (./sql-statements.ts, shared with migration-shape.ts) rather than matched with one big regex
+// over the whole file. The old single regex tried to capture a CREATE FUNCTION's entire text —
+// name, unbounded args, and body — in one shot: `\([^)]*\)` broke on a nested paren in an argument
+// type (`numeric(10,2)`), and `[\s\S]*?\$\$\s*;` required the closing `$$` to be followed
+// IMMEDIATELY by `;`, so a function with trailing attributes written AFTER its body (`$$ LANGUAGE
+// sql SECURITY DEFINER SET search_path = public;`) either went undetected or bled into whatever
+// came next in the file. Splitting into statements first sidesteps all three problems: each
+// statement is already isolated at its own terminating `;`, with its dollar-quoted body emptied,
+// so a lightweight "does this statement START with CREATE/DROP FUNCTION" check is enough, and
+// SECURITY DEFINER / SET search_path are matched against that one statement's full text — which
+// now always includes trailing attributes wherever they're written — never a neighbour's.
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
+import { splitSqlStatements } from "./sql-statements";
 
 export interface DefinerViolation {
   functionName: string;
@@ -31,9 +46,17 @@ interface DefinerState {
   file: string;
 }
 
-const CREATE_FUNCTION_RE =
-  /CREATE\s+(?:OR\s+REPLACE\s+)?FUNCTION\s+"?(\w+)"?\s*\([^)]*\)[\s\S]*?\$\$\s*;/gi;
-const DROP_FUNCTION_RE = /DROP\s+FUNCTION(?:\s+IF\s+EXISTS)?\s+"?(\w+)"?\s*\([^)]*\)\s*;/gi;
+// An optional schema-qualified prefix (quoted or not) before a function name, e.g. `public.` or
+// `"public".`, not captured — names are compared unqualified.
+const OPTIONAL_SCHEMA_PREFIX = `(?:"?[a-zA-Z0-9_]+"?\\.)?`;
+const CREATE_FUNCTION_HEAD_RE = new RegExp(
+  `^CREATE\\s+(?:OR\\s+REPLACE\\s+)?FUNCTION\\s+${OPTIONAL_SCHEMA_PREFIX}"?([a-zA-Z0-9_]+)"?\\s*\\(`,
+  "i",
+);
+const DROP_FUNCTION_HEAD_RE = new RegExp(
+  `^DROP\\s+FUNCTION(?:\\s+IF\\s+EXISTS)?\\s+${OPTIONAL_SCHEMA_PREFIX}"?([a-zA-Z0-9_]+)"?\\s*\\(`,
+  "i",
+);
 
 function migrationFiles(drizzleDir: string): string[] {
   return readdirSync(drizzleDir)
@@ -49,40 +72,43 @@ function collectDefinerFunctions(drizzleDir: string): Map<string, DefinerState> 
   for (const file of migrationFiles(drizzleDir)) {
     const content = readFileSync(join(drizzleDir, file), "utf8");
 
-    type Event = { index: number; kind: "create" | "drop"; name: string; chunk: string };
-    const events: Event[] = [];
-
-    for (const m of content.matchAll(CREATE_FUNCTION_RE)) {
-      events.push({ index: m.index!, kind: "create", name: m[1], chunk: m[0] });
-    }
-    for (const m of content.matchAll(DROP_FUNCTION_RE)) {
-      events.push({ index: m.index!, kind: "drop", name: m[1], chunk: m[0] });
-    }
-    // Process in the order they appear in the file — a DROP immediately followed by a CREATE of
-    // the same name (this project's re-create idiom) must land on the CREATE, not the DROP.
-    events.sort((a, b) => a.index - b.index);
-
-    for (const event of events) {
-      if (event.kind === "drop") {
-        state.delete(event.name);
+    // Statements are already in file order, and a DROP followed by a CREATE of the same name
+    // (this project's re-create idiom) naturally lands on the CREATE — they're two separate
+    // statements, processed in the order they appear.
+    for (const statement of splitSqlStatements(content)) {
+      const dropMatch = DROP_FUNCTION_HEAD_RE.exec(statement);
+      if (dropMatch) {
+        state.delete(dropMatch[1].toLowerCase());
         continue;
       }
-      const hasSecurityDefiner = /SECURITY\s+DEFINER/i.test(event.chunk);
+
+      const createMatch = CREATE_FUNCTION_HEAD_RE.exec(statement);
+      if (!createMatch) continue;
+      const name = createMatch[1].toLowerCase();
+
+      const hasSecurityDefiner = /SECURITY\s+DEFINER/i.test(statement);
       if (!hasSecurityDefiner) {
         // A plain (non-DEFINER) function redefinition removes any prior DEFINER state under this
         // name — this project has no such case today, but the state machine should be honest.
-        state.delete(event.name);
+        state.delete(name);
         continue;
       }
-      state.set(event.name, {
+      state.set(name, {
         hasSecurityDefiner: true,
-        hasSearchPath: /SET\s+search_path/i.test(event.chunk),
+        hasSearchPath: /SET\s+search_path/i.test(statement),
         file,
       });
     }
   }
 
   return state;
+}
+
+// Strips `//` line comments and `/* */` block comments from a TypeScript source. Not a full
+// parser (same honesty tradeoff as this repo's other hand-written lints) — a `//` or `/*` inside a
+// string literal would be mishandled, but no raw-sql test file does that today.
+function stripJsComments(source: string): string {
+  return source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
 }
 
 function rawSqlTestSources(rawSqlDir: string): string {
@@ -94,7 +120,7 @@ function rawSqlTestSources(rawSqlDir: string): string {
     return combined;
   }
   for (const file of files) {
-    combined += readFileSync(join(rawSqlDir, file), "utf8") + "\n";
+    combined += stripJsComments(readFileSync(join(rawSqlDir, file), "utf8")) + "\n";
   }
   return combined;
 }
@@ -111,11 +137,10 @@ export function checkDefinerCoverageLint(rootDir: string): DefinerViolation[] {
     if (!info.hasSearchPath) {
       violations.push({ functionName: name, file: info.file, rule: "missing-search-path" });
     }
-    // Word-boundary match on the bare function name — good enough given SQL identifiers here
-    // don't collide with unrelated substrings (checked against this project's current raw-sql
-    // test file names/content).
-    const nameRe = new RegExp(`\\b${name}\\b`);
-    if (!nameRe.test(rawSqlSource)) {
+    // The name followed by an actual call — optional whitespace, then `(` — not merely mentioned
+    // in a comment (comments are already stripped from rawSqlSource above) or in prose.
+    const calledRe = new RegExp(`\\b${name}\\s*\\(`);
+    if (!calledRe.test(rawSqlSource)) {
       violations.push({ functionName: name, file: info.file, rule: "missing-raw-sql-test" });
     }
   }

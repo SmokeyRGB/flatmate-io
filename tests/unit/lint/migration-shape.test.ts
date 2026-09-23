@@ -75,6 +75,23 @@ describe("migration-shape lint", () => {
 
       expect(checkMigrationShape(fixtureDir)).toHaveLength(0);
     });
+
+    // review fix: rule 1 used to split on `--> statement-breakpoint` markers ONLY. A hand-written
+    // migration (drizzle/0005, 0016 shape) carries none, so the whole file was treated as ONE
+    // segment/statement regardless of how many real statements it held — this file has two real
+    // statements and no breakpoint between them, and the old splitter would have seen
+    // `statements.length === 1`, so the `statements.length > 1` guard could never fire.
+    it("fails on a hand-written file (no breakpoints at all) where ADD VALUE isn't alone", () => {
+      fixtureDir = mkdtempSync(join(tmpdir(), "flatmate-migration-shape-"));
+      writeMigration(
+        "0018_enum_plus_use_no_breakpoint.sql",
+        `ALTER TYPE "public"."resident_profile_status" ADD VALUE 'removed';\n` +
+          `UPDATE "resident_profile" SET status = 'removed' WHERE status = 'moved_out';`,
+      );
+
+      const violations = checkMigrationShape(fixtureDir);
+      expect(violations.some((v) => v.rule === 1)).toBe(true);
+    });
   });
 
   describe("rule 2: ADD COLUMN carries IF NOT EXISTS", () => {
@@ -98,6 +115,50 @@ describe("migration-shape lint", () => {
       );
 
       expect(checkMigrationShape(fixtureDir)).toHaveLength(0);
+    });
+
+    // review fix: Postgres accepts `ADD <col> <type>` with the COLUMN keyword omitted entirely —
+    // the old regex required the literal text `ADD COLUMN` and missed this form completely.
+    it("fails on ADD without the COLUMN keyword, and without IF NOT EXISTS", () => {
+      fixtureDir = mkdtempSync(join(tmpdir(), "flatmate-migration-shape-"));
+      writeMigration(
+        "0018_add_no_column_keyword.sql",
+        `ALTER TABLE "join_code_issuance" ADD "resident_profile_id" uuid;`,
+      );
+
+      const violations = checkMigrationShape(fixtureDir);
+      expect(violations).toHaveLength(1);
+      expect(violations[0].rule).toBe(2);
+    });
+
+    it("passes ADD without COLUMN when IF NOT EXISTS is present", () => {
+      fixtureDir = mkdtempSync(join(tmpdir(), "flatmate-migration-shape-"));
+      writeMigration(
+        "0018_add_no_column_keyword_safe.sql",
+        `ALTER TABLE "join_code_issuance" ADD IF NOT EXISTS "resident_profile_id" uuid;`,
+      );
+
+      expect(checkMigrationShape(fixtureDir)).toHaveLength(0);
+    });
+
+    // review fix: these six ADD forms aren't a column add at all and don't take IF NOT EXISTS the
+    // same way — the old regex's literal `ADD\s+COLUMN\s+(?!IF NOT EXISTS)` never matched any of
+    // them (they don't contain the word COLUMN), so this is a non-regression guard for the new,
+    // broader ADD-without-COLUMN detection above.
+    it.each([
+      `ALTER TABLE "t" ADD CONSTRAINT "t_check" CHECK ("x" > 0);`,
+      `ALTER TABLE "t" ADD PRIMARY KEY ("id");`,
+      `ALTER TABLE "t" ADD UNIQUE ("code");`,
+      `ALTER TABLE "t" ADD CHECK ("x" > 0);`,
+      `ALTER TABLE "t" ADD FOREIGN KEY ("owner_id") REFERENCES "owner" ("id");`,
+      `ALTER TABLE "t" ADD EXCLUDE USING gist ("during" WITH &&);`,
+      `ALTER TYPE "t_status" ADD VALUE 'new_status';`,
+    ])("does not flag %j as a missing-IF-NOT-EXISTS column add", (statement) => {
+      fixtureDir = mkdtempSync(join(tmpdir(), "flatmate-migration-shape-"));
+      writeMigration("0018_add_non_column_form.sql", statement);
+
+      const violations = checkMigrationShape(fixtureDir);
+      expect(violations.some((v) => v.rule === 2)).toBe(false);
     });
   });
 
@@ -162,6 +223,46 @@ describe("migration-shape lint", () => {
 
       const violations = checkMigrationShape(fixtureDir);
       expect(violations.some((v) => v.rule === 3)).toBe(true);
+    });
+
+    // review fix: function-name regexes must accept schema-qualified and/or quoted names and
+    // compare on the unqualified name, so a DROP of `public.resolve_join_code` (or
+    // `"public"."resolve_join_code"`) satisfies the rule for a later bare `resolve_join_code`.
+    it.each([
+      ["public.resolve_join_code", "resolve_join_code"],
+      [`"public"."resolve_join_code"`, "resolve_join_code"],
+      ["resolve_join_code", "public.resolve_join_code"],
+    ])("treats %s (DROP) and %s (CREATE) as the same unqualified name", (dropName, createName) => {
+      fixtureDir = mkdtempSync(join(tmpdir(), "flatmate-migration-shape-"));
+      writeMigration(
+        "0018_qualified_names.sql",
+        `DROP FUNCTION IF EXISTS ${dropName}(text);\n` +
+          `--> statement-breakpoint\n` +
+          `CREATE FUNCTION ${createName}(p_code text) RETURNS TABLE (household_id uuid)\n` +
+          `LANGUAGE sql SECURITY DEFINER SET search_path = public STABLE AS $$ SELECT 1 $$;`,
+      );
+
+      expect(checkMigrationShape(fixtureDir)).toHaveLength(0);
+    });
+
+    // review fix: rule 3 used to `.exec()` (single match) per breakpoint-delimited segment, so a
+    // hand-written file with no breakpoints and TWO CREATE FUNCTIONs collapsed into one segment —
+    // only the FIRST one was ever checked. Neither function here has a preceding DROP, so both
+    // must be flagged.
+    it("evaluates every CREATE FUNCTION in a hand-written file with no breakpoints at all", () => {
+      fixtureDir = mkdtempSync(join(tmpdir(), "flatmate-migration-shape-"));
+      writeMigration(
+        "0018_two_functions_no_breakpoint.sql",
+        `CREATE FUNCTION first_fn(p_id uuid) RETURNS uuid\n` +
+          `LANGUAGE sql SECURITY DEFINER SET search_path = public STABLE AS $$ SELECT p_id $$;\n` +
+          `CREATE FUNCTION second_fn(p_id uuid) RETURNS uuid\n` +
+          `LANGUAGE sql SECURITY DEFINER SET search_path = public STABLE AS $$ SELECT p_id $$;`,
+      );
+
+      const violations = checkMigrationShape(fixtureDir);
+      const rule3Reasons = violations.filter((v) => v.rule === 3).map((v) => v.reason);
+      expect(rule3Reasons.some((r) => r.includes("first_fn"))).toBe(true);
+      expect(rule3Reasons.some((r) => r.includes("second_fn"))).toBe(true);
     });
   });
 

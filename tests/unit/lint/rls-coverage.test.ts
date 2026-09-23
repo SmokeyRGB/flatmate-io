@@ -56,6 +56,45 @@ export const uncovered = pgTable(
     expect(violations[0].file).toBe("src/modules/example/schema.ts");
   });
 
+  // review fix: segments used to key ONLY on top-level `export const`, so a non-exported
+  // `const t = pgTable(...)` had no segment start of its own — it silently merged into the
+  // PREVIOUS table's segment and borrowed that table's pgPolicy(...), so a household-scoped
+  // table with no policy of its own could pass. Keying on any top-level `(export )?const NAME =`
+  // closes that gap.
+  it("flags a non-exported household table with no policy, even directly below a policied table", () => {
+    fixtureDir = mkdtempSync(join(tmpdir(), "flatmate-rls-"));
+    writeFixture(
+      "src/modules/example/schema.ts",
+      `
+import { pgPolicy, pgTable, uuid } from "drizzle-orm/pg-core";
+
+export const covered = pgTable(
+  "covered",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    householdId: uuid("household_id").notNull(),
+  },
+  (t) => [
+    pgPolicy("covered_household_isolation", { as: "permissive", for: "all" }),
+  ],
+);
+
+const uncoveredNonExported = pgTable(
+  "uncovered_non_exported",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    householdId: uuid("household_id").notNull(),
+  },
+  () => [],
+);
+`,
+    );
+
+    const violations = checkRlsCoverage(fixtureDir);
+    expect(violations).toHaveLength(1);
+    expect(violations[0].table).toBe("uncovered_non_exported");
+  });
+
   it("passes when every table in the file has its own policy", () => {
     fixtureDir = mkdtempSync(join(tmpdir(), "flatmate-rls-"));
     writeFixture(

@@ -115,6 +115,152 @@ $$;`,
     expect(checkDefinerCoverageLint(fixtureDir)).toHaveLength(0);
   });
 
+  // review fix: the old CREATE_FUNCTION_RE captured a whole statement in one regex, including its
+  // args via `\([^)]*\)` — a nested paren in an argument's type (e.g. `numeric(10,2)`) broke that
+  // capture. Splitting into real statements first and matching only up to the function's OWN
+  // opening paren sidesteps the problem entirely.
+  it("handles a nested paren in an argument type (numeric(10,2))", () => {
+    fixtureDir = mkdtempSync(join(tmpdir(), "flatmate-lint-"));
+    writeFixture(
+      "drizzle/0001_test.sql",
+      `CREATE FUNCTION priced_fn(p_amount numeric(10,2)) RETURNS uuid
+LANGUAGE sql SECURITY DEFINER SET search_path = public STABLE AS $$
+  SELECT gen_random_uuid()
+$$;`,
+    );
+    writeFixture(
+      "tests/integration/raw-sql/priced.test.ts",
+      `it("calls priced_fn", () => { priced_fn(); });`,
+    );
+
+    expect(checkDefinerCoverageLint(fixtureDir)).toHaveLength(0);
+  });
+
+  // review fix: a dollar-quoted body may use any tag, not just bare $$.
+  it("handles a non-default dollar tag ($fn$...$fn$)", () => {
+    fixtureDir = mkdtempSync(join(tmpdir(), "flatmate-lint-"));
+    writeFixture(
+      "drizzle/0001_test.sql",
+      `CREATE FUNCTION tagged_fn(p_id uuid) RETURNS uuid
+LANGUAGE sql SECURITY DEFINER SET search_path = public STABLE AS $fn$
+  SELECT p_id
+$fn$;`,
+    );
+    writeFixture(
+      "tests/integration/raw-sql/tagged.test.ts",
+      `it("calls tagged_fn", () => { tagged_fn(); });`,
+    );
+
+    expect(checkDefinerCoverageLint(fixtureDir)).toHaveLength(0);
+  });
+
+  // review fix: the old regex required the closing `$$` to be followed IMMEDIATELY by `;` —
+  // trailing attributes written AFTER the body (this exact shape) either went undetected or bled
+  // into the next statement. SECURITY DEFINER / SET search_path must be seen wherever they're
+  // written in the statement.
+  it("detects SECURITY DEFINER and SET search_path written AFTER the function body", () => {
+    fixtureDir = mkdtempSync(join(tmpdir(), "flatmate-lint-"));
+    writeFixture(
+      "drizzle/0001_test.sql",
+      `CREATE FUNCTION trailing_attrs_fn(p_id uuid) RETURNS uuid AS $$
+  SELECT p_id
+$$ LANGUAGE sql SECURITY DEFINER SET search_path = public;`,
+    );
+    writeFixture(
+      "tests/integration/raw-sql/trailing.test.ts",
+      `it("calls trailing_attrs_fn", () => { trailing_attrs_fn(); });`,
+    );
+
+    expect(checkDefinerCoverageLint(fixtureDir)).toHaveLength(0);
+  });
+
+  // review fix: trailing attributes after the body, with NO raw-sql test and NO search_path, must
+  // still be caught as two separate violations — proves this isn't accidentally swallowed by the
+  // statement boundary.
+  it("still flags missing search_path/test when attributes are written after an untested function's body", () => {
+    fixtureDir = mkdtempSync(join(tmpdir(), "flatmate-lint-"));
+    writeFixture(
+      "drizzle/0001_test.sql",
+      `CREATE FUNCTION untested_trailing_fn(p_id uuid) RETURNS uuid AS $$
+  SELECT p_id
+$$ LANGUAGE sql SECURITY DEFINER;`,
+    );
+
+    const violations = checkDefinerCoverageLint(fixtureDir);
+    expect(violations).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ functionName: "untested_trailing_fn", rule: "missing-search-path" }),
+        expect.objectContaining({ functionName: "untested_trailing_fn", rule: "missing-raw-sql-test" }),
+      ]),
+    );
+  });
+
+  // review fix: function-name regexes must accept schema-qualified and/or quoted names, compared
+  // on the unqualified name — both for the DROP-then-CREATE re-create idiom and for the function
+  // definition itself. Asserted both ways: covered means zero violations, AND (separately) an
+  // uncovered qualified-name function is still flagged — proving the name is actually being
+  // tracked, not just silently invisible to the scanner (a regex that fails to match the
+  // qualified CREATE FUNCTION at all would also produce zero violations, for the wrong reason).
+  it("handles a schema-qualified, quoted function name", () => {
+    fixtureDir = mkdtempSync(join(tmpdir(), "flatmate-lint-"));
+    writeFixture(
+      "drizzle/0001_test.sql",
+      `CREATE FUNCTION "public"."qualified_fn"(p_id uuid) RETURNS uuid
+LANGUAGE sql SECURITY DEFINER SET search_path = public STABLE AS $$
+  SELECT p_id
+$$;`,
+    );
+    writeFixture(
+      "tests/integration/raw-sql/qualified.test.ts",
+      `it("calls qualified_fn", () => { qualified_fn(); });`,
+    );
+
+    expect(checkDefinerCoverageLint(fixtureDir)).toHaveLength(0);
+  });
+
+  it("still flags an uncovered schema-qualified, quoted function name (proves it's tracked, not invisible)", () => {
+    fixtureDir = mkdtempSync(join(tmpdir(), "flatmate-lint-"));
+    writeFixture(
+      "drizzle/0001_test.sql",
+      `CREATE FUNCTION "public"."uncovered_qualified_fn"(p_id uuid) RETURNS uuid
+LANGUAGE sql SECURITY DEFINER STABLE AS $$
+  SELECT p_id
+$$;`,
+    );
+
+    const violations = checkDefinerCoverageLint(fixtureDir);
+    expect(violations).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ functionName: "uncovered_qualified_fn", rule: "missing-search-path" }),
+        expect.objectContaining({ functionName: "uncovered_qualified_fn", rule: "missing-raw-sql-test" }),
+      ]),
+    );
+  });
+
+  // review fix: a name merely MENTIONED in a comment (not an actual SQL call) must not count as
+  // coverage — the old check matched the bare name anywhere in the file, comments included.
+  it("does not count a name that only appears in a comment, never as an actual call", () => {
+    fixtureDir = mkdtempSync(join(tmpdir(), "flatmate-lint-"));
+    writeFixture(
+      "drizzle/0001_test.sql",
+      `CREATE FUNCTION mentioned_only_fn(p_id uuid) RETURNS uuid
+LANGUAGE sql SECURITY DEFINER SET search_path = public STABLE AS $$
+  SELECT p_id
+$$;`,
+    );
+    writeFixture(
+      "tests/integration/raw-sql/mentioned.test.ts",
+      `// mentioned_only_fn is exercised elsewhere, see docs\n` +
+        `/* also mentioned_only_fn here, in a block comment */\n` +
+        `it("does something unrelated", () => { doesNotCallIt(); });`,
+    );
+
+    const violations = checkDefinerCoverageLint(fixtureDir);
+    expect(violations).toContainEqual(
+      expect.objectContaining({ functionName: "mentioned_only_fn", rule: "missing-raw-sql-test" }),
+    );
+  });
+
   it("treats a DROP with no following CREATE as real removal — nothing to flag", () => {
     fixtureDir = mkdtempSync(join(tmpdir(), "flatmate-lint-"));
     writeFixture(

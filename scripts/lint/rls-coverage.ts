@@ -9,12 +9,15 @@
 // let a new household_id table pass silently as long as any sibling table in the same file had
 // a policy — found latent, not yet exploited (pr-review-lessons-countermeasures.md P9).
 //
-// Segmentation: a table's segment runs from its own top-level `export const NAME = ...` down to
-// (but not including) the next top-level `export const` / EOF. This is deliberately keyed off
-// `export const`, not `pgTable(`, so that the doc comment block written directly above a table
-// (this project's convention — see joinAttempt in identity/schema.ts) is attributed to THAT
-// table's segment, not the previous one; a marker comment living in that block (see below) must
-// land in the right segment to work.
+// Segmentation: a table's segment runs from its own top-level `(export )?const NAME = ...` down
+// to (but not including) the next top-level `(export )?const` / EOF. Keyed off `const`, not
+// `pgTable(` or `export const` — review fix: keying on `export const` alone let a non-exported
+// `const t = pgTable(...)` (no segment of its own) merge into the PREVIOUS table's segment and
+// borrow ITS pgPolicy(...), so a household-scoped table with no policy of its own could pass
+// silently. Matching bare `const` too closes that gap. The doc comment block written directly
+// above a table (this project's convention — see joinAttempt in identity/schema.ts) is still
+// attributed to THAT table's segment, not the previous one; a marker comment living in that block
+// (see below) must land in the right segment to work.
 //
 // A table with no household_id at all (join_attempt — deliberately RLS-enabled with zero
 // policies, no tenant to key a policy on, EC-2.14) is never flagged: the rule only fires when a
@@ -31,7 +34,11 @@ export interface RlsCoverageViolation {
   reason: string;
 }
 
-const TOP_LEVEL_EXPORT_CONST = /^export const (\w+)\s*=/;
+// review fix: this used to require `export const`, so a non-exported `const t = pgTable(...)`
+// (never a segment start of its own) merged into the PREVIOUS table's segment and silently
+// borrowed that table's pgPolicy(...) — a household-scoped table with no policy of its own would
+// then pass. Any top-level `const NAME =`, exported or not, starts a new segment.
+const TOP_LEVEL_CONST = /^(?:export\s+)?const (\w+)\s*=/;
 const TABLE_NAME = /pgTable\s*\(\s*["'`]([a-zA-Z0-9_]+)["'`]/;
 const ESCAPE_HATCH = /\/\/\s*rls-coverage:\s*zero-policy by design/;
 const COMMENT_OR_BLANK_LINE = /^\s*(\/\/.*)?$/;
@@ -65,7 +72,7 @@ export function splitIntoTableSegments(content: string): TableSegment[] {
 
   const rawStarts: Array<{ lineIdx: number; name: string }> = [];
   lines.forEach((line, lineIdx) => {
-    const m = TOP_LEVEL_EXPORT_CONST.exec(line);
+    const m = TOP_LEVEL_CONST.exec(line);
     if (m) rawStarts.push({ lineIdx, name: m[1] });
   });
 
