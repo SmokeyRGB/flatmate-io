@@ -41,10 +41,11 @@ ab und neu an — es gibt keinen Wechsel innerhalb einer Sitzung.
 > abgebildet. Drei Regeln, und jede trägt:
 >
 > 1. **Abgeleitet aus der Profil-`uuid`, nie aus dem `display_name`.** Der Anzeigename ist nur unter
->    `status != moved_out` eindeutig — nach einem Auszug wird er wieder vergeben, und die
->    Nutzertabelle des Anbieters kennt `moved_out` nicht. Eine aus dem Namen gebildete Adresse würde
->    mit der des ausgezogenen Profils kollidieren. Sie trüge außerdem einen Personennamen in die
->    Tabelle eines Auftragsverarbeiters, ohne dass das irgendetwas brächte.
+>    Profilen eindeutig, die weder `moved_out` noch `removed` sind — nach einem Auszug oder einer
+>    endgültigen Entfernung wird er wieder vergeben, und die Nutzertabelle des Anbieters kennt weder
+>    `moved_out` noch `removed`. Eine aus dem Namen gebildete Adresse würde mit der des ausgezogenen
+>    oder entfernten Profils kollidieren. Sie trüge außerdem einen Personennamen in die Tabelle eines
+>    Auftragsverarbeiters, ohne dass das irgendetwas brächte.
 > 2. **Diese Adresse gilt beim Anbieter als bestätigt und ist niemals zustellbar.** „Bestätigt" ist
 >    dort eine technische Vorbedingung für den Anmeldeweg, keine Aussage über ein Postfach.
 > 3. **`Account.email_verified_at` bleibt `null` und bleibt die alleinige Autorität für den
@@ -63,7 +64,7 @@ ab und neu an — es gibt keinen Wechsel innerhalb einer Sitzung.
 > Passwort — kein zweites Feld, keine zweite Kennung.
 >
 > **Voraussetzung ist eine Eindeutigkeit, die es bisher nicht gab:** `ResidentProfile.display_name`
-> muss innerhalb eines Haushalts unter den nicht ausgezogenen Profilen (`status != moved_out`)
+> muss innerhalb eines Haushalts unter den Profilen, die weder `moved_out` noch `removed` sind,
 > eindeutig sein — sonst ist die Anmeldung nicht auflösbar. Bisher war `display_name` reine
 > Feed-Beschriftung ohne Eindeutigkeitsanspruch; mit dieser Entscheidung wird daraus eine Invariante.
 > Kollidiert ein neuer Beitritt mit einem bestehenden Namen, verlangt das Beitrittsformular eine
@@ -112,7 +113,7 @@ dem Auth-Modul zu überlassen.
 | `expires_at` | `timestamptz` | ⚙️ | **`remember_me = false`:** kurze Sitzung (Vorschlag 12 h). **`remember_me = true`:** lange Sitzung (Vorschlag **90 Tage**, gleitend verlängert bei Aktivität) — Auflösung O-13, damit „auf diesem Gerät angemeldet bleiben" (§10 des Plans) ein Feld hat, nicht nur eine Checkbox in der UI |
 | `user_agent` | `text?` | 🟠 | zur Wiedererkennung eigener Geräte in einer Sitzungsliste |
 | `created_at` | `timestamptz` | ⚙️ | |
-| `revoked_at` | `timestamptz?` | ⚙️ | **drei Auslöser, nicht einer:** „überall abmelden" nach einem Passwortwechsel (das gilt weiterhin) · Passwort-Reset durch die Verwaltung (§2.1, Kasten „Passwort-Reset") · `ResidentProfile.moved_out_on` wird gesetzt — eine ausgezogene Person behält sonst eine bereits lange Sitzung trotz V-3 |
+| `revoked_at` | `timestamptz?` | ⚙️ | **drei Auslöser, nicht einer:** „überall abmelden" nach einem Passwortwechsel (das gilt weiterhin) · Passwort-Reset durch die Verwaltung (§2.1, Kasten „Passwort-Reset") · `ResidentProfile.status` wechselt zu `moved_out` oder zu `removed` — eine ausgezogene oder entfernte Person behält sonst eine bereits lange Sitzung trotz V-3 |
 
 > **`acting_profile_id` trägt die handelnde Identität — und ist seit ADR-013 innerhalb einer Sitzung
 > unveränderlich.** Der Sitzungskontext aus §5 — `account_id` plus `profile_id` — wird aus dieser
@@ -417,8 +418,8 @@ Stimmen aber einer Person zurechenbar bleiben müssen.
 |---|---|:--:|---|
 | `id` | `uuid` | ⚙️ | |
 | `household_id` | `uuid` | ⚙️ | |
-| `display_name` | `text` | 🟠 | Anzeigename im Feed („Jonas hat Lea eingeladen"). **Seit O-12 (§2.1) zusätzlich die Anmeldekennung** für Resident-Accounts ohne E-Mail — deshalb **eindeutig pro Haushalt unter `status != moved_out`**, nicht mehr nur Beschriftung |
-| `status` | `enum(prepared, active, moved_out)` | ⚙️ | `prepared` = vom Haushalts-Account angelegt, noch von keinem Account übernommen |
+| `display_name` | `text` | 🟠 | Anzeigename im Feed („Jonas hat Lea eingeladen"). **Seit O-12 (§2.1) zusätzlich die Anmeldekennung** für Resident-Accounts ohne E-Mail — deshalb **eindeutig pro Haushalt unter Profilen, die weder `moved_out` noch `removed` sind**, nicht mehr nur Beschriftung |
+| `status` | `enum(prepared, active, moved_out, removed)` | ⚙️ | `prepared` = vom Haushalts-Account angelegt, noch von keinem Account übernommen. `removed` ist U-27's harter Entfernen-Schritt: endgültig, kein Übergang führt heraus, in der Datenbank per Trigger erzwungen (Menschliche Entscheidung, 2026-09-22) |
 | `moved_in_on` | `date?` | 🟠 | |
 | `moved_out_on` | `date?` | 🟠 | setzt `status = moved_out` → **sofortiger Zugriffsentzug** (V-3) |
 | `room_id` | `uuid?` | ⚙️ | aktuell bewohntes Zimmer |

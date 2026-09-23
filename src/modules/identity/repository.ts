@@ -1,5 +1,5 @@
 import { randomInt, randomUUID } from "node:crypto";
-import { and, desc, eq, gt, isNotNull, isNull, ne, sql } from "drizzle-orm";
+import { and, desc, eq, gt, isNotNull, isNull, ne, notInArray, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { withSessionContext, type SessionContext } from "@/db/session-context";
 
@@ -20,6 +20,7 @@ import {
 } from "./schema";
 import {
   assertResidentProfileTransitionAllowed,
+  NAME_RELEASING_STATUSES,
   type ResidentProfileStatus,
 } from "./transitions";
 
@@ -28,9 +29,10 @@ export interface Actor {
   profileId: string | null;
 }
 
-// FR-1.4: display_name unique among status != moved_out profiles within a household. Checked
-// here (a friendly, named error) in addition to the DB's own partial unique index (T009) — the
-// index is the enforcement of record; this is the readable error path AC-1.3 asks for.
+// FR-1.4 (amended 2026-09-22): display_name unique among profiles whose status is not in
+// NAME_RELEASING_STATUSES (neither moved_out nor removed) within a household. Checked here (a
+// friendly, named error) in addition to the DB's own partial unique index (T009) — the index is
+// the enforcement of record; this is the readable error path AC-1.3 asks for.
 export async function isDisplayNameTaken(
   context: SessionContext,
   displayName: string,
@@ -43,7 +45,7 @@ export async function isDisplayNameTaken(
         and(
           eq(residentProfile.householdId, context.householdId),
           eq(residentProfile.displayName, displayName),
-          ne(residentProfile.status, "moved_out"),
+          notInArray(residentProfile.status, [...NAME_RELEASING_STATUSES]),
         ),
       );
     return rows.length > 0;
@@ -116,10 +118,12 @@ async function transitionResidentProfileStatusTx(
   const patch: { status: ResidentProfileStatus; movedOutOn?: string | null } = { status: toStatus };
   if (toStatus === "moved_out") {
     patch.movedOutOn = new Date().toISOString().slice(0, 10);
-  } else if (fromStatus === "moved_out") {
+  } else if (toStatus === "active" && fromStatus === "moved_out") {
     // moved_out -> active (reactivation, U-27/U-30): clear the stale move-out date rather than
-    // leaving it dangling on an otherwise-active profile.
-    patch.movedOutOn = null;
+    // leaving it dangling on an otherwise-active profile. Deliberately NOT fired for
+    // moved_out -> removed (design.md Decision 5): moved_out_on is a "Wohn-Tatsache"
+    // (data-inventory.yml) and a moved-out-then-removed profile keeps the date it already had —
+    // removal sets no date of its own, whether from active or from moved_out.
   }
 
   const [updated] = await tx
@@ -421,6 +425,10 @@ export type ResidentListEntry = {
 // FR-1.25/FR-1.26/FR-1.27 (revised 2026-09-17, U-30)/FR-1.29: full parity for administration AND
 // a moderator — same rows, same actions (`canAct` is true for both) — refused entirely to anyone
 // else. Per FR-1.27's "not reachable at all — by any route" for a non-moderator, non-admin caller.
+//
+// FR-1.25/FR-1.26 as amended 2026-09-22 (human decision): a REMOVED member is excluded here —
+// unlike moved_out, which stays listed with "Ausgezogen" and a reactivate action. The audit trail
+// still carries the record (FR-1.30/AC-1.23 unchanged); this is only the resident list.
 export async function getResidentList(
   context: SessionContext,
   accountId: string,
@@ -444,7 +452,9 @@ export async function getResidentList(
       })
       .from(residentProfile)
       .leftJoin(membership, eq(membership.residentProfileId, residentProfile.id))
-      .where(eq(residentProfile.householdId, context.householdId));
+      .where(
+        and(eq(residentProfile.householdId, context.householdId), ne(residentProfile.status, "removed")),
+      );
 
     const members: ResidentListEntry[] = rows.map((r) => ({
       ...r,
@@ -497,6 +507,13 @@ export async function assertIsAdministration(context: SessionContext, accountId:
 // outer transaction as transitionResidentProfileStatusTx — the status update, the
 // membership/session revocation, and both audit writes now commit or roll back together instead
 // of as two independent commits.
+//
+// design.md Decision 5: removeMember can now be called on an ALREADY moved-out member (Decision 1
+// of that same design — a moved_out profile can still be removed). Its membership is already
+// revoked, and `isNull(membership.revokedAt)` on the UPDATE below leaves that original
+// revocation timestamp untouched rather than overwriting it with a later one — the audit event is
+// still ALWAYS written, so `membership.removed_as_intruder` reliably distinguishes the hard tier
+// in the trail (FR-1.30) even when the SET itself was a no-op.
 async function revokeMembershipForProfileTx(
   tx: Tx,
   context: SessionContext,
@@ -510,7 +527,10 @@ async function revokeMembershipForProfileTx(
     .where(eq(membership.residentProfileId, residentProfileId));
   if (!target) return; // profile was never claimed (still `prepared`) — nothing to revoke
 
-  await tx.update(membership).set({ revokedAt: new Date() }).where(eq(membership.id, target.id));
+  await tx
+    .update(membership)
+    .set({ revokedAt: new Date() })
+    .where(and(eq(membership.id, target.id), isNull(membership.revokedAt)));
 
   // V-3: a pre-existing session must stop working immediately, not just at its next
   // resolveSessionContext-independent check — revoking the Membership alone leaves any session
@@ -543,12 +563,14 @@ export class DisplayNameConfirmationMismatchError extends Error {
 // code — not for real move-outs, which go through transitionResidentProfileStatus's `moved_out`
 // (the soft tier) instead. Full parity: administration or moderator (FR-1.27/U-30).
 //
-// Sets ResidentProfile.status to `moved_out` too (not a new status value — U-27 doesn't need a
-// fourth ResidentProfile state, since the access/quorum consequence is identical to a real
-// move-out; what distinguishes the two tiers is the confirmation friction and the audit trail,
-// not a different data state). Purging their votes/applications from score (U-27's other half)
-// has nothing to act on yet — Application/Vote don't exist until F3+; that purge is F3+'s job
-// when those tables exist, not invented here ahead of them.
+// Sets ResidentProfile.status to `removed` (human decision, 2026-09-22): a fourth state, final —
+// `transitions.ts` declares no transition out of it, and drizzle/0017's trigger refuses one even
+// against a direct database update under app_runtime. Callable on an `active` OR a `moved_out`
+// profile (both `active -> removed` and `moved_out -> removed` are declared), so a moderator who
+// used the soft tier first does not have to reactivate before reaching the hard one. Purging
+// their votes/applications from score (U-27's other half) has nothing to act on yet —
+// Application/Vote don't exist until F3+; `removed` is the state that purge will key on, not
+// invented here ahead of them.
 export async function removeMember(
   context: SessionContext,
   actingAccountId: string,
@@ -561,7 +583,7 @@ export async function removeMember(
   // speckit-bug-fix identity-moveout-session-revocation-not-atomic: the lookup/confirmation
   // check, the status transition, and the membership/session revocation now share one
   // transaction — previously each was its own withSessionContext call, so a failure between them
-  // (e.g. while revoking the session) could leave a `moved_out` profile with a still-usable
+  // (e.g. while revoking the session) could leave a `removed` profile with a still-usable
   // session, violating V-3.
   await withSessionContext(context, async (tx) => {
     const [row] = await tx.select().from(membership).where(eq(membership.accountId, targetAccountId));
@@ -578,8 +600,10 @@ export async function removeMember(
     }
 
     // Goes through the declared transition table (ADR-002) like every other status change, not a
-    // raw UPDATE — active/prepared -> moved_out are both already-declared transitions.
-    await transitionResidentProfileStatusTx(tx, profile.id, "moved_out", actor);
+    // raw UPDATE — active -> removed and moved_out -> removed are both declared transitions;
+    // removed -> anything is not, so a second removal call on an already-removed profile throws
+    // InvalidResidentProfileTransitionError instead of silently no-op'ing.
+    await transitionResidentProfileStatusTx(tx, profile.id, "removed", actor);
     await revokeMembershipForProfileTx(tx, context, profile.id, "membership.removed_as_intruder", actor);
   });
 }
@@ -607,9 +631,14 @@ export async function setMovedOut(
   });
 }
 
-// Reverses either removal tier: restores ResidentProfile to `active` (via the declared
-// moved_out -> active transition) and un-revokes the Membership. One reactivate for both tiers,
-// since both land in the same moved_out + revoked-Membership state (see removeMember above).
+// Reverses the SOFT tier only (moved_out -> active, the one transition transitions.ts declares
+// out of moved_out): restores ResidentProfile to `active` and un-revokes the Membership. A
+// `removed` profile has no declared way out — the Tx-scoped transition below throws
+// InvalidResidentProfileTransitionError, and because the lookup, the transition attempt, the
+// un-revoke and the audit write now all share ONE transaction (final-member-removal tasks.md 4.4,
+// replacing the previous two-part standalone-transition-then-separate-transaction split), that
+// throw rolls back everything: the membership stays revoked, no "reactivated" event is written,
+// and the caller sees the same error a raw removed -> active attempt would produce.
 export async function reactivateMember(
   context: SessionContext,
   actingAccountId: string,
@@ -618,17 +647,14 @@ export async function reactivateMember(
   await assertIsAdministrationOrModerator(context, actingAccountId);
   const actor: Actor = { accountId: actingAccountId, profileId: null };
 
-  const target = await withSessionContext(context, async (tx) => {
-    const [row] = await tx.select().from(membership).where(eq(membership.accountId, targetAccountId));
-    if (!row) throw new Error(`Membership not found for account ${targetAccountId}`);
-    return row;
-  });
-
-  if (target.residentProfileId) {
-    await transitionResidentProfileStatus(context, target.residentProfileId, "active", actor);
-  }
-
   await withSessionContext(context, async (tx) => {
+    const [target] = await tx.select().from(membership).where(eq(membership.accountId, targetAccountId));
+    if (!target) throw new Error(`Membership not found for account ${targetAccountId}`);
+
+    if (target.residentProfileId) {
+      await transitionResidentProfileStatusTx(tx, target.residentProfileId, "active", actor);
+    }
+
     await tx.update(membership).set({ revokedAt: null }).where(eq(membership.id, target.id));
 
     await recordActivityEvent(tx, {
@@ -916,7 +942,16 @@ export type JoinCodeIssuanceWithJoiners = (typeof joinCodeIssuance.$inferSelect)
   // AC-2.26: who came in through this link — a used-up or deleted link still names them
   // ("Löschen berührt keine Mitgliedschaft", domain/identity.md §2.1). A link nobody has
   // redeemed yet names nobody — an empty array, not an absent field.
+  //
+  // design.md Decision 9 (human decision, 2026-09-22): a joiner who was subsequently REMOVED is
+  // excluded here — they are no longer a resident and are already hidden from the resident list
+  // (proposal Assumption 2), so naming them here would undo that hiding. `hasRemovedJoiner` below
+  // carries the fact without the name.
   joinedResidentNames: string[];
+  // design.md Decision 9: true iff at least one removed member joined through this link. O16
+  // renders a caution beside "Löschen" when this is true AND the link is not yet deleted — the
+  // link's use count is unaffected either way.
+  hasRemovedJoiner: boolean;
 };
 
 // FR-2.29: O16 lists live AND dead links, most recent first — a dead link is never hidden, only
@@ -943,6 +978,7 @@ export async function listJoinCodeIssuances(
       .select({
         issuanceId: membership.joinedViaIssuanceId,
         displayName: residentProfile.displayName,
+        status: residentProfile.status,
       })
       .from(membership)
       .innerJoin(residentProfile, eq(residentProfile.id, membership.residentProfileId))
@@ -956,8 +992,14 @@ export async function listJoinCodeIssuances(
       .orderBy(membership.joinedAt);
 
     const namesByIssuance = new Map<string, string[]>();
+    const removedJoinerIssuances = new Set<string>();
     for (const joiner of joiners) {
       if (!joiner.issuanceId) continue; // isNotNull above narrows this at the SQL level only
+      // design.md Decision 9: a removed joiner is not pushed into the name list — only flagged.
+      if (joiner.status === "removed") {
+        removedJoinerIssuances.add(joiner.issuanceId);
+        continue;
+      }
       const names = namesByIssuance.get(joiner.issuanceId) ?? [];
       names.push(joiner.displayName);
       namesByIssuance.set(joiner.issuanceId, names);
@@ -966,6 +1008,7 @@ export async function listJoinCodeIssuances(
     return issuances.map((issuance) => ({
       ...issuance,
       joinedResidentNames: namesByIssuance.get(issuance.id) ?? [],
+      hasRemovedJoiner: removedJoinerIssuances.has(issuance.id),
     }));
   });
 }

@@ -23,11 +23,13 @@ const HOUSEHOLD_MATCH = sql`household_id = (select current_setting('app.househol
 const IS_OWN_HOUSEHOLD = sql`id = (select current_setting('app.household_id', true)::uuid)`;
 const IS_OWN_HOUSEHOLD_SETTINGS = sql`household_id = (select current_setting('app.household_id', true)::uuid)`;
 
-// data-model.md "ResidentProfile" — three states, no reopen in F1's scope (transitions.ts).
+// data-model.md "ResidentProfile" — four states (transitions.ts). `removed` is U-27's hard tier:
+// final, no transition leads out of it (drizzle/0017's trigger enforces that in the database too).
 export const residentProfileStatusEnum = pgEnum("resident_profile_status", [
   "prepared",
   "active",
   "moved_out",
+  "removed",
 ]);
 
 // data-model.md "Membership" — orthogonal to is_resident (C-1.3); no hierarchy.
@@ -166,11 +168,14 @@ export const residentProfile = pgTable(
   },
   (t) => [
     index("resident_profile_household_id_idx").on(t.householdId),
-    // FR-1.4: unique among status != moved_out profiles within a household — a partial unique
-    // index, not a plain unique constraint, so a released name is reusable per AC-1.4.
+    // FR-1.4 (amended 2026-09-22): unique among profiles whose status is not in
+    // NAME_RELEASING_STATUSES (transitions.ts) within a household — a partial unique index, not a
+    // plain unique constraint, so a released name is reusable per AC-1.4. This WHERE text must list
+    // exactly NAME_RELEASING_STATUSES's members (tests/unit/identity/name-releasing-statuses.test.ts);
+    // SQL can't import the TS constant, so the two are kept honest by that test, not by this comment.
     uniqueIndex("resident_profile_display_name_active_idx")
       .on(t.householdId, t.displayName)
-      .where(sql`status != 'moved_out'`),
+      .where(sql`status NOT IN ('moved_out', 'removed')`),
     pgPolicy("resident_profile_household_isolation", {
       as: "permissive",
       for: "all",
