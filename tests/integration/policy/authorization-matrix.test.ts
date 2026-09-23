@@ -218,8 +218,10 @@ describe("authorization matrix (M6): every exported casting/identity mutator dec
       residentCtx = residentContext(hh, resident);
     });
 
+    // Guarded: if beforeAll failed partway, hh or resident is still unset, and dereferencing it
+    // would throw before hh.cleanup() ran, orphaning whatever beforeAll did create.
     afterAll(async () => {
-      await cleanupAll(deleteTestAccount(resident.accountId), hh.cleanup());
+      await cleanupAll(resident ? deleteTestAccount(resident.accountId) : undefined, hh?.cleanup());
     });
 
     it("createRoom", async () => {
@@ -317,11 +319,12 @@ describe("authorization matrix (M6): every exported casting/identity mutator dec
       residentCtx = residentContext(hh, resident);
     });
 
+    // Guarded like the casting block's afterAll: a partial beforeAll must not orphan the household.
     afterAll(async () => {
       await cleanupAll(
-        deleteTestAccount(resident.accountId),
+        resident ? deleteTestAccount(resident.accountId) : undefined,
         ...extraAccountIds.map(deleteTestAccount),
-        hh.cleanup(),
+        hh?.cleanup(),
       );
     });
 
