@@ -134,8 +134,10 @@ the TypeScript that states the rule:
 - **A sibling entry.** A rule checked where state is revoked must also be checked where it is
   created (sessions: `signIn`), and a guarded read has sibling reads (`getRoundForSession` vs
   `getRoundParticipants`). Authorization lives in the repository function, not the route that
-  happens to call it today; `tests/integration/policy/room-round-authorization.test.ts` is the
-  shape of a test that proves it.
+  happens to call it today. `tests/integration/policy/authorization-matrix.test.ts` fails when a
+  new `casting`/`identity` repository export has no recorded decision: it must refuse a plain
+  resident, or carry a stated reason for being exempt. It covers mutators only; each read's
+  visibility is tested per read.
 
 Anything keyed on request data — a header, a cookie, a route param — ask who can set it.
 `x-forwarded-for` is caller-supplied unless `JOIN_ATTEMPT_TRUSTED_IP_HEADER` names a proxy that

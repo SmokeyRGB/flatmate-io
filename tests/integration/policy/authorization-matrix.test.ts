@@ -47,6 +47,12 @@ function srcAppReferencesName(name: string): boolean {
 }
 
 // --- NOT_APPLICABLE: read-only, pre-session bootstrap, documented no-auth Tx primitives, pure helpers ---
+//
+// "read-only" means out of THIS matrix's scope, not "needs no authorization". This matrix proves
+// that every mutator refuses a plain resident. Reads carry visibility rules instead, and those are
+// tested per read: getRoundParticipants' and getRoundForSession's in the G-D15 suites, for
+// example. A read listed here is exempt from the mutation check only; nothing here tests its
+// visibility.
 
 const NOT_APPLICABLE_CASTING: Record<string, string> = {
   getApplication: "read-only",
