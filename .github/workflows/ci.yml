@@ -53,6 +53,9 @@ jobs:
       # tests/setup.ts now refuses to run if these point back at the production ref.
       - run: npm run verify
         env:
+          # Workers for the network-bound test suite; see vitest.config.ts's maxWorkers comment.
+          # Trial value (PR #19): the runner's default of 3 left it mostly idle on I/O.
+          VITEST_MAX_WORKERS: "8"
           # Must now be the flatmate-io-dev pooler string (app_runtime, port 6543). Update it at
           # Settings > Secrets and variables > Actions; a stale production value makes the run
           # fail fast in tests/setup.ts rather than writing to production.
