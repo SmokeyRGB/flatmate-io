@@ -1,17 +1,43 @@
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
-import { claimResidentProfile, signIn } from "@/modules/identity/auth";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { claimResidentProfile, registerHousehold, signIn } from "@/modules/identity/auth";
 import * as castingRepo from "@/modules/casting/repository";
 import * as identityRepo from "@/modules/identity/repository";
 import { PermissionDeniedError, ResidentListActionDeniedError } from "@/modules/identity/repository";
 import type { SessionContext } from "@/db/session-context";
 import {
   cleanupAll,
+  cleanupHousehold,
   deleteTestAccount,
-  registerTestHousehold,
+  testEmail,
   type TestHousehold,
 } from "../../helpers/identity";
+
+// PR #19 review (CI time): registerTestHousehold() tracks its promise in an in-flight set that
+// tests/setup.ts's global afterEach sweeps (and destroys) after EVERY test whose household is
+// still "in flight" — i.e. not yet deregistered by its own .cleanup() call. That is exactly right
+// for a household registered and cleaned up within ONE test, but wrong for a household meant to
+// survive across many `it`s (beforeAll/afterAll below): the sweep would delete it the moment the
+// first test's afterEach ran. registerHousehold (the underlying auth.ts function) is not tracked
+// by that set at all — cleanupHousehold + deleteTestAccount below do the same teardown
+// registerTestHousehold's own cleanup() does, the way tests/helpers/identity.ts's own comment on
+// cleanupHousehold documents for "a household registered directly via registerHousehold".
+async function registerSharedHousehold(name = "WG"): Promise<TestHousehold> {
+  const email = testEmail();
+  const password = "test-password-not-real-1234";
+  const { household: householdRow, context } = await registerHousehold(email, password, name);
+  return {
+    context,
+    accountId: context.accountId,
+    householdId: householdRow.id,
+    email,
+    cleanup: async () => {
+      await cleanupHousehold(context, householdRow.id);
+      await deleteTestAccount(context.accountId);
+    },
+  };
+}
 
 // M6 (P1 sibling paths, P7): generalises room-round-authorization.test.ts (80f2a0f) to EVERY
 // exported casting/identity repository.ts function. A new exported mutator now fails THIS test
@@ -167,289 +193,224 @@ describe("authorization matrix (M6): every exported casting/identity mutator dec
     });
   });
 
+  // PR #19 review (CI time): this matrix's ~24 cases each used to register a fresh household and
+  // claim a resident of their own — every one a real Supabase Auth round trip to eu-west-1, which
+  // made this the slowest file in CI (228s). Refusal cases mutate nothing (that's the whole
+  // point of a refusal), so sharing ONE household and ONE claimed plain resident per describe
+  // block (registered/claimed once in beforeAll, torn down once in afterAll) is sound — no case
+  // depends on another's outcome, only on the fixture existing. A case needing more than that
+  // (a room, a round, a second member, a join code) creates it fresh via the ADMIN's OWN context
+  // inside the test; the shared household's afterAll cleanup removes it regardless, since
+  // cleanupHousehold deletes every HOUSEHOLD_SCOPED_TABLES row for the household, not just what a
+  // single test created.
   describe("casting/repository.ts mutators refuse a plain resident", () => {
-    let hh: TestHousehold | undefined;
-    const accountIds: string[] = [];
+    let hh: TestHousehold;
+    let adminActor: { accountId: string; profileId: null };
+    let resident: { profileId: string; accountId: string; displayName: string };
+    let residentActor: { accountId: string; profileId: string };
+    let residentCtx: SessionContext;
 
-    afterEach(async () => {
-      await cleanupAll(...accountIds.map(deleteTestAccount), hh?.cleanup());
-      accountIds.length = 0;
-      hh = undefined;
+    beforeAll(async () => {
+      hh = await registerSharedHousehold();
+      adminActor = { accountId: hh.accountId, profileId: null };
+      resident = await claim(hh, "Resident1", []);
+      residentActor = { accountId: resident.accountId, profileId: resident.profileId };
+      residentCtx = residentContext(hh, resident);
+    });
+
+    afterAll(async () => {
+      await cleanupAll(deleteTestAccount(resident.accountId), hh.cleanup());
     });
 
     it("createRoom", async () => {
-      hh = await registerTestHousehold();
-      const resident = await claim(hh, "Resident1", accountIds);
-      const residentActor = { accountId: resident.accountId, profileId: resident.profileId };
       await expect(
-        castingRepo.createRoom(residentContext(hh, resident), "Room B", residentActor),
+        castingRepo.createRoom(residentCtx, "Room B", residentActor),
       ).rejects.toThrow(PermissionDeniedError);
     });
 
     it("createRoom refuses a resident's own session spoofed with the admin's accountId", async () => {
-      hh = await registerTestHousehold();
-      const resident = await claim(hh, "Resident1", accountIds);
       const spoofedActor = { accountId: hh.accountId, profileId: null };
       await expect(
-        castingRepo.createRoom(residentContext(hh, resident), "Room B", spoofedActor),
+        castingRepo.createRoom(residentCtx, "Room B", spoofedActor),
       ).rejects.toThrow(PermissionDeniedError);
     });
 
     it("renameRoom", async () => {
-      hh = await registerTestHousehold();
-      const adminActor = { accountId: hh.accountId, profileId: null };
       const room = await castingRepo.createRoom(hh.context, "Room A", adminActor);
-      const resident = await claim(hh, "Resident1", accountIds);
-      const residentActor = { accountId: resident.accountId, profileId: resident.profileId };
       await expect(
-        castingRepo.renameRoom(residentContext(hh, resident), room.id, "Renamed", residentActor),
+        castingRepo.renameRoom(residentCtx, room.id, "Renamed", residentActor),
       ).rejects.toThrow(PermissionDeniedError);
     });
 
     it("transitionRoomStatus", async () => {
-      hh = await registerTestHousehold();
-      const adminActor = { accountId: hh.accountId, profileId: null };
       const room = await castingRepo.createRoom(hh.context, "Room A", adminActor);
-      const resident = await claim(hh, "Resident1", accountIds);
-      const residentActor = { accountId: resident.accountId, profileId: resident.profileId };
       await expect(
-        castingRepo.transitionRoomStatus(residentContext(hh, resident), room.id, "open", residentActor),
+        castingRepo.transitionRoomStatus(residentCtx, room.id, "open", residentActor),
       ).rejects.toThrow(PermissionDeniedError);
     });
 
     it("removeRoom", async () => {
-      hh = await registerTestHousehold();
-      const adminActor = { accountId: hh.accountId, profileId: null };
       const room = await castingRepo.createRoom(hh.context, "Room A", adminActor);
-      const resident = await claim(hh, "Resident1", accountIds);
-      const residentActor = { accountId: resident.accountId, profileId: resident.profileId };
       await expect(
-        castingRepo.removeRoom(residentContext(hh, resident), room.id, residentActor),
+        castingRepo.removeRoom(residentCtx, room.id, residentActor),
       ).rejects.toThrow(PermissionDeniedError);
     });
 
     it("createRound", async () => {
-      hh = await registerTestHousehold();
-      const adminActor = { accountId: hh.accountId, profileId: null };
       const room = await castingRepo.createRoom(hh.context, "Room A", adminActor);
-      const resident = await claim(hh, "Resident1", accountIds);
-      const residentActor = { accountId: resident.accountId, profileId: resident.profileId };
       await expect(
-        castingRepo.createRound(residentContext(hh, resident), "Round", [room.id], residentActor),
+        castingRepo.createRound(residentCtx, "Round", [room.id], residentActor),
       ).rejects.toThrow(PermissionDeniedError);
     });
 
     it("openRound", async () => {
-      hh = await registerTestHousehold();
-      const adminActor = { accountId: hh.accountId, profileId: null };
       const room = await castingRepo.createRoom(hh.context, "Room A", adminActor);
       const round = await castingRepo.createRound(hh.context, "Round", [room.id], adminActor);
-      const resident = await claim(hh, "Resident1", accountIds);
-      const residentActor = { accountId: resident.accountId, profileId: resident.profileId };
       await expect(
-        castingRepo.openRound(residentContext(hh, resident), round.id, residentActor),
+        castingRepo.openRound(residentCtx, round.id, residentActor),
       ).rejects.toThrow(PermissionDeniedError);
     });
 
     it("createAndOpenRound", async () => {
-      hh = await registerTestHousehold();
-      const adminActor = { accountId: hh.accountId, profileId: null };
       const room = await castingRepo.createRoom(hh.context, "Room A", adminActor);
-      const resident = await claim(hh, "Resident1", accountIds);
-      const residentActor = { accountId: resident.accountId, profileId: resident.profileId };
       await expect(
-        castingRepo.createAndOpenRound(residentContext(hh, resident), "Round", [room.id], residentActor),
+        castingRepo.createAndOpenRound(residentCtx, "Round", [room.id], residentActor),
       ).rejects.toThrow(PermissionDeniedError);
     });
 
     it("addResidentToRound", async () => {
-      hh = await registerTestHousehold();
-      const adminActor = { accountId: hh.accountId, profileId: null };
       const room = await castingRepo.createRoom(hh.context, "Room A", adminActor);
       const round = await castingRepo.createRound(hh.context, "Round", [room.id], adminActor);
-      const resident = await claim(hh, "Resident1", accountIds);
-      const residentActor = { accountId: resident.accountId, profileId: resident.profileId };
       await expect(
-        castingRepo.addResidentToRound(residentContext(hh, resident), round.id, resident.profileId, residentActor),
+        castingRepo.addResidentToRound(residentCtx, round.id, resident.profileId, residentActor),
       ).rejects.toThrow(PermissionDeniedError);
     });
 
     it("updateHouseholdSettingsWithProcedureLock", async () => {
-      hh = await registerTestHousehold();
-      const resident = await claim(hh, "Resident1", accountIds);
-      const residentActor = { accountId: resident.accountId, profileId: resident.profileId };
       await expect(
-        castingRepo.updateHouseholdSettingsWithProcedureLock(
-          residentContext(hh, resident),
-          { quorumShare: "0.6" },
-          residentActor,
-        ),
+        castingRepo.updateHouseholdSettingsWithProcedureLock(residentCtx, { quorumShare: "0.6" }, residentActor),
       ).rejects.toThrow(PermissionDeniedError);
     });
 
     it("forceChangeSettingWhileRoundOpen", async () => {
-      hh = await registerTestHousehold();
-      const adminActor = { accountId: hh.accountId, profileId: null };
       // openRoundTx (via createAndOpenRound) refuses to open with zero eligible residents
-      // (EC-1.3) — the resident must be claimed BEFORE the round is opened.
-      const resident = await claim(hh, "Resident1", accountIds);
-      const residentActor = { accountId: resident.accountId, profileId: resident.profileId };
+      // (EC-1.3) — the shared resident (claimed in beforeAll) already satisfies that.
       const room = await castingRepo.createRoom(hh.context, "Room A", adminActor);
       const round = await castingRepo.createAndOpenRound(hh.context, "Round", [room.id], adminActor);
       await expect(
-        castingRepo.forceChangeSettingWhileRoundOpen(
-          residentContext(hh, resident),
-          "quorumShare",
-          "0.6",
-          round.id,
-          residentActor,
-        ),
+        castingRepo.forceChangeSettingWhileRoundOpen(residentCtx, "quorumShare", "0.6", round.id, residentActor),
       ).rejects.toThrow(PermissionDeniedError);
     });
   });
 
   describe("identity/repository.ts mutators refuse a plain resident", () => {
-    let hh: TestHousehold | undefined;
-    const accountIds: string[] = [];
+    let hh: TestHousehold;
+    let resident: { profileId: string; accountId: string; displayName: string };
+    let residentActor: { accountId: string; profileId: string };
+    let residentCtx: SessionContext;
+    const extraAccountIds: string[] = [];
 
-    afterEach(async () => {
-      await cleanupAll(...accountIds.map(deleteTestAccount), hh?.cleanup());
-      accountIds.length = 0;
-      hh = undefined;
+    beforeAll(async () => {
+      hh = await registerSharedHousehold();
+      resident = await claim(hh, "Resident1", []);
+      residentActor = { accountId: resident.accountId, profileId: resident.profileId };
+      residentCtx = residentContext(hh, resident);
+    });
+
+    afterAll(async () => {
+      await cleanupAll(
+        deleteTestAccount(resident.accountId),
+        ...extraAccountIds.map(deleteTestAccount),
+        hh.cleanup(),
+      );
     });
 
     it("createResidentProfile", async () => {
-      hh = await registerTestHousehold();
-      const resident = await claim(hh, "Resident1", accountIds);
-      const residentActor = { accountId: resident.accountId, profileId: resident.profileId };
       await expect(
-        identityRepo.createResidentProfile(residentContext(hh, resident), "Nobody", residentActor),
+        identityRepo.createResidentProfile(residentCtx, "Nobody", residentActor),
       ).rejects.toThrow(ResidentListActionDeniedError);
     });
 
     it("createResidentProfile refuses a resident's own session spoofed with the admin's accountId", async () => {
-      hh = await registerTestHousehold();
-      const resident = await claim(hh, "Resident1", accountIds);
       const spoofedActor = { accountId: hh.accountId, profileId: null };
       await expect(
-        identityRepo.createResidentProfile(residentContext(hh, resident), "Nobody", spoofedActor),
+        identityRepo.createResidentProfile(residentCtx, "Nobody", spoofedActor),
       ).rejects.toThrow(ResidentListActionDeniedError);
     });
 
     it("transitionResidentProfileStatus", async () => {
-      hh = await registerTestHousehold();
       const adminActor = { accountId: hh.accountId, profileId: null };
       const target = await identityRepo.createResidentProfile(hh.context, "Target", adminActor);
-      const resident = await claim(hh, "Resident1", accountIds);
-      const residentActor = { accountId: resident.accountId, profileId: resident.profileId };
       await expect(
-        identityRepo.transitionResidentProfileStatus(
-          residentContext(hh, resident),
-          target.id,
-          "moved_out",
-          residentActor,
-        ),
+        identityRepo.transitionResidentProfileStatus(residentCtx, target.id, "moved_out", residentActor),
       ).rejects.toThrow(ResidentListActionDeniedError);
     });
 
     it("removeMember", async () => {
-      hh = await registerTestHousehold();
-      const resident = await claim(hh, "Resident1", accountIds);
-      const target = await claim(hh, "Resident2", accountIds);
+      const target = await claim(hh, "Resident2", extraAccountIds);
       await expect(
-        identityRepo.removeMember(
-          residentContext(hh, resident),
-          resident.accountId,
-          target.accountId,
-          target.displayName,
-        ),
+        identityRepo.removeMember(residentCtx, resident.accountId, target.accountId, target.displayName),
       ).rejects.toThrow(ResidentListActionDeniedError);
     });
 
     it("setMovedOut", async () => {
-      hh = await registerTestHousehold();
-      const resident = await claim(hh, "Resident1", accountIds);
-      const target = await claim(hh, "Resident2", accountIds);
+      const target = await claim(hh, "Resident3", extraAccountIds);
       await expect(
-        identityRepo.setMovedOut(residentContext(hh, resident), resident.accountId, target.accountId),
+        identityRepo.setMovedOut(residentCtx, resident.accountId, target.accountId),
       ).rejects.toThrow(ResidentListActionDeniedError);
     });
 
     it("reactivateMember", async () => {
-      hh = await registerTestHousehold();
-      const resident = await claim(hh, "Resident1", accountIds);
-      const target = await claim(hh, "Resident2", accountIds);
+      const target = await claim(hh, "Resident4", extraAccountIds);
       await expect(
-        identityRepo.reactivateMember(residentContext(hh, resident), resident.accountId, target.accountId),
+        identityRepo.reactivateMember(residentCtx, resident.accountId, target.accountId),
       ).rejects.toThrow(ResidentListActionDeniedError);
     });
 
     it("issueJoinCode", async () => {
-      hh = await registerTestHousehold();
-      const resident = await claim(hh, "Resident1", accountIds);
       await expect(
-        identityRepo.issueJoinCode(residentContext(hh, resident), resident.accountId, {
-          validDays: 7,
-          maxUses: 1,
-        }),
+        identityRepo.issueJoinCode(residentCtx, resident.accountId, { validDays: 7, maxUses: 1 }),
       ).rejects.toThrow(ResidentListActionDeniedError);
     });
 
     it("extendJoinCode", async () => {
-      hh = await registerTestHousehold();
       const issuance = await identityRepo.issueJoinCode(hh.context, hh.accountId, { validDays: 7, maxUses: 1 });
-      const resident = await claim(hh, "Resident1", accountIds);
       await expect(
-        identityRepo.extendJoinCode(residentContext(hh, resident), resident.accountId, issuance.id),
+        identityRepo.extendJoinCode(residentCtx, resident.accountId, issuance.id),
       ).rejects.toThrow(ResidentListActionDeniedError);
     });
 
     it("deleteJoinCode", async () => {
-      hh = await registerTestHousehold();
       const issuance = await identityRepo.issueJoinCode(hh.context, hh.accountId, { validDays: 7, maxUses: 1 });
-      const resident = await claim(hh, "Resident1", accountIds);
       await expect(
-        identityRepo.deleteJoinCode(residentContext(hh, resident), resident.accountId, issuance.id),
+        identityRepo.deleteJoinCode(residentCtx, resident.accountId, issuance.id),
       ).rejects.toThrow(ResidentListActionDeniedError);
     });
 
     it("setMemberRole", async () => {
-      hh = await registerTestHousehold();
-      const resident = await claim(hh, "Resident1", accountIds);
-      const target = await claim(hh, "Resident2", accountIds);
+      const target = await claim(hh, "Resident5", extraAccountIds);
       await expect(
-        identityRepo.setMemberRole(
-          residentContext(hh, resident),
-          resident.accountId,
-          target.accountId,
-          "moderator",
-        ),
+        identityRepo.setMemberRole(residentCtx, resident.accountId, target.accountId, "moderator"),
       ).rejects.toThrow(ResidentListActionDeniedError);
     });
 
     it("setMemberRole refuses a resident's own session spoofed with the admin's accountId", async () => {
-      hh = await registerTestHousehold();
-      const resident = await claim(hh, "Resident1", accountIds);
-      const target = await claim(hh, "Resident2", accountIds);
+      const target = await claim(hh, "Resident6", extraAccountIds);
       await expect(
-        identityRepo.setMemberRole(residentContext(hh, resident), hh.accountId, target.accountId, "moderator"),
+        identityRepo.setMemberRole(residentCtx, hh.accountId, target.accountId, "moderator"),
       ).rejects.toThrow(ResidentListActionDeniedError);
     });
 
     it("triggerSubjectAccessExport", async () => {
-      hh = await registerTestHousehold();
-      const resident = await claim(hh, "Resident1", accountIds);
       await expect(
-        identityRepo.triggerSubjectAccessExport(residentContext(hh, resident), resident.accountId, "some-application-id"),
+        identityRepo.triggerSubjectAccessExport(residentCtx, resident.accountId, "some-application-id"),
       ).rejects.toThrow(ResidentListActionDeniedError);
     });
 
     it("revokeSession", async () => {
-      hh = await registerTestHousehold();
       const adminSignIn = await signIn({ kind: "household", email: hh.email, password: "test-password-not-real-1234" });
-      const resident = await claim(hh, "Resident1", accountIds);
       await expect(
-        identityRepo.revokeSession(residentContext(hh, resident), adminSignIn.session.id),
+        identityRepo.revokeSession(residentCtx, adminSignIn.session.id),
       ).rejects.toThrow(PermissionDeniedError);
     });
   });
