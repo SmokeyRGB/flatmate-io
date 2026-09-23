@@ -26,20 +26,27 @@ npm run lint       # eslint
 npm test          # vitest run
 npx vitest run tests/unit/casting/room-transitions.test.ts   # single file
 npx vitest run -t "test name substring"                       # single test by name
-npm run verify     # the full gate: lint + session-context + import-boundary + rls-coverage + guarded-tests lints, then vitest run
+npm run verify     # the full gate: eslint + tsc + six guardrail lints + check-refs, then vitest run
 npm run seed:demo # tsx --env-file=.env.local scripts/seed-demo-household.ts
 ```
 
 `npm run verify` is what CI/pre-push effectively require — run it, not just `npm test`, before
-treating a change as done. The four custom lints under `scripts/lint/` are hand-written checks
-(not eslint plugins), each enforcing one guardrail mechanically:
+treating a change as done. It type-checks (`next typegen && tsc --noEmit`; vitest alone does not
+enforce strict mode). The six custom lints under `scripts/lint/` are hand-written checks (not
+eslint plugins), each enforcing one guardrail mechanically:
 
 | Script | Guardrail | What it checks |
 |---|---|---|
 | `import-boundary.ts` | G-C1 / FR-0.1 | only `src/db/` and each module's own `repository.ts` may import the raw Postgres/Drizzle client |
 | `session-context.ts` | G-C8 / FR-0.4 | bare `SET` is never allowed; `SET LOCAL` for session context only in `src/db/session-context.ts` |
-| `rls-coverage.ts` | G-C7 | RLS invariants must be tested twice — through the policy layer and via raw SQL bypassing it |
+| `rls-coverage.ts` | FR-0.2 / EC-0.1 | every table declaring `household_id` has a `pgPolicy` of its own — per table, not per schema file |
+| `definer-coverage.ts` | G-C7 | every `SECURITY DEFINER` function in `drizzle/` sets `search_path` and is called by name in a `tests/integration/raw-sql/` test |
+| `migration-shape.ts` | — (re-runnability) | migrations after `0017`: an enum `ADD VALUE` alone in its file, `ADD COLUMN IF NOT EXISTS`, `DROP FUNCTION IF EXISTS` before a bare or `RETURNS TABLE` create, `search_path` on `SECURITY DEFINER` |
 | `guarded-tests.ts` | G-D | every entry in `test/guarded.manifest.json` (G-D1…G-D15) stays honest: `pending`/`implemented` must match reality |
+
+`tests/unit/lint/cleanup-inventory.test.ts` is the seventh check, run inside vitest: it fails when
+a household-scoped table is missing from the delete set in `tests/helpers/identity.ts`, or when
+`undoRegisterHousehold` misses a table `registerHousehold` writes.
 
 Husky's pre-commit hook runs `gitleaks protect --staged` (G-A1) — install gitleaks locally or the
 hook hard-fails the commit.
@@ -103,6 +110,59 @@ bun run format    # prettier --write .
   seeded from `docs/` — copying requirement prose out of `docs/backlog/requirements/` would be a
   Principle V violation, not a convenience. `openspec/` may cite `docs/`, but `docs/` must never
   point into `openspec/` (Rule 7, the handover gate).
+
+## Implementation hazards specific to this repo
+
+Each of these cost at least one review round in PRs #4–#18. They are facts about this codebase,
+not new rules — the rules stay in `docs/GUARDRAILS.md`.
+
+**An invariant holds only where it is enforced.** Four paths reach data without passing through
+the TypeScript that states the rule:
+
+- **Raw SQL as `app_runtime`.** RLS applies; the transition tables in `transitions.ts` do not. A
+  state rule that must hold needs a constraint or trigger (`drizzle/0017` is the example).
+- **A `SECURITY DEFINER` function.** It runs past RLS, and `resolve_join_code`, `claim_join_code`
+  and `record_join_attempt` answer unauthenticated callers. With no foreign keys nothing keeps a
+  stored id honest, so every join inside such a function carries its own `household_id`
+  predicate. `scripts/lint/definer-coverage.ts` requires each one to be called in a raw-SQL test.
+- **A concurrent request.** Any read-then-write needs a unique constraint, a row lock (`FOR
+  UPDATE`, or a conditional `UPDATE`) or an advisory lock. The Supavisor transaction pooler
+  serialises one-statement transactions by accident, so a racy function can pass a concurrency
+  test. Make the test deterministic by holding an uncommitted transaction while the other path
+  runs (`tests/integration/policy/revoked-membership-sign-in.test.ts`), or label it an invariant
+  guard rather than a regression test.
+- **A sibling entry.** A rule checked where state is revoked must also be checked where it is
+  created (sessions: `signIn`), and a guarded read has sibling reads (`getRoundForSession` vs
+  `getRoundParticipants`). Authorization lives in the repository function, not the route that
+  happens to call it today; `tests/integration/policy/room-round-authorization.test.ts` is the
+  shape of a test that proves it.
+
+Anything keyed on request data — a header, a cookie, a route param — ask who can set it.
+`x-forwarded-for` is caller-supplied unless `JOIN_ATTEMPT_TRUSTED_IP_HEADER` names a proxy that
+overwrites it.
+
+**Migrations.**
+
+- A new enum value goes in its own migration file; Postgres rejects using it in the transaction
+  that added it.
+- The agent harness refuses `DROP COLUMN` and `SECURITY DEFINER` statements. A human applies them
+  and then runs the whole file, so write such files re-runnable (`IF NOT EXISTS`, `DROP FUNCTION
+  IF EXISTS` before `CREATE`); `CREATE OR REPLACE` cannot change a `RETURNS TABLE` shape. The agent
+  never executes those statements, so nobody sees their errors until the human does — read them.
+  `scripts/lint/migration-shape.ts` checks the mechanical half for files after `0017`.
+- Order statements by the constraints live *at each statement*, including those the file is
+  about to drop (`drizzle/0017`: the old unique index had to go before the backfill).
+- There are no foreign keys, so nothing cascades. A new household-scoped table joins the delete
+  set in `tests/helpers/identity.ts` (`tests/unit/lint/cleanup-inventory.test.ts` fails
+  otherwise) and, if registration writes it, `undoRegisterHousehold` in
+  `src/modules/identity/auth.ts`.
+- `DATABASE_URL` connects as `app_runtime`: hand-run SQL through it matches zero rows under RLS
+  and reports success. Owner work goes through the Supabase SQL editor.
+
+**Tests that can fail.** Assert error codes, not only end states — a refusal reached by the wrong
+path looks identical otherwise. A status-transition test asserts every column the statement
+writes, not only the status. A migration test seeds the *pre*-migration state, including the
+conflicting row. A new test counts once it has been seen failing against a deliberate break.
 
 ## Architecture: how the spec is organized
 
