@@ -128,6 +128,7 @@ const NOT_APPLICABLE_IDENTITY: Record<string, string> = {
   generateJoinCode: "pure helper — no SessionContext, no DB access",
   buildJoinUrl: "pure helper — no SessionContext, no DB access",
   normalizeJoinCode: "pure helper — no SessionContext, no DB access",
+  isWellFormedJoinCode: "pure helper — no SessionContext, no DB access",
   issueJoinCodeTx:
     "Tx primitive with an explicit documented no-auth contract (own comment: 'THIS FUNCTION " +
     "PERFORMS NO AUTHORIZATION' — the one legitimate caller, registerHousehold, mints the " +

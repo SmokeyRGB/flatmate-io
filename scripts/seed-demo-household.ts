@@ -52,6 +52,13 @@ async function main() {
   const residentProfile = await createResidentProfile(context, "Sam", adminActor);
   await claimResidentProfile(context, residentProfile.id, PASSWORD);
 
+  // join-screen task 6.1: a PREPARED profile — never claimed — so there is a live BOUND link to
+  // walk through (design.md Decision 8's "Hi Robin!" greeting), beside the two already-claimed
+  // residents above. Uses the administration account's own context and actor, exactly like Alex
+  // and Sam above — #19's assert* helpers refuse an actor whose accountId differs from
+  // context.accountId.
+  const preparedProfile = await createResidentProfile(context, "Robin", adminActor);
+
   const roomA = await createRoom(context, "Zimmer 1", adminActor);
   const roomB = await createRoom(context, "Zimmer 2", adminActor);
 
@@ -64,8 +71,15 @@ async function main() {
   // so both are issued and both are printed: the reusable one for the happy path, the founding
   // single-use one for AC-2.8's "the cap is enforced" refusal once it has been spent.
   const reusableLink = await issueJoinCode(context, context.accountId, { validDays: 7, maxUses: 5 });
+  // join-screen task 6.1: a BOUND link for the prepared profile above — issueJoinCode forces
+  // maxUses to 1 for any link naming a residentProfileId, regardless of what is passed here.
+  const boundLink = await issueJoinCode(context, context.accountId, {
+    validDays: 7,
+    maxUses: 1,
+    residentProfileId: preparedProfile.id,
+  });
   const allLinks = await listJoinCodeIssuances(context, context.accountId);
-  const foundingLink = allLinks.find((link) => link.id !== reusableLink.id);
+  const foundingLink = allLinks.find((link) => link.id !== reusableLink.id && link.id !== boundLink.id);
 
   const BASE_URL = process.env.DEMO_BASE_URL ?? "http://localhost:3000";
 
@@ -83,10 +97,13 @@ async function main() {
   console.log("Join by link (open in a clean browser profile — signed out):");
   console.log(`  Reusable link (5 uses):  ${BASE_URL}/join/${reusableLink.code}`);
   console.log(`  Code to type by hand:    ${reusableLink.code}`);
+  console.log(`  Bound link (Robin, 1 use): ${BASE_URL}/join/${boundLink.code}`);
+  console.log('    ^ greets "Hi Robin!" and asks only for a password (design.md Decision 13)');
   if (foundingLink) {
     console.log(`  Founding link (1 use):   ${BASE_URL}/join/${foundingLink.code}`);
     console.log("    ^ spend it once, then re-open it to see the used-up refusal (AC-2.8)");
   }
+  console.log(`\nEnter any of the above by hand at ${BASE_URL}/join instead of opening the link.`);
   console.log("\nBoth links are also listed on the Mitglieder screen (O16) when signed in as");
   console.log("administration or as Alex (moderator), together with who joined through each.\n");
   // Not `psql "$DATABASE_URL" -f ...`: DATABASE_URL connects as app_runtime, and under RLS every

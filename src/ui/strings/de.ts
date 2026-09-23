@@ -63,6 +63,10 @@ export const de = {
       passwordLabel: "Passwort",
       submit: "Anmelden",
       submitPending: "Wird angemeldet…",
+      // join-screen (FR-2.27, A1 "Ohne Anmeldung erreichbar"): the two ways in that are not
+      // sign-in itself, offered as links beneath the card — `.btn-link` (design.md Decision 8).
+      foundHousehold: "WG gründen",
+      enterJoinCode: "Beitrittscode eingeben",
     },
     register: {
       heading: "WG gründen",
@@ -296,13 +300,18 @@ export const de = {
   // the invalid-link message and the "stay signed in" checkbox label are already-decided copy,
   // quoted verbatim from `screens/A-zugang.md` A3 rather than invented here.
   join: {
+    // join-screen design.md Decision 8: the NEUTRAL heading is now its own short sentence — the
+    // household name moves into the household chip beneath it (`householdChip` below), which is
+    // shared visually with the bound heading's greeting.
+    heading: () => "Du bist eingeladen",
     // `screens/A-zugang.md` A3: "Du trittst *WG Hauptstraße 12* bei" — FR-2.9/AC-2.1's household
-    // name shown before any field is requested.
-    heading: (householdName: string) => `Du trittst ${householdName} bei`,
-    // join-by-link design.md Decision 13: a BOUND link greets by the prepared profile's own name
-    // — design.md's own quoted example, „Hi Sam! Du wurdest eingeladen, der Demo-WG beizutreten."
-    boundHeading: (displayName: string, householdName: string) =>
-      `Hi ${displayName}! Du wurdest eingeladen, ${householdName} beizutreten.`,
+    // name shown before any field is requested. Now the `.context-chip`'s own text, shown beneath
+    // either heading (design.md Decision 8).
+    householdChip: (householdName: string) => `Du trittst ${householdName} bei`,
+    // join-by-link design.md Decision 13, revised by join-screen design.md Decision 8: a BOUND
+    // link's heading is now just the greeting — the invitation itself is the shared household chip
+    // above, so the two are never duplicated in one sentence as the old single-string version did.
+    boundHeading: (displayName: string) => `Hi ${displayName}!`,
     nameLabel: "Name",
     passwordLabel: "Passwort",
     // FR-2.10a/AC-2.20: the requirement is stated, not discovered by failing once.
@@ -317,9 +326,16 @@ export const de = {
     rememberMeLabel: "Auf diesem Gerät angemeldet bleiben",
     submit: "Beitreten",
     submitPending: "Wird beigetreten…",
+    // join-screen design.md Decision 8/10: offered beside the invalid-link refusal, both when the
+    // page itself shows it and when a submit produces it (Decision 10's shared component).
+    handEntryWayBack: "Beitrittscode von Hand eingeben",
+    // join-screen design.md Decision 7/10: the Keine-Berechtigung sign-out — ends only the
+    // visitor's own session and returns to this same invitation (`signOutAndReturnAction`).
+    signOutAndReturn: "Abmelden",
     errors: {
       // `screens/A-zugang.md` A3, corrected 2026-09-21 against FR-2.8: one message for all four
       // causes (expired, used up, deleted, never existed), naming none of them, plus the way back.
+      // join-screen: unchanged text — only the surrounding hand-entry link is new (task 1.1).
       invalidLink: "Dieser Einladungslink ist nicht gültig. Frag in der WG nach einem aktuellen Link.",
       // proposal.md Assumption 3: distinguishable from the invalid-link message — a rate-limited
       // refusal is not a statement about any link (FR-2.8 is about the three link-refusal
@@ -333,11 +349,43 @@ export const de = {
       // EC-2.5/A-2.4: deliberately NOT the invalid-link message — the link is fine.
       otherHousehold:
         "Du bist bei einem anderen Haushalt angemeldet. Melde dich ab, um diesem Haushalt beizutreten.",
-      genericFailure: "Der Beitritt ist fehlgeschlagen. Bitte versuche es erneut.",
+      // join-screen design.md Decision 5: rewritten from "Der Beitritt ist fehlgeschlagen" to state
+      // plainly that a join is one transaction — a failed one created nothing, so retrying loses
+      // nothing either.
+      genericFailure: "Der Beitritt hat nicht geklappt. Es wurde nichts angelegt — du kannst es erneut versuchen.",
     },
     // EC-2.4: rendered on the dashboard (task 8.5) when the join redirect carries the note —
     // "taken to Start with a note", the temporary /dashboard landing target (proposal Assumption 4).
     alreadyMemberNote: "Du bist bereits Mitglied dieses Haushalts.",
+    // Review fix (§12): A3's refusal states and its Laden skeleton have no visible heading or text of
+    // their own, so these give assistive tech one, rendered visually hidden (`sr-only`).
+    refusalHeading: "Einladung",
+    loading: "Einladung wird geladen…",
+    // join-screen design.md Decision 1/3: `/join`'s own manual-entry screen (FR-2.27, US-2.15).
+    joinByCode: {
+      heading: "Beitrittscode eingeben",
+      // Assumption 1: "Leer" read as "arriving on the join path with no code" — the sentence
+      // naming what normally appears here, plus the one sensible action (§6).
+      emptyBody: "Hier steht normalerweise eine Einladung. Tippe deinen Beitrittscode ein, um weiterzumachen.",
+      codeLabel: "Beitrittscode",
+      // The example SHAPE only, never a real code (task 2.2) — `UAMPN-QACVZ`'s own alphabet, but
+      // not a code that has ever been issued.
+      // U+2011 (non-breaking hyphen) and U+00A0 keep "z. B." and the example on one line. It is only
+      // the example shape, never a real code, so normalizeJoinCode never has to fold either.
+      codeFormatHint: "Zwei Gruppen zu je fünf Zeichen, z. B. ABCDE‑FGHJK.",
+      submit: "Weiter",
+      submitPending: "Wird geprüft…",
+      // Review fix (rahmenwerk.md §12, „Nie Farbe allein"): the refusal says in its own words that
+      // this is not a code, instead of the helper sentence merely turning red.
+      codeInvalid: "Das ist kein gültiger Beitrittscode.",
+    },
+    // join-screen design.md Decision 5: the `error.tsx` boundary — generic on purpose (never the
+    // failure's own text or the code, G-A5), covering a failed page load, submit or sign-out alike.
+    unexpectedError: {
+      heading: "Das hat gerade nicht geklappt.",
+      body: "Nichts ist verloren gegangen — du kannst es einfach noch einmal versuchen.",
+      retry: "Erneut versuchen",
+    },
   },
   whoLivesHere: {
     heading: "Wer hier wohnt",

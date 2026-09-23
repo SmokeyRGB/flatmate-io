@@ -5,28 +5,22 @@ import { recordJoinAttempt, resolveJoinCode } from "@/modules/identity/repositor
 import { getCurrentSession } from "@/modules/identity/session-cookie";
 import { de } from "@/ui/strings";
 import { JoinForm } from "./join-form";
+import { HandEntryWayBack, SignOutAndReturnForm } from "./join-ways-forward";
+import { decideJoinScreen } from "./join-screen-state";
 import { getClientIp } from "./request-ip";
 
 const t = de.join;
 
-function Refusal({ message }: { message: string }) {
-  return (
-    <div className="mx-auto max-w-md space-y-4 p-6">
-      <p className="field-error">{message}</p>
-    </div>
-  );
-}
-
-// The first public route in the application that is neither sign-in nor register (proposal.md).
-// Functional and plain, deliberately NOT screen A3 yet — G-N6's four mandatory states, the manual
-// code-entry screen and the invalid-link recovery wording are change 3's work (proposal
-// Assumption 6). `params` is a Promise in this Next version (see
-// src/app/(org)/rounds/[id]/page.tsx for the existing pattern).
+// Screen A3 (`docs/screens/A-zugang.md`), with `rahmenwerk.md` §6's four mandatory states (G-N6).
+// `params` is a Promise in this Next version (see src/app/(org)/rounds/[id]/page.tsx for the
+// existing pattern).
 //
-// design.md Decision 9: session is read BEFORE anything that costs. Then, structurally (AC-2.25),
-// the rate limit runs BEFORE any code lookup at all — a limited attempt never even reaches
-// resolveJoinCode. Only after both does the (non-consuming) resolve happen, which is what FR-2.9
-// needs anyway: the household's name before any field is requested.
+// design.md Decision 2/9: session is read BEFORE anything that costs. Then, structurally
+// (AC-2.25), the rate limit runs BEFORE any code lookup at all — a limited attempt never even
+// reaches resolveJoinCode. Only after both does the (non-consuming) resolve happen, which is what
+// FR-2.9 needs anyway: the household's name before any field is requested. The three results are
+// then handed to decideJoinScreen (join-screen-state.ts), the one pure function that decides which
+// state this render shows — this component only renders what that function returns.
 export default async function JoinPage({ params }: { params: Promise<{ code: string }> }) {
   const { code } = await params;
 
@@ -34,42 +28,80 @@ export default async function JoinPage({ params }: { params: Promise<{ code: str
 
   const ip = getClientIp(await headers());
   const allowed = await recordJoinAttempt(joinAttemptSourceHash(ip));
-  if (!allowed) {
-    return <Refusal message={t.errors.rateLimited} />;
-  }
+  const resolved = allowed ? await resolveJoinCode(code) : null;
 
-  const resolved = await resolveJoinCode(code);
-  if (!resolved) {
-    return <Refusal message={t.errors.invalidLink} />;
-  }
+  const screen = decideJoinScreen({
+    allowed,
+    resolved,
+    sessionHouseholdId: current?.context.householdId ?? null,
+  });
 
-  // design.md Decision 9 (EC-2.4/EC-2.5): a visitor already signed in gets no second identity —
-  // taken to Start (the temporary /dashboard landing target, proposal Assumption 4) with a note
-  // for this household, refused with its own explanation for a different one. The household-account
-  // case (profileId null) is not literally "a resident" (EC-2.4's own wording), but ADR-013 already
-  // requires the same outcome: it never occupies a profile, so it is treated the same way here.
-  if (current) {
-    if (current.context.householdId === resolved.householdId) {
+  switch (screen.kind) {
+    // Review fix (§12): the three refusal states have no visible heading of their own — each carries
+    // a visually hidden one, so a screen-reader user landing here is not on a headingless page.
+    case "rate_limited":
+      // design.md Decision 8: no retry button here — a retry would itself be an attempt.
+      return (
+        <div className="space-y-4">
+          <h1 className="sr-only">{t.refusalHeading}</h1>
+          <div role="alert" className="callout callout-caution">
+            {t.errors.rateLimited}
+          </div>
+        </div>
+      );
+
+    case "invalid_link":
+      return (
+        <div className="space-y-4">
+          <h1 className="sr-only">{t.refusalHeading}</h1>
+          <div role="alert" className="callout callout-caution">
+            {t.errors.invalidLink}
+          </div>
+          <HandEntryWayBack />
+        </div>
+      );
+
+    case "already_member":
+      // design.md Decision 9 (EC-2.4): a visitor already signed in as a member of THIS household
+      // gets no second identity — taken to Start with a note (proposal.md Assumption 4).
       redirect("/dashboard?note=already_member");
+
+    case "other_household":
+      return (
+        <div className="space-y-4">
+          <h1 className="sr-only">{t.refusalHeading}</h1>
+          <div role="alert" className="callout callout-caution">
+            {t.errors.otherHousehold}
+          </div>
+          <SignOutAndReturnForm code={code} />
+        </div>
+      );
+
+    case "neutral":
+      return (
+        <div className="space-y-6">
+          <h1 className="font-serif text-2xl font-semibold">{t.heading()}</h1>
+          <span className="context-chip">{t.householdChip(screen.householdName)}</span>
+          <JoinForm code={code} passwordMinLength={JOIN_PASSWORD_MIN_LENGTH} boundDisplayName={null} />
+        </div>
+      );
+
+    case "bound":
+      return (
+        <div className="space-y-6">
+          <h1 className="font-serif text-2xl font-semibold">{t.boundHeading(screen.displayName)}</h1>
+          <span className="context-chip">{t.householdChip(screen.householdName)}</span>
+          <JoinForm
+            code={code}
+            passwordMinLength={JOIN_PASSWORD_MIN_LENGTH}
+            boundDisplayName={screen.displayName}
+          />
+        </div>
+      );
+
+    default: {
+      const _exhaustive: never = screen;
+      return _exhaustive;
     }
-    return <Refusal message={t.errors.otherHousehold} />;
   }
-
-  // design.md Decision 13: a BOUND link greets the visitor by the prepared profile's own name
-  // and asks only for a password — the name is not theirs to choose. A NEUTRAL link is
-  // unchanged.
-  const bound = resolved.boundResidentProfile;
-
-  return (
-    <div className="mx-auto max-w-md space-y-6 p-6">
-      <h1 className="font-serif text-2xl font-semibold">
-        {bound ? t.boundHeading(bound.displayName, resolved.householdName) : t.heading(resolved.householdName)}
-      </h1>
-      <JoinForm
-        code={code}
-        passwordMinLength={JOIN_PASSWORD_MIN_LENGTH}
-        boundDisplayName={bound?.displayName ?? null}
-      />
-    </div>
-  );
 }

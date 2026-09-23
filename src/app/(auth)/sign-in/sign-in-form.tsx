@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useActionState, useState } from "react";
 import { de } from "@/ui/strings";
 import { signInAction, type SignInFormState } from "./actions";
@@ -15,7 +16,7 @@ export function SignInForm() {
   const [state, formAction, pending] = useActionState(signInAction, initialState);
 
   return (
-    <div className="mx-auto max-w-md space-y-6 p-6">
+    <div className="space-y-6">
       <h1 className="font-serif text-2xl font-semibold">{t.heading}</h1>
 
       {/* Tab switcher, not a choice selector — active tab is a raised cream sub-pill, not a
@@ -96,6 +97,21 @@ export function SignInForm() {
           {pending ? t.submitPending : t.submit}
         </button>
       </form>
+
+      {/* join-screen design.md Decision 8/proposal.md: the two ways in that are not sign-in itself
+          — neither requires knowing a URL (spec "Sign-in leads to the ways in that are not
+          sign-in"). "Beitrittscode eingeben" only makes sense for someone without an account yet,
+          so it is shown on the resident tab only; "WG gründen" applies to either tab. */}
+      <div className="flex flex-col items-center gap-2">
+        <Link href="/register" className="btn-link">
+          {t.foundHousehold}
+        </Link>
+        {mode === "resident" && (
+          <Link href="/join" className="btn-link">
+            {t.enterJoinCode}
+          </Link>
+        )}
+      </div>
     </div>
   );
 }

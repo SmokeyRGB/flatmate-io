@@ -324,4 +324,39 @@ h3 {
   .dialog::backdrop {
     background: rgba(50, 31, 20, 0.35);
   }
+
+  /* join-screen design.md Decision 6: A3's Laden placeholder — the shape of the heading, chip and
+     card that follow, so nothing jumps once the real content arrives. --color-muted is
+     09-Design-System.md's own "skeleton fills" token, not a new hue. */
+  .skeleton {
+    background: var(--color-muted);
+    border-radius: 0.5rem;
+    animation: skeleton-pulse 1.6s ease-in-out infinite;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .skeleton {
+      animation: none;
+    }
+  }
+  @keyframes skeleton-pulse {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.55;
+    }
+  }
+
+  /* join-screen design.md Decision 8: the household-invitation line ("Du trittst … bei"), shown
+     beneath A3's heading in both the neutral and the bound shape. */
+  .context-chip {
+    display: inline-block;
+    background: var(--color-secondary);
+    color: var(--color-secondary-foreground);
+    border-radius: 1rem;
+    padding: 0.375rem 0.875rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+  }
 }
