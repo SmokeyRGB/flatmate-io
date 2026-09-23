@@ -19,11 +19,12 @@ export function RemoveMemberForm({ accountId, displayName }: { accountId: string
   const [typedName, setTypedName] = useState("");
   const dialogRef = useRef<HTMLDialogElement>(null);
 
-  // `removeMember` performs a soft `status: "moved_out"` transition, not a deletion — the row
-  // stays in the list (it re-renders with a "moved out" badge and a Reactivate button instead),
-  // so closing "for free" via the row unmounting (as originally assumed in research.md Decision
-  // 4) does not happen. Close explicitly on a successful, already-open submission; a failed one
-  // (state.error set) stays open so the inline error is visible (FR-008).
+  // `removeMember` now performs the `status: "removed"` transition (U-27, final) — the row
+  // itself unmounts on a successful submission, since getResidentList excludes `removed` members
+  // from the list this form is rendered from. The explicit close below is kept anyway: it is
+  // harmless (a dialog on an about-to-unmount row), and it still covers the one case where the
+  // row does NOT disappear — a failed submission (state.error set), where the dialog stays open
+  // so the inline error is visible (FR-008).
   useEffect(() => {
     if (state.error === null && dialogRef.current?.open) {
       dialogRef.current.close();

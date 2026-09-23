@@ -113,6 +113,20 @@
       "when": 1790077830872,
       "tag": "0015_join_code_issuance_bound_profile",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1790102247871,
+      "tag": "0016_resident_profile_removed_status",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1790102304340,
+      "tag": "0017_resident_profile_removal_final",
+      "breakpoints": true
     }
   ]
 }

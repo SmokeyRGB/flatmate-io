@@ -406,7 +406,12 @@ Prozess vs. Person, nicht bei „beschreibend vs. empfehlend".
   ist kein Beiwerk — sie ist der Kanal für **FR-2.27**, die Eingabe von Hand.
 
   Ein toter Link verschwindet nicht: er bleibt mit seinem Endstand stehen und nennt, wer über ihn
-  hereinkam (`Membership.joined_via_issuance_id`). Genau das war O-18's Anliegen.
+  hereinkam (`Membership.joined_via_issuance_id`). Genau das war O-18's Anliegen. **Menschliche
+  Entscheidung, 2026-09-23:** lebende Links stehen zuerst, wie bisher; tote Links (abgelaufen,
+  aufgebraucht oder gelöscht) stehen darunter in einem standardmäßig eingeklappten Abschnitt, dessen
+  Titelzeile ihre Anzahl nennt. Eingeklappt heißt nicht verborgen — geöffnet zeigt der Abschnitt
+  jeden toten Link mit seinem Endstand und wer über ihn beigetreten ist, genau wie zuvor. „Ein toter
+  Link verschwindet nicht" gilt also unverändert; er steht nur nicht mehr ungefragt in der Liste.
 
   **„Löschen"**, nicht „Widerrufen" und nicht „Zurückziehen" (UI-Vokabular `rahmenwerk.md` §8.6) —
   und Löschen berührt die Mitgliedschaften nicht, die über diesen Link entstanden sind.
@@ -420,7 +425,21 @@ Prozess vs. Person, nicht bei „beschreibend vs. empfehlend".
   ist endgültig, verlangt die **Eingabe des exakten Anzeigenamens** zur Bestätigung (kein einfacher
   Klick) und ist ausdrücklich für **fälschlich oder böswillig über den Beitrittscode beigetretene
   Personen** gedacht — nicht für Auszüge. **Verfügbar für Verwaltung und Moderator gleichermaßen
-  (U-30, 2026-09-17)** — vormals nur Verwaltung, da der Moderator bis dahin ohnehin nur lesend war
+  (U-30, 2026-09-17)** — vormals nur Verwaltung, da der Moderator bis dahin ohnehin nur lesend war.
+  **Menschliche Entscheidung, 2026-09-22 — die Endgültigkeit gilt jetzt auch in der Datenbank:**
+  eine entfernte Person erscheint **nicht mehr** in dieser Liste (anders als „Ausgezogen", die
+  weiter mit Reaktivieren-Handlung gelistet bleibt), es gibt für sie keine Reaktivieren-Handlung
+  mehr irgendwo, und ihr Anzeigename ist sofort wieder frei vergebbar. Ein **lebender** Link, über
+  den eine entfernte Person beigetreten ist, trägt neben seiner „Löschen"-Handlung einen
+  Warnhinweis, dass diese Person ihn noch verwenden könnte — ohne die Person zu nennen (die
+  Bewohnerliste zeigt sie ja nicht mehr). Nichts wird automatisch gelöscht — die moderierende Person
+  entscheidet. **Menschliche Entscheidung, 2026-09-23 (korrigiert den Stand vom 22.9.):** der
+  Hinweis gilt nur für einen **lebenden** Link — nicht gelöscht, nicht abgelaufen, noch Nutzungen
+  übrig —, nicht für jeden „nicht gelöschten". Ein aufgebrauchter Link lässt sich nie wieder
+  verwenden (die Nutzungszahl wird nie zurückgesetzt), ein gelöschter ebenso wenig; beide tragen
+  deshalb keinen Hinweis. Ein abgelaufener Link ist unbenutzbar, bis ihn eine moderierende Person
+  per „+7 Tage" verlängert — genau dieser Schritt macht ihn wieder lebend und den Hinweis damit
+  wieder sichtbar.
 
 **Abweichende Zustände**
 

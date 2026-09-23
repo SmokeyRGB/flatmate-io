@@ -2,6 +2,7 @@ import { ArrowLeft, DoorOpen, ShieldCheck, TriangleAlert, UserMinus, UserPlus } 
 import Link from "next/link";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
+import { joinCodeState, removedJoinerCautionApplies } from "@/modules/identity/join-code-state";
 import {
   PermissionDeniedError,
   buildJoinUrl,
@@ -34,11 +35,76 @@ function formatGermanDate(date: Date): string {
 // design.md Decision 6 / spec.md "The moderating person governs the links": a link's state is
 // derived (domain/identity.md §2.1 forbids a status column), and the surface is allowed to name
 // the reason it's dead — the REDEMPTION path is what must never do that (FR-2.8).
-function joinCodeStatusLabel(issuance: JoinCodeIssuanceRow): string {
-  if (issuance.deletedAt) return t.joinCode.deletedOn(formatGermanDate(issuance.deletedAt));
-  if (issuance.expiresAt.getTime() <= Date.now()) return t.joinCode.expiredOn(formatGermanDate(issuance.expiresAt));
-  if (issuance.uses >= issuance.maxUses) return t.joinCode.usedUp;
-  return t.joinCode.validUntil(formatGermanDate(issuance.expiresAt));
+//
+// design.md Decision 9 (revised 2026-09-23): rebuilt on top of join-code-state.ts's joinCodeState,
+// which now also drives the live/dead split below and the removed-joiner caution — same texts,
+// same order (deleted, expired, used up, else live) as before the revision.
+//
+// Copilot review fix: `now` is the caller's, never this function's own `new Date()` — the page
+// computes exactly one `now` up front and threads it through every helper on this page, so a
+// link's live/dead split, its status label, and the removed-joiner caution can never disagree
+// about what moment "now" was, even if this render straddles an expiry or usage boundary.
+function joinCodeStatusLabel(issuance: JoinCodeIssuanceRow, now: Date): string {
+  switch (joinCodeState(issuance, now)) {
+    case "deleted":
+      return t.joinCode.deletedOn(formatGermanDate(issuance.deletedAt as Date));
+    case "expired":
+      return t.joinCode.expiredOn(formatGermanDate(issuance.expiresAt));
+    case "used_up":
+      return t.joinCode.usedUp;
+    case "live":
+      return t.joinCode.validUntil(formatGermanDate(issuance.expiresAt));
+  }
+}
+
+// One card for one issuance, shared by the live list and the collapsed dead-links section below
+// (design.md Decision 9 revised: "dead-link rendering inside is unchanged" — same label, controls,
+// caution and joiner names either way).
+function renderJoinCodeCard(issuance: JoinCodeIssuanceRow, host: string | null, now: Date) {
+  const isDeleted = issuance.deletedAt !== null;
+  const url = buildJoinUrl(host, issuance.code);
+  return (
+    <li key={issuance.id} className="card space-y-2">
+      <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+        <span>{joinCodeStatusLabel(issuance, now)}</span>
+        <span className="text-muted-foreground">{t.joinCode.usageCount(issuance.uses, issuance.maxUses)}</span>
+      </div>
+
+      {!isDeleted && (
+        <div className="flex flex-wrap items-center gap-3">
+          <form action={extendJoinCodeAction}>
+            <input type="hidden" name="issuanceId" value={issuance.id} />
+            <button type="submit" className="btn-link">
+              {t.joinCode.extend}
+            </button>
+          </form>
+          <DeleteJoinCodeForm issuanceId={issuance.id} code={issuance.code} />
+        </div>
+      )}
+
+      {/* design.md Decision 9 (revised 2026-09-23): the caution is for a LIVE link only — the
+          first version (hasRemovedJoiner && !deletedAt) also flagged a used-up or expired link,
+          which the 8.3 walkthrough caught. Names no one (C-2.5, proposal Assumption 2). */}
+      {removedJoinerCautionApplies(issuance, now) && (
+        <div className="callout callout-caution">
+          <TriangleAlert className="size-4" />
+          <p>{t.joinCode.removedJoinerCaution}</p>
+        </div>
+      )}
+
+      <p className="font-mono text-sm font-semibold">{issuance.code}</p>
+      <p className="text-xs text-muted-foreground break-all">{url}</p>
+      <JoinCodeCopyButtons code={issuance.code} url={url} />
+
+      {/* AC-2.26: every link names who joined through it — live, used-up, or deleted
+          alike — and a link nobody used names nobody rather than rendering nothing. */}
+      <p className="text-xs text-muted-foreground">
+        {issuance.joinedResidentNames.length > 0
+          ? t.joinCode.joinedNames(issuance.joinedResidentNames)
+          : t.joinCode.joinedNoneYet}
+      </p>
+    </li>
+  );
 }
 
 // Screen O16. FR-1.25–FR-1.29 (revised 2026-09-17, U-30): full parity for administration AND a
@@ -94,6 +160,13 @@ export default async function MembersPage() {
       boundIssuancesByProfile.set(issuance.residentProfileId, issuance);
     }
   }
+
+  // design.md Decision 9 (revised 2026-09-23): live links first as today, dead ones (expired,
+  // used up or deleted) collapsed below — order within each part stays created_at DESC, since
+  // joinCodeIssuances already comes back in that order and filtering preserves it (FR-2.29).
+  const now = new Date();
+  const liveIssuances = joinCodeIssuances.filter((issuance) => joinCodeState(issuance, now) === "live");
+  const deadIssuances = joinCodeIssuances.filter((issuance) => joinCodeState(issuance, now) !== "live");
 
   const createResidentForm = isAdmin ? (
     <div className="card space-y-2">
@@ -168,46 +241,24 @@ export default async function MembersPage() {
       {joinCodeIssuances.length === 0 ? (
         <p className="text-sm text-muted-foreground">{t.joinCode.empty}</p>
       ) : (
-        <ul className="space-y-3">
-          {joinCodeIssuances.map((issuance) => {
-            const isDeleted = issuance.deletedAt !== null;
-            const url = buildJoinUrl(host, issuance.code);
-            return (
-              <li key={issuance.id} className="card space-y-2">
-                <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
-                  <span>{joinCodeStatusLabel(issuance)}</span>
-                  <span className="text-muted-foreground">
-                    {t.joinCode.usageCount(issuance.uses, issuance.maxUses)}
-                  </span>
-                </div>
+        <>
+          <ul className="space-y-3">{liveIssuances.map((issuance) => renderJoinCodeCard(issuance, host, now))}</ul>
 
-                {!isDeleted && (
-                  <div className="flex flex-wrap items-center gap-3">
-                    <form action={extendJoinCodeAction}>
-                      <input type="hidden" name="issuanceId" value={issuance.id} />
-                      <button type="submit" className="btn-link">
-                        {t.joinCode.extend}
-                      </button>
-                    </form>
-                    <DeleteJoinCodeForm issuanceId={issuance.id} code={issuance.code} />
-                  </div>
-                )}
-
-                <p className="font-mono text-sm font-semibold">{issuance.code}</p>
-                <p className="text-xs text-muted-foreground break-all">{url}</p>
-                <JoinCodeCopyButtons code={issuance.code} url={url} />
-
-                {/* AC-2.26: every link names who joined through it — live, used-up, or deleted
-                    alike — and a link nobody used names nobody rather than rendering nothing. */}
-                <p className="text-xs text-muted-foreground">
-                  {issuance.joinedResidentNames.length > 0
-                    ? t.joinCode.joinedNames(issuance.joinedResidentNames)
-                    : t.joinCode.joinedNoneYet}
-                </p>
-              </li>
-            );
-          })}
-        </ul>
+          {/* design.md Decision 9 (revised 2026-09-23, human decision from the 8.3 walkthrough):
+              dead links (expired, used up or deleted) are still listed — "Ein toter Link
+              verschwindet nicht" — but collapsed by default so a household with many dead links
+              is not cluttered with them. Native <details>, no client JS, no `open` attribute.
+              Rendered only when at least one dead link exists (spec.md "Dead links are
+              collapsed"). */}
+          {deadIssuances.length > 0 && (
+            <details className="space-y-3">
+              <summary className="cursor-pointer text-sm text-muted-foreground">
+                {t.joinCode.deadLinksSummary(deadIssuances.length)}
+              </summary>
+              <ul className="space-y-3 pt-3">{deadIssuances.map((issuance) => renderJoinCodeCard(issuance, host, now))}</ul>
+            </details>
+          )}
+        </>
       )}
     </div>
   ) : null;
@@ -254,7 +305,10 @@ export default async function MembersPage() {
                   </span>
                 )}
               </div>
-              {canAct && m.accountId && m.status !== "moved_out" && (
+              {/* U-27 Decision 1: a moved-out member can now be removed too (moved_out -> removed
+                  is a declared transition) — explicit statuses, not `!== "removed"`, since a
+                  removed row never reaches this page at all (getResidentList excludes it). */}
+              {canAct && m.accountId && (m.status === "active" || m.status === "moved_out") && (
                 <RemoveMemberForm accountId={m.accountId} displayName={m.displayName} />
               )}
             </div>
@@ -321,7 +375,7 @@ export default async function MembersPage() {
                 {boundIssuance && (
                   <div className="space-y-1">
                     <p className="field-helper">{t.joinCode.issuedForProfileHeading}</p>
-                    <p className="text-xs text-muted-foreground">{joinCodeStatusLabel(boundIssuance)}</p>
+                    <p className="text-xs text-muted-foreground">{joinCodeStatusLabel(boundIssuance, now)}</p>
                     <p className="font-mono text-sm font-semibold">{boundIssuance.code}</p>
                     <JoinCodeCopyButtons
                       code={boundIssuance.code}

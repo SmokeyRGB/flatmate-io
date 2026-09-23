@@ -54,7 +54,7 @@ roles · parallel rounds offered in the UI · anything about applications, votes
 - **FR-1.1** The system shall register a household from an email address and a password. Both are required.
 - **FR-1.2** The registration screen shall display a notice that the email address will be shared with the household's residents, before submission.
 - **FR-1.3** The system shall allow the household account to create resident profiles. Each profile has a display name.
-- **FR-1.4** A resident profile's display name shall be unique within the household among profiles that are not `moved_out`.
+- **FR-1.4** A resident profile's display name shall be unique within the household among profiles that are neither `moved_out` nor `removed`. *(Amended 2026-09-22: extended from "not `moved_out`" to also exclude `removed`, so a removed member's name is free again.)*
 - **FR-1.5** The household account shall be able to create a resident profile, including one intended for the person operating it. It shall **never occupy** that profile itself — whoever uses it signs in separately with `(household, display name) + password`. Source: ADR-013.
 - **FR-1.6** The acting identity of a session shall be fixed at sign-in and shall not be writable afterwards. Moving between administration and a resident identity shall require signing out and signing in again. The interface shall name the signed-in identity rather than offer a switch. Source: ADR-013.
 - **FR-1.7** The household account shall not be able to cast a vote.
@@ -63,7 +63,7 @@ roles · parallel rounds offered in the UI · anything about applications, votes
 ### Resident list (administration)
 
 - **FR-1.25** The household resident list shall show, per member: display name, join date, contact detail if present, and status.
-- **FR-1.26** The resident list shall offer the actions: remove member, set `moved_out`, reactivate, and share or rotate the join code. **Two-tier removal (U-27, decided 2026-09-16, incorporated here 2026-09-17):** `moved_out` is the regular path for an actual move-out — votes and history are kept. "Remove" is final, requires **typing the exact display name** to confirm (not a plain click), and is meant specifically for a person who joined falsely or maliciously via the join code — not for real move-outs.
+- **FR-1.26** The resident list shall offer the actions: remove member, set `moved_out`, reactivate, and share or rotate the join code. **Two-tier removal (U-27, decided 2026-09-16, incorporated here 2026-09-17):** `moved_out` is the regular path for an actual move-out — votes and history are kept. "Remove" is final, requires **typing the exact display name** to confirm (not a plain click), and is meant specifically for a person who joined falsely or maliciously via the join code — not for real move-outs. *(Amended 2026-09-22: a removed member is not shown on the resident list at all — see FR-1.25 — and no action reactivates one.)*
 - **FR-1.27** *(Revised 2026-09-17)* The resident list and its actions shall be **fully available to administration and to a profile with moderator rights** (full parity — the same rows, the same actions), and **not reachable at all — by any route —** by a profile without moderator rights.
 - **FR-1.28** The resident list shall be a screen distinct from the round participant list (FR-1.19); neither shall link to the other's data.
 - **FR-1.29** When administration is the only member of the household, the resident-list screen shall lead with the join-code action instead of displaying an empty list.

@@ -1,6 +1,6 @@
 import { createHmac, randomUUID } from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
-import { and, eq, ne } from "drizzle-orm";
+import { and, eq, notInArray } from "drizzle-orm";
 import { isUuid, withSessionContext, type SessionContext } from "@/db/session-context";
 import { recordActivityEvent } from "@/modules/audit/repository";
 import {
@@ -19,6 +19,7 @@ import {
   residentProfile,
   session,
 } from "./schema";
+import { NAME_RELEASING_STATUSES } from "./transitions";
 
 // Mirrors identity/repository.ts's own `Tx` alias — kept in sync with withSessionContext's
 // signature so insertSessionTx (task group 6) can be composed under a caller's already-open
@@ -37,9 +38,11 @@ function supabaseAdmin() {
 
 // research.md §2: a non-deliverable, internally-unique email for a resident account without a
 // real one. Derived from the profile's own uuid, NEVER from display_name — display_name is only
-// unique among non-moved_out profiles and is reused after a move-out, so a name-derived address
-// would collide with the moved-out profile's. `.invalid` is the IANA-reserved TLD for exactly
-// this purpose (RFC 2606) — guaranteed never to resolve, so nothing is ever actually delivered.
+// unique among profiles whose status is not in NAME_RELEASING_STATUSES (neither moved_out nor
+// removed, FR-1.4 amended 2026-09-22) and is reused once a member moves out or is removed, so a
+// name-derived address would collide with that profile's. `.invalid` is the IANA-reserved TLD for
+// exactly this purpose (RFC 2606) — guaranteed never to resolve, so nothing is ever actually
+// delivered.
 export function deriveResidentEmail(residentProfileId: string): string {
   return `resident-${residentProfileId}@accounts.flatmate.invalid`;
 }
@@ -428,7 +431,7 @@ export async function signIn(
           and(
             eq(residentProfile.householdId, input.householdId),
             eq(residentProfile.displayName, input.displayName),
-            ne(residentProfile.status, "moved_out"),
+            notInArray(residentProfile.status, [...NAME_RELEASING_STATUSES]),
           ),
         ),
     );
@@ -457,8 +460,35 @@ export async function signIn(
   const context: SessionContext = { accountId, householdId, profileId: null };
 
   return withSessionContext(context, async (tx) => {
-    const [membershipRow] = await tx.select().from(membership).where(eq(membership.accountId, accountId));
+    // PR #18 review: without a lock this check races a removal. Sign-in reads revokedAt = null,
+    // the removal then revokes the membership and revokes every session it can SEE — which does
+    // not yet include the one this transaction is about to insert — and that new session survives
+    // the removal. `.for("update")` serializes the two on the membership row:
+    //  - removal locked it first: this SELECT blocks until the removal commits, then reads the
+    //    revoked row and refuses below;
+    //  - sign-in locked it first: the removal's membership UPDATE waits until this commits, and
+    //    its later session UPDATE (a fresh READ COMMITTED snapshot) then sees and revokes the
+    //    session inserted here.
+    //
+    // No deadlock: removeMember/setMovedOut take row locks in the order resident_profile (the
+    // status UPDATE) → membership → session; signIn takes only the membership lock and then
+    // INSERTs, never touching resident_profile, so the two never wait on each other in reverse.
+    const [membershipRow] = await tx
+      .select()
+      .from(membership)
+      .where(eq(membership.accountId, accountId))
+      .for("update");
     if (!membershipRow) throw new SignInError("Account has no membership", "no_membership");
+
+    // design.md Decision 6 (V-3 "sofortiger Zugriffsentzug"): a revoked membership must not be
+    // able to open a NEW session either — Supabase Auth has already issued its own session by
+    // this point (signInWithPassword above), but it is discarded unstored here, exactly like
+    // every other refusal after that call. Same code as a wrong password (proposal Assumption 4)
+    // — a moved-out or removed person learns nothing about why. household_admin's own membership
+    // is never revoked (C-1.4), so this can never lock out administration.
+    if (membershipRow.revokedAt) {
+      throw new SignInError("Membership revoked", "invalid_credentials");
+    }
 
     // ADR-013/G-D14: acting_profile_id is set here, once, and never written again. `null` for a
     // household account (is_resident = false); the profile id for a resident account.

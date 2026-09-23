@@ -484,6 +484,13 @@ export async function getRoundForSession(context: SessionContext, roundId: strin
 // ADR-014/G-D15: a profile-less (household-account) session gets round identity/lifecycle only —
 // see getRoundForSession above — and participant names are Application-derived/participant data,
 // explicitly excluded. Enforced here (not just at the call site) so every caller is covered.
+//
+// final-member-removal design.md Decision 7 (V-3/FR-1.19, human decision 2026-09-22): a
+// participant who has since moved out or been removed no longer belongs on "current residents
+// taking part" — added eq(residentProfile.status, "active"). Deliberately does NOT write
+// round_participation.removed_at: that column means a moderator took someone out of a round,
+// a different fact from a change to their ResidentProfile status. F4's denominator still reads
+// the untouched round_participation rows.
 export async function getRoundParticipants(context: SessionContext, roundId: string) {
   if (context.profileId === null) return [];
   return withSessionContext(context, (tx) =>
@@ -491,7 +498,13 @@ export async function getRoundParticipants(context: SessionContext, roundId: str
       .select({ displayName: residentProfile.displayName })
       .from(roundParticipation)
       .innerJoin(residentProfile, eq(residentProfile.id, roundParticipation.residentProfileId))
-      .where(and(eq(roundParticipation.roundId, roundId), isNull(roundParticipation.removedAt))),
+      .where(
+        and(
+          eq(roundParticipation.roundId, roundId),
+          isNull(roundParticipation.removedAt),
+          eq(residentProfile.status, "active"),
+        ),
+      ),
   );
 }
 

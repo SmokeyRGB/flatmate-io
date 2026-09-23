@@ -190,6 +190,21 @@ export const de = {
       // (which always issues a neutral link).
       issueForProfile: "Einladung für dieses Profil erzeugen",
       issuedForProfileHeading: "Ausgestellte Einladung für dieses Profil:",
+      // design.md Decision 9 (human decision, 2026-09-22; revised 2026-09-23): shown beside
+      // "Löschen" on a LIVE link a removed member joined through — not merely "not yet deleted"
+      // (the first version also flagged a used-up or expired link, which can never again be
+      // used; caught in the 8.3 walkthrough). Names no one (they're already hidden from the
+      // resident list), and is deliberately not framed as a security boundary (C-2.5): the link
+      // still works until deleted, this only makes that visible. The wording itself ("kann sie
+      // ihn erneut verwenden") still reads correctly for a live link — that is exactly what
+      // "live" means.
+      removedJoinerCaution:
+        "Über diesen Link ist eine inzwischen entfernte Person beigetreten. Solange du ihn nicht " +
+        "löschst, kann sie ihn erneut verwenden.",
+      // design.md Decision 9 (revised 2026-09-23): the <summary> of O16's collapsed dead-links
+      // section (expired, used up or deleted) — states the count so the section is informative
+      // even collapsed.
+      deadLinksSummary: (n: number) => `Nicht mehr nutzbare Links (${n})`,
     },
     moderationBadge: "Moderation",
     makeModerator: "Zur Moderation ernennen",
