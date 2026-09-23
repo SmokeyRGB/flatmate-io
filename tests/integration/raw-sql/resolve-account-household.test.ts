@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 import { afterEach, describe, expect, it } from "vitest";
 import { db } from "@/db/client";
+import { issueJoinCode } from "@/modules/identity/repository";
 import { cleanupAll, registerTestHousehold, type TestHousehold } from "../../helpers/identity";
 import { uuid } from "../../helpers/uuid";
 
@@ -48,13 +49,48 @@ describe("resolve_account_household — raw SQL (M3/P1)", () => {
     // exactly the kind of drift join-code-protections' resolve_join_code/claim_join_code widening
     // already went through once (drizzle/0015) and is now expected to re-justify (P2's "widened
     // without re-making the narrowness argument").
+    //
+    // review fix: `SELECT * FROM (SELECT f(x)) AS t` is vacuous — wrapping a function call as a
+    // scalar expression in a subquery's select-list ALWAYS yields exactly one output column named
+    // after the function, regardless of what f actually returns (even a RETURNS TABLE function,
+    // called that way, collapses to one column). Calling the function directly in the FROM clause
+    // instead (`SELECT * FROM f(x) AS t`) is the shape that would actually expand a set-returning
+    // or composite result into several columns — see the sanity check below, which proves this
+    // query shape is capable of catching a widened column set, using resolve_join_code (RETURNS
+    // TABLE, drizzle/0015) as the case that WOULD show more than one column.
     hh = await registerTestHousehold();
 
+    // `AS t(household_id)` names the single output column explicitly — Postgres otherwise names
+    // a bare-aliased scalar function's one column after the alias itself ("t"), which would make
+    // the assertion below check the alias, not the function's actual output shape.
     const rows = await db.execute<Record<string, unknown>>(
-      sql`SELECT * FROM (SELECT resolve_account_household(${hh.accountId}::uuid)) AS t`,
+      sql`SELECT * FROM resolve_account_household(${hh.accountId}::uuid) AS t(household_id)`,
     );
 
     expect(rows).toHaveLength(1);
-    expect(Object.keys(rows[0])).toEqual(["resolve_account_household"]);
+    expect(Object.keys(rows[0])).toEqual(["household_id"]);
+  });
+
+  it("sanity check: the same query shape against a RETURNS TABLE function expands into several columns", async () => {
+    // Proves the previous test's query shape is non-vacuous, without altering the database:
+    // resolve_join_code (drizzle/0015) RETURNS TABLE with five columns. If it came back as a
+    // single column here, that would mean `SELECT * FROM f(x) AS t` collapses results the same
+    // way the old `SELECT * FROM (SELECT f(x)) AS t` did — which would make the narrowness
+    // assertion above meaningless. It doesn't: it expands, so the assertion above is real.
+    hh = await registerTestHousehold();
+    const link = await issueJoinCode(hh.context, hh.accountId, { validDays: 7, maxUses: 1 });
+
+    const rows = await db.execute<Record<string, unknown>>(sql`SELECT * FROM resolve_join_code(${link.code}) AS t`);
+
+    expect(rows).toHaveLength(1);
+    expect(Object.keys(rows[0]).sort()).toEqual(
+      [
+        "household_id",
+        "issuance_id",
+        "household_name",
+        "bound_resident_profile_id",
+        "bound_resident_display_name",
+      ].sort(),
+    );
   });
 });

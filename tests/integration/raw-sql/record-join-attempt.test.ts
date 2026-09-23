@@ -68,7 +68,18 @@ describe("record_join_attempt — raw SQL (M3/P1)", () => {
   it("app_runtime cannot read join_attempt directly — a raw SELECT returns zero rows (RLS enabled, zero policies)", async () => {
     const sourceHash = `test-definer-coverage-read-${randomUUID()}`;
     sourceHashesToClean.push(sourceHash);
-    await callRecordJoinAttempt(sourceHash, 60, 2); // the row exists — service_role can see it via teardown
+    await callRecordJoinAttempt(sourceHash, 60, 2);
+
+    // review fix: prove the row actually exists first — via service_role, which bypasses RLS —
+    // before trusting that app_runtime's own zero-rows result means "blocked by RLS" rather than
+    // "there was never anything to see". Without this, a bug in callRecordJoinAttempt itself (or
+    // in the source_hash it wrote) would make the app_runtime assertion below pass vacuously.
+    const { count, error } = await serviceRoleClient()
+      .from("join_attempt")
+      .select("id", { count: "exact", head: true })
+      .eq("source_hash", sourceHash);
+    expect(error).toBeNull();
+    expect(count).toBe(1);
 
     const rows = await db.execute<{ id: string }>(
       sql`SELECT id FROM join_attempt WHERE source_hash = ${sourceHash}`,
@@ -82,8 +93,19 @@ describe("record_join_attempt — raw SQL (M3/P1)", () => {
     // the assertion below is what actually proves it does not, today.
     sourceHashesToClean.push(sourceHash);
 
-    await expect(
-      db.execute(sql`INSERT INTO join_attempt (source_hash) VALUES (${sourceHash})`),
-    ).rejects.toThrow();
+    // review fix: `.rejects.toThrow()` alone would also pass for a syntax error or a connection
+    // drop — assert the actual Postgres error code (42501 = insufficient_privilege, the RLS
+    // rejection) instead, following session-immutable-profile.test.ts's pattern: postgres/drizzle
+    // wrap the driver-level PostgresError under a generic "Failed query: ..." message, and the
+    // code lives on the wrapped error's `cause`, not on the top-level Error.
+    let caught: unknown;
+    try {
+      await db.execute(sql`INSERT INTO join_attempt (source_hash) VALUES (${sourceHash})`);
+    } catch (err) {
+      caught = err;
+    }
+    expect(caught).toBeInstanceOf(Error);
+    const code = (caught as Error & { cause?: { code?: string } }).cause?.code;
+    expect(code).toBe("42501");
   });
 });
