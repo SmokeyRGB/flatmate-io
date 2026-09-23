@@ -58,7 +58,10 @@ function findSchemaFiles(dir: string): string[] {
 }
 
 export function splitIntoTableSegments(content: string): TableSegment[] {
-  const lines = content.split("\n");
+  // Split on CRLF too: with core.autocrlf the Windows checkout is CRLF while CI's is LF, and a
+  // trailing \r defeats COMMENT_OR_BLANK_LINE's `.*$`, which silently moved a marker comment into
+  // the PREVIOUS table's segment — so the lint would silence the wrong table on Windows only.
+  const lines = content.split(/\r?\n/);
 
   const rawStarts: Array<{ lineIdx: number; name: string }> = [];
   lines.forEach((line, lineIdx) => {
@@ -99,6 +102,13 @@ export function splitIntoTableSegments(content: string): TableSegment[] {
   return segments;
 }
 
+// Removes `//` comments (whole-line or trailing) and `/* */` blocks. A `//` inside a string
+// literal is not expected in a schema file's table definitions; if one ever appears, the worst
+// case is that the rest of that line is ignored for the household_id/pgPolicy match.
+function stripLineComments(segment: string): string {
+  return segment.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
+}
+
 export function checkRlsCoverage(rootDir: string): RlsCoverageViolation[] {
   const srcDir = `${rootDir}/src`;
   const violations: RlsCoverageViolation[] = [];
@@ -108,8 +118,12 @@ export function checkRlsCoverage(rootDir: string): RlsCoverageViolation[] {
     const relPath = relative(rootDir, file).replace(/\\/g, "/");
 
     for (const table of splitIntoTableSegments(content)) {
-      const hasHouseholdId = /household_id/.test(table.segment);
-      const hasPolicy = /\bpgPolicy\s*\(/.test(table.segment);
+      // Column and policy are matched against CODE only: a doc comment that merely mentions
+      // household_id (joinAttempt's explains why it has none) must not count as declaring it.
+      // The marker is a comment by definition, so it is matched against the raw segment.
+      const code = stripLineComments(table.segment);
+      const hasHouseholdId = /household_id/.test(code);
+      const hasPolicy = /\bpgPolicy\s*\(/.test(code);
       const hasEscapeHatch = ESCAPE_HATCH.test(table.segment);
 
       if (hasHouseholdId && !hasPolicy && !hasEscapeHatch) {

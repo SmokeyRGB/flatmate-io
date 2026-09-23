@@ -1,4 +1,4 @@
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -158,5 +158,60 @@ export const shouldStillBeFlagged = pgTable(
     const violations = checkRlsCoverage(fixtureDir);
     expect(violations).toHaveLength(1);
     expect(violations[0].table).toBe("should_still_be_flagged");
+  });
+
+  it("attributes the marker to the same table under CRLF line endings as under LF", () => {
+    // core.autocrlf makes the Windows checkout CRLF and CI's LF; the verdict must not depend on it.
+    const source = [
+      'import { pgPolicy, pgTable, uuid } from "drizzle-orm/pg-core";',
+      "",
+      'export const policied = pgTable("policied", { householdId: uuid("household_id") }, () => [pgPolicy("p")]);',
+      "",
+      "// rls-coverage: zero-policy by design - probe",
+      'export const marked = pgTable("marked", { householdId: uuid("household_id") }, () => []);',
+      "",
+    ].join("\r\n");
+    fixtureDir = mkdtempSync(join(tmpdir(), "flatmate-lint-"));
+    writeFixture("src/modules/example/schema.ts", source);
+    expect(checkRlsCoverage(fixtureDir)).toHaveLength(0);
+
+    // And the marker must not leak backward: with it removed, "marked" alone is flagged.
+    rmSync(fixtureDir, { recursive: true, force: true });
+    fixtureDir = mkdtempSync(join(tmpdir(), "flatmate-lint-"));
+    writeFixture(
+      "src/modules/example/schema.ts",
+      source.replace("// rls-coverage: zero-policy by design - probe\r\n", ""),
+    );
+    expect(checkRlsCoverage(fixtureDir).map((v) => v.table)).toEqual(["marked"]);
+  });
+
+  it("does not count a comment that mentions household_id as declaring the column", () => {
+    fixtureDir = mkdtempSync(join(tmpdir(), "flatmate-lint-"));
+    writeFixture(
+      "src/modules/example/schema.ts",
+      [
+        'import { pgTable, uuid } from "drizzle-orm/pg-core";',
+        "",
+        "// No household_id here, deliberately: the limit is global (joinAttempt's shape).",
+        'export const unscoped = pgTable("unscoped", { id: uuid("id") }, () => []);',
+        "",
+      ].join("\n"),
+    );
+    expect(checkRlsCoverage(fixtureDir)).toHaveLength(0);
+  });
+
+  // The real schema files, under both line endings: the Windows checkout is CRLF
+  // (core.autocrlf) and CI's is LF, and the lint's verdict on the real repo must be the same on
+  // both. A first per-table version passed on Windows and would have failed on CI.
+  it.each(["\n", "\r\n"])("passes on the repo's real schema files with %j line endings", (eol) => {
+    fixtureDir = mkdtempSync(join(tmpdir(), "flatmate-lint-"));
+    const modulesDir = join(process.cwd(), "src", "modules");
+    for (const mod of readdirSync(modulesDir)) {
+      const schema = join(modulesDir, mod, "schema.ts");
+      if (!existsSync(schema)) continue;
+      const normalised = readFileSync(schema, "utf8").replace(/\r?\n/g, eol);
+      writeFixture(`src/modules/${mod}/schema.ts`, normalised);
+    }
+    expect(checkRlsCoverage(fixtureDir)).toEqual([]);
   });
 });
