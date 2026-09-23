@@ -10,7 +10,11 @@
 //       tests/integration/raw-sql/ — the G-C7 raw-SQL half, which is the only place a leak PAST
 //       the TypeScript layer would ever be caught (a policy-layer test alone calls through the
 //       app's own repository functions and would never notice a SECURITY DEFINER hole). A name
-//       merely MENTIONED (e.g. in a comment) does not count — see stripJsComments below.
+//       merely MENTIONED (e.g. in a comment, a test title, a plain string, or a bare JS call that
+//       is never sent to Postgres) does not count — see stripJsComments and
+//       extractSqlTemplateContents below. "Called by name" means called from inside an actual
+//       sql`...` tagged template (PR #19 review: the old check matched `name(` anywhere in the
+//       file, so a test's own title or a JS-only call could satisfy it without ever reaching SQL).
 //
 // "Latest definition of a name wins": drizzle/*.sql is scanned in file order (numeric prefix), and
 // a later `DROP FUNCTION` with no following `CREATE FUNCTION` of the same name removes it from
@@ -111,6 +115,135 @@ function stripJsComments(source: string): string {
   return source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
 }
 
+// PR #19 review: the old check matched `name(` anywhere in a comment-stripped raw-sql test file —
+// a test TITLE, a plain string, or a bare JS call (`covered_fn()`, never sent to Postgres) all
+// satisfied it, none of which prove the function is actually exercised by SQL. "Called by name"
+// must mean called from inside an actual `sql` tagged template (drizzle-orm's `sql` from
+// "drizzle-orm", the only tag this project's raw-sql tests use), the literal text that becomes a
+// real query. This walks the comment-stripped source once, extracts every sql`...`'s raw content,
+// and returns it all joined — the ONLY text `checkDefinerCoverageLint` below searches for a call
+// in. `${...}` interpolations inside a template are skipped (their own text is JS, not SQL, and
+// per this lint's own examples may itself contain a nested template literal with its own
+// backticks) — skipNestedTemplate/skipStringLiteral below walk past a nested template or string
+// literal without treating its backtick/quote as the outer template's own closing character.
+function skipStringLiteral(source: string, start: number, quote: string): number {
+  let i = start + 1;
+  while (i < source.length) {
+    if (source[i] === "\\") {
+      i += 2;
+      continue;
+    }
+    if (source[i] === quote) return i + 1;
+    i++;
+  }
+  return i;
+}
+
+// `start` points at the opening backtick of a template literal nested inside a `${...}`
+// expression. Recurses into ITS OWN `${...}` (which may itself nest a template/string) so a
+// backtick or quote belonging to that inner expression is never mistaken for this template's own
+// closing backtick.
+function skipNestedTemplate(source: string, start: number): number {
+  let i = start + 1;
+  let depth = 0;
+  while (i < source.length) {
+    const ch = source[i];
+    if (ch === "\\") {
+      i += 2;
+      continue;
+    }
+    if (depth === 0) {
+      if (ch === "`") return i + 1;
+      if (ch === "$" && source[i + 1] === "{") {
+        depth = 1;
+        i += 2;
+        continue;
+      }
+      i++;
+    } else {
+      if (ch === "{") {
+        depth++;
+        i++;
+        continue;
+      }
+      if (ch === "}") {
+        depth--;
+        i++;
+        continue;
+      }
+      if (ch === "`") {
+        i = skipNestedTemplate(source, i);
+        continue;
+      }
+      if (ch === '"' || ch === "'") {
+        i = skipStringLiteral(source, i, ch);
+        continue;
+      }
+      i++;
+    }
+  }
+  return i;
+}
+
+function extractSqlTemplateContents(source: string): string {
+  const parts: string[] = [];
+  const tagRe = /\bsql`/g;
+  let match: RegExpExecArray | null;
+
+  while ((match = tagRe.exec(source))) {
+    let i = match.index + match[0].length;
+    let depth = 0; // 0 = in the template's own raw text; >0 = inside a ${...} expression
+    let out = "";
+
+    while (i < source.length) {
+      const ch = source[i];
+      if (ch === "\\") {
+        if (depth === 0) out += ch + (source[i + 1] ?? "");
+        i += 2;
+        continue;
+      }
+      if (depth === 0) {
+        if (ch === "`") {
+          i++;
+          break;
+        }
+        if (ch === "$" && source[i + 1] === "{") {
+          depth = 1;
+          i += 2;
+          continue;
+        }
+        out += ch;
+        i++;
+      } else {
+        if (ch === "{") {
+          depth++;
+          i++;
+          continue;
+        }
+        if (ch === "}") {
+          depth--;
+          i++;
+          continue;
+        }
+        if (ch === "`") {
+          i = skipNestedTemplate(source, i);
+          continue;
+        }
+        if (ch === '"' || ch === "'") {
+          i = skipStringLiteral(source, i, ch);
+          continue;
+        }
+        i++;
+      }
+    }
+
+    tagRe.lastIndex = i;
+    parts.push(out);
+  }
+
+  return parts.join("\n");
+}
+
 function rawSqlTestSources(rawSqlDir: string): string {
   let combined = "";
   let files: string[] = [];
@@ -120,7 +253,8 @@ function rawSqlTestSources(rawSqlDir: string): string {
     return combined;
   }
   for (const file of files) {
-    combined += stripJsComments(readFileSync(join(rawSqlDir, file), "utf8")) + "\n";
+    const stripped = stripJsComments(readFileSync(join(rawSqlDir, file), "utf8"));
+    combined += extractSqlTemplateContents(stripped) + "\n";
   }
   return combined;
 }

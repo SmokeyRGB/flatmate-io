@@ -29,7 +29,7 @@ $$;`,
     );
     writeFixture(
       "tests/integration/raw-sql/dangerous.test.ts",
-      `it("calls dangerous_fn", () => { dangerous_fn(); });`,
+      `it("calls dangerous_fn", () => { db.execute(sql\`SELECT dangerous_fn(\${id})\`); });`,
     );
 
     const violations = checkDefinerCoverageLint(fixtureDir);
@@ -68,7 +68,7 @@ $$;`,
     );
     writeFixture(
       "tests/integration/raw-sql/covered.test.ts",
-      `it("calls covered_fn", () => { covered_fn(); });`,
+      `it("calls covered_fn", () => { db.execute(sql\`SELECT covered_fn(\${id})\`); });`,
     );
 
     expect(checkDefinerCoverageLint(fixtureDir)).toHaveLength(0);
@@ -108,7 +108,7 @@ $$;`,
     );
     writeFixture(
       "tests/integration/raw-sql/resolve-it.test.ts",
-      `it("calls resolve_it", () => { resolve_it(); });`,
+      `it("calls resolve_it", () => { db.execute(sql\`SELECT resolve_it(\${code})\`); });`,
     );
 
     // Exactly one entry considered (the latest definition), not flagged as dropped.
@@ -130,7 +130,7 @@ $$;`,
     );
     writeFixture(
       "tests/integration/raw-sql/priced.test.ts",
-      `it("calls priced_fn", () => { priced_fn(); });`,
+      `it("calls priced_fn", () => { db.execute(sql\`SELECT priced_fn(\${amount})\`); });`,
     );
 
     expect(checkDefinerCoverageLint(fixtureDir)).toHaveLength(0);
@@ -148,7 +148,7 @@ $fn$;`,
     );
     writeFixture(
       "tests/integration/raw-sql/tagged.test.ts",
-      `it("calls tagged_fn", () => { tagged_fn(); });`,
+      `it("calls tagged_fn", () => { db.execute(sql\`SELECT tagged_fn(\${id})\`); });`,
     );
 
     expect(checkDefinerCoverageLint(fixtureDir)).toHaveLength(0);
@@ -168,7 +168,7 @@ $$ LANGUAGE sql SECURITY DEFINER SET search_path = public;`,
     );
     writeFixture(
       "tests/integration/raw-sql/trailing.test.ts",
-      `it("calls trailing_attrs_fn", () => { trailing_attrs_fn(); });`,
+      `it("calls trailing_attrs_fn", () => { db.execute(sql\`SELECT trailing_attrs_fn(\${id})\`); });`,
     );
 
     expect(checkDefinerCoverageLint(fixtureDir)).toHaveLength(0);
@@ -212,7 +212,7 @@ $$;`,
     );
     writeFixture(
       "tests/integration/raw-sql/qualified.test.ts",
-      `it("calls qualified_fn", () => { qualified_fn(); });`,
+      `it("calls qualified_fn", () => { db.execute(sql\`SELECT qualified_fn(\${id})\`); });`,
     );
 
     expect(checkDefinerCoverageLint(fixtureDir)).toHaveLength(0);
@@ -259,6 +259,139 @@ $$;`,
     expect(violations).toContainEqual(
       expect.objectContaining({ functionName: "mentioned_only_fn", rule: "missing-raw-sql-test" }),
     );
+  });
+
+  // PR #19 review: "called by name" used to mean nothing more than the text `name(` appearing
+  // anywhere in a comment-stripped raw-sql test file — a test's own TITLE, a plain string, or a
+  // bare JS call that is never sent to Postgres all satisfied it. None of those reach SQL, so none
+  // of them should count. The four cases below pin the distinction the fix draws: only text
+  // actually inside a `sql`...`` tagged template counts as a call.
+  it("does not count a name that only appears in an it(...) title", () => {
+    fixtureDir = mkdtempSync(join(tmpdir(), "flatmate-lint-"));
+    writeFixture(
+      "drizzle/0001_test.sql",
+      `CREATE FUNCTION title_only_fn(p_id uuid) RETURNS uuid
+LANGUAGE sql SECURITY DEFINER SET search_path = public STABLE AS $$
+  SELECT p_id
+$$;`,
+    );
+    writeFixture(
+      "tests/integration/raw-sql/title-only.test.ts",
+      `it("title_only_fn(x) should do the right thing", () => { expect(true).toBe(true); });`,
+    );
+
+    const violations = checkDefinerCoverageLint(fixtureDir);
+    expect(violations).toContainEqual(
+      expect.objectContaining({ functionName: "title_only_fn", rule: "missing-raw-sql-test" }),
+    );
+  });
+
+  it("does not count a name that only appears in a plain string", () => {
+    fixtureDir = mkdtempSync(join(tmpdir(), "flatmate-lint-"));
+    writeFixture(
+      "drizzle/0001_test.sql",
+      `CREATE FUNCTION string_only_fn(p_id uuid) RETURNS uuid
+LANGUAGE sql SECURITY DEFINER SET search_path = public STABLE AS $$
+  SELECT p_id
+$$;`,
+    );
+    writeFixture(
+      "tests/integration/raw-sql/string-only.test.ts",
+      `it("mentions it in a message", () => {\n` +
+        `  const note = "see string_only_fn( for details";\n` +
+        `  expect(note).toContain("string_only_fn");\n` +
+        `});`,
+    );
+
+    const violations = checkDefinerCoverageLint(fixtureDir);
+    expect(violations).toContainEqual(
+      expect.objectContaining({ functionName: "string_only_fn", rule: "missing-raw-sql-test" }),
+    );
+  });
+
+  it("does not count a bare JS call that is never sent to Postgres", () => {
+    fixtureDir = mkdtempSync(join(tmpdir(), "flatmate-lint-"));
+    writeFixture(
+      "drizzle/0001_test.sql",
+      `CREATE FUNCTION js_call_only_fn(p_id uuid) RETURNS uuid
+LANGUAGE sql SECURITY DEFINER SET search_path = public STABLE AS $$
+  SELECT p_id
+$$;`,
+    );
+    writeFixture(
+      "tests/integration/raw-sql/js-call-only.test.ts",
+      `it("calls the JS-only stub", () => { js_call_only_fn(); });`,
+    );
+
+    const violations = checkDefinerCoverageLint(fixtureDir);
+    expect(violations).toContainEqual(
+      expect.objectContaining({ functionName: "js_call_only_fn", rule: "missing-raw-sql-test" }),
+    );
+  });
+
+  it("counts a name called inside sql`SELECT name(${x})`", () => {
+    fixtureDir = mkdtempSync(join(tmpdir(), "flatmate-lint-"));
+    writeFixture(
+      "drizzle/0001_test.sql",
+      `CREATE FUNCTION interpolated_fn(p_id uuid) RETURNS uuid
+LANGUAGE sql SECURITY DEFINER SET search_path = public STABLE AS $$
+  SELECT p_id
+$$;`,
+    );
+    writeFixture(
+      "tests/integration/raw-sql/interpolated.test.ts",
+      "it(\"calls interpolated_fn\", () => { db.execute(sql`SELECT interpolated_fn(${id})`); });",
+    );
+
+    expect(checkDefinerCoverageLint(fixtureDir)).toHaveLength(0);
+  });
+
+  it("counts a name called inside a multi-line sql template", () => {
+    fixtureDir = mkdtempSync(join(tmpdir(), "flatmate-lint-"));
+    writeFixture(
+      "drizzle/0001_test.sql",
+      `CREATE FUNCTION multiline_fn(p_id uuid) RETURNS uuid
+LANGUAGE sql SECURITY DEFINER SET search_path = public STABLE AS $$
+  SELECT p_id
+$$;`,
+    );
+    writeFixture(
+      "tests/integration/raw-sql/multiline.test.ts",
+      [
+        'it("calls multiline_fn", () => {',
+        "  const rows = db.execute(sql`",
+        "    SELECT *",
+        "    FROM multiline_fn(${id})",
+        "    AS t(result)",
+        "  `);",
+        "});",
+      ].join("\n"),
+    );
+
+    expect(checkDefinerCoverageLint(fixtureDir)).toHaveLength(0);
+  });
+
+  // A nested template literal inside a ${...} interpolation must not be mistaken for the outer
+  // sql`...`'s own closing backtick — otherwise the outer template's content would be truncated
+  // partway through and a real call after the interpolation would go unseen.
+  it("does not let a nested template literal inside ${...} close the outer sql template early", () => {
+    fixtureDir = mkdtempSync(join(tmpdir(), "flatmate-lint-"));
+    writeFixture(
+      "drizzle/0001_test.sql",
+      `CREATE FUNCTION nested_template_fn(p_id uuid) RETURNS uuid
+LANGUAGE sql SECURITY DEFINER SET search_path = public STABLE AS $$
+  SELECT p_id
+$$;`,
+    );
+    writeFixture(
+      "tests/integration/raw-sql/nested-template.test.ts",
+      "it(\"calls nested_template_fn\", () => {\n" +
+        "  const label = `prefix-${uuid()}-suffix`;\n" +
+        "  db.execute(sql`SELECT nested_template_fn(${label})`);\n" +
+        "});",
+    );
+
+    expect(checkDefinerCoverageLint(fixtureDir)).toHaveLength(0);
   });
 
   it("treats a DROP with no following CREATE as real removal — nothing to flag", () => {
