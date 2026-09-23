@@ -67,9 +67,14 @@ export async function createResidentProfile(
   displayName: string,
   actor: Actor,
 ) {
-  if (actor.accountId) {
-    await assertIsAdministration(context, actor.accountId);
-  }
+  // G-C fix (2026-09-23 human decision): a null actor.accountId used to skip this check
+  // entirely instead of refusing — not exploitable by any current caller (the one production
+  // call site always passes a real account id), but a repository function's own authorization
+  // must hold regardless of what a future caller passes. Refused with the exact error
+  // assertIsAdministration itself throws for a real-but-unauthorized account, so a null actor is
+  // indistinguishable from "not administration", never a bypass.
+  if (!actor.accountId) throw new ResidentListActionDeniedError();
+  await assertIsAdministration(context, actor.accountId);
   return withSessionContext(context, async (tx) => {
     if (await isDisplayNameTaken(context, displayName)) {
       throw new DuplicateDisplayNameError(displayName);
@@ -152,6 +157,13 @@ export async function transitionResidentProfileStatus(
   toStatus: ResidentProfileStatus,
   actor: Actor,
 ) {
+  // G-C fix (2026-09-23 human decision): this export had NO authorization check at all — no
+  // route calls it today (only display-name-uniqueness.test.ts, which needs it to move a
+  // PREPARED profile with no account yet, so it cannot be replaced by setMovedOut), but it stays
+  // exported and must be guarded like its siblings removeMember/setMovedOut/reactivateMember, all
+  // of which gate on assertIsAdministrationOrModerator before touching anything.
+  if (!actor.accountId) throw new ResidentListActionDeniedError();
+  await assertIsAdministrationOrModerator(context, actor.accountId);
   return withSessionContext(context, (tx) =>
     transitionResidentProfileStatusTx(tx, residentProfileId, toStatus, actor),
   );
@@ -292,6 +304,10 @@ export class HouseholdAccountCannotVoteError extends Error {
 // anything. Refuses by every route that would eventually call it, because there is exactly one
 // such check, not one per route.
 export async function assertAccountCanVote(context: SessionContext, accountId: string): Promise<void> {
+  // PR #19 review: authorization derives from the authenticated session, not from whatever
+  // accountId a caller passes in — accountId must name the session's own account
+  // (context.accountId), never an id supplied independently of it.
+  if (accountId !== context.accountId) throw new HouseholdAccountCannotVoteError();
   const membershipRow = await getMembershipForAccount(context, accountId);
   if (!membershipRow || !membershipRow.isResident) {
     throw new HouseholdAccountCannotVoteError();
@@ -321,6 +337,10 @@ export async function assertHasPermission(
   accountId: string,
   permission: string,
 ): Promise<void> {
+  // PR #19 review: authorization derives from the authenticated session, not from whatever
+  // accountId a caller passes in — accountId must name the session's own account
+  // (context.accountId), never an id supplied independently of it.
+  if (accountId !== context.accountId) throw new PermissionDeniedError(permission);
   const membershipRow = await getMembershipForAccount(context, accountId);
   if (!membershipRow) throw new PermissionDeniedError(permission);
   if (membershipRow.role === "household_admin") return;
@@ -484,6 +504,10 @@ export class ResidentListActionDeniedError extends Error {
 // actions, not a subset. `triggerSubjectAccessExport` below deliberately does NOT use this: FR-1.24
 // names that action as administration's specifically, unaffected by U-30's resident-list parity.
 async function assertIsAdministrationOrModerator(context: SessionContext, accountId: string): Promise<void> {
+  // PR #19 review: authorization derives from the authenticated session, not from whatever
+  // accountId a caller passes in — accountId must name the session's own account
+  // (context.accountId), never an id supplied independently of it.
+  if (accountId !== context.accountId) throw new ResidentListActionDeniedError();
   const membershipRow = await getMembershipForAccount(context, accountId);
   if (!membershipRow || (membershipRow.role !== "household_admin" && membershipRow.role !== "moderator")) {
     throw new ResidentListActionDeniedError();
@@ -491,6 +515,10 @@ async function assertIsAdministrationOrModerator(context: SessionContext, accoun
 }
 
 export async function assertIsAdministration(context: SessionContext, accountId: string): Promise<void> {
+  // PR #19 review: authorization derives from the authenticated session, not from whatever
+  // accountId a caller passes in — accountId must name the session's own account
+  // (context.accountId), never an id supplied independently of it.
+  if (accountId !== context.accountId) throw new ResidentListActionDeniedError();
   const membershipRow = await getMembershipForAccount(context, accountId);
   if (!membershipRow || membershipRow.role !== "household_admin") {
     throw new ResidentListActionDeniedError();
@@ -1078,10 +1106,39 @@ export async function triggerSubjectAccessExport(
   return { exportId: `export-${applicationId}-${Date.now()}` };
 }
 
+// G-C fix (2026-09-23 human decision): this used to accept ANY sessionId under RLS's
+// household-only scoping — no check that the session belonged to the CALLER's own account, so a
+// plain resident who learned or guessed another member's session id could revoke it. Scoped here
+// to context.accountId as well: through this function, a session can only be revoked by its own
+// account. RLS guarantees household isolation only (ADR-004); within a household this rule is
+// application-level, like every role and ownership rule — raw SQL as app_runtime inside the
+// household is not bound by it (PR #19 review). sign-out-action.ts's only call site already
+// passes the caller's own sessionId, so its behaviour is unchanged.
+//
+// revokeSession review fix: filtered the UPDATE on revokedAt IS NULL, matching the repo's
+// convention that an original revocation timestamp is never overwritten (see
+// revokeMembershipForProfileTx's comment ~line 526). Signing out twice (or revoking an
+// already-revoked session of your own) must still be a no-op-shaped success, not a refusal — so
+// when the UPDATE matches nothing, look the session up by id+account unfiltered: if it exists
+// (already revoked, but still the caller's own), return normally. Only throw
+// PermissionDeniedError when no session with that id belongs to context.accountId at all.
 export async function revokeSession(context: SessionContext, sessionId: string): Promise<void> {
-  await withSessionContext(context, (tx) =>
-    tx.update(session).set({ revokedAt: new Date() }).where(eq(session.id, sessionId)),
-  );
+  await withSessionContext(context, async (tx) => {
+    const [revoked] = await tx
+      .update(session)
+      .set({ revokedAt: new Date() })
+      .where(and(eq(session.id, sessionId), eq(session.accountId, context.accountId), isNull(session.revokedAt)))
+      .returning({ id: session.id });
+    if (revoked) return;
+
+    const [existing] = await tx
+      .select({ id: session.id })
+      .from(session)
+      .where(and(eq(session.id, sessionId), eq(session.accountId, context.accountId)));
+    if (existing) return; // already revoked, still the caller's own session — harmless no-op
+
+    throw new PermissionDeniedError("revoke_session");
+  });
 }
 
 export { account, household, householdSettings, joinCodeIssuance, membership, residentProfile, session };

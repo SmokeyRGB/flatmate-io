@@ -54,12 +54,19 @@ describe("Resident list access by role", () => {
     expect(asAdmin.canAct).toBe(true);
     expect(asAdmin.members.length).toBeGreaterThanOrEqual(2);
 
+    // getResidentList enforces its own inline admin/moderator gate (not one of the four
+    // assertHasPermission/assertIsAdministration[OrModerator]/assertAccountCanVote helpers), so
+    // it is unaffected by PR #19 review's session-derived check and can still be called with
+    // hh.context regardless of which accountId is passed.
     const asModerator = await getResidentList(hh.context, modAccountId);
     expect(asModerator.canAct).toBe(true); // U-30: full parity, not read-only
     expect(asModerator.members.length).toBe(asAdmin.members.length);
 
-    // Parity means a moderator can actually act, not just see canAct = true.
-    await expect(setMovedOut(hh.context, modAccountId, memberAccountId)).resolves.not.toThrow();
+    // Parity means a moderator can actually act, not just see canAct = true. setMovedOut DOES
+    // route through assertIsAdministrationOrModerator, so PR #19 review's check requires the
+    // moderator's OWN SessionContext here, not hh.context (the admin's).
+    const modContext = { accountId: modAccountId, householdId: hh.householdId, profileId: modProfile.id };
+    await expect(setMovedOut(modContext, modAccountId, memberAccountId)).resolves.not.toThrow();
 
     // AC-1.21: a non-moderator member is refused by the one function this list has.
     await expect(getResidentList(hh.context, memberAccountId)).rejects.toThrow(PermissionDeniedError);

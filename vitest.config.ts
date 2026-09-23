@@ -29,6 +29,14 @@ export default defineConfig({
     // that on its own against eu-west-1, where CI operations legitimately run 12-19s. Match
     // testTimeout so teardown has the same budget it had before the move.
     hookTimeout: 60000,
+    // The suite is network-bound: 98% of CI time is waiting on round trips from a US GitHub
+    // runner to eu-west-1, not CPU. Vitest's default (availableParallelism() - 1) gives a 4-vCPU
+    // runner 3 workers, most of them idle on I/O. CI raises it via VITEST_MAX_WORKERS
+    // (.github/workflows/ci.yml); unset, the default stands, so local runs are unchanged. The
+    // ceiling is Supabase's, not the runner's: each worker holds up to 10 pooler connections, and
+    // Auth rate-limits sign-ins per IP, which every worker shares — lower the number if CI starts
+    // failing on 429s or connection limits rather than on assertions.
+    maxWorkers: Number(process.env.VITEST_MAX_WORKERS) || undefined,
   },
   resolve: {
     alias: {

@@ -78,9 +78,17 @@ describe("Procedure lock while a round is open", () => {
     const resident = await claim(hh, "Resident1");
     accountIds.push(resident.accountId);
     const residentActor = { accountId: resident.accountId, profileId: resident.profileId };
+    // PR #19 review: authorization derives from the authenticated session — the resident's OWN
+    // SessionContext, not hh.context (the admin's) paired with the resident's accountId, which
+    // would now be refused as a spoofed session rather than for lacking manage_settings.
+    const residentContext = {
+      accountId: resident.accountId,
+      householdId: hh.householdId,
+      profileId: resident.profileId,
+    };
 
     await expect(
-      updateHouseholdSettingsWithProcedureLock(hh.context, { quorumShare: "0.6" }, residentActor),
+      updateHouseholdSettingsWithProcedureLock(residentContext, { quorumShare: "0.6" }, residentActor),
     ).rejects.toThrow(PermissionDeniedError);
   });
 
@@ -90,12 +98,17 @@ describe("Procedure lock while a round is open", () => {
     const resident = await claim(hh, "Resident1");
     accountIds.push(resident.accountId);
     const residentActor = { accountId: resident.accountId, profileId: resident.profileId };
+    const residentContext = {
+      accountId: resident.accountId,
+      householdId: hh.householdId,
+      profileId: resident.profileId,
+    };
     const roomA = await createRoom(hh.context, "Room A", actor);
     const round = await createRound(hh.context, "Round", [roomA.id], actor);
     await openRound(hh.context, round.id, actor);
 
     await expect(
-      forceChangeSettingWhileRoundOpen(hh.context, "quorumShare", "0.9", round.id, residentActor),
+      forceChangeSettingWhileRoundOpen(residentContext, "quorumShare", "0.9", round.id, residentActor),
     ).rejects.toThrow(PermissionDeniedError);
   });
 });
