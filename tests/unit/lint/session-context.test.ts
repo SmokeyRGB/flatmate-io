@@ -3,7 +3,6 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { checkSessionContextLint } from "../../../scripts/lint/session-context";
-import { checkImportBoundaryLint } from "../../../scripts/lint/import-boundary";
 
 let fixtureDir: string;
 
@@ -46,28 +45,4 @@ describe("session-context lint (FR-0.4, T006/T011)", () => {
     expect(checkSessionContextLint(fixtureDir)).toHaveLength(0);
   });
 });
-
-// FR-0.1/G-C1: no route/component/job handler may import the raw client directly.
-describe("import-boundary lint (FR-0.1, T007/T011)", () => {
-  it("flags a raw client import outside src/db/ and repository.ts files", () => {
-    fixtureDir = mkdtempSync(join(tmpdir(), "flatmate-lint-"));
-    writeFixture("src/app/page.tsx", `import { db } from "@/db/client";\nexport default function Page() {}`);
-
-    const violations = checkImportBoundaryLint(fixtureDir);
-    expect(violations.length).toBeGreaterThan(0);
-  });
-
-  it("allows the raw client import inside src/db/", () => {
-    fixtureDir = mkdtempSync(join(tmpdir(), "flatmate-lint-"));
-    writeFixture("src/db/client.ts", `import postgres from "postgres";`);
-
-    expect(checkImportBoundaryLint(fixtureDir)).toHaveLength(0);
-  });
-
-  it("allows the raw client import inside a module's own repository.ts", () => {
-    fixtureDir = mkdtempSync(join(tmpdir(), "flatmate-lint-"));
-    writeFixture("src/modules/casting/repository.ts", `import { db } from "@/db/client";`);
-
-    expect(checkImportBoundaryLint(fixtureDir)).toHaveLength(0);
-  });
-});
+// import-boundary lint tests moved to tests/unit/lint/import-boundary.test.ts (FR-0.1/G-C1).
