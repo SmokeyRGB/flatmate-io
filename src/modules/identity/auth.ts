@@ -460,7 +460,24 @@ export async function signIn(
   const context: SessionContext = { accountId, householdId, profileId: null };
 
   return withSessionContext(context, async (tx) => {
-    const [membershipRow] = await tx.select().from(membership).where(eq(membership.accountId, accountId));
+    // PR #18 review: without a lock this check races a removal. Sign-in reads revokedAt = null,
+    // the removal then revokes the membership and revokes every session it can SEE — which does
+    // not yet include the one this transaction is about to insert — and that new session survives
+    // the removal. `.for("update")` serializes the two on the membership row:
+    //  - removal locked it first: this SELECT blocks until the removal commits, then reads the
+    //    revoked row and refuses below;
+    //  - sign-in locked it first: the removal's membership UPDATE waits until this commits, and
+    //    its later session UPDATE (a fresh READ COMMITTED snapshot) then sees and revokes the
+    //    session inserted here.
+    //
+    // No deadlock: removeMember/setMovedOut take row locks in the order resident_profile (the
+    // status UPDATE) → membership → session; signIn takes only the membership lock and then
+    // INSERTs, never touching resident_profile, so the two never wait on each other in reverse.
+    const [membershipRow] = await tx
+      .select()
+      .from(membership)
+      .where(eq(membership.accountId, accountId))
+      .for("update");
     if (!membershipRow) throw new SignInError("Account has no membership", "no_membership");
 
     // design.md Decision 6 (V-3 "sofortiger Zugriffsentzug"): a revoked membership must not be

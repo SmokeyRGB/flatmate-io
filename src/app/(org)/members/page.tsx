@@ -39,8 +39,12 @@ function formatGermanDate(date: Date): string {
 // design.md Decision 9 (revised 2026-09-23): rebuilt on top of join-code-state.ts's joinCodeState,
 // which now also drives the live/dead split below and the removed-joiner caution — same texts,
 // same order (deleted, expired, used up, else live) as before the revision.
-function joinCodeStatusLabel(issuance: JoinCodeIssuanceRow): string {
-  const now = new Date();
+//
+// Copilot review fix: `now` is the caller's, never this function's own `new Date()` — the page
+// computes exactly one `now` up front and threads it through every helper on this page, so a
+// link's live/dead split, its status label, and the removed-joiner caution can never disagree
+// about what moment "now" was, even if this render straddles an expiry or usage boundary.
+function joinCodeStatusLabel(issuance: JoinCodeIssuanceRow, now: Date): string {
   switch (joinCodeState(issuance, now)) {
     case "deleted":
       return t.joinCode.deletedOn(formatGermanDate(issuance.deletedAt as Date));
@@ -56,13 +60,13 @@ function joinCodeStatusLabel(issuance: JoinCodeIssuanceRow): string {
 // One card for one issuance, shared by the live list and the collapsed dead-links section below
 // (design.md Decision 9 revised: "dead-link rendering inside is unchanged" — same label, controls,
 // caution and joiner names either way).
-function renderJoinCodeCard(issuance: JoinCodeIssuanceRow, host: string | null) {
+function renderJoinCodeCard(issuance: JoinCodeIssuanceRow, host: string | null, now: Date) {
   const isDeleted = issuance.deletedAt !== null;
   const url = buildJoinUrl(host, issuance.code);
   return (
     <li key={issuance.id} className="card space-y-2">
       <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
-        <span>{joinCodeStatusLabel(issuance)}</span>
+        <span>{joinCodeStatusLabel(issuance, now)}</span>
         <span className="text-muted-foreground">{t.joinCode.usageCount(issuance.uses, issuance.maxUses)}</span>
       </div>
 
@@ -81,7 +85,7 @@ function renderJoinCodeCard(issuance: JoinCodeIssuanceRow, host: string | null) 
       {/* design.md Decision 9 (revised 2026-09-23): the caution is for a LIVE link only — the
           first version (hasRemovedJoiner && !deletedAt) also flagged a used-up or expired link,
           which the 8.3 walkthrough caught. Names no one (C-2.5, proposal Assumption 2). */}
-      {removedJoinerCautionApplies(issuance, new Date()) && (
+      {removedJoinerCautionApplies(issuance, now) && (
         <div className="callout callout-caution">
           <TriangleAlert className="size-4" />
           <p>{t.joinCode.removedJoinerCaution}</p>
@@ -238,7 +242,7 @@ export default async function MembersPage() {
         <p className="text-sm text-muted-foreground">{t.joinCode.empty}</p>
       ) : (
         <>
-          <ul className="space-y-3">{liveIssuances.map((issuance) => renderJoinCodeCard(issuance, host))}</ul>
+          <ul className="space-y-3">{liveIssuances.map((issuance) => renderJoinCodeCard(issuance, host, now))}</ul>
 
           {/* design.md Decision 9 (revised 2026-09-23, human decision from the 8.3 walkthrough):
               dead links (expired, used up or deleted) are still listed — "Ein toter Link
@@ -251,7 +255,7 @@ export default async function MembersPage() {
               <summary className="cursor-pointer text-sm text-muted-foreground">
                 {t.joinCode.deadLinksSummary(deadIssuances.length)}
               </summary>
-              <ul className="space-y-3 pt-3">{deadIssuances.map((issuance) => renderJoinCodeCard(issuance, host))}</ul>
+              <ul className="space-y-3 pt-3">{deadIssuances.map((issuance) => renderJoinCodeCard(issuance, host, now))}</ul>
             </details>
           )}
         </>
@@ -371,7 +375,7 @@ export default async function MembersPage() {
                 {boundIssuance && (
                   <div className="space-y-1">
                     <p className="field-helper">{t.joinCode.issuedForProfileHeading}</p>
-                    <p className="text-xs text-muted-foreground">{joinCodeStatusLabel(boundIssuance)}</p>
+                    <p className="text-xs text-muted-foreground">{joinCodeStatusLabel(boundIssuance, now)}</p>
                     <p className="font-mono text-sm font-semibold">{boundIssuance.code}</p>
                     <JoinCodeCopyButtons
                       code={boundIssuance.code}

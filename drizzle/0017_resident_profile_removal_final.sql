@@ -2,13 +2,33 @@
 -- 0016 (Postgres refuses "unsafe use of new value" for a value used in the same transaction that
 -- added it). Every statement here is written re-runnable (IF EXISTS / IF NOT EXISTS / CREATE OR
 -- REPLACE), because a human may run the whole file after an agent already ran part of it.
+--
+-- Ordering (Copilot review, fixed): DROP INDEX -> backfill -> CREATE UNIQUE INDEX -> trigger, not
+-- backfill-first. The backfill (below) flips some `moved_out` rows to `removed`. The OLD partial
+-- unique index only excludes `moved_out` from uniqueness — `removed` is not yet in its predicate at
+-- that point in a naive backfill-first ordering. So if a hard-removed member (mistakenly stored as
+-- `moved_out` by the pre-fix bug) has had their display_name reused by a new active profile in the
+-- same household — legitimate under FR-1.4, since `moved_out` already released the name — flipping
+-- the old row to `removed` moves it right back INSIDE the old index's scope (which does not exclude
+-- `removed`), colliding with the row that reused the name and aborting the whole migration on a
+-- duplicate-key error. Dropping the old index first removes that scope entirely for the duration of
+-- the backfill, so no uniqueness check can fire while status values are in flux; the new index (with
+-- `removed` correctly excluded) is only created once every row already has its final status. This
+-- whole file runs in ONE transaction (whatever applies it — psql, a migration runner, or the
+-- Supabase MCP's apply_migration — must not split it), so there is no window where display_name
+-- uniqueness is unenforced: between the DROP and the CREATE, no other transaction can commit a
+-- conflicting row either, because Postgres holds the DROP/CREATE's locks and nothing here releases
+-- them until COMMIT.
+DROP INDEX IF EXISTS "resident_profile_display_name_active_idx";
+--> statement-breakpoint
 
--- Step 1: backfill. A profile still `moved_out` whose LATEST membership-lifecycle audit event is
+-- Step 2: backfill. A profile still `moved_out` whose LATEST membership-lifecycle audit event is
 -- `membership.removed_as_intruder` becomes `removed` — U-27's hard tier, mistakenly landed in the
 -- soft tier's status before this change. A profile whose latest such event is `membership.revoked`
 -- (an actual move-out) or `membership.reactivated` (reactivated since, regardless of tier) is left
--- exactly as it is. Runs FIRST, before the index rebuild below: it only widens the set of statuses
--- the partial unique index excludes, so the index can never fail to build because of it.
+-- exactly as it is. Runs AFTER the old index is dropped (see the comment above) and BEFORE the new
+-- one is built, so the promotion it performs is never checked against either index's uniqueness
+-- predicate while it runs.
 --
 -- G-D3: every ResidentProfile transition produces exactly one ActivityEvent — this migration
 -- performs a transition, so it writes exactly one `resident_profile.status_changed` event per row
@@ -43,16 +63,16 @@ FROM promoted;
 -- backfill:end
 --> statement-breakpoint
 
--- Step 2: FR-1.4 as amended — the partial unique index now excludes `removed` as well as
+-- Step 3: FR-1.4 as amended — the partial unique index now excludes `removed` as well as
 -- `moved_out` (NAME_RELEASING_STATUSES, transitions.ts). Same name, so nothing else has to change;
--- dropped and recreated rather than altered, since Postgres has no ALTER INDEX ... WHERE.
-DROP INDEX IF EXISTS "resident_profile_display_name_active_idx";
---> statement-breakpoint
+-- dropped (step 1, above) and recreated rather than altered, since Postgres has no ALTER INDEX ...
+-- WHERE. Built only now, after the backfill has settled every row's final status, so it never has
+-- to accept a row mid-transition.
 CREATE UNIQUE INDEX IF NOT EXISTS "resident_profile_display_name_active_idx" ON "resident_profile"
   USING btree ("household_id", "display_name") WHERE status NOT IN ('moved_out', 'removed');
 --> statement-breakpoint
 
--- Step 3: the one guarantee U-27 calls "endgültig" enforced in the database, not only in
+-- Step 4: the one guarantee U-27 calls "endgültig" enforced in the database, not only in
 -- transitions.ts's application-code table (design.md Decision 2). Plain plpgsql, NOT SECURITY
 -- DEFINER — this must apply to every caller including app_runtime itself, not bypass RLS for one.
 -- Deliberately narrow: it blocks only OLD.status = 'removed' AND NEW.status <> 'removed', so every

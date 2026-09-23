@@ -10,7 +10,7 @@ import {
   removeMember,
   setMovedOut,
 } from "@/modules/identity/repository";
-import { membership } from "@/modules/identity/schema";
+import { membership, residentProfile } from "@/modules/identity/schema";
 import { InvalidResidentProfileTransitionError } from "@/modules/identity/transitions";
 import {
   cleanupAll,
@@ -33,6 +33,13 @@ async function membershipRowFor(hh: TestHousehold, accountId: string) {
     tx.select().from(membership).where(eq(membership.accountId, accountId)),
   );
   return row;
+}
+
+async function movedOutOnFor(hh: TestHousehold, profileId: string): Promise<string | null> {
+  const [row] = await withSessionContext(hh.context, (tx) =>
+    tx.select({ movedOutOn: residentProfile.movedOutOn }).from(residentProfile).where(eq(residentProfile.id, profileId)),
+  );
+  return row.movedOutOn ?? null;
 }
 
 async function eventsFor(hh: TestHousehold, eventType: string) {
@@ -133,6 +140,47 @@ describe("Member removal is final (U-27, design.md Decision 1)", () => {
     expect(row.revokedAt).toBeNull();
     const { members: afterReactivate } = await getResidentList(hh.context, hh.accountId);
     expect(afterReactivate.find((m) => m.id === profile.id)?.status).toBe("active");
+  });
+
+  // Copilot review fix (PR #18): transitionResidentProfileStatusTx's moved_out -> active branch
+  // had lost its `patch.movedOutOn = null` assignment (repository.ts) — only the comment
+  // explaining it survived a previous edit, so `moved_out_on` kept dangling on a reactivated,
+  // otherwise-active profile. This asserts the full lifecycle of that one field: set on
+  // setMovedOut, cleared on reactivateMember, and — the other half of the same comment's
+  // guarantee — left UNTOUCHED by a moved_out -> removed transition, since removal sets no date of
+  // its own (design.md Decision 5).
+  it("moved_out_on is set by setMovedOut, cleared by reactivateMember, and kept by moved_out -> removed", async () => {
+    hh = await registerTestHousehold();
+    const actor = { accountId: hh.accountId, profileId: null };
+
+    const profileReactivated = await createResidentProfile(hh.context, "MovedOutOnClears", actor);
+    const { accountId: accountReactivated } = await claimResidentProfile(
+      hh.context,
+      profileReactivated.id,
+      "test-password-not-real-1234",
+    );
+    accountIds.push(accountReactivated);
+
+    await setMovedOut(hh.context, hh.accountId, accountReactivated);
+    expect(await movedOutOnFor(hh, profileReactivated.id)).not.toBeNull();
+
+    await reactivateMember(hh.context, hh.accountId, accountReactivated);
+    expect(await movedOutOnFor(hh, profileReactivated.id)).toBeNull();
+
+    const profileRemoved = await createResidentProfile(hh.context, "MovedOutOnKeptOnRemoval", actor);
+    const { accountId: accountRemoved } = await claimResidentProfile(
+      hh.context,
+      profileRemoved.id,
+      "test-password-not-real-1234",
+    );
+    accountIds.push(accountRemoved);
+
+    await setMovedOut(hh.context, hh.accountId, accountRemoved);
+    const movedOutOnBeforeRemoval = await movedOutOnFor(hh, profileRemoved.id);
+    expect(movedOutOnBeforeRemoval).not.toBeNull();
+
+    await removeMember(hh.context, hh.accountId, accountRemoved, "MovedOutOnKeptOnRemoval");
+    expect(await movedOutOnFor(hh, profileRemoved.id)).toBe(movedOutOnBeforeRemoval);
   });
 
   it("leads with the join-code action once the household's only resident is removed (AC-1.22)", async () => {

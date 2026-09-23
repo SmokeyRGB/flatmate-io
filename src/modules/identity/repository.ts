@@ -124,6 +124,7 @@ async function transitionResidentProfileStatusTx(
     // moved_out -> removed (design.md Decision 5): moved_out_on is a "Wohn-Tatsache"
     // (data-inventory.yml) and a moved-out-then-removed profile keeps the date it already had —
     // removal sets no date of its own, whether from active or from moved_out.
+    patch.movedOutOn = null;
   }
 
   const [updated] = await tx
