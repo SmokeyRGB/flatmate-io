@@ -119,8 +119,12 @@ not new rules — the rules stay in `docs/GUARDRAILS.md`.
 **An invariant holds only where it is enforced.** Four paths reach data without passing through
 the TypeScript that states the rule:
 
-- **Raw SQL as `app_runtime`.** RLS applies; the transition tables in `transitions.ts` do not. A
-  state rule that must hold needs a constraint or trigger (`drizzle/0017` is the example).
+- **Raw SQL as `app_runtime`.** RLS applies, but it guarantees household isolation only. Roles,
+  permissions and ownership *within* a household are application-level for every table, by
+  ADR-004's layering ("zweifach erzwungen heißt nicht identisch zweimal"); `import-boundary.ts`
+  keeps raw SQL inside the repositories. The transition tables in `transitions.ts` are
+  application-level too, so a state rule that must survive even that — finality, say — needs a
+  constraint or trigger (`drizzle/0017` is the example).
 - **A `SECURITY DEFINER` function.** It runs past RLS, and `resolve_join_code`, `claim_join_code`
   and `record_join_attempt` answer unauthenticated callers. With no foreign keys nothing keeps a
   stored id honest, so every join inside such a function carries its own `household_id`
@@ -134,7 +138,9 @@ the TypeScript that states the rule:
 - **A sibling entry.** A rule checked where state is revoked must also be checked where it is
   created (sessions: `signIn`), and a guarded read has sibling reads (`getRoundForSession` vs
   `getRoundParticipants`). Authorization lives in the repository function, not the route that
-  happens to call it today. `tests/integration/policy/authorization-matrix.test.ts` fails when a
+  happens to call it today, and it derives from the authenticated session (`context.accountId`),
+  never from a caller-supplied actor id — the `assert*` helpers in `identity/repository.ts` refuse
+  a mismatch. `tests/integration/policy/authorization-matrix.test.ts` fails when a
   new `casting`/`identity` repository export has no recorded decision: it must refuse a plain
   resident, or carry a stated reason for being exempt. It covers mutators only; each read's
   visibility is tested per read.
