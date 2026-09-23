@@ -67,9 +67,14 @@ export async function createResidentProfile(
   displayName: string,
   actor: Actor,
 ) {
-  if (actor.accountId) {
-    await assertIsAdministration(context, actor.accountId);
-  }
+  // G-C fix (2026-09-23 human decision): a null actor.accountId used to skip this check
+  // entirely instead of refusing — not exploitable by any current caller (the one production
+  // call site always passes a real account id), but a repository function's own authorization
+  // must hold regardless of what a future caller passes. Refused with the exact error
+  // assertIsAdministration itself throws for a real-but-unauthorized account, so a null actor is
+  // indistinguishable from "not administration", never a bypass.
+  if (!actor.accountId) throw new ResidentListActionDeniedError();
+  await assertIsAdministration(context, actor.accountId);
   return withSessionContext(context, async (tx) => {
     if (await isDisplayNameTaken(context, displayName)) {
       throw new DuplicateDisplayNameError(displayName);
@@ -152,6 +157,13 @@ export async function transitionResidentProfileStatus(
   toStatus: ResidentProfileStatus,
   actor: Actor,
 ) {
+  // G-C fix (2026-09-23 human decision): this export had NO authorization check at all — no
+  // route calls it today (only display-name-uniqueness.test.ts, which needs it to move a
+  // PREPARED profile with no account yet, so it cannot be replaced by setMovedOut), but it stays
+  // exported and must be guarded like its siblings removeMember/setMovedOut/reactivateMember, all
+  // of which gate on assertIsAdministrationOrModerator before touching anything.
+  if (!actor.accountId) throw new ResidentListActionDeniedError();
+  await assertIsAdministrationOrModerator(context, actor.accountId);
   return withSessionContext(context, (tx) =>
     transitionResidentProfileStatusTx(tx, residentProfileId, toStatus, actor),
   );
@@ -1078,10 +1090,23 @@ export async function triggerSubjectAccessExport(
   return { exportId: `export-${applicationId}-${Date.now()}` };
 }
 
+// G-C fix (2026-09-23 human decision): this used to accept ANY sessionId under RLS's
+// household-only scoping — no check that the session belonged to the CALLER's own account, so a
+// plain resident who learned or guessed another member's session id could revoke it. Scoped here
+// to context.accountId as well, so a session can only ever be revoked by the account it belongs
+// to. sign-out-action.ts's only call site already passes the caller's own sessionId, so its
+// behaviour is unchanged. Deliberately NOT filtered on revokedAt IS NULL — signing out twice (or
+// revoking an already-revoked session) is harmless and must stay a no-op-shaped success, not a
+// refusal.
 export async function revokeSession(context: SessionContext, sessionId: string): Promise<void> {
-  await withSessionContext(context, (tx) =>
-    tx.update(session).set({ revokedAt: new Date() }).where(eq(session.id, sessionId)),
-  );
+  await withSessionContext(context, async (tx) => {
+    const [revoked] = await tx
+      .update(session)
+      .set({ revokedAt: new Date() })
+      .where(and(eq(session.id, sessionId), eq(session.accountId, context.accountId)))
+      .returning({ id: session.id });
+    if (!revoked) throw new PermissionDeniedError("revoke_session");
+  });
 }
 
 export { account, household, householdSettings, joinCodeIssuance, membership, residentProfile, session };
