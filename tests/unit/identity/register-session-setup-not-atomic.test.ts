@@ -7,10 +7,9 @@ import {
   householdSettings,
   joinCodeIssuance,
   membership,
-  session,
 } from "@/modules/identity/schema";
 import { registerHousehold, signIn, undoRegisterHousehold } from "@/modules/identity/auth";
-import { cleanupAll, deleteTestAccount, testEmail } from "../../helpers/identity";
+import { cleanupAll, cleanupHousehold, deleteTestAccount, testEmail } from "../../helpers/identity";
 
 // speckit-bug-fix register-action-not-atomic-with-signin: registerHousehold commits the Auth
 // user/Household/HouseholdSettings/Account/Membership before signIn ever runs. If signIn fails
@@ -73,23 +72,11 @@ describe("register: compensating cleanup when session setup fails", () => {
     const signInResult = await signIn({ kind: "household", email, password });
     expect(signInResult.context.householdId).toBe(retried.context.householdId);
 
-    // Cleanup the successful retry's rows (registerTestHousehold's own cleanup shape).
-    await withSessionContext(retried.context, async (tx) => {
-      // The signIn above created a Session row. This list omitted it until 2026-09-18, so every
-      // run left one orphaned session behind — an inline copy of cleanup() that had drifted from
-      // the original, the same way the casting-table deletes were missing from cleanup() itself.
-      //
-      // **It drifted again on 2026-09-22**, and the comment above did not prevent it:
-      // join-code-protections gave registerHousehold a founding join_code_issuance row, cleanup()
-      // was updated and this copy was not, so the retry below left a second orphan. Two recurrences
-      // is a pattern, not bad luck — see the finding filed against this file: the durable fix is for
-      // cleanup() to expose its delete set so there is nothing left to copy.
-      await tx.delete(session).where(eq(session.householdId, retried.context.householdId));
-      await tx.delete(membership).where(eq(membership.householdId, retried.context.householdId));
-      await tx.delete(account).where(eq(account.id, retried.context.accountId));
-      await tx.delete(householdSettings).where(eq(householdSettings.householdId, retried.context.householdId));
-      await tx.delete(joinCodeIssuance).where(eq(joinCodeIssuance.householdId, retried.context.householdId));
-      await tx.delete(household).where(eq(household.id, retried.context.householdId));
-    });
+    // Cleanup the successful retry's rows. Used to be an inline hand-copy of cleanup()'s delete
+    // set — it drifted from the original twice (missed Session until 2026-09-18, missed
+    // join_code_issuance again on 2026-09-22, despite a comment warning about the first drift).
+    // M2 (P6) closes that: cleanupHousehold() shares HOUSEHOLD_SCOPED_TABLES with makeCleanup()
+    // itself, so there is nothing left here to hand-copy or drift.
+    await cleanupHousehold(retried.context, retried.context.householdId);
   });
 });

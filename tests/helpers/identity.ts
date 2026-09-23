@@ -4,6 +4,57 @@ import { withSessionContext, type SessionContext } from "@/db/session-context";
 import { registerHousehold } from "@/modules/identity/auth";
 import { uuid } from "./uuid";
 
+// The household-scoped delete set (M2, P6: "no foreign keys means a hand-kept deletion
+// inventory"). Exported so this is the ONE hand-kept list — the cleanup-inventory lint
+// (tests/unit/lint/cleanup-inventory.test.ts) statically parses src/modules/*/schema.ts for every
+// pgTable carrying a household_id column (or keyed on household's own id/household_id) and
+// asserts each one is a member of this array, and register-session-setup-not-atomic.test.ts's own
+// compensating cleanup is built from it too, instead of keeping a second hand-copied list — that
+// second copy drifted from this one twice (4a9724f, then again on 2026-09-22 per that test's own
+// comment) before the comment warning about the first drift stopped it happening a third time.
+//
+// activity_event is deliberately absent: FR-0.13 makes it append-only (RESTRICTIVE policies plus
+// FORCE ROW LEVEL SECURITY), so this transaction could not delete it even if it tried — see
+// audit/schema.ts. join_attempt is also deliberately absent: it carries no household_id column at
+// all (see identity/schema.ts's own comment on that table) and app_runtime has no DELETE access
+// to it regardless (RLS enabled, zero policies) — tests that call recordJoinAttempt own their own
+// teardown via the service-role client (tests/integration/policy/join-rate-limit.test.ts).
+export const HOUSEHOLD_SCOPED_TABLES = [
+  "round_participation",
+  "casting_round",
+  "room",
+  "application",
+  "resident_profile",
+  "membership",
+  "session",
+  "account",
+  "household_settings",
+  "join_code_issuance",
+] as const;
+
+// Builds the one-round-trip data-modifying-CTE delete statement (see the comment inside
+// makeCleanup for why it has to be one round trip) from HOUSEHOLD_SCOPED_TABLES, so the SQL text
+// and the exported list can never drift from each other the way the two hand-copies used to.
+function buildHouseholdCleanupStatement(id: string) {
+  const deletes = HOUSEHOLD_SCOPED_TABLES.map(
+    (table, i) =>
+      sql`${sql.raw(`d_${i}`)} as (delete from ${sql.raw(table)} where household_id = ${id})`,
+  );
+  return sql`with ${sql.join(deletes, sql`, `)} delete from household where id = ${id}`;
+}
+
+// Deletes exactly HOUSEHOLD_SCOPED_TABLES's rows for one household, scoped by the given session
+// context. For a household registered directly via registerHousehold (not
+// registerTestHousehold()), which has no TestHousehold wrapper to call .cleanup() on — e.g.
+// register-session-setup-not-atomic.test.ts's "retried" registration. Its Auth user is tracked
+// and deleted separately (that test pushes onto its own accountIds array and calls
+// deleteTestAccount), so this only removes the DB rows, mirroring makeCleanup's own CTE exactly.
+export async function cleanupHousehold(context: SessionContext, householdId: string): Promise<void> {
+  await withSessionContext(context, async (tx) => {
+    await tx.execute(buildHouseholdCleanupStatement(householdId));
+  });
+}
+
 function adminClient() {
   return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
     auth: { autoRefreshToken: false, persistSession: false },
@@ -126,35 +177,9 @@ function makeCleanup(context: SessionContext, deregister: () => void): () => Pro
     // CTE exactly once and to completion whether or not the primary query reads it, and with no
     // FKs between these tables their order does not matter.
     //
-    // activity_event is deliberately absent: FR-0.13 makes it append-only, enforced by RESTRICTIVE
-    // policies plus FORCE ROW LEVEL SECURITY, so this transaction could not delete it anyway.
-    //
-    // join_attempt is ALSO deliberately absent, for the opposite reason: it carries no
-    // household_id at all (design.md Decision 3, join-by-link), so it has nothing to key this
-    // CTE's `where household_id = ${id}` on — and app_runtime (the role this whole transaction
-    // runs as) has no DELETE access to it regardless, RLS-enabled with zero policies. A test that
-    // calls recordJoinAttempt owns its own teardown via the Supabase service-role client; see
-    // identity/schema.ts's joinAttempt table comment and
-    // tests/integration/policy/join-rate-limit.test.ts.
-    await withSessionContext(context, async (tx) => {
-      await tx.execute(sql`
-        with
-          d_participation as (delete from round_participation where household_id = ${id}),
-          d_round         as (delete from casting_round       where household_id = ${id}),
-          d_room          as (delete from room                where household_id = ${id}),
-          d_application   as (delete from application         where household_id = ${id}),
-          d_profile       as (delete from resident_profile    where household_id = ${id}),
-          d_membership    as (delete from membership          where household_id = ${id}),
-          d_session       as (delete from session             where household_id = ${id}),
-          d_account       as (delete from account             where household_id = ${id}),
-          d_settings      as (delete from household_settings  where household_id = ${id}),
-          -- join-code-protections (O-18): registerHousehold now mints a founding
-          -- join_code_issuance row for every test household — without this, every call to
-          -- registerTestHousehold() would leave one orphaned row per test run.
-          d_join_code     as (delete from join_code_issuance  where household_id = ${id})
-        delete from household where id = ${id}
-      `);
-    });
+    // The delete set itself lives in HOUSEHOLD_SCOPED_TABLES above (M2) — see its comment for why
+    // activity_event and join_attempt are deliberately absent from it.
+    await cleanupHousehold(context, id);
     await adminClient().auth.admin.deleteUser(context.accountId);
   };
 }
