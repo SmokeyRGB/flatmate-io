@@ -93,12 +93,6 @@ describe("revokeSession refuses to revoke another account's session (G-C fix 1)"
     hh = await registerTestHousehold();
     const resident = await claimResident(hh, "Resident2");
     accountIds.push(resident.accountId);
-    const residentSignIn = await signIn({
-      kind: "resident",
-      householdId: hh.householdId,
-      displayName: resident.displayName,
-      password: PASSWORD,
-    });
     const adminSignIn = await signIn({ kind: "household", email: hh.email, password: PASSWORD });
 
     // The admin revokes their own session first, so it exists but is already revoked...
