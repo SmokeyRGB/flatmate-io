@@ -36,11 +36,19 @@ describe("Room and round mutations require their documented permission", () => {
     const resident = await claim(hh, "Resident1");
     accountIds.push(resident.accountId);
     const residentActor = { accountId: resident.accountId, profileId: resident.profileId };
+    // PR #19 review: authorization derives from the authenticated session — the resident's OWN
+    // SessionContext, not hh.context (the admin's) paired with the resident's accountId, which
+    // would now be refused as a spoofed session rather than for lacking manage_rooms.
+    const residentContext = {
+      accountId: resident.accountId,
+      householdId: hh.householdId,
+      profileId: resident.profileId,
+    };
 
-    await expect(createRoom(hh.context, "Room B", residentActor)).rejects.toThrow(PermissionDeniedError);
-    await expect(renameRoom(hh.context, room.id, "Renamed", residentActor)).rejects.toThrow(PermissionDeniedError);
-    await expect(transitionRoomStatus(hh.context, room.id, "open", residentActor)).rejects.toThrow(PermissionDeniedError);
-    await expect(removeRoom(hh.context, room.id, residentActor)).rejects.toThrow(PermissionDeniedError);
+    await expect(createRoom(residentContext, "Room B", residentActor)).rejects.toThrow(PermissionDeniedError);
+    await expect(renameRoom(residentContext, room.id, "Renamed", residentActor)).rejects.toThrow(PermissionDeniedError);
+    await expect(transitionRoomStatus(residentContext, room.id, "open", residentActor)).rejects.toThrow(PermissionDeniedError);
+    await expect(removeRoom(residentContext, room.id, residentActor)).rejects.toThrow(PermissionDeniedError);
   });
 
   it("refuses a plain resident (no close_round) on every round-lifecycle mutation", async () => {
@@ -56,13 +64,18 @@ describe("Room and round mutations require their documented permission", () => {
     const resident = await claim(hh, "Resident2");
     accountIds.push(resident.accountId);
     const residentActor = { accountId: resident.accountId, profileId: resident.profileId };
+    const residentContext = {
+      accountId: resident.accountId,
+      householdId: hh.householdId,
+      profileId: resident.profileId,
+    };
 
-    await expect(createRound(hh.context, "Round 2", [room.id], residentActor)).rejects.toThrow(
+    await expect(createRound(residentContext, "Round 2", [room.id], residentActor)).rejects.toThrow(
       PermissionDeniedError,
     );
-    await expect(openRound(hh.context, round.id, residentActor)).rejects.toThrow(PermissionDeniedError);
+    await expect(openRound(residentContext, round.id, residentActor)).rejects.toThrow(PermissionDeniedError);
     await expect(
-      addResidentToRound(hh.context, round.id, resident.profileId, residentActor),
+      addResidentToRound(residentContext, round.id, resident.profileId, residentActor),
     ).rejects.toThrow(PermissionDeniedError);
   });
 });

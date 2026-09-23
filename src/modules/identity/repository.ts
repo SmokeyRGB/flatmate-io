@@ -304,6 +304,10 @@ export class HouseholdAccountCannotVoteError extends Error {
 // anything. Refuses by every route that would eventually call it, because there is exactly one
 // such check, not one per route.
 export async function assertAccountCanVote(context: SessionContext, accountId: string): Promise<void> {
+  // PR #19 review: authorization derives from the authenticated session, not from whatever
+  // accountId a caller passes in — accountId must name the session's own account
+  // (context.accountId), never an id supplied independently of it.
+  if (accountId !== context.accountId) throw new HouseholdAccountCannotVoteError();
   const membershipRow = await getMembershipForAccount(context, accountId);
   if (!membershipRow || !membershipRow.isResident) {
     throw new HouseholdAccountCannotVoteError();
@@ -333,6 +337,10 @@ export async function assertHasPermission(
   accountId: string,
   permission: string,
 ): Promise<void> {
+  // PR #19 review: authorization derives from the authenticated session, not from whatever
+  // accountId a caller passes in — accountId must name the session's own account
+  // (context.accountId), never an id supplied independently of it.
+  if (accountId !== context.accountId) throw new PermissionDeniedError(permission);
   const membershipRow = await getMembershipForAccount(context, accountId);
   if (!membershipRow) throw new PermissionDeniedError(permission);
   if (membershipRow.role === "household_admin") return;
@@ -496,6 +504,10 @@ export class ResidentListActionDeniedError extends Error {
 // actions, not a subset. `triggerSubjectAccessExport` below deliberately does NOT use this: FR-1.24
 // names that action as administration's specifically, unaffected by U-30's resident-list parity.
 async function assertIsAdministrationOrModerator(context: SessionContext, accountId: string): Promise<void> {
+  // PR #19 review: authorization derives from the authenticated session, not from whatever
+  // accountId a caller passes in — accountId must name the session's own account
+  // (context.accountId), never an id supplied independently of it.
+  if (accountId !== context.accountId) throw new ResidentListActionDeniedError();
   const membershipRow = await getMembershipForAccount(context, accountId);
   if (!membershipRow || (membershipRow.role !== "household_admin" && membershipRow.role !== "moderator")) {
     throw new ResidentListActionDeniedError();
@@ -503,6 +515,10 @@ async function assertIsAdministrationOrModerator(context: SessionContext, accoun
 }
 
 export async function assertIsAdministration(context: SessionContext, accountId: string): Promise<void> {
+  // PR #19 review: authorization derives from the authenticated session, not from whatever
+  // accountId a caller passes in — accountId must name the session's own account
+  // (context.accountId), never an id supplied independently of it.
+  if (accountId !== context.accountId) throw new ResidentListActionDeniedError();
   const membershipRow = await getMembershipForAccount(context, accountId);
   if (!membershipRow || membershipRow.role !== "household_admin") {
     throw new ResidentListActionDeniedError();
@@ -1093,9 +1109,11 @@ export async function triggerSubjectAccessExport(
 // G-C fix (2026-09-23 human decision): this used to accept ANY sessionId under RLS's
 // household-only scoping — no check that the session belonged to the CALLER's own account, so a
 // plain resident who learned or guessed another member's session id could revoke it. Scoped here
-// to context.accountId as well, so a session can only ever be revoked by the account it belongs
-// to. sign-out-action.ts's only call site already passes the caller's own sessionId, so its
-// behaviour is unchanged.
+// to context.accountId as well: through this function, a session can only be revoked by its own
+// account. RLS guarantees household isolation only (ADR-004); within a household this rule is
+// application-level, like every role and ownership rule — raw SQL as app_runtime inside the
+// household is not bound by it (PR #19 review). sign-out-action.ts's only call site already
+// passes the caller's own sessionId, so its behaviour is unchanged.
 //
 // revokeSession review fix: filtered the UPDATE on revokedAt IS NULL, matching the repo's
 // convention that an original revocation timestamp is never overwritten (see

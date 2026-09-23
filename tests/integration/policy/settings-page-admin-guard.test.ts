@@ -34,7 +34,11 @@ describe("Settings page admin guard (O20)", () => {
     const claimed = await claimResidentProfile(hh.context, profile.id, "test-password-not-real-1234");
     memberAccountId = claimed.accountId;
 
-    await expect(assertIsAdministration(hh.context, memberAccountId)).rejects.toThrow(
+    // PR #19 review: authorization derives from the authenticated session — the member's OWN
+    // SessionContext, not hh.context (the admin's) paired with the member's accountId, which
+    // would now be refused as a spoofed session rather than for lacking household_admin.
+    const memberContext = { accountId: memberAccountId, householdId: hh.householdId, profileId: profile.id };
+    await expect(assertIsAdministration(memberContext, memberAccountId)).rejects.toThrow(
       ResidentListActionDeniedError,
     );
     await expect(assertIsAdministration(hh.context, hh.accountId)).resolves.toBeUndefined();

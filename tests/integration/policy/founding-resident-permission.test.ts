@@ -71,14 +71,20 @@ describe("close_round is a role default (identity/permissions capability), not a
     firstAccountId = accountId;
     expect(memberMembership.permissions).toEqual([]);
 
+    // PR #19 review: assertHasPermission now derives authorization from the authenticated
+    // session — exercise it with the resident's OWN SessionContext, not the admin's hh.context
+    // paired with the resident's accountId (that combination is refused as a session/actor
+    // mismatch, not for lacking close_round, which is what this test means to show).
+    const residentContext = { accountId, householdId: hh.householdId, profileId: profile.id };
+
     // A plain member: close_round is refused, and nothing in its own permissions array grants it.
-    await expect(assertHasPermission(hh.context, accountId, "close_round")).rejects.toThrow(
+    await expect(assertHasPermission(residentContext, accountId, "close_round")).rejects.toThrow(
       PermissionDeniedError,
     );
 
     // Appointed moderator: close_round now passes via MODERATOR_DEFAULT_PERMISSIONS — the
     // permissions array itself is still empty, nothing was granted to it individually.
     await setMemberRole(hh.context, hh.accountId, accountId, "moderator");
-    await expect(assertHasPermission(hh.context, accountId, "close_round")).resolves.toBeUndefined();
+    await expect(assertHasPermission(residentContext, accountId, "close_round")).resolves.toBeUndefined();
   });
 });

@@ -5,6 +5,7 @@ import { claimResidentProfile, signIn } from "@/modules/identity/auth";
 import * as castingRepo from "@/modules/casting/repository";
 import * as identityRepo from "@/modules/identity/repository";
 import { PermissionDeniedError, ResidentListActionDeniedError } from "@/modules/identity/repository";
+import type { SessionContext } from "@/db/session-context";
 import {
   cleanupAll,
   deleteTestAccount,
@@ -119,6 +120,18 @@ async function claim(hh: TestHousehold, name: string, accountIds: string[]) {
   return { profileId: profile.id, accountId, displayName: name };
 }
 
+// PR #19 review: authorization derives from the authenticated session (context.accountId), not
+// from an actor/actingAccountId a caller happens to pass — so a REFUSAL case must present the
+// resident's OWN SessionContext, not the household admin's hh.context paired with the resident's
+// accountId (that combination is now refused for being a mismatched session, not for lacking the
+// permission this test means to exercise).
+function residentContext(
+  hh: TestHousehold,
+  resident: { accountId: string; profileId: string },
+): SessionContext {
+  return { accountId: resident.accountId, householdId: hh.householdId, profileId: resident.profileId };
+}
+
 describe("authorization matrix (M6): every exported casting/identity mutator decides its authorization", () => {
   describe("set coverage — every export is classified exactly once", () => {
     it("casting/repository.ts: NOT_APPLICABLE + KNOWN_OPEN + cases below == every exported function", () => {
@@ -168,9 +181,18 @@ describe("authorization matrix (M6): every exported casting/identity mutator dec
       hh = await registerTestHousehold();
       const resident = await claim(hh, "Resident1", accountIds);
       const residentActor = { accountId: resident.accountId, profileId: resident.profileId };
-      await expect(castingRepo.createRoom(hh.context, "Room B", residentActor)).rejects.toThrow(
-        PermissionDeniedError,
-      );
+      await expect(
+        castingRepo.createRoom(residentContext(hh, resident), "Room B", residentActor),
+      ).rejects.toThrow(PermissionDeniedError);
+    });
+
+    it("createRoom refuses a resident's own session spoofed with the admin's accountId", async () => {
+      hh = await registerTestHousehold();
+      const resident = await claim(hh, "Resident1", accountIds);
+      const spoofedActor = { accountId: hh.accountId, profileId: null };
+      await expect(
+        castingRepo.createRoom(residentContext(hh, resident), "Room B", spoofedActor),
+      ).rejects.toThrow(PermissionDeniedError);
     });
 
     it("renameRoom", async () => {
@@ -180,7 +202,7 @@ describe("authorization matrix (M6): every exported casting/identity mutator dec
       const resident = await claim(hh, "Resident1", accountIds);
       const residentActor = { accountId: resident.accountId, profileId: resident.profileId };
       await expect(
-        castingRepo.renameRoom(hh.context, room.id, "Renamed", residentActor),
+        castingRepo.renameRoom(residentContext(hh, resident), room.id, "Renamed", residentActor),
       ).rejects.toThrow(PermissionDeniedError);
     });
 
@@ -191,7 +213,7 @@ describe("authorization matrix (M6): every exported casting/identity mutator dec
       const resident = await claim(hh, "Resident1", accountIds);
       const residentActor = { accountId: resident.accountId, profileId: resident.profileId };
       await expect(
-        castingRepo.transitionRoomStatus(hh.context, room.id, "open", residentActor),
+        castingRepo.transitionRoomStatus(residentContext(hh, resident), room.id, "open", residentActor),
       ).rejects.toThrow(PermissionDeniedError);
     });
 
@@ -201,9 +223,9 @@ describe("authorization matrix (M6): every exported casting/identity mutator dec
       const room = await castingRepo.createRoom(hh.context, "Room A", adminActor);
       const resident = await claim(hh, "Resident1", accountIds);
       const residentActor = { accountId: resident.accountId, profileId: resident.profileId };
-      await expect(castingRepo.removeRoom(hh.context, room.id, residentActor)).rejects.toThrow(
-        PermissionDeniedError,
-      );
+      await expect(
+        castingRepo.removeRoom(residentContext(hh, resident), room.id, residentActor),
+      ).rejects.toThrow(PermissionDeniedError);
     });
 
     it("createRound", async () => {
@@ -213,7 +235,7 @@ describe("authorization matrix (M6): every exported casting/identity mutator dec
       const resident = await claim(hh, "Resident1", accountIds);
       const residentActor = { accountId: resident.accountId, profileId: resident.profileId };
       await expect(
-        castingRepo.createRound(hh.context, "Round", [room.id], residentActor),
+        castingRepo.createRound(residentContext(hh, resident), "Round", [room.id], residentActor),
       ).rejects.toThrow(PermissionDeniedError);
     });
 
@@ -224,9 +246,9 @@ describe("authorization matrix (M6): every exported casting/identity mutator dec
       const round = await castingRepo.createRound(hh.context, "Round", [room.id], adminActor);
       const resident = await claim(hh, "Resident1", accountIds);
       const residentActor = { accountId: resident.accountId, profileId: resident.profileId };
-      await expect(castingRepo.openRound(hh.context, round.id, residentActor)).rejects.toThrow(
-        PermissionDeniedError,
-      );
+      await expect(
+        castingRepo.openRound(residentContext(hh, resident), round.id, residentActor),
+      ).rejects.toThrow(PermissionDeniedError);
     });
 
     it("createAndOpenRound", async () => {
@@ -236,7 +258,7 @@ describe("authorization matrix (M6): every exported casting/identity mutator dec
       const resident = await claim(hh, "Resident1", accountIds);
       const residentActor = { accountId: resident.accountId, profileId: resident.profileId };
       await expect(
-        castingRepo.createAndOpenRound(hh.context, "Round", [room.id], residentActor),
+        castingRepo.createAndOpenRound(residentContext(hh, resident), "Round", [room.id], residentActor),
       ).rejects.toThrow(PermissionDeniedError);
     });
 
@@ -248,7 +270,7 @@ describe("authorization matrix (M6): every exported casting/identity mutator dec
       const resident = await claim(hh, "Resident1", accountIds);
       const residentActor = { accountId: resident.accountId, profileId: resident.profileId };
       await expect(
-        castingRepo.addResidentToRound(hh.context, round.id, resident.profileId, residentActor),
+        castingRepo.addResidentToRound(residentContext(hh, resident), round.id, resident.profileId, residentActor),
       ).rejects.toThrow(PermissionDeniedError);
     });
 
@@ -257,7 +279,11 @@ describe("authorization matrix (M6): every exported casting/identity mutator dec
       const resident = await claim(hh, "Resident1", accountIds);
       const residentActor = { accountId: resident.accountId, profileId: resident.profileId };
       await expect(
-        castingRepo.updateHouseholdSettingsWithProcedureLock(hh.context, { quorumShare: "0.6" }, residentActor),
+        castingRepo.updateHouseholdSettingsWithProcedureLock(
+          residentContext(hh, resident),
+          { quorumShare: "0.6" },
+          residentActor,
+        ),
       ).rejects.toThrow(PermissionDeniedError);
     });
 
@@ -271,7 +297,13 @@ describe("authorization matrix (M6): every exported casting/identity mutator dec
       const room = await castingRepo.createRoom(hh.context, "Room A", adminActor);
       const round = await castingRepo.createAndOpenRound(hh.context, "Round", [room.id], adminActor);
       await expect(
-        castingRepo.forceChangeSettingWhileRoundOpen(hh.context, "quorumShare", "0.6", round.id, residentActor),
+        castingRepo.forceChangeSettingWhileRoundOpen(
+          residentContext(hh, resident),
+          "quorumShare",
+          "0.6",
+          round.id,
+          residentActor,
+        ),
       ).rejects.toThrow(PermissionDeniedError);
     });
   });
@@ -291,7 +323,16 @@ describe("authorization matrix (M6): every exported casting/identity mutator dec
       const resident = await claim(hh, "Resident1", accountIds);
       const residentActor = { accountId: resident.accountId, profileId: resident.profileId };
       await expect(
-        identityRepo.createResidentProfile(hh.context, "Nobody", residentActor),
+        identityRepo.createResidentProfile(residentContext(hh, resident), "Nobody", residentActor),
+      ).rejects.toThrow(ResidentListActionDeniedError);
+    });
+
+    it("createResidentProfile refuses a resident's own session spoofed with the admin's accountId", async () => {
+      hh = await registerTestHousehold();
+      const resident = await claim(hh, "Resident1", accountIds);
+      const spoofedActor = { accountId: hh.accountId, profileId: null };
+      await expect(
+        identityRepo.createResidentProfile(residentContext(hh, resident), "Nobody", spoofedActor),
       ).rejects.toThrow(ResidentListActionDeniedError);
     });
 
@@ -302,7 +343,12 @@ describe("authorization matrix (M6): every exported casting/identity mutator dec
       const resident = await claim(hh, "Resident1", accountIds);
       const residentActor = { accountId: resident.accountId, profileId: resident.profileId };
       await expect(
-        identityRepo.transitionResidentProfileStatus(hh.context, target.id, "moved_out", residentActor),
+        identityRepo.transitionResidentProfileStatus(
+          residentContext(hh, resident),
+          target.id,
+          "moved_out",
+          residentActor,
+        ),
       ).rejects.toThrow(ResidentListActionDeniedError);
     });
 
@@ -311,7 +357,12 @@ describe("authorization matrix (M6): every exported casting/identity mutator dec
       const resident = await claim(hh, "Resident1", accountIds);
       const target = await claim(hh, "Resident2", accountIds);
       await expect(
-        identityRepo.removeMember(hh.context, resident.accountId, target.accountId, target.displayName),
+        identityRepo.removeMember(
+          residentContext(hh, resident),
+          resident.accountId,
+          target.accountId,
+          target.displayName,
+        ),
       ).rejects.toThrow(ResidentListActionDeniedError);
     });
 
@@ -320,7 +371,7 @@ describe("authorization matrix (M6): every exported casting/identity mutator dec
       const resident = await claim(hh, "Resident1", accountIds);
       const target = await claim(hh, "Resident2", accountIds);
       await expect(
-        identityRepo.setMovedOut(hh.context, resident.accountId, target.accountId),
+        identityRepo.setMovedOut(residentContext(hh, resident), resident.accountId, target.accountId),
       ).rejects.toThrow(ResidentListActionDeniedError);
     });
 
@@ -329,7 +380,7 @@ describe("authorization matrix (M6): every exported casting/identity mutator dec
       const resident = await claim(hh, "Resident1", accountIds);
       const target = await claim(hh, "Resident2", accountIds);
       await expect(
-        identityRepo.reactivateMember(hh.context, resident.accountId, target.accountId),
+        identityRepo.reactivateMember(residentContext(hh, resident), resident.accountId, target.accountId),
       ).rejects.toThrow(ResidentListActionDeniedError);
     });
 
@@ -337,7 +388,10 @@ describe("authorization matrix (M6): every exported casting/identity mutator dec
       hh = await registerTestHousehold();
       const resident = await claim(hh, "Resident1", accountIds);
       await expect(
-        identityRepo.issueJoinCode(hh.context, resident.accountId, { validDays: 7, maxUses: 1 }),
+        identityRepo.issueJoinCode(residentContext(hh, resident), resident.accountId, {
+          validDays: 7,
+          maxUses: 1,
+        }),
       ).rejects.toThrow(ResidentListActionDeniedError);
     });
 
@@ -346,7 +400,7 @@ describe("authorization matrix (M6): every exported casting/identity mutator dec
       const issuance = await identityRepo.issueJoinCode(hh.context, hh.accountId, { validDays: 7, maxUses: 1 });
       const resident = await claim(hh, "Resident1", accountIds);
       await expect(
-        identityRepo.extendJoinCode(hh.context, resident.accountId, issuance.id),
+        identityRepo.extendJoinCode(residentContext(hh, resident), resident.accountId, issuance.id),
       ).rejects.toThrow(ResidentListActionDeniedError);
     });
 
@@ -355,7 +409,7 @@ describe("authorization matrix (M6): every exported casting/identity mutator dec
       const issuance = await identityRepo.issueJoinCode(hh.context, hh.accountId, { validDays: 7, maxUses: 1 });
       const resident = await claim(hh, "Resident1", accountIds);
       await expect(
-        identityRepo.deleteJoinCode(hh.context, resident.accountId, issuance.id),
+        identityRepo.deleteJoinCode(residentContext(hh, resident), resident.accountId, issuance.id),
       ).rejects.toThrow(ResidentListActionDeniedError);
     });
 
@@ -364,7 +418,21 @@ describe("authorization matrix (M6): every exported casting/identity mutator dec
       const resident = await claim(hh, "Resident1", accountIds);
       const target = await claim(hh, "Resident2", accountIds);
       await expect(
-        identityRepo.setMemberRole(hh.context, resident.accountId, target.accountId, "moderator"),
+        identityRepo.setMemberRole(
+          residentContext(hh, resident),
+          resident.accountId,
+          target.accountId,
+          "moderator",
+        ),
+      ).rejects.toThrow(ResidentListActionDeniedError);
+    });
+
+    it("setMemberRole refuses a resident's own session spoofed with the admin's accountId", async () => {
+      hh = await registerTestHousehold();
+      const resident = await claim(hh, "Resident1", accountIds);
+      const target = await claim(hh, "Resident2", accountIds);
+      await expect(
+        identityRepo.setMemberRole(residentContext(hh, resident), hh.accountId, target.accountId, "moderator"),
       ).rejects.toThrow(ResidentListActionDeniedError);
     });
 
@@ -372,7 +440,7 @@ describe("authorization matrix (M6): every exported casting/identity mutator dec
       hh = await registerTestHousehold();
       const resident = await claim(hh, "Resident1", accountIds);
       await expect(
-        identityRepo.triggerSubjectAccessExport(hh.context, resident.accountId, "some-application-id"),
+        identityRepo.triggerSubjectAccessExport(residentContext(hh, resident), resident.accountId, "some-application-id"),
       ).rejects.toThrow(ResidentListActionDeniedError);
     });
 
@@ -380,10 +448,9 @@ describe("authorization matrix (M6): every exported casting/identity mutator dec
       hh = await registerTestHousehold();
       const adminSignIn = await signIn({ kind: "household", email: hh.email, password: "test-password-not-real-1234" });
       const resident = await claim(hh, "Resident1", accountIds);
-      const residentContext = { accountId: resident.accountId, householdId: hh.householdId, profileId: resident.profileId };
-      await expect(identityRepo.revokeSession(residentContext, adminSignIn.session.id)).rejects.toThrow(
-        PermissionDeniedError,
-      );
+      await expect(
+        identityRepo.revokeSession(residentContext(hh, resident), adminSignIn.session.id),
+      ).rejects.toThrow(PermissionDeniedError);
     });
   });
 });

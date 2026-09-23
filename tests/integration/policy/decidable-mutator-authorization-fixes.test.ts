@@ -138,11 +138,36 @@ describe("transitionResidentProfileStatus requires administration or moderator (
     const resident = await claimResident(hh, "Resident1");
     accountIds.push(resident.accountId);
 
+    // PR #19 review: authorization derives from the authenticated session, so this refusal must
+    // use the resident's OWN SessionContext, not the admin's hh.context paired with the
+    // resident's accountId — that combination is refused as a session/actor mismatch, not for
+    // lacking the administration-or-moderator role this test means to exercise.
     await expect(
-      transitionResidentProfileStatus(hh.context, target.id, "moved_out", {
-        accountId: resident.accountId,
-        profileId: resident.profileId,
-      }),
+      transitionResidentProfileStatus(
+        { accountId: resident.accountId, householdId: hh.householdId, profileId: resident.profileId },
+        target.id,
+        "moved_out",
+        { accountId: resident.accountId, profileId: resident.profileId },
+      ),
+    ).rejects.toThrow(ResidentListActionDeniedError);
+  });
+
+  it("refuses a resident's own session spoofed with the admin's accountId (PR #19 review)", async () => {
+    hh = await registerTestHousehold();
+    const target = await createResidentProfile(hh.context, "Target3", {
+      accountId: hh.accountId,
+      profileId: null,
+    });
+    const resident = await claimResident(hh, "Resident3");
+    accountIds.push(resident.accountId);
+
+    await expect(
+      transitionResidentProfileStatus(
+        { accountId: resident.accountId, householdId: hh.householdId, profileId: resident.profileId },
+        target.id,
+        "moved_out",
+        { accountId: hh.accountId, profileId: null },
+      ),
     ).rejects.toThrow(ResidentListActionDeniedError);
   });
 

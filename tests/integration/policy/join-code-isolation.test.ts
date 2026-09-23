@@ -88,26 +88,59 @@ describe("Join code moderator boundary (FR-1.27/U-30)", () => {
     );
     accountIds.push(memberAccountId);
 
+    // PR #19 review: authorization derives from the authenticated session, so exercising the
+    // moderator's and the plain member's own permissions requires THEIR OWN SessionContext, not
+    // hhA.context (the household admin's) paired with a different accountId — that mismatched
+    // combination is refused as a spoofed session regardless of role, which is not what any of
+    // these cases mean to show.
+    const modContext = { accountId: modAccountId, householdId: hhA.householdId, profileId: modProfile.id };
+    const memberContext = {
+      accountId: memberAccountId,
+      householdId: hhA.householdId,
+      profileId: memberProfile.id,
+    };
+
     // Administration (the household account itself) and the moderator both succeed.
     const asAdminLink = await issueJoinCode(hhA.context, hhA.accountId, { validDays: 7, maxUses: 1 });
-    const asModeratorLink = await issueJoinCode(hhA.context, modAccountId, { validDays: 7, maxUses: 1 });
+    const asModeratorLink = await issueJoinCode(modContext, modAccountId, { validDays: 7, maxUses: 1 });
     await expect(listJoinCodeIssuances(hhA.context, hhA.accountId)).resolves.not.toThrow();
-    await expect(listJoinCodeIssuances(hhA.context, modAccountId)).resolves.not.toThrow();
-    await expect(extendJoinCode(hhA.context, modAccountId, asAdminLink.id)).resolves.not.toThrow();
+    await expect(listJoinCodeIssuances(modContext, modAccountId)).resolves.not.toThrow();
+    await expect(extendJoinCode(modContext, modAccountId, asAdminLink.id)).resolves.not.toThrow();
     await expect(deleteJoinCode(hhA.context, hhA.accountId, asModeratorLink.id)).resolves.not.toThrow();
 
     // A plain member is refused by all four actions.
     await expect(
-      issueJoinCode(hhA.context, memberAccountId, { validDays: 7, maxUses: 1 }),
+      issueJoinCode(memberContext, memberAccountId, { validDays: 7, maxUses: 1 }),
     ).rejects.toThrow(ResidentListActionDeniedError);
-    await expect(listJoinCodeIssuances(hhA.context, memberAccountId)).rejects.toThrow(
+    await expect(listJoinCodeIssuances(memberContext, memberAccountId)).rejects.toThrow(
       ResidentListActionDeniedError,
     );
-    await expect(extendJoinCode(hhA.context, memberAccountId, asAdminLink.id)).rejects.toThrow(
+    await expect(extendJoinCode(memberContext, memberAccountId, asAdminLink.id)).rejects.toThrow(
       ResidentListActionDeniedError,
     );
-    await expect(deleteJoinCode(hhA.context, memberAccountId, asAdminLink.id)).rejects.toThrow(
+    await expect(deleteJoinCode(memberContext, memberAccountId, asAdminLink.id)).rejects.toThrow(
       ResidentListActionDeniedError,
     );
+  });
+
+  it("refuses a plain member's own session spoofed with the admin's accountId (PR #19 review)", async () => {
+    hhA = await registerTestHousehold();
+    const actor = { accountId: hhA.accountId, profileId: null };
+    const memberProfile = await createResidentProfile(hhA.context, "PlainMember2", actor);
+    const { accountId: memberAccountId } = await claimResidentProfile(
+      hhA.context,
+      memberProfile.id,
+      "test-password-not-real-1234",
+    );
+    accountIds.push(memberAccountId);
+    const memberContext = {
+      accountId: memberAccountId,
+      householdId: hhA.householdId,
+      profileId: memberProfile.id,
+    };
+
+    await expect(
+      issueJoinCode(memberContext, hhA.accountId, { validDays: 7, maxUses: 1 }),
+    ).rejects.toThrow(ResidentListActionDeniedError);
   });
 });

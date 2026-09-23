@@ -54,8 +54,13 @@ describe("Moderator appointment (EC-1.7)", () => {
     const claimed = await claimResidentProfile(hh.context, profile.id, "test-password-not-real-1234");
     memberAccountId = claimed.accountId;
 
+    // PR #19 review: authorization derives from the authenticated session, so this refusal must
+    // use the member's OWN SessionContext, not the admin's hh.context paired with the member's
+    // accountId — that combination is refused as a session/actor mismatch, not for being a
+    // non-admin caller, which is what this test means to show.
+    const memberContext = { accountId: memberAccountId, householdId: hh.householdId, profileId: profile.id };
     await expect(
-      setMemberRole(hh.context, memberAccountId, memberAccountId, "moderator"),
+      setMemberRole(memberContext, memberAccountId, memberAccountId, "moderator"),
     ).rejects.toThrow(ResidentListActionDeniedError);
 
     await expect(

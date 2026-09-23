@@ -55,8 +55,11 @@ describe("Resident profile creation and claim, via a bound link (Convergence T08
     residentAccountId = residentContext.accountId;
 
     const residentActor = { accountId: residentContext.accountId, profileId: residentContext.profileId };
+    // PR #19 review: authorization derives from the authenticated session — use the resident's
+    // OWN SessionContext (joinHousehold's own return value), not hh.context (the admin's) paired
+    // with the resident's accountId, which is now refused as a spoofed session regardless of role.
     await expect(
-      createResidentProfile(hh.context, "AttemptedByResident", residentActor),
+      createResidentProfile(residentContext, "AttemptedByResident", residentActor),
     ).rejects.toThrow(ResidentListActionDeniedError);
   });
 
