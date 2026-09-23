@@ -1095,17 +1095,31 @@ export async function triggerSubjectAccessExport(
 // plain resident who learned or guessed another member's session id could revoke it. Scoped here
 // to context.accountId as well, so a session can only ever be revoked by the account it belongs
 // to. sign-out-action.ts's only call site already passes the caller's own sessionId, so its
-// behaviour is unchanged. Deliberately NOT filtered on revokedAt IS NULL — signing out twice (or
-// revoking an already-revoked session) is harmless and must stay a no-op-shaped success, not a
-// refusal.
+// behaviour is unchanged.
+//
+// revokeSession review fix: filtered the UPDATE on revokedAt IS NULL, matching the repo's
+// convention that an original revocation timestamp is never overwritten (see
+// revokeMembershipForProfileTx's comment ~line 526). Signing out twice (or revoking an
+// already-revoked session of your own) must still be a no-op-shaped success, not a refusal — so
+// when the UPDATE matches nothing, look the session up by id+account unfiltered: if it exists
+// (already revoked, but still the caller's own), return normally. Only throw
+// PermissionDeniedError when no session with that id belongs to context.accountId at all.
 export async function revokeSession(context: SessionContext, sessionId: string): Promise<void> {
   await withSessionContext(context, async (tx) => {
     const [revoked] = await tx
       .update(session)
       .set({ revokedAt: new Date() })
-      .where(and(eq(session.id, sessionId), eq(session.accountId, context.accountId)))
+      .where(and(eq(session.id, sessionId), eq(session.accountId, context.accountId), isNull(session.revokedAt)))
       .returning({ id: session.id });
-    if (!revoked) throw new PermissionDeniedError("revoke_session");
+    if (revoked) return;
+
+    const [existing] = await tx
+      .select({ id: session.id })
+      .from(session)
+      .where(and(eq(session.id, sessionId), eq(session.accountId, context.accountId)));
+    if (existing) return; // already revoked, still the caller's own session — harmless no-op
+
+    throw new PermissionDeniedError("revoke_session");
   });
 }
 

@@ -70,14 +70,47 @@ describe("revokeSession refuses to revoke another account's session (G-C fix 1)"
     );
     expect(adminSessionRow.revokedAt).toBeNull();
 
-    // Own session (self-service sign-out) still works, and revoking it twice stays harmless.
+    // Own session (self-service sign-out) still works, and revoking it twice stays harmless —
+    // and the ORIGINAL revocation timestamp is never overwritten by the second call (the repo's
+    // convention, see revokeMembershipForProfileTx's comment ~line 526).
     await revokeSession(residentSignIn.context, residentSignIn.session.id);
+
+    const [firstRevocation] = await withSessionContext(hh.context, (tx) =>
+      tx.select().from(sessionTable).where(eq(sessionTable.id, residentSignIn.session.id)),
+    );
+    expect(firstRevocation.revokedAt).not.toBeNull();
+
     await expect(revokeSession(residentSignIn.context, residentSignIn.session.id)).resolves.toBeUndefined();
 
     const [residentSessionRow] = await withSessionContext(hh.context, (tx) =>
       tx.select().from(sessionTable).where(eq(sessionTable.id, residentSignIn.session.id)),
     );
     expect(residentSessionRow.revokedAt).not.toBeNull();
+    expect(residentSessionRow.revokedAt).toEqual(firstRevocation.revokedAt);
+  });
+
+  it("revoking another member's already-revoked session is still refused", async () => {
+    hh = await registerTestHousehold();
+    const resident = await claimResident(hh, "Resident2");
+    accountIds.push(resident.accountId);
+    const residentSignIn = await signIn({
+      kind: "resident",
+      householdId: hh.householdId,
+      displayName: resident.displayName,
+      password: PASSWORD,
+    });
+    const adminSignIn = await signIn({ kind: "household", email: hh.email, password: PASSWORD });
+
+    // The admin revokes their own session first, so it exists but is already revoked...
+    await revokeSession(adminSignIn.context, adminSignIn.session.id);
+
+    // ...and the resident still cannot revoke it, even though it's already revoked.
+    await expect(
+      revokeSession(
+        { accountId: resident.accountId, householdId: hh.householdId, profileId: resident.profileId },
+        adminSignIn.session.id,
+      ),
+    ).rejects.toThrow(PermissionDeniedError);
   });
 });
 
