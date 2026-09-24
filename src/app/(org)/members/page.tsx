@@ -77,6 +77,15 @@ function renderJoinCodeCard(
   const resetTargetName = isReset && issuance.residentProfileId
     ? profileNameById.get(issuance.residentProfileId)
     : undefined;
+  // review fix (PR #23 finding): profileNameById comes from getResidentList, which hides a
+  // removed profile's name entirely (PR #18 decision) — a reset link whose target was later
+  // removed would otherwise lose its label completely. Falls back to a neutral label rather than
+  // showing the removed person's name some other way, which would contradict #18.
+  const resetLabel = isReset
+    ? resetTargetName
+      ? t.joinCode.resetLinkForName(resetTargetName)
+      : t.joinCode.resetLinkForRemovedPerson
+    : undefined;
   return (
     <li key={issuance.id} className="card space-y-2">
       <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
@@ -84,7 +93,7 @@ function renderJoinCodeCard(
         <span className="text-muted-foreground">{t.joinCode.usageCount(issuance.uses, issuance.maxUses)}</span>
       </div>
 
-      {resetTargetName && <p className="text-sm font-medium">{t.joinCode.resetLinkForName(resetTargetName)}</p>}
+      {resetLabel && <p className="text-sm font-medium">{resetLabel}</p>}
 
       {!isDeleted && (
         <div className="flex flex-wrap items-center gap-3">

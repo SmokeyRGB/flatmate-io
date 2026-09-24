@@ -141,6 +141,13 @@
       "when": 1790263448769,
       "tag": "0019_join_code_purpose",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1790274059635,
+      "tag": "0020_membership_resident_pairing",
+      "breakpoints": true
     }
   ]
 }

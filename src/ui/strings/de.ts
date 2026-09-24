@@ -89,10 +89,6 @@ export const de = {
       // household tab still accepts a resident's address, but no longer advertises it.
       residentUseEmail: "Mit E-Mail-Adresse anmelden",
       residentUseName: "Mit Name anmelden",
-      // review fix (auth.ts redeemPasswordReset's reset_done_sign_in_failed): the reset itself
-      // already succeeded (password set, sessions revoked, link spent) — only the immediate
-      // sign-in afterwards failed, so this is a note beside the ordinary form, not an error.
-      passwordResetNote: "Dein neues Passwort ist gesetzt. Melde dich damit an.",
     },
     register: {
       heading: "WG gründen",
@@ -247,6 +243,11 @@ export const de = {
       // The link-history label for a reset row, replacing the invitation label (design.md
       // Decision 8: "Passwort-Link für <Name>" instead of an invitation).
       resetLinkForName: (displayName: string) => `Passwort-Link für ${displayName}`,
+      // review fix (PR #23 finding): getResidentList (PR #18 decision) hides a removed profile's
+      // name entirely (O16 never shows who a removed person was) — so a reset link whose target
+      // was later removed cannot look the name up in profileNameById. Never fall back to showing
+      // the name some other way (that would contradict #18); this neutral label names no one.
+      resetLinkForRemovedPerson: "Passwort-Link für eine entfernte Person",
       errors: {
         // identity/repository.ts's ResidentProfileNotEligibleForResetError — one throw site, one
         // message, mapped by class (same convention as members.errors.nameMismatch).

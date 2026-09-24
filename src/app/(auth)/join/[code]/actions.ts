@@ -155,10 +155,6 @@ export async function joinHouseholdAction(
           // a failed one created nothing (t.errors.genericFailure states that now, task 2.2).
           console.error(err);
           return { error: t.errors.genericFailure, fieldError: null, refusal: null };
-        // review fix: reset_done_sign_in_failed belongs to redeemPasswordReset's own refusals —
-        // joinHousehold never throws it, covered here only so this switch stays exhaustive.
-        case "reset_done_sign_in_failed":
-          return { error: t.errors.genericFailure, fieldError: null, refusal: null };
         default: {
           const _exhaustive: never = errCode;
           return _exhaustive;
@@ -267,16 +263,13 @@ export async function redeemPasswordResetAction(
         case "rate_limited":
           return { error: t.errors.rateLimited, fieldError: null, refusal: null };
         case "signup_failed":
+          // review fix (Copilot finding, PR #23): also covers what used to be the dedicated
+          // reset_done_sign_in_failed outcome — the sign-in-after-reset step now runs INSIDE
+          // redeemPasswordReset's own transaction (auth.ts), so a failure there rolls the whole
+          // reset back (link not spent, password not changed) and surfaces as this same generic
+          // code, exactly like any other unexpected provider error in that transaction.
           console.error(err);
           return { error: t.errors.genericFailure, fieldError: null, refusal: null };
-        case "reset_done_sign_in_failed":
-          // review fix: past this point the reset has ALREADY SUCCEEDED (password set, sessions
-          // revoked, link spent) — only the immediate sign-in afterwards failed. Showing the
-          // generic failure text here would be a lie (it promises "your invitation is not
-          // consumed", which is false for a spent reset link). Redirect to sign-in with a note
-          // instead, same shape as joinHouseholdAction's own already_member redirect (inside this
-          // catch block, so the outer try's own catch can never intercept it).
-          redirect("/sign-in?note=password_reset");
         // The remaining JoinErrorCode members belong to joinHousehold's own refusals
         // (name collisions, an already-signed-in visitor, a duplicate email) and redeemPasswordReset
         // never throws them — covered here only so this switch stays exhaustive.

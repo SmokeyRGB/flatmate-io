@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { afterEach, describe, expect, it } from "vitest";
 import { withSessionContext, type SessionContext } from "@/db/session-context";
 import {
@@ -371,4 +371,138 @@ describe("redeemPasswordReset (design.md Decision 5)", () => {
     );
     expect(linkRow.uses).toBe(0);
   });
+
+  // review fix (Copilot finding, PR #23): redeemPasswordReset used to insert the new session in a
+  // SEPARATE transaction AFTER the reset itself had committed. A concurrent setMovedOut/
+  // removeMember committing in that gap could leave the moved-out resident with a live session
+  // anyway — the reset's own transaction had already revoked every PRIOR session, but the new one
+  // was inserted afterwards, outside that revoke's view entirely. Fixed by moving the sign-in and
+  // session insert INSIDE the same transaction, still holding the membership row lock. This builds
+  // the race directly, same technique as the "account FOR UPDATE re-check" guard above: a raw
+  // transaction stands in for a concurrent removal, locking the membership row first and holding it
+  // open while the redemption is started, then — still holding the lock — revoking the membership
+  // and the resident's session (removeMember's own effect) before committing.
+  it("a removal winning the membership lock makes the redemption fail, with no live session left behind (invariant guard)", async () => {
+    hh = await registerTestHousehold();
+    const resident = await claimResident(hh, "RemovalWinsLock");
+    const link = await issuePasswordResetLink(hh.context, hh.accountId, resident.profileId);
+
+    // A pre-existing session, so "no live session afterwards" is a real assertion, not a vacuous
+    // one — claimResidentProfile alone never signs in.
+    const priorSignIn = await signIn({
+      kind: "resident",
+      householdId: hh.householdId,
+      displayName: "RemovalWinsLock",
+      password: PASSWORD,
+    });
+
+    let releaseRawTx: () => void = () => {};
+    const rawTxGate = new Promise<void>((resolve) => {
+      releaseRawTx = resolve;
+    });
+    let markLocked: () => void = () => {};
+    const locked = new Promise<void>((resolve) => {
+      markLocked = resolve;
+    });
+
+    // Stand-in for a concurrent removal (removeMember/setMovedOut): locks the membership row
+    // FIRST — the same row redeemPasswordReset's own `SELECT membership ... FOR UPDATE` locks —
+    // holds the transaction open (uncommitted), then, still holding the lock, revokes the
+    // membership and the resident's existing session (removeMember's own order,
+    // resident_profile -> membership -> session, collapsed here to membership -> session since no
+    // resident_profile status change is needed to make the point), and only then commits.
+    const rawTxPromise = withSessionContext(hh!.context, async (tx) => {
+      await tx.select().from(membership).where(eq(membership.residentProfileId, resident.profileId)).for("update");
+      markLocked();
+      await rawTxGate;
+      await tx
+        .update(membership)
+        .set({ revokedAt: new Date() })
+        .where(eq(membership.residentProfileId, resident.profileId));
+      await tx
+        .update(session)
+        .set({ revokedAt: new Date() })
+        .where(and(eq(session.accountId, resident.accountId), isNull(session.revokedAt)));
+    });
+
+    // Wait for the raw transaction to actually hold the lock before starting the redemption —
+    // otherwise redeemPasswordReset could race ahead of it, not just its commit.
+    await locked;
+
+    const redeemPromise = redeemPasswordReset(link.code, { password: "reset-new-password-123" }).then(
+      (result) => ({ ok: true as const, result }),
+      (err) => ({ ok: false as const, err }),
+    );
+
+    // A generous window for redeemPasswordReset's own claim and membership `FOR UPDATE` to reach
+    // the database and start waiting on the lock, before this test commits the raw transaction out
+    // from under it.
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+
+    releaseRawTx();
+    await rawTxPromise;
+
+    const outcome = await redeemPromise;
+    expect(outcome.ok).toBe(false);
+    if (!outcome.ok) {
+      expect(outcome.err).toBeInstanceOf(JoinError);
+      expect((outcome.err as JoinError).code).toBe("invalid_link");
+    }
+
+    const liveSessions = await withSessionContext(hh!.context, (tx) =>
+      tx.select().from(session).where(and(eq(session.accountId, resident.accountId), isNull(session.revokedAt))),
+    );
+    expect(liveSessions).toHaveLength(0);
+    // Sanity: the prior session really did exist and really was the one revoked by the removal
+    // above, not merely absent because none was ever created.
+    const [priorRow] = await withSessionContext(hh!.context, (tx) =>
+      tx.select().from(session).where(eq(session.id, priorSignIn.session.id)),
+    );
+    expect(priorRow.revokedAt).not.toBeNull();
+  });
+
+  // review fix (Copilot finding, PR #23), second half: two concurrent resets for the SAME profile
+  // (two different single-use links, each independently valid) used to both reach the old
+  // post-commit session insert and both leave a session alive — the account row lock inside the
+  // main transaction only served the claim/password/audit steps, not the session insert that ran
+  // after it. With the insert moved inside the transaction, whichever reset's transaction commits
+  // SECOND still revokes every session that is live at that point (design.md D5's "revoke EVERY
+  // session of the account", `isNull(revokedAt)`) — which by then includes the FIRST reset's own
+  // just-inserted session — before inserting its own. Exactly one live session survives, whichever
+  // reset committed last.
+  it("two concurrent redemptions of two links for the same profile leave exactly one live session", async () => {
+    hh = await registerTestHousehold();
+    const resident = await claimResident(hh, "ConcurrentTwoLinks");
+
+    const link1 = await issuePasswordResetLink(hh.context, hh.accountId, resident.profileId);
+    const link2 = await issuePasswordResetLink(hh.context, hh.accountId, resident.profileId);
+
+    const results = await Promise.allSettled([
+      redeemPasswordReset(link1.code, { password: "concurrent-pw-one-123" }),
+      redeemPasswordReset(link2.code, { password: "concurrent-pw-two-123" }),
+    ]);
+
+    // Nothing about redemption itself refuses a SECOND reset link for a profile whose account
+    // still has no email after the first reset — only changeResidentEmail ever sets one
+    // (design.md D6: issuing is deliberately unserialized against a concurrent change). Both
+    // resets are expected to succeed; the account row lock decides their ORDER, not whether the
+    // second one is honoured.
+    expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(2);
+
+    const liveSessions = await withSessionContext(hh.context, (tx) =>
+      tx.select().from(session).where(and(eq(session.accountId, resident.accountId), isNull(session.revokedAt))),
+    );
+    expect(liveSessions).toHaveLength(1);
+  });
+
+  // Deliberate break (argued, not executed — CLAUDE.md forbids weakening a test to prove a
+  // regression): moving the sign-in/session-insert steps back OUT of redeemPasswordReset's
+  // transaction (the pre-fix shape) reopens both races above. In the first test, the raw
+  // transaction's membership+session revoke would no longer be strictly ordered against
+  // redeemPasswordReset's own commit boundary the same way — but more directly, the SECOND test
+  // would start failing: each reset's session insert would happen in a NEW, separate transaction
+  // after its own commit, so the second reset's "revoke every live session" step (still inside its
+  // main transaction) could run BEFORE the first reset's post-commit insert has happened, missing
+  // it entirely — leaving TWO live sessions instead of one, failing
+  // `expect(liveSessions).toHaveLength(1)`.
 });

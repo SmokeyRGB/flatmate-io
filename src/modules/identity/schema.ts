@@ -224,6 +224,17 @@ export const membership = pgTable(
   (t) => [
     index("membership_household_id_idx").on(t.householdId),
     index("membership_account_id_idx").on(t.accountId),
+    // drizzle/0020 (review fix, Copilot PR #23): there are no foreign keys in this schema, so
+    // nothing previously stopped a membership row from carrying `is_resident = false` alongside a
+    // set `resident_profile_id`, or `is_resident = true` with a null one — a pairing that
+    // resolve_join_code/claim_join_code's (drizzle/0019) resident-only joins, and
+    // issuePasswordResetLink's own SQL predicate (repository.ts), both trust without re-checking.
+    // This CHECK makes that pairing a database invariant instead of an assumption held only by the
+    // three writers (registerHousehold, claimResidentProfile, joinHousehold in auth.ts).
+    check(
+      "membership_resident_pairing",
+      sql`${t.isResident} = (${t.residentProfileId} IS NOT NULL)`,
+    ),
     pgPolicy("membership_household_isolation", {
       as: "permissive",
       for: "all",
