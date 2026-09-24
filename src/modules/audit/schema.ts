@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import { index, jsonb, pgPolicy, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { PROFILE_PRESENT } from "../../db/rls-predicates";
 
 // Wrapped in (select ...): Supabase's RLS-performance guidance — otherwise Postgres re-evaluates
 // current_setting() per row instead of once per query (confirmed via this project's own
@@ -76,6 +77,22 @@ export const activityEvent = pgTable(
       as: "restrictive",
       for: "delete",
       using: sql`false`,
+    }),
+    // G-D15 (openspec application-requires-resident-profile, design Decision 3): application's own
+    // new RESTRICTIVE policy stops a household-account session from counting rows directly, but
+    // `application.state_changed` events carry fromState/toState per application in this table
+    // too — a count of them per subject_id is the application count, and their payloads give the
+    // state distribution. Same leak, sibling path (G-D15: "weder Zeilen noch Aggregate"). Scoped to
+    // subject_type = 'application' only, so the household account's own room/round/settings/
+    // membership events (hasProcedureChangedNotice among them) stay readable. FOR SELECT only:
+    // INSERT stays governed by the policies above (recordActivityEvent's .returning() would raise
+    // for a household-account session inserting an application event — unreachable today, since
+    // transitionApplication refuses first, and loud if it ever becomes reachable). PROFILE_PRESENT
+    // comes from src/db/rls-predicates.ts, the one definition every such policy shares.
+    pgPolicy("activityevent_application_requires_resident_profile", {
+      as: "restrictive",
+      for: "select",
+      using: sql`subject_type <> 'application' OR ${PROFILE_PRESENT}`,
     }),
   ],
 );

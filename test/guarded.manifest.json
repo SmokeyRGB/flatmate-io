@@ -97,7 +97,9 @@
       "status": "implemented",
       "testFiles": [
         "tests/integration/policy/round-visibility-household-account.test.ts",
-        "tests/integration/raw-sql/round-visibility-household-account.test.ts"
+        "tests/integration/raw-sql/round-visibility-household-account.test.ts",
+        "tests/integration/policy/application-visibility-household-account.test.ts",
+        "tests/integration/raw-sql/application-visibility-household-account.test.ts"
       ]
     }
   ],

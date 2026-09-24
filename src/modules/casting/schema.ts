@@ -13,10 +13,12 @@ import {
   uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
+import { PROFILE_PRESENT } from "../../db/rls-predicates";
 
 // Wrapped in (select ...): Supabase's RLS-performance guidance — same shape as F0's Application
 // policy below and identity/schema.ts's HOUSEHOLD_MATCH.
 const HOUSEHOLD_MATCH = sql`household_id = (select current_setting('app.household_id', true)::uuid)`;
+
 
 // Eleven states declared in docs/03-PRD.md §4.2.1 — the maßgeblich transition table (FR-0.9):
 // seven main-path states (new → screened → invited → scheduled → interviewed → offer_made →
@@ -48,7 +50,9 @@ export const application = pgTable(
     becameResidentId: uuid("became_resident_id"),
     createdByAccountId: uuid("created_by_account_id").notNull(),
     createdByProfileId: uuid("created_by_profile_id").notNull(),
-    // Default `created_at + 180 Tage` — docs/domain/casting.md §7/line 124.
+    // 180 days (or the household's `retention_days`) from `CastingRound.closed_at`, not from
+    // `created_at` — corrected 2026-09-24 to match docs/06-Compliance-Anhang.md §5.3, the
+    // authoritative source. No DB default; nothing sets it yet (the retention slice will).
     retentionUntil: date("retention_until"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     deletedAt: timestamp("deleted_at", { withTimezone: true }),
@@ -67,6 +71,20 @@ export const application = pgTable(
       // project's own performance advisor after the first migration, 2026-09-16).
       using: sql`household_id = (select current_setting('app.household_id', true)::uuid)`,
       withCheck: sql`household_id = (select current_setting('app.household_id', true)::uuid)`,
+    }),
+    // G-D15 (openspec application-requires-resident-profile, design Decision 1): a household-
+    // account session (no resident profile acting) SHALL NOT read, count, insert, update or
+    // delete any Application row — not through the repository, and not by raw SQL under
+    // app_runtime. RESTRICTIVE + FOR ALL: Postgres ANDs this with the PERMISSIVE household
+    // policy above, so household isolation is unchanged and this can only narrow access further.
+    // FOR ALL rather than FOR SELECT: created_by_profile_id is NOT NULL (O-17), so a
+    // household-account session has no legitimate write either — an insert fails loudly
+    // (WITH CHECK), an update/delete matches zero rows.
+    pgPolicy("application_requires_resident_profile", {
+      as: "restrictive",
+      for: "all",
+      using: PROFILE_PRESENT,
+      withCheck: PROFILE_PRESENT,
     }),
   ],
 );

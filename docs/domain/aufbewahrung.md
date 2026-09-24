@@ -11,7 +11,7 @@ vermischt man leicht.
 
 | Was | Frist | Anker | Feld |
 |---|---|---|---|
-| `Application` inkl. `message_raw`, `attributes`, Kontaktdaten | **180 Tage** | `created_at` | `Application.retention_until` |
+| `Application` inkl. `message_raw`, `attributes`, Kontaktdaten | **180 Tage** bzw. `retention_days` | `CastingRound.closed_at` *(korrigiert 2026-09-24, maßgeblich `06-Compliance-Anhang.md` §5.3)* | `Application.retention_until` |
 | `Application.subject_statement` | **geerbt**, kein eigener Zeitgeber | — | **Löschung in derselben Transaktion** wie die Bezugsdaten — sonst ist die gelöschte Beurteilung aus ihrer Erwiderung rekonstruierbar (§2.2) |
 | `Vote`, `Veto`, `CastingNote` | **180 Tage** | `CastingRound.closed_at` | `CastingNote.retention_until`, sonst über die Runde |
 | `CastingRound` als Ganzes | 180 Tage | `closed_at` | `CastingRound.retention_until` |

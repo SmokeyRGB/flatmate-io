@@ -16,8 +16,14 @@ describe("Backward transition produces exactly one ActivityEvent (FR-0.11, G-D3)
   const seededHouseholds: string[] = [];
 
   afterEach(async () => {
+    // G-D15 (openspec application-requires-resident-profile, design Decision 6, human-approved
+    // 2026-09-24, teardown only): `application` now carries a RESTRICTIVE policy requiring a
+    // resident profile. A profile-less context here would make this DELETE match zero rows and
+    // silently orphan the seeded row instead of removing it — a synthetic profile id is used only
+    // to satisfy the policy for this teardown delete (Decision 1's policy checks presence, not
+    // identity).
     for (const householdId of seededHouseholds) {
-      await withSessionContext({ accountId: uuid(), householdId, profileId: null }, (tx) =>
+      await withSessionContext({ accountId: uuid(), householdId, profileId: uuid() }, (tx) =>
         tx.delete(application).where(eq(application.householdId, householdId)),
       );
     }

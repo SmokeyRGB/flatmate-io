@@ -121,7 +121,7 @@ gewählt haben.** Entsprechend die strengste Datenhaltung.
 | `planned_move_in_on` | `date?` | 🔴 | |
 | `decision_note` | `text?` | ⚫ | vorläufige Beschlüsse der WG („erst Zimmer 2 anbieten") |
 | `rejection_reason` | `text?` | ⚫ | |
-| `retention_until` | `date` | ⚙️ | Default `created_at + 180 Tage`, siehe §7 |
+| `retention_until` | `date` | ⚙️ | 180 Tage bzw. `retention_days` ab `CastingRound.closed_at` *(korrigiert 2026-09-24, maßgeblich `06-Compliance-Anhang.md` §5.3)*, siehe §7 |
 | `subject_access_exported_at` | `timestamptz?` | 🔴 | wann eine Datenauskunft erzeugt wurde — Nachweis der Unterstützungspflicht |
 | `created_by_account_id` | `uuid` | ⚙️ | |
 | `created_by_profile_id` | `uuid` | ⚙️ | **`NOT NULL` seit O-17.** `Application` anlegen setzt `create_application` voraus, und das hat nur, wer ein `ResidentProfile` besetzt — seit S-50/U-20 gibt es keinen Pfad mehr, der hier `null` erzeugen könnte. Kommt später ein Systempfad (Import, Formulareingang), bekommt er eine **benannte** Quelle; „kein Wert" und „vom System" dürfen nicht gleich aussehen |
