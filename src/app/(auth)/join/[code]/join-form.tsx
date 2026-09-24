@@ -4,6 +4,7 @@ import { useActionState, useState } from "react";
 import { de } from "@/ui/strings";
 import { joinHouseholdAction, type JoinFormState } from "./actions";
 import { HandEntryWayBack, SignOutAndReturnForm } from "./join-ways-forward";
+import { PasswordInput } from "@/ui/password-input";
 
 const initialState: JoinFormState = { error: null, fieldError: null, refusal: null };
 const t = de.join;
@@ -77,7 +78,7 @@ export function JoinForm({
           <label htmlFor="password" className="field-label">
             {t.passwordLabel}
           </label>
-          <input id="password" name="password" type="password" className="field-input" />
+          <PasswordInput id="password" name="password" autoComplete="new-password" />
           {/* FR-2.10a/AC-2.20: the requirement is readable before submitting, not discovered by a
               rejection. */}
           <p className="field-helper">{t.passwordRequirement(passwordMinLength)}</p>

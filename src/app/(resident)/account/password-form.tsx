@@ -3,6 +3,8 @@
 import { useActionState } from "react";
 import { de } from "@/ui/strings";
 import { changePasswordAction, type PasswordFormState } from "./actions";
+import { PasswordInput } from "@/ui/password-input";
+import { SuccessToast } from "@/ui/success-toast";
 
 const initialState: PasswordFormState = { error: null, saved: false };
 const t = de.account.password;
@@ -13,18 +15,20 @@ export function PasswordForm({ passwordMinLength }: { passwordMinLength: number 
   const [state, formAction, pending] = useActionState(changePasswordAction, initialState);
 
   return (
-    <form action={formAction} className="space-y-2">
+    // noValidate: the server action is the one validator, so every refusal is our German text
+    // (de.ts), never the browser's own tooltip in the browser's language (walkthrough 2026-09-24).
+    <form action={formAction} className="space-y-2" noValidate>
       <div>
         <label htmlFor="currentPassword" className="field-label">
           {t.currentLabel}
         </label>
-        <input id="currentPassword" name="currentPassword" type="password" className="field-input" />
+        <PasswordInput id="currentPassword" name="currentPassword" autoComplete="current-password" />
       </div>
       <div>
         <label htmlFor="newPassword" className="field-label">
           {t.newLabel}
         </label>
-        <input id="newPassword" name="newPassword" type="password" className="field-input" />
+        <PasswordInput id="newPassword" name="newPassword" autoComplete="new-password" />
         {/* FR-2.10a: the rule is visible beside the field before submitting, not discovered by a
             rejection. */}
         <p className="field-helper">{t.requirement(passwordMinLength)}</p>
@@ -35,6 +39,7 @@ export function PasswordForm({ passwordMinLength }: { passwordMinLength: number 
         </p>
       )}
       {state.saved && !state.error && <p className="text-sm text-muted-foreground">{t.saved}</p>}
+      <SuccessToast message={t.saved} trigger={state.saved && !state.error ? state : null} />
       <button type="submit" disabled={pending} className="btn btn-primary w-full">
         {pending ? t.submitPending : t.submit}
       </button>

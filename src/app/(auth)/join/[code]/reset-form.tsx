@@ -3,6 +3,7 @@
 import { useActionState, useState } from "react";
 import { de } from "@/ui/strings";
 import { redeemPasswordResetAction, type ResetFormState } from "./actions";
+import { PasswordInput } from "@/ui/password-input";
 
 const initialState: ResetFormState = { error: null, fieldError: null };
 const t = de.join;
@@ -30,7 +31,7 @@ export function ResetForm({ code, passwordMinLength }: { code: string; passwordM
         <label htmlFor="password" className="field-label">
           {t.reset.newPasswordLabel}
         </label>
-        <input id="password" name="password" type="password" className="field-input" />
+        <PasswordInput id="password" name="password" autoComplete="new-password" />
         <p className="field-helper">{t.passwordRequirement(passwordMinLength)}</p>
         {state.fieldError === "password" && (
           <p className="field-error" role="alert">

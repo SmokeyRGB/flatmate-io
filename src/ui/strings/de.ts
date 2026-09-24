@@ -7,6 +7,11 @@
 // entries are functions rather than a template-substitution helper.
 export const de = {
   common: {
+    // src/ui/password-input.tsx: the eye toggle beside every password field.
+    showPassword: "Passwort anzeigen",
+    hidePassword: "Passwort verbergen",
+    // src/ui/success-toast.tsx: closes the success notice.
+    close: "Schließen",
     save: "Speichern",
     saving: "Wird gespeichert…",
     cancel: "Abbrechen",
@@ -230,6 +235,9 @@ export const de = {
       issueResetLink: "Passwort-Link erstellen",
       // E-03/K-18 ("Nicht als Sicherheitsgrenze darstellen"): states plainly what the link can do,
       // shown once a reset link is issued — never framed as protection.
+      // Walkthrough fix 2026-09-24: a reset link is not an invitation, so it gets its own heading
+      // instead of issuedForProfileHeading.
+      resetLinkIssuedHeading: "Ausgestellter Passwort-Link für dieses Profil:",
       resetLinkIssuedCaution: "Wer diesen Link öffnet, kann das Passwort dieser Person setzen.",
       // The link-history label for a reset row, replacing the invitation label (design.md
       // Decision 8: "Passwort-Link für <Name>" instead of an invitation).
@@ -349,6 +357,9 @@ export const de = {
     // is asked only for a new password (spec: "SHALL NOT ask for a name or an email").
     reset: {
       heading: (displayName: string) => `Hi ${displayName}!`,
+      // Walkthrough fix 2026-09-24: the join chip ("Du trittst … bei") is wrong here, since the
+      // person already belongs. FR-2.9 only needs the household named.
+      householdChip: (householdName: string) => `Neues Passwort für ${householdName}`,
       newPasswordLabel: "Neues Passwort",
       submit: "Passwort setzen",
       submitPending: "Wird gesetzt…",

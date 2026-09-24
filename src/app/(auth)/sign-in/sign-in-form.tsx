@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useActionState, useState } from "react";
 import { de } from "@/ui/strings";
 import { signInAction, type SignInFormState } from "./actions";
+import { PasswordInput } from "@/ui/password-input";
 
 const initialState: SignInFormState = { error: null };
 const t = de.auth.signIn;
@@ -85,13 +86,7 @@ export function SignInForm() {
           <label htmlFor="password" className="field-label">
             {t.passwordLabel}
           </label>
-          <input
-            id="password"
-            name="password"
-            type="password"
-            required
-            className="field-input"
-          />
+          <PasswordInput id="password" name="password" required autoComplete="current-password" />
         </div>
 
         {state.error && <p className="field-error">{state.error}</p>}

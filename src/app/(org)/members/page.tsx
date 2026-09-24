@@ -410,7 +410,7 @@ export default async function MembersPage() {
                 password") — never presented as a security measure. */}
             {isAdmin && m.status === "active" && !m.hasEmail && resetIssuancesByProfile.get(m.id) && (
               <div className="mt-3 space-y-2">
-                <p className="field-helper">{t.joinCode.issuedForProfileHeading}</p>
+                <p className="field-helper">{t.joinCode.resetLinkIssuedHeading}</p>
                 <p className="text-xs text-muted-foreground">
                   {joinCodeStatusLabel(resetIssuancesByProfile.get(m.id)!, now)}
                 </p>

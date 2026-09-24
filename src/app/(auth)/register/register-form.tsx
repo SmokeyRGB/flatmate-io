@@ -4,6 +4,7 @@ import { Info } from "lucide-react";
 import { useActionState, useState } from "react";
 import { de } from "@/ui/strings";
 import { registerHouseholdAction, type RegisterFormState } from "./actions";
+import { PasswordInput } from "@/ui/password-input";
 
 const initialState: RegisterFormState = { error: null, fieldError: null };
 const t = de.auth.register;
@@ -57,7 +58,7 @@ export function RegisterForm() {
           <label htmlFor="password" className="field-label">
             {t.passwordLabel}
           </label>
-          <input id="password" name="password" type="password" className="field-input" />
+          <PasswordInput id="password" name="password" autoComplete="new-password" />
           {state.fieldError === "password" && <p className="field-error">{state.error}</p>}
         </div>
 

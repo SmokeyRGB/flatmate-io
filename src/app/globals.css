@@ -163,6 +163,34 @@ h3 {
     outline: 2px solid var(--color-primary);
     outline-offset: 1px;
   }
+  /* src/ui/password-input.tsx: the eye toggle sits inside the field's right edge, and the input
+     reserves room for it so typed text never runs underneath. */
+  .password-field {
+    position: relative;
+  }
+  .password-field .field-input {
+    padding-right: 2.75rem;
+  }
+  .password-toggle {
+    position: absolute;
+    top: 50%;
+    right: 0.25rem;
+    transform: translateY(-50%);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: 0.5rem;
+    color: var(--color-muted-foreground);
+  }
+  .password-toggle:hover {
+    color: var(--color-foreground);
+  }
+  .password-toggle:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 1px;
+  }
   .field-helper {
     font-size: 0.75rem;
     color: var(--color-muted-foreground);
@@ -458,6 +486,68 @@ h3 {
   }
   @media (prefers-reduced-motion: reduce) {
     .skeleton {
+      animation: none;
+    }
+  }
+  /* src/ui/success-toast.tsx: a success notice that overlays the page (09-Design-System.md
+     "Feedback states"). Top-centred below the header, so it covers neither the header links nor
+     the mobile bottom bar; a solid card
+     background mixed with the celebratory tint, because the translucent callout would be
+     unreadable over content. */
+  .toast-region {
+    position: fixed;
+    /* Below the resident header (about 3.6rem tall), so the notice never covers its links. */
+    top: 4.25rem;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 50;
+    width: calc(100% - 2rem);
+    max-width: 26rem;
+    pointer-events: none;
+  }
+  .toast {
+    pointer-events: auto;
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    padding: 0.75rem 0.75rem 0.75rem 1rem;
+    border-radius: 0.875rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--color-foreground);
+    background: color-mix(in srgb, var(--color-primary) 12%, var(--color-card));
+    border: 1px solid color-mix(in srgb, var(--color-primary) 45%, transparent);
+    box-shadow: 0 10px 30px -12px rgb(0 0 0 / 0.35);
+    animation: toast-in 220ms ease-out;
+  }
+  .toast-close {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    border-radius: 0.5rem;
+    color: var(--color-muted-foreground);
+  }
+  .toast-close:hover {
+    color: var(--color-foreground);
+  }
+  .toast-close:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 1px;
+  }
+  @keyframes toast-in {
+    from {
+      opacity: 0;
+      transform: translateY(-0.5rem);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .toast {
       animation: none;
     }
   }

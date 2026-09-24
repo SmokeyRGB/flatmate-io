@@ -112,7 +112,7 @@ export default async function JoinPage({ params }: { params: Promise<{ code: str
       return (
         <div className="space-y-6">
           <h1 className="font-serif text-2xl font-semibold">{t.reset.heading(screen.displayName)}</h1>
-          <span className="context-chip">{t.householdChip(screen.householdName)}</span>
+          <span className="context-chip">{t.reset.householdChip(screen.householdName)}</span>
           <ResetForm code={code} passwordMinLength={JOIN_PASSWORD_MIN_LENGTH} />
         </div>
       );
