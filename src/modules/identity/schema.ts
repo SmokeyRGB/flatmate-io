@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 import {
   boolean,
+  check,
   date,
   index,
   integer,
@@ -39,6 +40,12 @@ export const membershipRoleEnum = pgEnum("membership_role", [
   "member",
 ]);
 
+// resident-settings design.md Decision 4: every join link now carries a purpose. `join` is every
+// link this table has ever held; `password_reset` is the new administration-issued, single-use
+// link bound to an ACTIVE profile whose account has no email (identity/password-reset). Default
+// 'join' on the column below makes every existing row a joining link without a backfill.
+export const joinCodePurposeEnum = pgEnum("join_code_purpose", ["join", "password_reset"]);
+
 // data-model.md "Account". `household_id` is a deliberate denormalization not in
 // docs/domain/identity.md's field list — added under the same documented pattern
 // docs/domain/casting.md already uses for Application.household_id ("redundant zur Runde, aber
@@ -51,10 +58,14 @@ export const account = pgTable(
   {
     id: uuid("id").primaryKey().defaultRandom(),
     householdId: uuid("household_id").notNull(),
-    // Required + unique for the household-admin account (FR-1.1); nullable + a derived,
-    // non-deliverable address for a resident account (research.md §2). Uniqueness is enforced at
-    // the Supabase Auth layer (the actual sign-in identifier), not duplicated here as a DB
-    // constraint — this column is a local cache of what Auth already guarantees unique.
+    // Required + unique for the household-admin account (FR-1.1); nullable for a resident
+    // account, which starts out on a derived, non-deliverable address (research.md §2) and may
+    // later gain a real one — added at join or in the resident's own settings
+    // (identity/account-settings) — at which point it REPLACES the derived address at the
+    // provider (resident-settings design.md Decision 1/2) and becomes usable for email sign-in
+    // (identity/sign-in). Uniqueness is enforced at the Supabase Auth layer (the actual sign-in
+    // identifier), not duplicated here as a DB constraint — this column is a local cache of what
+    // Auth already guarantees unique.
     email: text("email"),
     emailVerifiedAt: timestamp("email_verified_at", { withTimezone: true }),
     locale: text("locale").notNull().default("de"),
@@ -262,10 +273,24 @@ export const joinCodeIssuance = pgTable(
     // and its refusal all behave identically (spec.md identity/join-code "A link may name the
     // person it was issued for").
     residentProfileId: uuid("resident_profile_id"),
+    // resident-settings design.md Decision 4: every link now carries a purpose. Default 'join'
+    // makes every row that predates this column a joining link, unconditionally — no backfill
+    // needed. A `password_reset` link is minted only by issuePasswordResetLink (repository.ts),
+    // never by issueJoinCode's public, moderator-reachable options type.
+    purpose: joinCodePurposeEnum("purpose").notNull().default("join"),
   },
   (t) => [
     index("join_code_issuance_household_id_idx").on(t.householdId),
     uniqueIndex("join_code_issuance_code_idx").on(t.code),
+    // A password-reset link always names a profile — there is no such thing as a neutral reset
+    // link, unlike a joining link, which may or may not be bound (design.md Decision 4). Holds in
+    // raw SQL too: nothing but this constraint stops a corrupt or hand-written row from minting a
+    // reset link naming nobody, which `resolve_join_code`/`claim_join_code` would then have to
+    // refuse defensively instead of by construction.
+    check(
+      "join_code_issuance_reset_names_profile",
+      sql`${t.purpose} = 'join' OR ${t.residentProfileId} IS NOT NULL`,
+    ),
     pgPolicy("join_code_issuance_household_isolation", {
       as: "permissive",
       for: "all",

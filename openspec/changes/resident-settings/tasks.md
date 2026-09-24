@@ -7,30 +7,30 @@ goes in `afterEach`.
 
 ## 1. Docs first (D10)
 
-- [ ] 1.1 `docs/domain/identity.md` §2.1: amend the provider box ("Trägt eine Person später eine
+- [x] 1.1 `docs/domain/identity.md` §2.1: amend the provider box ("Trägt eine Person später eine
       echte `email` nach …"). The real address **replaces** the derived identifier at the
       provider, `email_verified_at` stays the sole delivery authority, and a resident with an
       address may sign in with it. In the O-12 box, add the email sign-in sentence. In the O-16
       box, the reset is performed through a single-use link bound to the active profile, issued by
       the administration only while no `email` is set, with the same `ActivityEvent` and
       session-ending consequences. German, quotes verbatim, no reference into `openspec/`.
-- [ ] 1.2 `docs/backlog/requirements/F2-requirements.md` EC-2.6: correct it to the K-18/O-16
+- [x] 1.2 `docs/backlog/requirements/F2-requirements.md` EC-2.6: correct it to the K-18/O-16
       behaviour, marked *(corrected 2026-09-24)*, citing `review-log.md`.
-- [ ] 1.3 `docs/review-log.md` §Offene-Punkte-Register: one entry for the human decisions of
+- [x] 1.3 `docs/review-log.md` §Offene-Punkte-Register: one entry for the human decisions of
       2026-09-24 (Auth switch plus email sign-in; the address cannot be removed; reset by link,
       household-account issuer only; EC-2.6 corrected). Follow the register's own format and
       rules.
-- [ ] 1.4 `docs/SPEC-INDEX.md`: confirm rows exist for O-12 and O-16. Add a row only if the topic
+- [x] 1.4 `docs/SPEC-INDEX.md`: confirm rows exist for O-12 and O-16. Add a row only if the topic
       has none.
-- [ ] 1.5 `data-inventory.yml` `account.email.purpose` per D9. Then run
+- [x] 1.5 `data-inventory.yml` `account.email.purpose` per D9. Then run
       `node tools/check-refs.ts`, which must pass.
 
 ## 2. Schema and migration (D4, Migration Plan)
 
-- [ ] 2.1 `src/modules/identity/schema.ts`: add the `joinCodePurpose` pgEnum (`join`,
+- [x] 2.1 `src/modules/identity/schema.ts`: add the `joinCodePurpose` pgEnum (`join`,
       `password_reset`) and the `purpose` column (not null, default `join`) on `joinCodeIssuance`,
       with the `CHECK` from D4. Correct the `account.email` comment (D9).
-- [ ] 2.2 `drizzle/0019_join_code_purpose.sql` (+ journal/snapshot via `drizzle-kit generate`,
+- [x] 2.2 `drizzle/0019_join_code_purpose.sql` (+ journal/snapshot via `drizzle-kit generate`,
       then hand-edit). All six steps from the Migration Plan, **re-runnable** (`DO … EXCEPTION
       WHEN duplicate_object`, `IF NOT EXISTS`, `DROP CONSTRAINT IF EXISTS`, `DROP FUNCTION IF
       EXISTS` for `resolve_join_code(text)`, `claim_join_code(text)` **and**
@@ -39,7 +39,7 @@ goes in `afterEach`.
       `SET search_path = public`, and REVOKE/GRANT as in 0015. Carry 0015's explanatory comments
       forward and add the new ones. `npx tsx scripts/lint/migration-shape.ts` and
       `definer-coverage.ts` must pass.
-- [ ] 2.3 Apply steps 1–3 (type, column, constraint) to `flatmate-io-dev` through the Supabase
+- [x] 2.3 Apply steps 1–3 (type, column, constraint) to `flatmate-io-dev` through the Supabase
       MCP. Verify with a query that `join_code_issuance.purpose` exists, that every row is `join`,
       and that the constraint exists.
 - [ ] 2.4 **HUMAN HAND-OFF.** Stop. Tell the human to run the **whole** `drizzle/0019` file in the
