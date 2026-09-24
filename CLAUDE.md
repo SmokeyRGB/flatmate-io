@@ -143,7 +143,23 @@ the TypeScript that states the rule:
   a mismatch. `tests/integration/policy/authorization-matrix.test.ts` fails when a
   new `casting`/`identity` repository export has no recorded decision: it must refuse a plain
   resident, or carry a stated reason for being exempt. It covers mutators only; each read's
-  visibility is tested per read.
+  visibility is tested per read. A history view (a dead link, a past event) takes its labels from
+  its own rows, never from a current-state list: `getResidentList` hides removed people, so a
+  label looked up there silently disappears (PR #23).
+
+**The relationship a predicate joins through must itself be enforced.** With no foreign keys, a
+pairing between columns is true only where a constraint says so. Before a predicate or a
+`SECURITY DEFINER` join relies on one, check that it is a constraint. If it isn't, add the
+constraint once rather than a predicate in every reader. `membership`'s `is_resident` ⇔
+`resident_profile_id` pairing was trusted by the reset-link SQL for exactly one PR before
+`drizzle/0020` made it a `CHECK`.
+
+**Every writer of the same state, pairwise.** When two functions write the same thing (a password,
+a provider address, the set of live sessions), each pair has to be serialized against each other,
+not each against its own caller. `changeResidentPassword` and `redeemPasswordReset` both change
+the password and both take the `account` row lock (PR #23). A new session is created inside the
+same transaction, under the same `membership` lock, that decides the membership still stands, as
+`signIn` does. Inserting it after that transaction commits reopens the race with removal.
 
 Anything keyed on request data — a header, a cookie, a route param — ask who can set it.
 `x-forwarded-for` is caller-supplied unless `JOIN_ATTEMPT_TRUSTED_IP_HEADER` names a proxy that
