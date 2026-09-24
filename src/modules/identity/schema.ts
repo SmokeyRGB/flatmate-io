@@ -223,7 +223,20 @@ export const membership = pgTable(
   },
   (t) => [
     index("membership_household_id_idx").on(t.householdId),
-    index("membership_account_id_idx").on(t.accountId),
+    // drizzle/0021 (Copilot review round 2, PR #23): one membership per profile and one per
+    // account are invariants the reset path and signIn both rely on — the reset path picks
+    // `[membershipRow]` by resident_profile_id (issuePasswordResetLink/redeemPasswordReset) and
+    // signIn picks it by account_id, so a second row for either would make that pick ambiguous.
+    // These UNIQUE indexes replace the plain `membership_account_id_idx` (drizzle-kit generates a
+    // unique index for a unique column constraint, so the old non-unique one is redundant — a
+    // unique index is usable for every plain equality lookup the old one served). The profile
+    // index is partial (`WHERE resident_profile_id IS NOT NULL`) because a household account's
+    // membership row always has a null one (ADR-013) and there may legitimately be many such rows
+    // across different households — nothing about "one membership per profile" applies to null.
+    uniqueIndex("membership_resident_profile_id_unique")
+      .on(t.residentProfileId)
+      .where(sql`${t.residentProfileId} IS NOT NULL`),
+    uniqueIndex("membership_account_id_unique").on(t.accountId),
     // drizzle/0020 (review fix, Copilot PR #23): there are no foreign keys in this schema, so
     // nothing previously stopped a membership row from carrying `is_resident = false` alongside a
     // set `resident_profile_id`, or `is_resident = true` with a null one — a pairing that

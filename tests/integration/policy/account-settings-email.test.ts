@@ -7,7 +7,7 @@ import {
   claimResidentProfile,
   signIn,
 } from "@/modules/identity/auth";
-import { createResidentProfile } from "@/modules/identity/repository";
+import { createResidentProfile, setMovedOut } from "@/modules/identity/repository";
 import { account } from "@/modules/identity/schema";
 import { activityEvent } from "@/modules/audit/schema";
 import type { CurrentSession } from "@/modules/identity/session-cookie";
@@ -201,6 +201,33 @@ describe("changeResidentEmail (identity/account-settings, design.md Decision 2)"
   // setMemberRole, this function has no separate actor/target-account parameter at all for a
   // caller to spoof; the only identity it ever reads is the session's own context. This proves the
   // isolation that guarantee is meant to buy: two residents' sessions never cross-contaminate.
+  // Copilot review round 2 (PR #23), CLAUDE.md "A concurrent request": a move-out or removal that
+  // commits AFTER this action read CurrentSession must still be caught — context.profileId alone
+  // is a claim the session made at sign-in (ADR-013) and can go stale. This uses the STALE
+  // CurrentSession captured before the revocation, exactly the race the fix closes.
+  it("using a stale CurrentSession after the membership is revoked gives not_a_resident, with nothing changed", async () => {
+    hh = await registerTestHousehold();
+    const resident = await claimResident(hh, "RevokedThenEmail");
+    const current = residentSession(hh, resident); // captured BEFORE the revocation below
+
+    await setMovedOut(hh.context, hh.accountId, resident.accountId);
+
+    await expect(changeResidentEmail(current, "should-not-apply@example.test")).rejects.toMatchObject({
+      code: "not_a_resident",
+    });
+
+    const [row] = await withSessionContext(hh.context, (tx) =>
+      tx.select().from(account).where(eq(account.id, resident.accountId)),
+    );
+    expect(row.email).toBeNull();
+
+    const { data } = await adminClient().auth.admin.getUserById(resident.accountId);
+    expect(data.user?.email).toMatch(/^resident-.*@accounts\.flatmate\.invalid$/);
+
+    const events = await emailChangedEvents(current.context, resident.accountId);
+    expect(events).toHaveLength(0);
+  });
+
   it("acts only on the session's own account — two residents' changes never cross-contaminate", async () => {
     hh = await registerTestHousehold();
     const residentA = await claimResident(hh, "IsolationA");

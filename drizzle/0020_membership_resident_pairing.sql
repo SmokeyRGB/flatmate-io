@@ -23,6 +23,13 @@
 -- takes no `IF NOT EXISTS` in this Postgres version (scripts/lint/migration-shape.ts rule 2
 -- excludes it from the ADD-needs-IF-NOT-EXISTS check for the same reason) — the DROP-first idiom
 -- is what stands in for it here.
+--
+-- Copilot review round 2 (PR #23): drizzle/0019 now carries its own re-runnable copy of this exact
+-- statement pair at the top of that file (fresh-database migration-order fix), so on dev — which
+-- already applied 0019 before those lines existed — the statement below is now an idempotent
+-- RE-ASSERTION of a constraint dev already has, not new work. Left in place rather than removed:
+-- a database that somehow reaches 0020 without 0019's new top section (a hand-edited history,
+-- say) still gets the constraint from here.
 ALTER TABLE "membership" DROP CONSTRAINT IF EXISTS "membership_resident_pairing";
 --> statement-breakpoint
 ALTER TABLE "membership" ADD CONSTRAINT "membership_resident_pairing" CHECK ("membership"."is_resident" = ("membership"."resident_profile_id" IS NOT NULL));

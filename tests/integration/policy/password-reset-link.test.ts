@@ -9,6 +9,7 @@ import {
   joinHousehold,
   redeemPasswordReset,
   signIn,
+  type JoinHouseholdResult,
 } from "@/modules/identity/auth";
 import {
   ResidentListActionDeniedError,
@@ -22,7 +23,13 @@ import {
 import { activityEvent } from "@/modules/audit/schema";
 import { account, joinCodeIssuance, membership, residentProfile, session } from "@/modules/identity/schema";
 import type { CurrentSession } from "@/modules/identity/session-cookie";
-import { cleanupAll, deleteTestAccount, registerTestHousehold, type TestHousehold } from "../../helpers/identity";
+import {
+  adminClient,
+  cleanupAll,
+  deleteTestAccount,
+  registerTestHousehold,
+  type TestHousehold,
+} from "../../helpers/identity";
 
 const PASSWORD = "test-password-not-real-1234";
 
@@ -231,6 +238,49 @@ describe("redeemPasswordReset (design.md Decision 5)", () => {
       tx.select().from(membership).where(eq(membership.householdId, hh!.householdId)),
     );
     expect(memberships).toHaveLength(2);
+  });
+
+  // Copilot review round 2 (PR #23): redeemPasswordReset is now three SEPARATE transactions
+  // (phase 1 claim+revoke, phase 2 the provider write, phase 3 sign-in+session) with no
+  // transaction spanning Postgres and Supabase — this asserts directly against the PROVIDER
+  // (adminClient, not the app-level signIn) that phase 2's password write really lands, and that
+  // phase 1's revoke-all really reaches every session that existed before redemption, independent
+  // of the "sets the password..." test above (which only ever exercises this through signIn).
+  it("after a successful redemption, the provider password is the new one and every pre-existing session is revoked", async () => {
+    hh = await registerTestHousehold();
+    const resident = await claimResident(hh, "ProviderPasswordCheck");
+    const priorSignIn1 = await signIn({
+      kind: "resident",
+      householdId: hh.householdId,
+      displayName: "ProviderPasswordCheck",
+      password: PASSWORD,
+    });
+    const priorSignIn2 = await signIn({
+      kind: "resident",
+      householdId: hh.householdId,
+      displayName: "ProviderPasswordCheck",
+      password: PASSWORD,
+    });
+
+    const link = await issuePasswordResetLink(hh.context, hh.accountId, resident.profileId);
+    await redeemPasswordReset(link.code, { password: "provider-check-new-pw-123" });
+
+    // The provider's OWN sign-in, not the app's — directly against Supabase Auth.
+    const { error: newPasswordError } = await adminClient().auth.signInWithPassword({
+      email: `resident-${resident.profileId}@accounts.flatmate.invalid`,
+      password: "provider-check-new-pw-123",
+    });
+    expect(newPasswordError).toBeNull();
+    const { error: oldPasswordError } = await adminClient().auth.signInWithPassword({
+      email: `resident-${resident.profileId}@accounts.flatmate.invalid`,
+      password: PASSWORD,
+    });
+    expect(oldPasswordError).not.toBeNull();
+
+    const rows = await sessionRowsFor(hh.context, resident.accountId);
+    const byId = new Map(rows.map((r) => [r.id, r]));
+    expect(byId.get(priorSignIn1.session.id)?.revokedAt).not.toBeNull();
+    expect(byId.get(priorSignIn2.session.id)?.revokedAt).not.toBeNull();
   });
 
   it("a second redemption gives invalid_link (assert the code)", async () => {
@@ -461,48 +511,81 @@ describe("redeemPasswordReset (design.md Decision 5)", () => {
     expect(priorRow.revokedAt).not.toBeNull();
   });
 
-  // review fix (Copilot finding, PR #23), second half: two concurrent resets for the SAME profile
-  // (two different single-use links, each independently valid) used to both reach the old
-  // post-commit session insert and both leave a session alive — the account row lock inside the
-  // main transaction only served the claim/password/audit steps, not the session insert that ran
-  // after it. With the insert moved inside the transaction, whichever reset's transaction commits
-  // SECOND still revokes every session that is live at that point (design.md D5's "revoke EVERY
-  // session of the account", `isNull(revokedAt)`) — which by then includes the FIRST reset's own
-  // just-inserted session — before inserting its own. Exactly one live session survives, whichever
-  // reset committed last.
-  it("two concurrent redemptions of two links for the same profile leave exactly one live session", async () => {
+  // review fix (Copilot finding, PR #23), second half, REDESIGNED for the three-phase split
+  // (Copilot review round 2): two concurrent resets for the SAME profile (two different
+  // single-use links, each independently valid) used to both reach the old post-commit session
+  // insert and both leave a session alive. Now each redemption is three SEPARATE transactions
+  // (phase 1 claim+revoke, phase 2 the one provider write, phase 3 a FRESH membership lock +
+  // sign-in + session insert) — phase 3's sign-in runs against whatever password is CURRENT at
+  // that moment, so a redemption whose own phase 2 committed FIRST can find, once it reaches its
+  // OWN phase 3, that the OTHER redemption's phase 2 has since overwritten the password: its
+  // sign-in fails and the WHOLE redemption call rejects with `reset_done_sign_in_failed` (the
+  // password IS set — just not to what this call thinks it is). Whichever redemption's phase 2
+  // commits LAST never sees the password change again, so its own later phase 3 always signs in
+  // successfully and revokes every OTHER live session (design.md's "revoke every OTHER live
+  // session of the account") before inserting its own — so exactly one live session survives,
+  // belonging to whichever password was written last, never both and never neither.
+  it("two concurrent redemptions of two links for the same profile leave exactly one live session, with the provider's current password", async () => {
     hh = await registerTestHousehold();
     const resident = await claimResident(hh, "ConcurrentTwoLinks");
 
     const link1 = await issuePasswordResetLink(hh.context, hh.accountId, resident.profileId);
     const link2 = await issuePasswordResetLink(hh.context, hh.accountId, resident.profileId);
+    const attempts = [
+      { code: link1.code, password: "concurrent-pw-one-123" },
+      { code: link2.code, password: "concurrent-pw-two-123" },
+    ];
 
-    const results = await Promise.allSettled([
-      redeemPasswordReset(link1.code, { password: "concurrent-pw-one-123" }),
-      redeemPasswordReset(link2.code, { password: "concurrent-pw-two-123" }),
-    ]);
+    const results = await Promise.allSettled(
+      attempts.map((a) => redeemPasswordReset(a.code, { password: a.password })),
+    );
 
     // Nothing about redemption itself refuses a SECOND reset link for a profile whose account
     // still has no email after the first reset — only changeResidentEmail ever sets one
-    // (design.md D6: issuing is deliberately unserialized against a concurrent change). Both
-    // resets are expected to succeed; the account row lock decides their ORDER, not whether the
-    // second one is honoured.
-    expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(2);
+    // (design.md D6: issuing is deliberately unserialized against a concurrent change). At least
+    // one of the two always succeeds (the last password writer's own phase 3, argued above); a
+    // rejected one must reject with exactly `reset_done_sign_in_failed`, never anything else.
+    const rejected = results.filter((r): r is PromiseRejectedResult => r.status === "rejected");
+    for (const r of rejected) {
+      expect(r.reason).toBeInstanceOf(JoinError);
+      expect((r.reason as JoinError).code).toBe("reset_done_sign_in_failed");
+    }
+    const fulfilled = results
+      .map((r, i) => (r.status === "fulfilled" ? { result: r.value, password: attempts[i].password } : null))
+      .filter((x): x is { result: JoinHouseholdResult; password: string } => x !== null);
+    expect(fulfilled.length).toBeGreaterThanOrEqual(1);
 
     const liveSessions = await withSessionContext(hh.context, (tx) =>
       tx.select().from(session).where(and(eq(session.accountId, resident.accountId), isNull(session.revokedAt))),
     );
     expect(liveSessions).toHaveLength(1);
+
+    // The result tells which one got the live session — sign in with THAT redemption's own
+    // password, directly against the provider (adminClient, not the app), confirming the live
+    // session's owner is exactly the one whose password the provider currently accepts.
+    const winner = fulfilled.find((f) => f.result.session.id === liveSessions[0].id);
+    expect(winner).toBeDefined();
+    const { error: winnerSignInError } = await adminClient().auth.signInWithPassword({
+      email: `resident-${resident.profileId}@accounts.flatmate.invalid`,
+      password: winner!.password,
+    });
+    expect(winnerSignInError).toBeNull();
   });
 
-  // Deliberate break (argued, not executed — CLAUDE.md forbids weakening a test to prove a
-  // regression): moving the sign-in/session-insert steps back OUT of redeemPasswordReset's
-  // transaction (the pre-fix shape) reopens both races above. In the first test, the raw
-  // transaction's membership+session revoke would no longer be strictly ordered against
-  // redeemPasswordReset's own commit boundary the same way — but more directly, the SECOND test
-  // would start failing: each reset's session insert would happen in a NEW, separate transaction
-  // after its own commit, so the second reset's "revoke every live session" step (still inside its
-  // main transaction) could run BEFORE the first reset's post-commit insert has happened, missing
-  // it entirely — leaving TWO live sessions instead of one, failing
-  // `expect(liveSessions).toHaveLength(1)`.
+  // Deliberate break, RUN (Copilot review round 2, CLAUDE.md's own instruction for this fix):
+  // phase 3's sign-in was moved OUTSIDE the re-acquired membership lock (signInWithPassword called
+  // BEFORE the `SELECT membership ... FOR UPDATE` re-check, instead of after it, in a scratch copy
+  // of redeemPasswordReset) and this test was run against it — see the PR/commit description for
+  // the observed result. There is no deterministic way to force the provider to answer a
+  // concurrent signInWithPassword out of order without mocking (forbidden by CLAUDE.md/the task) —
+  // two real Supabase Auth round trips racing each other are exactly as fast or slow as the network
+  // is on any given run, so this test is best read as an INVARIANT GUARD (same status as the two
+  // raw-transaction race tests above, which use an explicit gate instead of real timing) rather
+  // than a regression test with a guaranteed reproduction. Argued directly: without the membership
+  // lock around it, phase 3's sign-in reads whatever password happens to be current at the moment
+  // it runs, with NOTHING serializing that read against the other redemption's own phase 3
+  // revoke-then-insert step — both redemptions can reach their own "revoke every other live
+  // session, then insert" sequence interleaved rather than strictly ordered by a shared lock, so
+  // BOTH inserts can survive whatever the other's revoke saw at ITS OWN read time, leaving TWO live
+  // sessions and failing this test's own `expect(liveSessions).toHaveLength(1)`.
 });

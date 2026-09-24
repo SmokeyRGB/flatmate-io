@@ -8,7 +8,7 @@ import {
   claimResidentProfile,
   signIn,
 } from "@/modules/identity/auth";
-import { createResidentProfile } from "@/modules/identity/repository";
+import { createResidentProfile, setMovedOut } from "@/modules/identity/repository";
 import { account, session } from "@/modules/identity/schema";
 import { activityEvent } from "@/modules/audit/schema";
 import type { CurrentSession } from "@/modules/identity/session-cookie";
@@ -123,6 +123,43 @@ describe("changeResidentPassword (identity/account-settings, design.md Decision 
     expect(events).toHaveLength(1);
     expect(events[0].payload).toEqual({});
     expect(events[0].actorAccountId).toBe(resident.accountId);
+  });
+
+  // Copilot review round 2 (PR #23), CLAUDE.md "A concurrent request": mirrors
+  // account-settings-email.test.ts's own "stale CurrentSession after revocation" case — a
+  // move-out/removal that commits AFTER this action read CurrentSession must still be caught, not
+  // only context.profileId's (possibly stale) claim.
+  it("using a stale CurrentSession after the membership is revoked gives not_a_resident, with nothing changed", async () => {
+    hh = await registerTestHousehold();
+    const resident = await claimResident(hh, "RevokedThenPassword");
+    const signedIn = await residentSignIn(hh, "RevokedThenPassword");
+    const current: CurrentSession = { sessionId: signedIn.session.id, context: signedIn.context };
+
+    await setMovedOut(hh.context, hh.accountId, resident.accountId);
+
+    await expect(
+      changeResidentPassword(current, PASSWORD, "should-not-apply-123"),
+    ).rejects.toMatchObject({ code: "not_a_resident" });
+
+    // Nothing changed: the provider password is still the original one.
+    const { error: signInError } = await adminClient().auth.signInWithPassword({
+      email: `resident-${resident.profileId}@accounts.flatmate.invalid`,
+      password: PASSWORD,
+    });
+    expect(signInError).toBeNull();
+
+    const events = await withSessionContext(hh.context, (tx) =>
+      tx
+        .select()
+        .from(activityEvent)
+        .where(
+          and(
+            eq(activityEvent.eventType, "account.password_changed"),
+            eq(activityEvent.subjectId, resident.accountId),
+          ),
+        ),
+    );
+    expect(events).toHaveLength(0);
   });
 
   it("a too-short new password gives password_too_short", async () => {

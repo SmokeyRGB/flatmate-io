@@ -89,6 +89,11 @@ export const de = {
       // household tab still accepts a resident's address, but no longer advertises it.
       residentUseEmail: "Mit E-Mail-Adresse anmelden",
       residentUseName: "Mit Name anmelden",
+      // Copilot review round 2 (PR #23), auth.ts redeemPasswordReset's `reset_done_sign_in_failed`
+      // (phase 3): the reset itself already succeeded (password set in phase 2, prior sessions
+      // revoked in phase 1, link spent) — only the immediate sign-in afterwards failed, so this is
+      // a note beside the ordinary form, not an error. Recreated exactly as in commit a95bbb9.
+      passwordResetNote: "Dein neues Passwort ist gesetzt. Melde dich damit an.",
     },
     register: {
       heading: "WG gründen",
@@ -422,6 +427,12 @@ export const de = {
       // best-effort (auth.ts joinHousehold).
       genericFailure:
         "Der Beitritt hat nicht geklappt. Deine Einladung ist dadurch nicht verbraucht — versuch es einfach noch einmal.",
+      // Copilot review round 2 (PR #23): redeemPasswordReset's phase 2 (the provider password
+      // write) failed AFTER phase 1 already committed — the link is spent and every prior session
+      // is dead, but the password itself never changed. Distinct from genericFailure, which
+      // promises the invitation is unconsumed — that would be false here.
+      resetIncomplete:
+        "Der Link ist jetzt verbraucht, aber dein neues Passwort konnte nicht gesetzt werden. Bitte die Verwaltung um einen neuen Link.",
     },
     // EC-2.4: rendered on the dashboard (task 8.5) when the join redirect carries the note —
     // "taken to Start with a note", the temporary /dashboard landing target (proposal Assumption 4).

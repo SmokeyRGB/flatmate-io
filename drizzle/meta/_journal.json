@@ -148,6 +148,13 @@
       "when": 1790274059635,
       "tag": "0020_membership_resident_pairing",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1790276163170,
+      "tag": "0021_membership_uniqueness",
+      "breakpoints": true
     }
   ]
 }

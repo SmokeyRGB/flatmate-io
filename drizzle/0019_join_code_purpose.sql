@@ -1,3 +1,26 @@
+-- Copilot review round 2 (PR #23), CLAUDE.md "The relationship a predicate joins through must
+-- itself be enforced": this file's own resolve_join_code/claim_join_code (below) are SECURITY
+-- DEFINER, unauthenticated-reachable, and their password_reset branch trusts TWO invariants that
+-- only drizzle/0020 (the is_resident/resident_profile_id pairing CHECK) and drizzle/0021 (the
+-- one-membership-per-profile/per-account UNIQUE indexes) actually add — on a FRESH database that
+-- applies migrations in order, a window would otherwise open between this file committing (the
+-- functions live) and 0020/0021 committing (the invariants they trust exist). Re-runnable copies
+-- of both go here, at the TOP, before any function: DROP CONSTRAINT IF EXISTS + ADD CONSTRAINT for
+-- the CHECK, and CREATE UNIQUE INDEX IF NOT EXISTS for the two indexes — closing that window for a
+-- database that has never seen 0020/0021 at all. 0020 and 0021 keep their own statements too, now
+-- idempotent re-assertions for a database (dev included) that applied this file BEFORE these lines
+-- existed — each of those files gets a one-line comment saying so. dev's own 0020/0021 are NOT
+-- re-applied by this comment: nothing in 0019 needs re-running there, because 0020/0021 already
+-- cover it (CLAUDE.md instruction for this fix).
+ALTER TABLE "membership" DROP CONSTRAINT IF EXISTS "membership_resident_pairing";
+--> statement-breakpoint
+ALTER TABLE "membership" ADD CONSTRAINT "membership_resident_pairing" CHECK ("membership"."is_resident" = ("membership"."resident_profile_id" IS NOT NULL));
+--> statement-breakpoint
+CREATE UNIQUE INDEX IF NOT EXISTS "membership_resident_profile_id_unique" ON "membership" USING btree ("resident_profile_id") WHERE "membership"."resident_profile_id" IS NOT NULL;
+--> statement-breakpoint
+CREATE UNIQUE INDEX IF NOT EXISTS "membership_account_id_unique" ON "membership" USING btree ("account_id");
+--> statement-breakpoint
+
 -- resident-settings design.md Decision 4 (Migration Plan). A join link gains a `purpose`
 -- (`join` / `password_reset`); a reset link is a bound link naming an ACTIVE profile whose
 -- account has no email (identity/password-reset). Steps 1-3 are a plain column/constraint add,

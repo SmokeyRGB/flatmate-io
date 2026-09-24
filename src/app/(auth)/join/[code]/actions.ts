@@ -155,6 +155,12 @@ export async function joinHouseholdAction(
           // a failed one created nothing (t.errors.genericFailure states that now, task 2.2).
           console.error(err);
           return { error: t.errors.genericFailure, fieldError: null, refusal: null };
+        // reset_incomplete/reset_done_sign_in_failed belong to redeemPasswordReset's own
+        // refusals (Copilot review round 2, PR #23) — joinHousehold never throws either, covered
+        // here only so this switch stays exhaustive.
+        case "reset_incomplete":
+        case "reset_done_sign_in_failed":
+          return { error: t.errors.genericFailure, fieldError: null, refusal: null };
         default: {
           const _exhaustive: never = errCode;
           return _exhaustive;
@@ -263,13 +269,29 @@ export async function redeemPasswordResetAction(
         case "rate_limited":
           return { error: t.errors.rateLimited, fieldError: null, refusal: null };
         case "signup_failed":
-          // review fix (Copilot finding, PR #23): also covers what used to be the dedicated
-          // reset_done_sign_in_failed outcome — the sign-in-after-reset step now runs INSIDE
-          // redeemPasswordReset's own transaction (auth.ts), so a failure there rolls the whole
-          // reset back (link not spent, password not changed) and surfaces as this same generic
-          // code, exactly like any other unexpected provider error in that transaction.
           console.error(err);
           return { error: t.errors.genericFailure, fieldError: null, refusal: null };
+        // Copilot review round 2 (PR #23): redeemPasswordReset is now three separate
+        // transactions, not one — phase 1 (claim + revoke-all + audit) always commits before any
+        // provider call, so a failure past that point can no longer roll the whole reset back.
+        case "reset_incomplete":
+          // Phase 2 (the provider password write) failed AFTER phase 1 committed: the link is
+          // spent, every prior session is dead, but the password never changed. The safe
+          // direction (auth.ts's own comment): nobody's session survives and no half-known
+          // password exists. Tell the person to ask the administration for a new link — a fresh
+          // one can be issued immediately, since the account still has no email.
+          console.error(err);
+          return { error: t.errors.resetIncomplete, fieldError: null, refusal: null };
+        case "reset_done_sign_in_failed":
+          // Phase 3's sign-in failed AFTER phase 2 already committed the new password — reporting
+          // the generic failure text here would be a lie (it promises the invitation is not
+          // consumed, which is false for a spent reset link with its password already changed).
+          // Redirect to sign-in with a note instead, recreated exactly as in commit a95bbb9 (this
+          // outcome is materially the same as the one that shape covered — a provider sign-in
+          // failing after a committed password change — even though the code path that reaches it
+          // is now phase 3's re-acquired membership lock, not a post-commit step).
+          console.error(err);
+          redirect("/sign-in?note=password_reset");
         // The remaining JoinErrorCode members belong to joinHousehold's own refusals
         // (name collisions, an already-signed-in visitor, a duplicate email) and redeemPasswordReset
         // never throws them — covered here only so this switch stays exhaustive.

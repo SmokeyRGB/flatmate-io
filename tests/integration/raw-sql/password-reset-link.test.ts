@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { eq, sql } from "drizzle-orm";
 import { afterEach, describe, expect, it } from "vitest";
 import { withSessionContext } from "@/db/session-context";
@@ -152,19 +153,24 @@ describe("resolve_join_code / claim_join_code — the password_reset branch, raw
     expect(issuanceRow.uses).toBe(0);
   });
 
-  // (f) a corrupt membership row whose OWN household_id differs from the link's, resolves to
-  // nothing — the EXISTS subquery's household predicate on `m` (not only the LEFT JOIN's
-  // predicate on `rp`, already covered by (e)) must independently hold.
-  //
-  // RLS's own WITH CHECK refuses an UPDATE that changes an EXISTING row's household_id under
-  // app_runtime (tried first; confirmed by the refusal itself: "new row violates row-level
-  // security policy"), so the corrupt row is INSERTED fresh, under household B's OWN session
-  // context (satisfies B's WITH CHECK on household_id), naming household A's resident_profile_id
-  // and household A's account_id — nothing but this predicate stops a membership row's
-  // resident_profile_id/account_id from pointing outside its own household_id, since there are no
-  // foreign keys anywhere in this schema. The profile's OWN legitimate membership is revoked
-  // first, so the corrupt row is the only LIVE (`revoked_at IS NULL`) one the EXISTS could match.
-  it("(f) a corrupt membership row (wrong household_id) makes the link resolve to nothing", async () => {
+  // (f) a corrupt membership row whose OWN household_id differs from the link's — the scenario
+  // this case was written to construct, so the EXISTS subquery's household predicate on `m` (not
+  // only the LEFT JOIN's predicate on `rp`, already covered by (e)) could be shown to hold
+  // independently. Copilot review round 2 (PR #23), CLAUDE.md "The relationship a predicate joins
+  // through must itself be enforced": drizzle/0021 added a UNIQUE index on
+  // membership.resident_profile_id (partial: WHERE NOT NULL) covering EVERY row for that profile,
+  // live or revoked, for all time, not only per household — so the second, corrupt INSERT below
+  // (a second membership row naming the SAME resident_profile_id, attempted under household B's
+  // session after the profile's own legitimate row in A was revoked) is now REJECTED by the
+  // database itself, before resolve_join_code's SQL predicate ever gets a chance to matter. This
+  // is a STRONGER guarantee than the one this test originally exercised, not a weaker one — the
+  // corruption this predicate defended against is now structurally impossible to construct at
+  // all, in any household, which is why the assertion below is a rejected INSERT (SQLSTATE 23505)
+  // rather than an empty resolve_join_code result. The SQL predicate itself is unchanged and still
+  // stands as defense in depth against a database that somehow lacks this index (a restore from an
+  // older backup, say) — see the file-level comment at the bottom for that argument, which no
+  // longer has an executable case in this file to point at.
+  it("(f) a second membership row for the same profile — REJECTED by drizzle/0021's unique index, not merely refused by the SQL predicate", async () => {
     hhA = await registerTestHousehold();
     hhB = await registerTestHousehold();
     const resident = await activeResidentNoEmail(hhA, "CorruptMembershipHousehold");
@@ -174,17 +180,27 @@ describe("resolve_join_code / claim_join_code — the password_reset branch, raw
     await withSessionContext(hhA.context, (tx) =>
       tx.execute(sql`UPDATE membership SET revoked_at = now() WHERE account_id = ${resident.accountId}`),
     );
-    await withSessionContext(hhB.context, (tx) =>
-      tx.execute(sql`
-        INSERT INTO membership (household_id, account_id, resident_profile_id, is_resident, role, permissions)
-        VALUES (${hhB!.householdId}::uuid, ${resident.accountId}::uuid, ${resident.profileId}::uuid, true, 'member', '{}')
-      `),
-    );
 
+    let caught: unknown;
+    try {
+      await withSessionContext(hhB.context, (tx) =>
+        tx.execute(sql`
+          INSERT INTO membership (household_id, account_id, resident_profile_id, is_resident, role, permissions)
+          VALUES (${hhB!.householdId}::uuid, ${randomUUID()}::uuid, ${resident.profileId}::uuid, true, 'member', '{}')
+        `),
+      );
+    } catch (err) {
+      caught = err;
+    }
+    const pgErr = caught as { code?: string; cause?: { code?: string } } | undefined;
+    expect((pgErr?.code ?? pgErr?.cause?.code)).toBe("23505");
+
+    // The link still resolves normally against the profile's own (revoked) legitimate row — this
+    // corruption attempt changed nothing.
     const rows = await withSessionContext(hhA.context, (tx) =>
       tx.execute<Record<string, unknown>>(sql`SELECT * FROM resolve_join_code(${code})`),
     );
-    expect(rows).toHaveLength(0);
+    expect(rows).toHaveLength(0); // the legitimate row is revoked, so still correctly no match
   });
 
   // (g) claim_join_code(code, 'join') on a reset link matches nothing and leaves `uses`
@@ -270,16 +286,25 @@ describe("resolve_join_code / claim_join_code — the password_reset branch, raw
 // Argued instead, one per predicate, naming which case above would fail without it:
 //
 // - The household predicate on the membership join (`m.household_id = jci.household_id`, inside
-//   the EXISTS in both functions' password_reset branch): without it, case (f) would PASS instead
-//   of resolving to nothing — a membership row corrupted to point at another household would
-//   still satisfy `m.resident_profile_id = rp.id` (unchanged) and the EXISTS would find it via a
-//   join on the WRONG household_id, disclosing another household's display name to case (f)'s
-//   caller.
+//   the EXISTS in both functions' password_reset branch): case (f) USED to construct this directly
+//   (a second membership row for the same profile, in the wrong household) and show the predicate
+//   refusing it; as of drizzle/0021's unique index on resident_profile_id, that construction is
+//   itself rejected by the database (case (f) now asserts the 23505, not an empty resolve), so the
+//   predicate's OWN behaviour on this exact shape of corruption is no longer independently
+//   demonstrable here — argued instead: without the predicate, a membership row that DID somehow
+//   carry the wrong household_id (a restore from a backup taken before drizzle/0021, a manual
+//   `COPY` into a fresh database bypassing the index, or any other path outside this application's
+//   own writers) would still satisfy `m.resident_profile_id = rp.id` and the EXISTS would find it
+//   via a join on the WRONG household_id, disclosing another household's display name — the
+//   predicate is defense in depth against exactly that, independent of whether the unique index
+//   also happens to hold.
 // - The household predicate on the account join (`a.household_id = jci.household_id`, alongside
-//   `a.id = m.account_id`): without it, the same shape of corruption on the ACCOUNT row instead of
-//   the membership row (a variant of (f) this suite groups under the same case for the identical
-//   reason) would let a reset link resolve `a.email IS NULL` against an account of the WRONG
-//   household, again disclosing a name that predicate exists to withhold.
+//   `a.id = m.account_id`): unaffected by drizzle/0021 (which constrains membership, not account) —
+//   without it, a corrupted ACCOUNT row pointing at the wrong household would let a reset link
+//   resolve `a.email IS NULL` against an account of the WRONG household, again disclosing a name
+//   that predicate exists to withhold. No case in this file constructs this directly (account has
+//   no analogous uniqueness constraint blocking the construction, but nor does any case here need
+//   one); argued the same way as the membership predicate above.
 // - `a.email IS NULL`: without it, case (b) would resolve and claim successfully even after the
 //   resident added an email — the exact gap O-16 says "closes itself", left open.
 // - `rp.status = 'active'`: without it, case (c) (moved_out) would still resolve — a
