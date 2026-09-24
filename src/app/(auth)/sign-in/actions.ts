@@ -21,9 +21,9 @@ export async function signInAction(
 
   try {
     const result =
-      mode === "household"
+      mode === "household" || mode === "resident_email"
         ? await signIn({
-            kind: "household",
+            kind: mode,
             email: String(formData.get("email") ?? ""),
             password: String(formData.get("password") ?? ""),
           })

@@ -291,9 +291,17 @@ existing single invalid-link state.
   is set. Otherwise the overwritten cookie would leave a valid, orphaned session row behind.
   Pre-mortem fix, 2026-09-24.
 
-**Sign-in** (`src/app/(auth)/sign-in/`): the email tab gains one line, e.g. „Bewohner:innen mit
-hinterlegter E-Mail können sich auch hier anmelden". The final wording goes in `de.ts`, and the
-tab label is judged in the walkthrough.
+**Sign-in** (`src/app/(auth)/sign-in/`), revised in the walkthrough (human decision 2026-09-24):
+- A hint on the household tab was confusing, so it is gone.
+- Instead, the **resident tab** switches between household + name and „Mit E-Mail-Adresse
+  anmelden".
+- That switch posts a new `signIn` kind, `resident_email`. It uses the same address lookup as the
+  household path, but refuses a non-resident membership as `invalid_credentials` after the
+  membership lock. So the tab still decides the identity (ADR-013), and the household account's
+  address on the resident tab never opens a household session.
+- The household tab still accepts a resident's address. Its behaviour is unchanged; the tab just
+  doesn't mention it.
+- Test: `tests/integration/policy/sign-in-resident-email.test.ts`.
 
 ### D9 — Audit and inventory
 

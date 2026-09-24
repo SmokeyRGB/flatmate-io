@@ -421,11 +421,16 @@ async function insertSessionTx(
 export async function signIn(
   input:
     | { kind: "household"; email: string; password: string }
-    | { kind: "resident"; householdId: string; displayName: string; password: string },
+    | { kind: "resident"; householdId: string; displayName: string; password: string }
+    // resident-settings (human decision 2026-09-24, walkthrough): the resident tab's own email
+    // path. Same address lookup as "household", but the account it resolves to MUST be a resident
+    // one. Choosing the tab is choosing the identity (ADR-013), so the household account's address
+    // typed here is refused rather than silently opening a household session.
+    | { kind: "resident_email"; email: string; password: string },
   options: { rememberMe?: boolean } = {},
 ): Promise<SignInResult> {
   let email: string;
-  if (input.kind === "household") {
+  if (input.kind === "household" || input.kind === "resident_email") {
     email = input.email;
   } else {
     // Blank fields reach here unvalidated from the resident sign-in form (no `required`,
@@ -535,6 +540,12 @@ export async function signIn(
     // is never revoked (C-1.4), so this can never lock out administration.
     if (membershipRow.revokedAt) {
       throw new SignInError("Membership revoked", "invalid_credentials");
+    }
+
+    // resident_email: the same refusal as a wrong password, so the resident tab says nothing about
+    // whether the address belongs to a household account.
+    if (input.kind === "resident_email" && !membershipRow.isResident) {
+      throw new SignInError("Not a resident account", "invalid_credentials");
     }
 
     // ADR-013/G-D14: acting_profile_id is set here, once, and never written again. `null` for a

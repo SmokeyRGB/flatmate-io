@@ -84,10 +84,11 @@ export const de = {
       // sign-in itself, offered as links beneath the card — `.btn-link` (design.md Decision 8).
       foundHousehold: "WG gründen",
       enterJoinCode: "Beitrittscode eingeben",
-      // resident-settings design.md Decision 8/human decision 2026-09-24: a resident whose account
-      // has an email may sign in on this (the household/email) tab too — signIn's email path is
-      // already identity-agnostic (D1), so this is copy only, no behaviour change.
-      residentEmailHint: "Bewohner:innen mit hinterlegter E-Mail-Adresse können sich auch hier anmelden.",
+      // resident-settings (human decision 2026-09-24, walkthrough): a resident with an email signs
+      // in on the resident tab, switching between the name fields and the email field. The
+      // household tab still accepts a resident's address, but no longer advertises it.
+      residentUseEmail: "Mit E-Mail-Adresse anmelden",
+      residentUseName: "Mit Name anmelden",
     },
     register: {
       heading: "WG gründen",
