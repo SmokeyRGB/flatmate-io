@@ -32,7 +32,7 @@ export function RegisterForm() {
   }
 
   return (
-    <div className="mx-auto max-w-md space-y-6 p-6">
+    <div className="space-y-6">
       <h1 className="font-serif text-2xl font-semibold">
         {step === 1 ? t.heading : t.householdNameHeading}
       </h1>

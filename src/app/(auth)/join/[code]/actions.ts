@@ -3,14 +3,29 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { JOIN_PASSWORD_MIN_LENGTH, JoinError, joinAttemptSourceHash, joinHousehold } from "@/modules/identity/auth";
-import { recordJoinAttempt } from "@/modules/identity/repository";
-import { getCurrentSession, sessionCookieMaxAge, setSessionCookie } from "@/modules/identity/session-cookie";
+import {
+  buildJoinUrl,
+  isWellFormedJoinCode,
+  normalizeJoinCode,
+  recordJoinAttempt,
+  revokeSession,
+} from "@/modules/identity/repository";
+import {
+  clearSessionCookie,
+  getCurrentSession,
+  sessionCookieMaxAge,
+  setSessionCookie,
+} from "@/modules/identity/session-cookie";
 import { de } from "@/ui/strings";
 import { getClientIp } from "./request-ip";
 
+// design.md Decision 10: `refusal` names the ONE OTHER way-forward component this refusal needs
+// beside its inline message (join-ways-forward.tsx) — never a typed value (design.md constraint 5:
+// the previous state is what next dev's action log prints on the NEXT submit).
 export interface JoinFormState {
   error: string | null;
   fieldError: "displayName" | "password" | null;
+  refusal: "invalid_link" | "other_household" | null;
 }
 
 const t = de.join;
@@ -47,6 +62,7 @@ export async function joinHouseholdAction(
     return {
       error: t.errors.missingFields,
       fieldError: displayName !== undefined && !displayName.trim() ? "displayName" : "password",
+      refusal: null,
     };
   }
 
@@ -56,7 +72,7 @@ export async function joinHouseholdAction(
   const ip = getClientIp(await headers());
   const allowed = await recordJoinAttempt(joinAttemptSourceHash(ip));
   if (!allowed) {
-    return { error: t.errors.rateLimited, fieldError: null };
+    return { error: t.errors.rateLimited, fieldError: null, refusal: null };
   }
 
   const current = await getCurrentSession();
@@ -81,29 +97,39 @@ export async function joinHouseholdAction(
       const errCode = err.code;
       switch (errCode) {
         case "invalid_link":
-          return { error: t.errors.invalidLink, fieldError: null };
+          // design.md Decision 10 (EC-2.9/EC-2.1): a link deleted or spent mid-registration is
+          // refused the same way the page itself would refuse it, hand-entry link included.
+          return { error: t.errors.invalidLink, fieldError: null, refusal: "invalid_link" };
         case "name_taken":
           // Only ever reached for a NEUTRAL link (a bound link skips the collision check
-          // entirely, design.md Decision 13) — displayName is therefore always present here.
-          return { error: t.errors.nameTaken((displayName ?? "").trim()), fieldError: "displayName" };
+          // entirely, design.md Decision 13). The message is fixed text: the typed name stays in
+          // the browser's own draft and never travels back in this state (PR #20 review).
+          return { error: t.errors.nameTaken, fieldError: "displayName", refusal: null };
         case "rate_limited":
-          return { error: t.errors.rateLimited, fieldError: null };
+          return { error: t.errors.rateLimited, fieldError: null, refusal: null };
         case "missing_fields":
-          return { error: t.errors.missingFields, fieldError: null };
+          return { error: t.errors.missingFields, fieldError: null, refusal: null };
         case "password_too_short":
           return {
             error: t.errors.passwordTooShort(JOIN_PASSWORD_MIN_LENGTH),
             fieldError: "password",
+            refusal: null,
           };
         case "already_member":
           // EC-2.4: no inline error at all — taken to Start (the temporary /dashboard landing
           // target, proposal Assumption 4) with a note, exactly like the page's own GET refusal.
           redirect("/dashboard?note=already_member");
         case "other_household":
-          return { error: t.errors.otherHousehold, fieldError: null };
+          // design.md Decision 10 (EC-2.5 met again at submit time): the same sign-out way forward
+          // as the page's own Keine-Berechtigung state.
+          return { error: t.errors.otherHousehold, fieldError: null, refusal: "other_household" };
         case "signup_failed":
+          // design.md I1: unchanged from before this change — a JoinError's own message never
+          // contains the code (join-code-never-in-query-or-log.test.ts, extended by task 7.4), so
+          // logging the error itself here is not a G-A5 violation. The join is one transaction, so
+          // a failed one created nothing (t.errors.genericFailure states that now, task 2.2).
           console.error(err);
-          return { error: t.errors.genericFailure, fieldError: null };
+          return { error: t.errors.genericFailure, fieldError: null, refusal: null };
         default: {
           const _exhaustive: never = errCode;
           return _exhaustive;
@@ -114,4 +140,34 @@ export async function joinHouseholdAction(
   }
 
   redirect("/dashboard");
+}
+
+// design.md Decision 7 (EC-2.5's Keine-Berechtigung way forward): in exactly
+// src/app/(org)/sign-out-action.ts's shape — revokeSession enforces ownership itself (it refuses a
+// session that is not the caller's own), so this action adds no authorization check of its own
+// (G-C unchanged) and cannot widen it. redirect() stays OUTSIDE the try/finally, same reasoning as
+// sign-out-action.ts: Next implements it by throwing, and keeping it outside makes that explicit.
+//
+// The action's only argument is `formData` — next dev's server-function log prints it as `{}`
+// (design.md constraint 5), never the code inside it.
+export async function signOutAndReturnAction(formData: FormData): Promise<void> {
+  const current = await getCurrentSession();
+  if (current) {
+    try {
+      await revokeSession(current.context, current.sessionId);
+    } finally {
+      await clearSessionCookie();
+    }
+  } else {
+    await clearSessionCookie();
+  }
+
+  // I2: only ever redirects to a join path this app assembled itself, from a code that has passed
+  // the shape check — never a raw copy of the body's value (buildJoinUrl does not encode).
+  const raw = String(formData.get("code") ?? "");
+  const normalised = normalizeJoinCode(raw);
+  if (isWellFormedJoinCode(normalised)) {
+    redirect(buildJoinUrl(null, normalised));
+  }
+  redirect("/join");
 }

@@ -755,6 +755,22 @@ export function normalizeJoinCode(input: string): string {
   return `${stripped.slice(0, JOIN_CODE_GROUP_LENGTH)}-${stripped.slice(JOIN_CODE_GROUP_LENGTH)}`;
 }
 
+// join-screen design.md Decision 3 (FR-2.27/EC-2.15): the one definition of "a string that could be
+// a code at all" — two groups of five JOIN_CODE_ALPHABET characters joined by a hyphen, built from
+// the SAME alphabet and group length normalizeJoinCode/generateJoinCode already use, so it can never
+// drift into judging a shape the generator does not produce. It is a UX hint (refuse before any
+// lookup, AC-2.24), but it is also load-bearing for I2: the alphabet excludes `/`, `.`, `%`, `?` and
+// `#`, so a string this returns true for is, by construction, exactly one URL path segment — which
+// is what makes `buildJoinUrl(null, normalised)` safe to call on it without ever encoding. Callers
+// always pass the ALREADY-NORMALISED string (normalizeJoinCode's output), never raw user input.
+const JOIN_CODE_SHAPE = new RegExp(
+  `^[${JOIN_CODE_ALPHABET}]{${JOIN_CODE_GROUP_LENGTH}}-[${JOIN_CODE_ALPHABET}]{${JOIN_CODE_GROUP_LENGTH}}$`,
+);
+
+export function isWellFormedJoinCode(normalised: string): boolean {
+  return JOIN_CODE_SHAPE.test(normalised);
+}
+
 const POSTGRES_UNIQUE_VIOLATION = "23505";
 
 function isUniqueViolation(err: unknown): boolean {

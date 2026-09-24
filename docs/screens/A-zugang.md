@@ -89,7 +89,9 @@
 
 | Zustand | Verhalten |
 |---|---|
-| Fehler — Link nicht gültig | **Eine** Meldung für alle drei Gründe aus FR-2.7 (abgelaufen, Nutzungsgrenze erreicht, rotiert): „Dieser Einladungslink ist nicht gültig." + „Frag in der WG nach einem aktuellen Link." Der Grund wird **nicht** genannt. *(Korrigiert 2026-09-21, FR-2.8: die frühere Fassung nannte den Ablauf und verriet damit, dass es den Code gab. Der Weg zurück bleibt — im Usability-Test des Prototyps war genau dieser fehlende Ausweg der Befund.)* |
+| Leer — kein Code | Wer den Beitrittspfad ohne Code aufruft (`/join`), sieht einen Satz, was hier normalerweise steht, und ein Eingabefeld für den Beitrittscode (FR-2.27, P-1 Kanalneutralität). Der Code wird per POST übermittelt, nie als Query-String (G-A5). |
+| Fehler — Link nicht gültig | **Eine** Meldung für alle vier Fälle (abgelaufen, Nutzungsgrenze erreicht, gelöscht, nie ausgestellt — FR-2.7/FR-2.8; *„rotiert"* stand hier bis 2026-09-24 und ist seit O-18 das Löschen eines Links, `../domain/identity.md` §2.1): „Dieser Einladungslink ist nicht gültig." + „Frag in der WG nach einem aktuellen Link." Der Grund wird **nicht** genannt. *(Korrigiert 2026-09-21, FR-2.8: die frühere Fassung nannte den Ablauf und verriet damit, dass es den Code gab. Der Weg zurück bleibt — im Usability-Test des Prototyps war genau dieser fehlende Ausweg der Befund.)* **Ergänzt 2026-09-23:** ein zweiter Weg zurück, „Beitrittscode von Hand eingeben" → `/join` — sowohl beim Öffnen des Links als auch bei einer Ablehnung erst beim Absenden. Der beschädigte Code wird nie vorausgefüllt. |
+| Keine Berechtigung — bei einem anderen Haushalt angemeldet | Wer bereits bei einem **anderen** Haushalt angemeldet ist, als Bewohner:in oder mit dessen Haushalts-Account (EC-2.5), liest eine Erklärung und erhält „Abmelden" direkt auf dem Bildschirm — sowohl beim Öffnen des Links als auch bei einer Ablehnung erst beim Absenden. Das Abmelden beendet ausschließlich die eigene Sitzung und führt zurück zu genau dieser Einladung. |
 
 ---
 
