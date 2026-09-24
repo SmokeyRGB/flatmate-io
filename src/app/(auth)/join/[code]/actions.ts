@@ -102,12 +102,9 @@ export async function joinHouseholdAction(
           return { error: t.errors.invalidLink, fieldError: null, refusal: "invalid_link" };
         case "name_taken":
           // Only ever reached for a NEUTRAL link (a bound link skips the collision check
-          // entirely, design.md Decision 13) — displayName is therefore always present here.
-          return {
-            error: t.errors.nameTaken((displayName ?? "").trim()),
-            fieldError: "displayName",
-            refusal: null,
-          };
+          // entirely, design.md Decision 13). The message is fixed text: the typed name stays in
+          // the browser's own draft and never travels back in this state (PR #20 review).
+          return { error: t.errors.nameTaken, fieldError: "displayName", refusal: null };
         case "rate_limited":
           return { error: t.errors.rateLimited, fieldError: null, refusal: null };
         case "missing_fields":

@@ -343,16 +343,21 @@ export const de = {
       rateLimited: "Von hier kamen zuletzt zu viele Versuche. Bitte versuche es in Kürze erneut.",
       missingFields: "Name und Passwort sind erforderlich.",
       passwordTooShort: (minLength: number) => `Das Passwort muss mindestens ${minLength} Zeichen haben.`,
-      // AC-2.17/EC-2.11: inline, with a way forward — never a dead end.
-      nameTaken: (displayName: string) =>
-        `Der Name "${displayName}" ist in dieser WG bereits vergeben. Wähle einen anderen.`,
+      // AC-2.17/EC-2.11: inline, with a way forward — never a dead end. A fixed sentence, never the
+      // typed name (PR #20 review): this text is returned in the action state, which next dev's
+      // server-function log prints on the next submit, and the name already stands in its own
+      // field right above it (join-screen design.md Decision 4).
+      nameTaken: "Dieser Name ist in dieser WG bereits vergeben. Wähle einen anderen.",
       // EC-2.5/A-2.4: deliberately NOT the invalid-link message — the link is fine.
       otherHousehold:
         "Du bist bei einem anderen Haushalt angemeldet. Melde dich ab, um diesem Haushalt beizutreten.",
-      // join-screen design.md Decision 5: rewritten from "Der Beitritt ist fehlgeschlagen" to state
-      // plainly that a join is one transaction — a failed one created nothing, so retrying loses
-      // nothing either.
-      genericFailure: "Der Beitritt hat nicht geklappt. Es wurde nichts angelegt — du kannst es erneut versuchen.",
+      // join-screen design.md Decision 5, corrected in PR #20 review: promises only what the join
+      // transaction guarantees. The redemption is spent only by a join that completes
+      // (identity/join), so the invitation is still good. "Nothing was created" was not
+      // guaranteed: the Supabase Auth user is created outside that transaction and removed only
+      // best-effort (auth.ts joinHousehold).
+      genericFailure:
+        "Der Beitritt hat nicht geklappt. Deine Einladung ist dadurch nicht verbraucht — versuch es einfach noch einmal.",
     },
     // EC-2.4: rendered on the dashboard (task 8.5) when the join redirect carries the note —
     // "taken to Start with a note", the temporary /dashboard landing target (proposal Assumption 4).

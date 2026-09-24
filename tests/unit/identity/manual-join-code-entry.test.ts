@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { de } from "@/ui/strings";
 
 // Same precedent as join-code-never-in-query-or-log.test.ts's own G-A5 mock: actions.ts pulls in
 // next/navigation's `redirect`, which throws in a real Next runtime — mocked here to record its
@@ -54,10 +55,10 @@ describe("enterJoinCodeAction", () => {
     expect(target).not.toContain("?");
   });
 
-  it("malformed input returns the format hint, never the raw input, and does not redirect", async () => {
+  it("malformed input returns the refusal text, never the raw input, and does not redirect", async () => {
     const raw = "not-a-code-at-all";
     const state = await enterJoinCodeAction({ error: null }, formDataWith(raw));
-    expect(state.error).toBeTruthy();
+    expect(state.error).toBe(de.join.joinByCode.codeInvalid);
     expect(JSON.stringify(state)).not.toContain(raw.toUpperCase().replace(/[\s-]/g, ""));
     expect(JSON.stringify(state)).not.toContain(raw);
     expect(redirect).not.toHaveBeenCalled();

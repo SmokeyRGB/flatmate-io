@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { JoinError, type JoinErrorCode } from "@/modules/identity/auth";
 import { buildJoinUrl } from "@/modules/identity/repository";
+import { de } from "@/ui/strings";
 
 // actions.ts pulls in session-cookie.ts (server-only + next/headers) and next/navigation via its
 // import chain — none of that runs before the deterministic refusal paths below fire, but it must
@@ -160,5 +161,25 @@ describe("The join code never reaches a query string or a log line (G-A5/AC-2.18
       })()).catch(() => {});
       assertNoLogContains(validCode);
     });
+  });
+});
+
+// PR #20 review: `name_taken` used to return `Der Name "<typed name>" ist … vergeben`, sending the
+// visitor's own input back in the action state, which next dev's server-function log prints on
+// the next submit (join-screen design.md constraint 5). Guarded at the class, not the instance:
+// every refusal text the join actions can return is fixed text. The one parameterised message
+// takes the configured minimum length, a number the visitor never types.
+describe("No join refusal text interpolates what the visitor typed", () => {
+  const ALLOWED_PARAMETERISED = new Set(["passwordTooShort"]);
+
+  it("every de.join.errors entry is fixed text, except the password-length message", () => {
+    for (const [key, value] of Object.entries(de.join.errors)) {
+      if (ALLOWED_PARAMETERISED.has(key)) continue;
+      expect(typeof value, `de.join.errors.${key}`).toBe("string");
+    }
+  });
+
+  it("the manual-entry refusal is fixed text too", () => {
+    expect(typeof de.join.joinByCode.codeInvalid).toBe("string");
   });
 });
