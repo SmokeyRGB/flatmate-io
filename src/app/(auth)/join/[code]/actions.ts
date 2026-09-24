@@ -31,7 +31,9 @@ import { getClientIp } from "./request-ip";
 // the previous state is what next dev's action log prints on the NEXT submit).
 export interface JoinFormState {
   error: string | null;
-  fieldError: "displayName" | "password" | null;
+  // review fix: "email" added alongside displayName/password — invalid_email below needs somewhere
+  // to point the inline error at, following the exact same fieldError convention.
+  fieldError: "displayName" | "password" | "email" | null;
   refusal: "invalid_link" | "other_household" | null;
 }
 
@@ -136,17 +138,26 @@ export async function joinHouseholdAction(
           // as the page's own Keine-Berechtigung state.
           return { error: t.errors.otherHousehold, fieldError: null, refusal: "other_household" };
         case "email_taken":
-          // resident-settings design.md Decision 3: names no one (proposal Assumption 2). Rendered
-          // as the form's generic error (JoinFormState's fieldError has no "email" variant — the
-          // field itself has no per-field error slot, unlike name/password), never a way-forward
-          // component.
-          return { error: t.errors.emailTaken, fieldError: null, refusal: null };
+          // resident-settings design.md Decision 3: names no one (proposal Assumption 2). Shown on
+          // the email field itself (review fix: JoinFormState now has an "email" fieldError variant,
+          // added for invalid_email below and reused here).
+          return { error: t.errors.emailTaken, fieldError: "email", refusal: null };
+        case "invalid_email":
+          // review fix: auth.ts's joinHousehold now validates the optional email itself
+          // (normalizeEmail/isWellFormedEmail) — a malformed value is refused here, before any Auth
+          // user is created or any link is claimed. Name and email stay typed in the browser's own
+          // draft (join-form.tsx), never the password.
+          return { error: t.errors.invalidEmail, fieldError: "email", refusal: null };
         case "signup_failed":
           // design.md I1: unchanged from before this change — a JoinError's own message never
           // contains the code (join-code-never-in-query-or-log.test.ts, extended by task 7.4), so
           // logging the error itself here is not a G-A5 violation. The join is one transaction, so
           // a failed one created nothing (t.errors.genericFailure states that now, task 2.2).
           console.error(err);
+          return { error: t.errors.genericFailure, fieldError: null, refusal: null };
+        // review fix: reset_done_sign_in_failed belongs to redeemPasswordReset's own refusals —
+        // joinHousehold never throws it, covered here only so this switch stays exhaustive.
+        case "reset_done_sign_in_failed":
           return { error: t.errors.genericFailure, fieldError: null, refusal: null };
         default: {
           const _exhaustive: never = errCode;
@@ -198,6 +209,9 @@ export async function signOutAndReturnAction(formData: FormData): Promise<void> 
 export interface ResetFormState {
   error: string | null;
   fieldError: "password" | null;
+  // review fix: mirrors JoinFormState's own refusal field — invalid_link needs the same way-forward
+  // component (HandEntryWayBack) the join form renders, not just an inline error.
+  refusal: "invalid_link" | null;
 }
 
 // FR-2.28/EC-2.14: the attempt is recorded on page load (page.tsx's resolve) AND here, on submit —
@@ -214,7 +228,7 @@ export async function redeemPasswordResetAction(
   const ip = getClientIp(await headers());
   const allowed = await recordJoinAttempt(joinAttemptSourceHash(ip));
   if (!allowed) {
-    return { error: t.errors.rateLimited, fieldError: null };
+    return { error: t.errors.rateLimited, fieldError: null, refusal: null };
   }
 
   // design.md Decision 8 (pre-mortem fix, 2026-09-24): captured BEFORE redemption so the visitor's
@@ -239,19 +253,30 @@ export async function redeemPasswordResetAction(
       const errCode = err.code;
       switch (errCode) {
         case "invalid_link":
-          return { error: t.errors.invalidLink, fieldError: null };
+          // review fix: the same refusal shape joinHouseholdAction gives — an inline message PLUS
+          // the way forward (hand entry), rendered by reset-form.tsx reusing HandEntryWayBack.
+          return { error: t.errors.invalidLink, fieldError: null, refusal: "invalid_link" };
         case "missing_fields":
-          return { error: t.errors.missingFields, fieldError: null };
+          return { error: t.errors.missingFields, fieldError: null, refusal: null };
         case "password_too_short":
           return {
             error: t.errors.passwordTooShort(JOIN_PASSWORD_MIN_LENGTH),
             fieldError: "password",
+            refusal: null,
           };
         case "rate_limited":
-          return { error: t.errors.rateLimited, fieldError: null };
+          return { error: t.errors.rateLimited, fieldError: null, refusal: null };
         case "signup_failed":
           console.error(err);
-          return { error: t.errors.genericFailure, fieldError: null };
+          return { error: t.errors.genericFailure, fieldError: null, refusal: null };
+        case "reset_done_sign_in_failed":
+          // review fix: past this point the reset has ALREADY SUCCEEDED (password set, sessions
+          // revoked, link spent) — only the immediate sign-in afterwards failed. Showing the
+          // generic failure text here would be a lie (it promises "your invitation is not
+          // consumed", which is false for a spent reset link). Redirect to sign-in with a note
+          // instead, same shape as joinHouseholdAction's own already_member redirect (inside this
+          // catch block, so the outer try's own catch can never intercept it).
+          redirect("/sign-in?note=password_reset");
         // The remaining JoinErrorCode members belong to joinHousehold's own refusals
         // (name collisions, an already-signed-in visitor, a duplicate email) and redeemPasswordReset
         // never throws them — covered here only so this switch stays exhaustive.
@@ -259,7 +284,8 @@ export async function redeemPasswordResetAction(
         case "already_member":
         case "other_household":
         case "email_taken":
-          return { error: t.errors.genericFailure, fieldError: null };
+        case "invalid_email":
+          return { error: t.errors.genericFailure, fieldError: null, refusal: null };
         default: {
           const _exhaustive: never = errCode;
           return _exhaustive;

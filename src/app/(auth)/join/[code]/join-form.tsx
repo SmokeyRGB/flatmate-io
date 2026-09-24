@@ -101,6 +101,13 @@ export function JoinForm({
             className="field-input"
           />
           <p className="field-helper">{t.emailHelper}</p>
+          {/* review fix: invalid_email/email_taken now target the email field itself, same as
+              displayName/password above, instead of falling through to the form's generic error. */}
+          {state.fieldError === "email" && (
+            <p className="field-error" role="alert">
+              {state.error}
+            </p>
+          )}
         </div>
 
         <div className="flex items-center gap-2">

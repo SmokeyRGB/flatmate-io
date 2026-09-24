@@ -89,6 +89,10 @@ export const de = {
       // household tab still accepts a resident's address, but no longer advertises it.
       residentUseEmail: "Mit E-Mail-Adresse anmelden",
       residentUseName: "Mit Name anmelden",
+      // review fix (auth.ts redeemPasswordReset's reset_done_sign_in_failed): the reset itself
+      // already succeeded (password set, sessions revoked, link spent) — only the immediate
+      // sign-in afterwards failed, so this is a note beside the ordinary form, not an error.
+      passwordResetNote: "Dein neues Passwort ist gesetzt. Melde dich damit an.",
     },
     register: {
       heading: "WG gründen",
@@ -404,6 +408,9 @@ export const de = {
       // resident-settings design.md Decision 3: the provider's duplicate-email refusal — names no
       // account, household or person (proposal Assumption 2), same wording style as E1's own.
       emailTaken: "Diese E-Mail-Adresse kann nicht verwendet werden.",
+      // review fix: joinHousehold now validates the optional email itself (normalizeEmail/
+      // isWellFormedEmail) — same wording style as account.email.errors.invalidEmail (E1's own).
+      invalidEmail: "Das sieht nicht nach einer gültigen E-Mail-Adresse aus.",
       // EC-2.5/A-2.4: deliberately NOT the invalid-link message — the link is fine.
       otherHousehold:
         "Du bist bei einem anderen Haushalt angemeldet. Melde dich ab, um diesem Haushalt beizutreten.",

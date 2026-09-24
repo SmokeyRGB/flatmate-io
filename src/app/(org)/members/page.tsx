@@ -320,6 +320,9 @@ export default async function MembersPage() {
           // issuance history it has, but issuing a NEW one for it makes no sense (issueJoinCodeTx
           // would refuse it anyway, ResidentProfileNotEligibleForBindingError).
           const boundIssuance = !m.accountId ? boundIssuancesByProfile.get(m.id) : undefined;
+          // review fix: bound once per row instead of `resetIssuancesByProfile.get(m.id)` re-run
+          // five times below (once in the condition, four times with `!`).
+          const resetIssuance = m.accountId ? resetIssuancesByProfile.get(m.id) : undefined;
           return (
           <li key={m.id} className="card">
             <div className="flex items-start justify-between gap-2">
@@ -408,16 +411,16 @@ export default async function MembersPage() {
                 issued reset link for this profile, with the E-03/K-18 caution (spec: "The screen
                 that issues it SHALL state that whoever holds the link can set this person's
                 password") — never presented as a security measure. */}
-            {isAdmin && m.status === "active" && !m.hasEmail && resetIssuancesByProfile.get(m.id) && (
+            {isAdmin && m.status === "active" && !m.hasEmail && resetIssuance && (
               <div className="mt-3 space-y-2">
                 <p className="field-helper">{t.joinCode.resetLinkIssuedHeading}</p>
                 <p className="text-xs text-muted-foreground">
-                  {joinCodeStatusLabel(resetIssuancesByProfile.get(m.id)!, now)}
+                  {joinCodeStatusLabel(resetIssuance, now)}
                 </p>
-                <p className="font-mono text-sm font-semibold">{resetIssuancesByProfile.get(m.id)!.code}</p>
+                <p className="font-mono text-sm font-semibold">{resetIssuance.code}</p>
                 <JoinCodeCopyButtons
-                  code={resetIssuancesByProfile.get(m.id)!.code}
-                  url={buildJoinUrl(host, resetIssuancesByProfile.get(m.id)!.code)}
+                  code={resetIssuance.code}
+                  url={buildJoinUrl(host, resetIssuance.code)}
                 />
                 <div className="callout callout-caution">
                   <TriangleAlert className="size-4" />

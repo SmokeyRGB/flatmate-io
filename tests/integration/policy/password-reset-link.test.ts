@@ -15,6 +15,7 @@ import {
   ResidentProfileNotEligibleForResetError,
   createResidentProfile,
   issuePasswordResetLink,
+  listJoinCodeIssuances,
   setMemberRole,
   setMovedOut,
 } from "@/modules/identity/repository";
@@ -111,6 +112,43 @@ describe("issuePasswordResetLink (design.md Decision 6)", () => {
       issuePasswordResetLink(hh.context, hh.accountId, hasEmail.profileId),
     ).rejects.toThrow(ResidentProfileNotEligibleForResetError);
   });
+});
+
+// review fix (finding 1): a password_reset row's code/url lets whoever reads it take over the
+// named resident's profile — only the household account may issue one (O-16), and for the exact
+// same reason only the household account may READ one back through listJoinCodeIssuances. Before
+// this fix a moderator's list included the row in full (code, url, copy buttons via
+// renderJoinCodeCard on O16) despite never being able to issue one themselves.
+describe("listJoinCodeIssuances filters password_reset rows for a moderator (O-16)", () => {
+  it("a moderator's list has no password_reset row; the household account's list does", async () => {
+    hh = await registerTestHousehold();
+    const moderator = await claimResident(hh, "ModeratorReader");
+    await setMemberRole(hh.context, hh.accountId, moderator.accountId, "moderator");
+    const resident = await claimResident(hh, "ResetReaderTarget");
+    const moderatorCtx: SessionContext = {
+      accountId: moderator.accountId,
+      householdId: hh.householdId,
+      profileId: moderator.profileId,
+    };
+
+    const link = await issuePasswordResetLink(hh.context, hh.accountId, resident.profileId);
+
+    const moderatorList = await listJoinCodeIssuances(moderatorCtx, moderator.accountId);
+    expect(moderatorList.some((row) => row.id === link.id)).toBe(false);
+    expect(moderatorList.some((row) => row.purpose === "password_reset")).toBe(false);
+
+    const householdList = await listJoinCodeIssuances(hh.context, hh.accountId);
+    const row = householdList.find((r) => r.id === link.id);
+    expect(row).toBeDefined();
+    expect(row?.purpose).toBe("password_reset");
+    expect(row?.code).toBe(link.code);
+  });
+
+  // Deliberate break (reported, then reverted): removing the
+  // `callerIsHouseholdAdmin || issuance.purpose !== "password_reset"` filter in
+  // listJoinCodeIssuances made this test fail as expected — the moderator's list then contained
+  // the reset row (`moderatorList.some(...) === true`), confirming the filter is what this test
+  // exercises rather than an unrelated invariant.
 });
 
 // resident-settings design.md Decision 5 (identity/password-reset): redeeming a reset link.

@@ -581,7 +581,15 @@ export type JoinErrorCode =
   // resident-settings design.md Decision 3: the provider's duplicate-email refusal, thrown before
   // anything is committed — the link's use rolls back with the rest (spent only by a join that
   // completes).
-  | "email_taken";
+  | "email_taken"
+  // review fix: a malformed (but non-empty) email at join — thrown BEFORE any Auth user is
+  // created or any link is claimed (joinHousehold below), same "keeps what was typed" convention
+  // as name_taken/email_taken.
+  | "invalid_email"
+  // review fix: redeemPasswordReset's OWN outcome for a sign-in failure reached AFTER its
+  // transaction has already committed — the password is changed and the link is spent, so this
+  // must never be shown as a failed reset (signup_failed). Thrown only after commit.
+  | "reset_done_sign_in_failed";
 
 export class JoinError extends Error {
   constructor(message: string, readonly code: JoinErrorCode) {
@@ -595,6 +603,18 @@ export class JoinError extends Error {
 // requirement asks for one (design.md Decision 11). Exported so the join form's field text states
 // the exact number this validates against.
 export const JOIN_PASSWORD_MIN_LENGTH = 6;
+
+// review fix: the missing/too-short check was written out three times (joinHousehold,
+// changeResidentPassword, redeemPasswordReset below) with identical rules — one helper computes
+// which rule (if any) a password value fails; each caller still throws its OWN error class and
+// code (JoinError vs AccountSettingsError), so behaviour and codes stay exactly as they were.
+type PasswordRuleFailure = "missing_password" | "password_too_short";
+
+function checkPasswordRule(password: string): PasswordRuleFailure | null {
+  if (!password) return "missing_password";
+  if (password.length < JOIN_PASSWORD_MIN_LENGTH) return "password_too_short";
+  return null;
+}
 
 export interface JoinHouseholdInput {
   // join-by-link design.md Decision 13: optional — a BOUND link's display name comes from the
@@ -630,16 +650,29 @@ export async function joinHousehold(
 ): Promise<JoinHouseholdResult> {
   const displayNameInput = input.displayName?.trim() ?? "";
   const password = input.password;
-  const email = input.email?.trim() || null; // FR-2.11: optional, may be submitted empty
 
-  if (!password) {
+  const passwordFailure = checkPasswordRule(password);
+  if (passwordFailure === "missing_password") {
     throw new JoinError("Password is required", "missing_fields");
   }
-  if (password.length < JOIN_PASSWORD_MIN_LENGTH) {
+  if (passwordFailure === "password_too_short") {
     throw new JoinError(
       `Password must be at least ${JOIN_PASSWORD_MIN_LENGTH} characters`,
       "password_too_short",
     );
+  }
+
+  // review fix: the optional email is normalised (trim + lower-case, normalizeEmail below) and
+  // validated (isWellFormedEmail) exactly like E1's own changeResidentEmail — previously this was
+  // sent to Supabase Auth unvalidated and un-normalised, so a malformed address failed the WHOLE
+  // join as an opaque signup_failed, and mixed case reached the provider/account.email un-lowered
+  // while E1 always lower-cases. Empty stays allowed (FR-2.11); a malformed value is refused here,
+  // BEFORE any Auth user is created (createUser below) or any link is claimed (claimJoinCodeTx
+  // inside the transaction below).
+  const trimmedEmail = input.email?.trim() ?? "";
+  const email = trimmedEmail ? normalizeEmail(trimmedEmail) : null;
+  if (email && !isWellFormedEmail(email)) {
+    throw new JoinError("Email address is not well-formed", "invalid_email");
   }
 
   // Step 3: non-consuming resolve — tells this function which household's display-name space to
@@ -979,10 +1012,18 @@ export async function changeResidentPassword(
       "not_a_resident",
     );
   }
-  if (!currentPassword || !newPassword) {
+  // review fix (checkPasswordRule): the shared helper covers newPassword's own rule; currentPassword
+  // has no length rule of its own here, only "present" — checked first so the combined
+  // missing_fields message ("current AND new are required") still fires when either is empty,
+  // exactly as the original `!currentPassword || !newPassword` did.
+  if (!currentPassword) {
     throw new AccountSettingsError("Current and new password are required", "missing_fields");
   }
-  if (newPassword.length < JOIN_PASSWORD_MIN_LENGTH) {
+  const passwordFailure = checkPasswordRule(newPassword);
+  if (passwordFailure === "missing_password") {
+    throw new AccountSettingsError("Current and new password are required", "missing_fields");
+  }
+  if (passwordFailure === "password_too_short") {
     throw new AccountSettingsError(
       `Password must be at least ${JOIN_PASSWORD_MIN_LENGTH} characters`,
       "password_too_short",
@@ -1058,10 +1099,11 @@ export async function redeemPasswordReset(
   options: { rememberMe?: boolean; currentSession?: CurrentSession | null } = {},
 ): Promise<JoinHouseholdResult> {
   const password = input.password;
-  if (!password) {
+  const passwordFailure = checkPasswordRule(password);
+  if (passwordFailure === "missing_password") {
     throw new JoinError("Password is required", "missing_fields");
   }
-  if (password.length < JOIN_PASSWORD_MIN_LENGTH) {
+  if (passwordFailure === "password_too_short") {
     throw new JoinError(
       `Password must be at least ${JOIN_PASSWORD_MIN_LENGTH} characters`,
       "password_too_short",
@@ -1095,9 +1137,18 @@ export async function redeemPasswordReset(
       throw new JoinError("Join code is not valid", "invalid_link");
     }
 
+    // review fix: created_by_account_id (below) is read HERE, in the same plain SELECT as the
+    // profile's own active-status re-check, rather than as a separate statement after the claim —
+    // this query carries no FOR UPDATE (unlike membershipRow/accountRow above), so joining
+    // join_code_issuance onto it adds no new lock and changes nothing about D5's lock-order
+    // analysis (membership -> account, then session; never resident_profile or join_code_issuance).
     const [profileRow] = await tx
-      .select()
+      .select({
+        status: residentProfile.status,
+        createdByAccountId: joinCodeIssuance.createdByAccountId,
+      })
       .from(residentProfile)
+      .leftJoin(joinCodeIssuance, eq(joinCodeIssuance.id, claimed.issuanceId))
       .where(eq(residentProfile.id, claimedProfileId));
     if (!profileRow || profileRow.status !== "active") {
       throw new JoinError("Join code is not valid", "invalid_link");
@@ -1117,17 +1168,12 @@ export async function redeemPasswordReset(
       .set({ revokedAt: new Date() })
       .where(and(eq(session.accountId, accountRow.id), isNull(session.revokedAt)));
 
-    const [issuanceRow] = await tx
-      .select({ createdByAccountId: joinCodeIssuance.createdByAccountId })
-      .from(joinCodeIssuance)
-      .where(eq(joinCodeIssuance.id, claimed.issuanceId));
-
     await recordActivityEvent(tx, {
       householdId: resolved.householdId,
       eventType: "account.password_reset_by_admin",
       subjectType: "resident_profile",
       subjectId: claimedProfileId,
-      actorAccountId: issuanceRow?.createdByAccountId ?? null,
+      actorAccountId: profileRow.createdByAccountId ?? null,
       actorProfileId: null,
       payload: {},
     });
@@ -1150,9 +1196,15 @@ export async function redeemPasswordReset(
     await revokeSession(options.currentSession.context, options.currentSession.sessionId);
   }
 
+  // review fix: past this point the reset transaction has ALREADY COMMITTED — the password is
+  // changed, every prior session is revoked, and the link is spent. A failure from here on must
+  // not look like a failed reset (the old "signup_failed" code, which the action shows as a
+  // generic failure implying nothing happened): reset_done_sign_in_failed is a distinct outcome,
+  // thrown only after commit, so the action can send the person to sign in with their new
+  // password instead of telling them the reset itself failed.
   const { data: userData, error: userError } = await supabaseAdmin().auth.admin.getUserById(accountId);
   if (userError || !userData.user?.email) {
-    throw new JoinError("Sign-in immediately after reset failed", "signup_failed");
+    throw new JoinError("Reset succeeded but sign-in afterwards failed", "reset_done_sign_in_failed");
   }
 
   const { data: signInData, error: signInError } = await supabaseAdmin().auth.signInWithPassword({
@@ -1160,7 +1212,7 @@ export async function redeemPasswordReset(
     password,
   });
   if (signInError || !signInData.session) {
-    throw new JoinError("Sign-in immediately after reset failed", "signup_failed");
+    throw new JoinError("Reset succeeded but sign-in afterwards failed", "reset_done_sign_in_failed");
   }
 
   const context: SessionContext = { accountId, householdId: resolved.householdId, profileId };

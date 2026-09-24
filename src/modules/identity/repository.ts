@@ -1160,6 +1160,17 @@ export async function listJoinCodeIssuances(
   actingAccountId: string,
 ): Promise<JoinCodeIssuanceWithJoiners[]> {
   await assertIsAdministrationOrModerator(context, actingAccountId);
+
+  // review fix (O-16): a password_reset row's code/url lets whoever reads it take over the named
+  // resident's profile (open the link, set their password) — only the household account
+  // (household_admin) may issue one (issuePasswordResetLink's own assertIsAdministration), and for
+  // the exact same reason only the household account may READ one back here. A moderator's own
+  // membership role, from the session's own account (context.accountId via getMembershipForAccount,
+  // never a caller-supplied flag), decides the filter — deleteJoinCode/extendJoinCode stay
+  // moderator-reachable regardless, since neither discloses the code.
+  const callerMembership = await getMembershipForAccount(context, actingAccountId);
+  const callerIsHouseholdAdmin = callerMembership?.role === "household_admin";
+
   return withSessionContext(context, async (tx) => {
     const issuances = await tx
       .select()
@@ -1198,11 +1209,13 @@ export async function listJoinCodeIssuances(
       namesByIssuance.set(joiner.issuanceId, names);
     }
 
-    return issuances.map((issuance) => ({
-      ...issuance,
-      joinedResidentNames: namesByIssuance.get(issuance.id) ?? [],
-      hasRemovedJoiner: removedJoinerIssuances.has(issuance.id),
-    }));
+    return issuances
+      .filter((issuance) => callerIsHouseholdAdmin || issuance.purpose !== "password_reset")
+      .map((issuance) => ({
+        ...issuance,
+        joinedResidentNames: namesByIssuance.get(issuance.id) ?? [],
+        hasRemovedJoiner: removedJoinerIssuances.has(issuance.id),
+      }));
   });
 }
 
