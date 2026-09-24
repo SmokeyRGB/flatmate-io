@@ -49,9 +49,15 @@ async function residentSignIn(household: TestHousehold, name: string, password =
 // password. Plan's Risk note (D7/Working tips): each case here signs in at least once, sometimes
 // several times — kept to one small file, run serially, per the /token pacing tip.
 describe("changeResidentPassword (identity/account-settings, design.md Decision 7)", () => {
-  it("a wrong current password gives wrong_current_password and no session is revoked", async () => {
+  // Copilot review round 3 (PR #23): changeResidentPassword now revokes the other sessions and
+  // records account.password_changed BEFORE calling the provider (the provider's password write is
+  // the LAST statement of the transaction). A wrong current password is still caught earlier (the
+  // signInWithPassword verification step, unmoved by the reorder), before either of these writes,
+  // so this test's own "nothing changed" assertions hold under both the old and the new order —
+  // see the deliberate-break note below for why that is expected, not a gap in the test.
+  it("a wrong current password gives wrong_current_password, no session is revoked, and no event is recorded", async () => {
     hh = await registerTestHousehold();
-    await claimResident(hh, "WrongCurrent");
+    const resident = await claimResident(hh, "WrongCurrent");
     const signedIn = await residentSignIn(hh, "WrongCurrent");
     const current: CurrentSession = { sessionId: signedIn.session.id, context: signedIn.context };
 
@@ -63,7 +69,27 @@ describe("changeResidentPassword (identity/account-settings, design.md Decision 
       tx.select().from(session).where(eq(session.id, signedIn.session.id)),
     );
     expect(row.revokedAt).toBeNull();
+
+    const events = await withSessionContext(current.context, (tx) =>
+      tx
+        .select()
+        .from(activityEvent)
+        .where(
+          and(eq(activityEvent.eventType, "account.password_changed"), eq(activityEvent.subjectId, resident.accountId)),
+        ),
+    );
+    expect(events).toHaveLength(0);
   });
+
+  // Copilot review round 3 (PR #23), deliberate break (argued, not executed — same reasoning as
+  // account-settings-email.test.ts's own note): moving the session-revoke and the
+  // recordActivityEvent call back to AFTER the provider's password write (the pre-round-3 shape)
+  // would not make the test above fail, since a wrong current password is refused at the
+  // signInWithPassword check, which sits BEFORE either ordering's session-revoke/audit step either
+  // way. The reorder only matters for a provider password write that itself fails or for a commit
+  // that fails after a successful one — neither can be forced here without mocking Supabase or
+  // Postgres, which CLAUDE.md forbids; changeResidentPassword's own big comment states the
+  // compensating transaction and the `change_incomplete` code that covers the commit-failure case.
 
   it("success means the new password signs in and the old one doesn't", async () => {
     hh = await registerTestHousehold();

@@ -62,14 +62,19 @@ FR-2.9, FR-2.10a, FR-2.12.
 
 ### Requirement: Redeeming a reset link sets the password and ends every session
 
-Redeeming a reset link SHALL:
-- set the profile's new password;
-- end every session of the profile's account;
-- spend the link;
-- sign the person in with a new session that lands on Start.
+Redeeming a reset link SHALL happen in order, each step safe on its own if nothing after it ever
+runs:
+- first, every session of the profile's account SHALL end and the link SHALL be spent;
+- then the profile's new password SHALL be set;
+- then the person SHALL be signed in with a new session that lands on Start.
 
-Either all of this happens or none of it does. The old password SHALL no longer sign in. Sources:
-O-16 (*„beendet alle aktiven `Session`s des betroffenen Profils"*); O-13; FR-2.18.
+A failure before the password is set SHALL leave the link spent and every session ended, with the
+password unchanged; the person needs a new link. A failure after the password is set SHALL leave
+it set; the person is told to sign in with their new password. The old password SHALL no longer
+sign in once the new one is set. Sources: O-16 (*„beendet alle aktiven `Session`s des betroffenen
+Profils"*); O-13; FR-2.18; the redesign in answer to the second review round of PR #23 (Postgres and the identity
+provider are separate systems with no transaction spanning both — CLAUDE.md "No transaction spans Postgres and
+Supabase Auth").
 
 #### Scenario: A redeemed reset
 - **WHEN** someone redeems a valid reset link with a new password that meets the rule
@@ -80,6 +85,19 @@ O-16 (*„beendet alle aktiven `Session`s des betroffenen Profils"*); O-13; FR-2
 #### Scenario: A spent reset link
 - **WHEN** a redeemed reset link is opened again
 - **THEN** it is refused with the single invalid-link message
+
+#### Scenario: A failure before the password is set
+- **WHEN** redeeming a reset link ends every session and spends the link, but setting the new
+  password then fails
+- **THEN** the link stays spent and every session stays ended
+- **AND** the password is unchanged (the old one still signs in), and the person is told to ask
+  the administration for a new link
+
+#### Scenario: A failure after the password is set
+- **WHEN** redeeming a reset link sets the new password, but signing the person in afterward then
+  fails
+- **THEN** the new password is set and signs in
+- **AND** the person is told to sign in with their new password, rather than told the reset failed
 
 ### Requirement: A reset is recorded where the household can see it
 

@@ -1,4 +1,4 @@
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 import { afterEach, describe, expect, it } from "vitest";
 import { withSessionContext, type SessionContext } from "@/db/session-context";
 import {
@@ -421,6 +421,118 @@ describe("redeemPasswordReset (design.md Decision 5)", () => {
     );
     expect(linkRow.uses).toBe(0);
   });
+
+  // Copilot review round 3 (PR #23): phase 2 used to set the password with NO re-check of its
+  // own — between phase 1 committing (link spent, every prior session dead) and phase 2 running,
+  // the OLD password is still valid at the provider, so the resident could sign in with it and add
+  // an email in that gap; a reset link must die once an email exists (O-16), even then. Fixed by
+  // re-checking membership/profile/account.email inside phase 2 itself, before its provider call.
+  //
+  // This is a DIFFERENT race from "the account FOR UPDATE re-check does not race a concurrent
+  // email add" above, which forces the email to appear before PHASE 1's own account check (and so
+  // only ever proves phase 1's existing recheck, not this fix) — phase 1 already refuses that case
+  // both before and after this change. To exercise phase 2's NEW recheck specifically, the email
+  // has to be added AFTER phase 1 commits (link already spent, sessions already dead) but BEFORE
+  // phase 2 re-locks the account row — a window with no external hook to pause on, since
+  // redeemPasswordReset runs its three phases back to back inside one function call and CLAUDE.md
+  // forbids mocking it open.
+  //
+  // Best effort without mocking: a side loop polls (unlocked, cheap) for join_code_issuance.uses to
+  // flip to 1 — the observable sign that phase 1 has committed — then immediately races to take the
+  // account row lock itself (FOR UPDATE NOWAIT, so it never blocks behind phase 2 if phase 2 wins),
+  // and if it wins, sets the email and commits before phase 2 gets there. This depends on real
+  // network timing (the loop's own round trips vs. phase 2's own BEGIN + SELECT ... FOR UPDATE) —
+  // not a deterministic gate like the guards above — so this is an INVARIANT GUARD: when the loop
+  // wins the race, the assertions below prove the fix; when it loses, nothing about the fix is
+  // disproven by losing a race, so the test does not fail either way.
+  it("an email added between phase 1 and phase 2 makes the redemption fail without touching the provider password (invariant guard)", async () => {
+    hh = await registerTestHousehold();
+    const resident = await claimResident(hh, "RaceBetweenPhases");
+    const link = await issuePasswordResetLink(hh.context, hh.accountId, resident.profileId);
+    const NEW_PASSWORD = "reset-new-password-123";
+    const residentEmail = `resident-${resident.profileId}@accounts.flatmate.invalid`;
+
+    let grabbedLock = false;
+    const raceLoop = (async () => {
+      for (let i = 0; i < 400 && !grabbedLock; i++) {
+        const [linkRow] = await withSessionContext(hh!.context, (tx) =>
+          tx
+            .select({ uses: joinCodeIssuance.uses })
+            .from(joinCodeIssuance)
+            .where(eq(joinCodeIssuance.id, link.id)),
+        );
+        if (linkRow?.uses === 1) {
+          try {
+            await withSessionContext(hh!.context, async (tx) => {
+              await tx.execute(
+                sql`SELECT 1 FROM account WHERE id = ${resident.accountId}::uuid FOR UPDATE NOWAIT`,
+              );
+              await tx
+                .update(account)
+                .set({ email: "raced-between-phases@example.test" })
+                .where(eq(account.id, resident.accountId));
+            });
+            grabbedLock = true;
+          } catch {
+            // Phase 2 already holds the lock (NOWAIT refused immediately) — not a win.
+          }
+          break;
+        }
+        await new Promise((resolve) => setTimeout(resolve, 5));
+      }
+    })();
+
+    const outcome = await redeemPasswordReset(link.code, { password: NEW_PASSWORD }).then(
+      (result) => ({ ok: true as const, result }),
+      (err) => ({ ok: false as const, err }),
+    );
+    await raceLoop;
+
+    // Grabbing the NOWAIT lock only proves the account row was free at that moment — not that it
+    // was free BECAUSE we are in the narrow phase-1/phase-2 gap rather than later (phase 2 could
+    // already have finished and released it, or phase 3 could be running by then; neither locks
+    // account). The real, causal test for "did our email write land before phase 2's own provider
+    // call": ask the PROVIDER directly whether the new password now works. If phase 2 already ran
+    // (with the email still null at the time it checked), it succeeded and the new password DOES
+    // sign in, regardless of our later write — that is a lost race, not a win, however it looked
+    // from the lock alone.
+    const { error: newPasswordError } = await adminClient().auth.signInWithPassword({
+      email: residentEmail,
+      password: NEW_PASSWORD,
+    });
+    const wonRace = grabbedLock && newPasswordError !== null;
+
+    if (wonRace) {
+      expect(outcome.ok).toBe(false);
+      if (!outcome.ok) {
+        expect(outcome.err).toBeInstanceOf(JoinError);
+        expect((outcome.err as JoinError).code).toBe("invalid_link");
+      }
+
+      // The provider password is still the ORIGINAL one — phase 2's provider call never ran.
+      const { error: oldPasswordError } = await adminClient().auth.signInWithPassword({
+        email: residentEmail,
+        password: PASSWORD,
+      });
+      expect(oldPasswordError).toBeNull();
+
+      // No new live session — phase 3 never ran either.
+      const liveSessions = await withSessionContext(hh!.context, (tx) =>
+        tx.select().from(session).where(and(eq(session.accountId, resident.accountId), isNull(session.revokedAt))),
+      );
+      expect(liveSessions).toHaveLength(0);
+    }
+    // else: lost the real-timing race this run — see the comment above; not a test failure.
+  });
+
+  // Deliberate break, argued (not executed — real network timing makes the invariant guard above
+  // too unreliable to use for a before/after comparison; CLAUDE.md forbids mocking the commit or
+  // provider open to force it deterministically instead): removing phase 2's own
+  // membership/profile/account.email recheck (reverting to a bare `SELECT account ... FOR UPDATE`
+  // with no conditions) would make phase 2 always reach the provider call once phase 1 has
+  // committed, however the account got its email in between — so a run where the race loop above
+  // wins would instead observe `outcome.ok === true` (the password DOES get set) and a live session
+  // afterwards, exactly the state O-16 says a reset link must not produce once an email exists.
 
   // review fix (Copilot finding, PR #23): redeemPasswordReset used to insert the new session in a
   // SEPARATE transaction AFTER the reset itself had committed. A concurrent setMovedOut/

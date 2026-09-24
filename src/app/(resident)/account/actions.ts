@@ -41,6 +41,11 @@ export async function changeEmailAction(
           return { error: t.email.errors.emailTaken, saved: false };
         case "not_a_resident":
           return { error: t.email.errors.notAResident, saved: false };
+        // Copilot review round 3 (PR #23): a failed COMMIT after the provider call already
+        // succeeded, where the best-effort compensating transaction (auth.ts's own big comment on
+        // changeResidentEmail) also failed — a distinct, honest message, not genericFailure.
+        case "change_incomplete":
+          return { error: t.email.errors.changeIncomplete, saved: false };
         // The password-only codes never reach this action (changeResidentEmail never throws
         // them) — covered here only so the switch stays exhaustive over the shared error type.
         case "missing_fields":
@@ -92,6 +97,10 @@ export async function changePasswordAction(
           return { error: t.password.errors.wrongCurrentPassword, saved: false };
         case "not_a_resident":
           return { error: t.password.errors.notAResident, saved: false };
+        // Copilot review round 3 (PR #23): see the matching case in changeEmailAction above — the
+        // compensating transaction in changeResidentPassword's own big comment also failed.
+        case "change_incomplete":
+          return { error: t.password.errors.changeIncomplete, saved: false };
         // The email-only codes never reach this action — covered so the switch stays exhaustive.
         case "missing_email":
         case "invalid_email":

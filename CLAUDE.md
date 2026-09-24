@@ -160,7 +160,10 @@ two review rounds because the first fix covered only the pairing.
 is not rolled back with it. Order the steps so that every failure point leaves a safe state, and
 write down which state each one leaves. For a reset, that means ending the sessions and spending
 the link first, then setting the password, then signing in (`redeemPasswordReset`). Don't claim
-atomicity in a comment.
+atomicity in a comment. The rule covers every provider call, not only the one a review named. Before calling
+a boundary fixed, `grep -n "supabaseAdmin()" src/` and check each call inside a transaction: the
+provider call goes last before the commit, and a failed commit after it is reconciled. PR #23 fixed
+the reset in one round and the password and email changes, three screens up, only in the next.
 
 **Every writer of the same state, pairwise.** When two functions write the same thing (a password,
 a provider address, the set of live sessions), each pair has to be serialized against each other,
@@ -331,6 +334,11 @@ commit that made the move.
 touches that capability, describing implemented behaviour and citing its `FR-n.m`. It is never
 seeded by copying `docs/backlog/requirements/` prose; that would duplicate an authoritative source
 and rot against it.
+
+A fix made after `/opsx:archive` that changes specified behaviour updates `openspec/specs/` in
+the same commit. The archived copy stays as it was (it is the frozen record), so the current spec
+is the only place the new behaviour is written down. PR #23's reset redesign left the current
+spec promising "all or none" for a round.
 
 ## Git commit attribution
 

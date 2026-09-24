@@ -553,6 +553,12 @@ export const de = {
         emailTaken: "Diese E-Mail-Adresse kann nicht verwendet werden.",
         notAResident: "Nur Bewohner:innen können ihre E-Mail-Adresse ändern.",
         genericFailure: "Das hat nicht geklappt. Bitte versuche es erneut.",
+        // Copilot review round 3 (PR #23): the provider write succeeded but the commit that should
+        // have followed it failed, and the best-effort repair (auth.ts changeResidentEmail's own
+        // comment) also failed — distinct from genericFailure, which would wrongly imply nothing
+        // happened at all.
+        changeIncomplete:
+          "Die Änderung wurde möglicherweise nur teilweise übernommen. Bitte versuche es erneut.",
       },
     },
     password: {
@@ -569,6 +575,10 @@ export const de = {
         wrongCurrentPassword: "Das aktuelle Passwort ist nicht richtig.",
         notAResident: "Nur Bewohner:innen können ihr Passwort ändern.",
         genericFailure: "Das hat nicht geklappt. Bitte versuche es erneut.",
+        // Copilot review round 3 (PR #23): see email.errors.changeIncomplete above — same
+        // situation, changeResidentPassword's own compensating transaction also failed.
+        changeIncomplete:
+          "Die Änderung wurde möglicherweise nur teilweise übernommen. Bitte versuche es erneut.",
       },
     },
     signOut: {

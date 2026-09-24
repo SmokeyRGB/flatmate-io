@@ -901,10 +901,10 @@ export async function joinHousehold(
 }
 
 // resident-settings design.md Decisions 2/7: E1's own settings errors. One class, several codes —
-// changeResidentEmail uses missing_email/invalid_email/email_taken/not_a_resident,
+// changeResidentEmail uses missing_email/invalid_email/email_taken/not_a_resident/change_incomplete,
 // changeResidentPassword uses missing_fields/password_too_short/wrong_current_password/
-// not_a_resident. german-ui-vocabulary (design.md Decision 4): a `code` discriminant, never a
-// message, same convention as JoinError/SignInError/ClaimError above.
+// not_a_resident/change_incomplete. german-ui-vocabulary (design.md Decision 4): a `code`
+// discriminant, never a message, same convention as JoinError/SignInError/ClaimError above.
 export type AccountSettingsErrorCode =
   | "missing_email"
   | "invalid_email"
@@ -912,7 +912,17 @@ export type AccountSettingsErrorCode =
   | "not_a_resident"
   | "missing_fields"
   | "password_too_short"
-  | "wrong_current_password";
+  | "wrong_current_password"
+  // Copilot review round 3 (PR #23): both changeResidentEmail and changeResidentPassword now call
+  // the provider LAST, right before commit — a provider failure (email_taken, or any other) rolls
+  // the whole DB write back with it, which is what makes the account row's own state trustworthy.
+  // The one window that discipline cannot close is a failed COMMIT of that same transaction AFTER
+  // the provider call already succeeded: Postgres rolls back (no DB write survives) while Supabase
+  // keeps the change. Each function's own big comment states the compensating transaction that
+  // reruns the DB side under the same locks; this code is thrown only when THAT compensation also
+  // fails — both the original commit and the repair attempt are logged (console.error) and the
+  // caller is told the change may have applied only partly.
+  | "change_incomplete";
 
 export class AccountSettingsError extends Error {
   constructor(message: string, readonly code: AccountSettingsErrorCode) {
@@ -938,7 +948,13 @@ export function isWellFormedEmail(normalized: string): boolean {
   return EMAIL_SHAPE.test(normalized);
 }
 
-// design.md Decision 2: DB row locked first, Auth updated inside the transaction.
+// design.md Decision 2, REORDERED (Copilot review round 3, PR #23): the previous shape called the
+// provider (updateUserById) in the MIDDLE of the transaction and then still had DB work left to do
+// (the account UPDATE, the audit insert) — CLAUDE.md's "no transaction spans Postgres and Supabase
+// Auth": a failure of that LATER DB work, or of the commit itself, would leave Supabase already
+// changed while Postgres rolled back, and account.email/the audit trail would then disagree with
+// the provider silently. Fixed by making the provider call the LAST statement of the transaction,
+// exactly redeemPasswordReset's own discipline (its phase 2):
 //   1. validate (trim, lower-case; empty is refused whether or not an address exists already —
 //      this is how "change but not remove", proposal Assumption 3, is enforced);
 //   2. identity (fast path): context.profileId === null (a household session) is refused before
@@ -956,15 +972,31 @@ export function isWellFormedEmail(normalized: string): boolean {
 //      could commit between the stale check and the account update with nothing to serialize
 //      against;
 //   4. SELECT account ... FOR UPDATE (serializes against a concurrent change of the same account,
-//      and against D5's redemption, which locks the same row); unchanged address writes nothing;
-//      auth.admin.updateUserById(email, email_confirm: true) — email_confirm is a technical
+//      and against D5's redemption, which locks the same row); unchanged address returns — no
+//      write, no audit, no provider call;
+//   5. UPDATE account SET email, email_verified_at = null;
+//   6. record account.email_changed;
+//   7. LAST: auth.admin.updateUserById(email, email_confirm: true) — email_confirm is a technical
 //      precondition for the provider's sign-in path (identity.md provider rule 2), never a claim
-//      about delivery, which stays account.email_verified_at's alone; on email_exists, throw
-//      email_taken; then UPDATE account SET email, email_verified_at = null, and record
-//      account.email_changed.
-// A failed commit after a successful provider update leaves Auth ahead of account.email — D1
-// makes sign-in immune to that (it always asks the provider), and saving again repairs the DB row.
-// Accepted and documented rather than compensated (design.md Decision 2).
+//      about delivery, which stays account.email_verified_at's alone. On email_exists, throw
+//      email_taken — this now rolls the DB write (step 5/6) back WITH it, since it is thrown
+//      before the transaction's own commit. Any other provider error rethrows the same way.
+//
+// The only window this discipline cannot close is a failed COMMIT after step 7's provider call
+// already returned success: Postgres then rolls back everything (email/audit gone) while Supabase
+// already carries the new address. Handled by a best-effort RECONCILIATION, outside the
+// transaction: a local `providerUpdated` flag is set true immediately after step 7 succeeds; the
+// `withSessionContext(...)` call is wrapped in try/catch; if it throws AND `providerUpdated` is
+// true (meaning the throw can only be the commit itself failing, since every earlier throw path
+// leaves the flag false), a second, best-effort transaction re-applies the DB side under the same
+// locks (membership -> account) — the UPDATE and the audit insert, nothing else. If that
+// compensating transaction succeeds, this function returns normally: the change did take effect,
+// late. If it also fails, both errors are logged (console.error) and this throws
+// AccountSettingsError("change_incomplete") — the account may now be ahead of Postgres, and the
+// caller is told the change may have applied only partly.
+//
+// This cannot be exercised by a real test without mocking Supabase or forcing a commit failure,
+// which CLAUDE.md forbids here (no DB/auth mocking) — see the test file's own note.
 //
 // Lock order: membership -> account, then no further lock — every path in this file takes a
 // prefix-compatible subsequence of resident_profile -> membership -> account -> session, never the
@@ -986,51 +1018,95 @@ export async function changeResidentEmail(current: CurrentSession, rawEmail: str
     );
   }
 
-  await withSessionContext(context, async (tx) => {
-    // The authoritative, non-stale check — see the comment above. Locked FIRST, before the
-    // account row, so this serializes against a concurrent removal (which locks membership before
-    // session, never account) the same way D5/D7's own membership-then-account order does.
-    const [membershipRow] = await tx
-      .select()
-      .from(membership)
-      .where(eq(membership.accountId, context.accountId))
-      .for("update");
-    if (!membershipRow || membershipRow.revokedAt || !membershipRow.isResident) {
+  // Flips to true only once the provider call (the LAST statement of the transaction below) has
+  // actually succeeded — so the catch block below can tell "the provider never changed" (this
+  // stays false: every throw before that point, including email_taken, leaves it false) apart from
+  // "the provider changed but the commit that should have followed it failed" (this is true).
+  let providerUpdated = false;
+
+  try {
+    await withSessionContext(context, async (tx) => {
+      // The authoritative, non-stale check — see the comment above. Locked FIRST, before the
+      // account row, so this serializes against a concurrent removal (which locks membership
+      // before session, never account) the same way D5/D7's own membership-then-account order does.
+      const [membershipRow] = await tx
+        .select()
+        .from(membership)
+        .where(eq(membership.accountId, context.accountId))
+        .for("update");
+      if (!membershipRow || membershipRow.revokedAt || !membershipRow.isResident) {
+        throw new AccountSettingsError(
+          "Only a resident may change their own email address (identity/account-settings)",
+          "not_a_resident",
+        );
+      }
+
+      const [row] = await tx.select().from(account).where(eq(account.id, context.accountId)).for("update");
+      if (!row || row.email === email) return; // no account, or unchanged — no write, no audit
+
+      await tx
+        .update(account)
+        .set({ email, emailVerifiedAt: null })
+        .where(eq(account.id, context.accountId));
+
+      await recordActivityEvent(tx, {
+        householdId: context.householdId,
+        eventType: "account.email_changed",
+        subjectType: "account",
+        subjectId: context.accountId,
+        actorAccountId: context.accountId,
+        actorProfileId: context.profileId,
+        payload: {},
+      });
+
+      // LAST statement before commit — see the big comment above.
+      const { error } = await supabaseAdmin().auth.admin.updateUserById(context.accountId, {
+        email,
+        email_confirm: true,
+      });
+      if (error) {
+        if (isEmailTakenError(error, "update")) {
+          throw new AccountSettingsError("Email address is already in use", "email_taken");
+        }
+        throw error;
+      }
+      providerUpdated = true;
+    });
+  } catch (err) {
+    if (!providerUpdated) throw err;
+
+    // The provider call succeeded but the transaction's own commit failed — best-effort
+    // reconciliation, re-applying the DB side under the same locks. See the big comment above.
+    try {
+      await withSessionContext(context, async (tx) => {
+        await tx.select().from(membership).where(eq(membership.accountId, context.accountId)).for("update");
+        await tx.select().from(account).where(eq(account.id, context.accountId)).for("update");
+
+        await tx
+          .update(account)
+          .set({ email, emailVerifiedAt: null })
+          .where(eq(account.id, context.accountId));
+
+        await recordActivityEvent(tx, {
+          householdId: context.householdId,
+          eventType: "account.email_changed",
+          subjectType: "account",
+          subjectId: context.accountId,
+          actorAccountId: context.accountId,
+          actorProfileId: context.profileId,
+          payload: {},
+        });
+      });
+      return; // compensation succeeded — the change did take effect, late
+    } catch (compensationErr) {
+      console.error(err);
+      console.error(compensationErr);
       throw new AccountSettingsError(
-        "Only a resident may change their own email address (identity/account-settings)",
-        "not_a_resident",
+        "The email change may have applied only partly — please try again",
+        "change_incomplete",
       );
     }
-
-    const [row] = await tx.select().from(account).where(eq(account.id, context.accountId)).for("update");
-    if (!row || row.email === email) return; // no account, or unchanged — no write, no audit
-
-    const { error } = await supabaseAdmin().auth.admin.updateUserById(context.accountId, {
-      email,
-      email_confirm: true,
-    });
-    if (error) {
-      if (isEmailTakenError(error, "update")) {
-        throw new AccountSettingsError("Email address is already in use", "email_taken");
-      }
-      throw error;
-    }
-
-    await tx
-      .update(account)
-      .set({ email, emailVerifiedAt: null })
-      .where(eq(account.id, context.accountId));
-
-    await recordActivityEvent(tx, {
-      householdId: context.householdId,
-      eventType: "account.email_changed",
-      subjectType: "account",
-      subjectId: context.accountId,
-      actorAccountId: context.accountId,
-      actorProfileId: context.profileId,
-      payload: {},
-    });
-  });
+  }
 }
 
 // design.md Decision 7: resident-only, as changeResidentEmail above.
@@ -1051,12 +1127,33 @@ export async function changeResidentEmail(current: CurrentSession, rawEmail: str
 //      three gets there first finishes before the next one's lookup can start;
 //   3. WHILE HOLDING THAT LOCK: look up the provider's current address (getUserById, D1's lookup)
 //      and verify the current password (signInWithPassword; the session it returns is discarded,
-//      as signIn already does on refusal) — a failure is wrong_current_password;
-//   4. updateUserById(password);
-//   5. revoke every OTHER session of the account (current.sessionId is kept) and record
-//      account.password_changed.
+//      as signIn already does on refusal) — a failure is wrong_current_password. Neither of these
+//      two provider calls changes any state, so putting them before the DB writes below is not the
+//      hazard round 3 fixes — see the next paragraph;
+//   4. Copilot review round 3 (PR #23), CLAUDE.md "No transaction spans Postgres and Supabase
+//      Auth": revoke every OTHER session of the account (current.sessionId is kept) and record
+//      account.password_changed — moved BEFORE the provider password write, so the MUTATING
+//      provider call (step 5) is the LAST statement of the transaction, exactly
+//      changeResidentEmail's own reorder and redeemPasswordReset's phase 2 discipline;
+//   5. LAST: updateUserById(password). A failure here now rolls the session-revoke and the audit
+//      insert back WITH it — no half-known state where sessions ended for a password that never
+//      actually changed.
 // Validation that touches no row (missing fields, the new password's length rule) stays OUTSIDE
 // the lock, exactly as before.
+//
+// The only window this cannot close is a failed COMMIT after step 5's provider call already
+// returned success: Postgres rolls back (the revoke and the audit entry are gone) while Supabase
+// already has the new password — the OTHER sessions would then still be live for a password that
+// did change. Handled the same way as changeResidentEmail: a local `providerUpdated` flag flips
+// true right after the provider call succeeds; the `withSessionContext(...)` call is wrapped in
+// try/catch; if it throws AND `providerUpdated` is true, a best-effort compensating transaction
+// re-applies the DB side under the same locks (membership -> account, then session) — revoking the
+// other sessions and recording the event again, nothing else. Success returns normally (the
+// change did take effect); failure logs both errors (console.error) and throws
+// AccountSettingsError("change_incomplete").
+//
+// This cannot be exercised by a real test without mocking Supabase or forcing a commit failure,
+// which CLAUDE.md forbids here (no DB/auth mocking) — see the test file's own note.
 //
 // Lock order: membership -> account, then session — same as changeResidentEmail (account only,
 // no session write), redeemPasswordReset (D5: membership -> account, then session) and removal
@@ -1093,61 +1190,105 @@ export async function changeResidentPassword(
     );
   }
 
-  await withSessionContext(context, async (tx) => {
-    // The authoritative, non-stale check — see the comment above. Locked FIRST, before the
-    // account row, matching changeResidentEmail's and redeemPasswordReset's own order.
-    const [membershipRow] = await tx
-      .select()
-      .from(membership)
-      .where(eq(membership.accountId, context.accountId))
-      .for("update");
-    if (!membershipRow || membershipRow.revokedAt || !membershipRow.isResident) {
+  // See the big comment above: flips true only once the provider password write (the LAST
+  // statement of the transaction below) has actually succeeded.
+  let providerUpdated = false;
+
+  try {
+    await withSessionContext(context, async (tx) => {
+      // The authoritative, non-stale check — see the comment above. Locked FIRST, before the
+      // account row, matching changeResidentEmail's and redeemPasswordReset's own order.
+      const [membershipRow] = await tx
+        .select()
+        .from(membership)
+        .where(eq(membership.accountId, context.accountId))
+        .for("update");
+      if (!membershipRow || membershipRow.revokedAt || !membershipRow.isResident) {
+        throw new AccountSettingsError(
+          "Only a resident may change their own password (identity/account-settings)",
+          "not_a_resident",
+        );
+      }
+
+      // Locked next, before any provider call — this is what serializes against a concurrent
+      // redeemPasswordReset/changeResidentEmail, not the provider call itself.
+      const [row] = await tx.select().from(account).where(eq(account.id, context.accountId)).for("update");
+      if (!row) {
+        throw new AccountSettingsError("Current password is incorrect", "wrong_current_password");
+      }
+
+      const { data: userData, error: userError } = await supabaseAdmin().auth.admin.getUserById(context.accountId);
+      if (userError || !userData.user?.email) {
+        throw new AccountSettingsError("Current password is incorrect", "wrong_current_password");
+      }
+
+      const { error: signInError } = await supabaseAdmin().auth.signInWithPassword({
+        email: userData.user.email,
+        password: currentPassword,
+      });
+      if (signInError) {
+        throw new AccountSettingsError("Current password is incorrect", "wrong_current_password");
+      }
+
+      await tx
+        .update(session)
+        .set({ revokedAt: new Date() })
+        .where(and(eq(session.accountId, context.accountId), ne(session.id, sessionId), isNull(session.revokedAt)));
+
+      await recordActivityEvent(tx, {
+        householdId: context.householdId,
+        eventType: "account.password_changed",
+        subjectType: "account",
+        subjectId: context.accountId,
+        actorAccountId: context.accountId,
+        actorProfileId: context.profileId,
+        payload: {},
+      });
+
+      // LAST statement before commit — see the big comment above.
+      const { error: updateError } = await supabaseAdmin().auth.admin.updateUserById(context.accountId, {
+        password: newPassword,
+      });
+      if (updateError) throw updateError;
+      providerUpdated = true;
+    });
+  } catch (err) {
+    if (!providerUpdated) throw err;
+
+    // The provider call succeeded but the transaction's own commit failed — best-effort
+    // reconciliation, re-applying the DB side under the same locks. See the big comment above.
+    try {
+      await withSessionContext(context, async (tx) => {
+        await tx.select().from(membership).where(eq(membership.accountId, context.accountId)).for("update");
+        await tx.select().from(account).where(eq(account.id, context.accountId)).for("update");
+
+        await tx
+          .update(session)
+          .set({ revokedAt: new Date() })
+          .where(
+            and(eq(session.accountId, context.accountId), ne(session.id, sessionId), isNull(session.revokedAt)),
+          );
+
+        await recordActivityEvent(tx, {
+          householdId: context.householdId,
+          eventType: "account.password_changed",
+          subjectType: "account",
+          subjectId: context.accountId,
+          actorAccountId: context.accountId,
+          actorProfileId: context.profileId,
+          payload: {},
+        });
+      });
+      return; // compensation succeeded — the change did take effect, late
+    } catch (compensationErr) {
+      console.error(err);
+      console.error(compensationErr);
       throw new AccountSettingsError(
-        "Only a resident may change their own password (identity/account-settings)",
-        "not_a_resident",
+        "The password change may have applied only partly — please try again",
+        "change_incomplete",
       );
     }
-
-    // Locked next, before any provider call — this is what serializes against a concurrent
-    // redeemPasswordReset/changeResidentEmail, not the provider call itself.
-    const [row] = await tx.select().from(account).where(eq(account.id, context.accountId)).for("update");
-    if (!row) {
-      throw new AccountSettingsError("Current password is incorrect", "wrong_current_password");
-    }
-
-    const { data: userData, error: userError } = await supabaseAdmin().auth.admin.getUserById(context.accountId);
-    if (userError || !userData.user?.email) {
-      throw new AccountSettingsError("Current password is incorrect", "wrong_current_password");
-    }
-
-    const { error: signInError } = await supabaseAdmin().auth.signInWithPassword({
-      email: userData.user.email,
-      password: currentPassword,
-    });
-    if (signInError) {
-      throw new AccountSettingsError("Current password is incorrect", "wrong_current_password");
-    }
-
-    const { error: updateError } = await supabaseAdmin().auth.admin.updateUserById(context.accountId, {
-      password: newPassword,
-    });
-    if (updateError) throw updateError;
-
-    await tx
-      .update(session)
-      .set({ revokedAt: new Date() })
-      .where(and(eq(session.accountId, context.accountId), ne(session.id, sessionId), isNull(session.revokedAt)));
-
-    await recordActivityEvent(tx, {
-      householdId: context.householdId,
-      eventType: "account.password_changed",
-      subjectType: "account",
-      subjectId: context.accountId,
-      actorAccountId: context.accountId,
-      actorProfileId: context.profileId,
-      payload: {},
-    });
-  });
+  }
 }
 
 // resident-settings design.md Decision 5, REDESIGNED (Copilot review round 2, PR #23): the
@@ -1180,12 +1321,20 @@ export async function changeResidentPassword(
 //      of whether the provider call in phase 2 below ever succeeds.
 //
 // PHASE 2 (a second, separate transaction) — the ONE provider write:
-//   a. SELECT account ... FOR UPDATE — this is what serializes against changeResidentPassword,
-//      which holds the very same lock while it verifies the current password and writes a new
-//      one (its own big comment states this explicitly now);
-//   b. auth.admin.updateUserById(password);
-//   c. COMMIT (releases the lock; nothing else was written in this transaction — the lock itself
-//      is phase 2's entire DB-side job).
+//   a. Copilot review round 3 (PR #23): re-check the SAME conditions phase 1 already checked,
+//      because between the two phases the OLD password is still valid — a resident could sign in
+//      with it and add an email, or be removed, before phase 2 ever runs. A reset link must die
+//      once an email exists (O-16) even in that gap. Consistent lock order, same as everywhere
+//      else in this file: `SELECT membership ... FOR UPDATE` FIRST, re-check live + resident +
+//      the named profile still active (plain SELECT, no lock, same as phase 1's own); THEN
+//      `SELECT account ... FOR UPDATE`, re-check it STILL has no email. Any failure throws
+//      `invalid_link` BEFORE the provider call — phase 1 already committed, so the link is spent
+//      and every session is already dead, which is the safe state;
+//   b. the account lock is also what serializes against changeResidentPassword, which holds the
+//      very same lock while it verifies the current password and writes a new one (its own big
+//      comment states this explicitly now);
+//   c. auth.admin.updateUserById(password);
+//   d. COMMIT (releases the locks).
 //   If the provider call fails: throw `reset_incomplete`. Phase 1 already committed, so the link
 //   is spent and every session is dead — the password never changed. This is the SAFE direction
 //   stated above: nobody's session survives, and there is no password anyone half-knows. The
@@ -1324,11 +1473,36 @@ export async function redeemPasswordReset(
     return { accountId: accountRow.id, profileId: claimedProfileId };
   });
 
-  // PHASE 2: the one provider write, under the account lock (serializes with
-  // changeResidentPassword's own account lock). Nothing else is written here — see the big
-  // comment above for why a failure here is `reset_incomplete`, not `signup_failed`.
+  // PHASE 2: re-check phase 1's own conditions (Copilot review round 3 — see the big comment
+  // above for why: the old password is still valid between the phases, so the resident could add
+  // an email or be removed in that gap), THEN the one provider write, under the account lock
+  // (serializes with changeResidentPassword's own account lock). Nothing else is written here —
+  // see the big comment above for why a failure of the provider call itself is `reset_incomplete`,
+  // not `signup_failed`.
   await withSessionContext(bootstrapContext, async (tx) => {
-    await tx.select().from(account).where(eq(account.id, accountId)).for("update");
+    // Consistent lock order, same as phase 1 and everywhere else in this file: membership FIRST.
+    const [membershipRow] = await tx
+      .select()
+      .from(membership)
+      .where(eq(membership.residentProfileId, profileId))
+      .for("update");
+    if (!membershipRow || membershipRow.revokedAt || !membershipRow.isResident) {
+      throw new JoinError("Join code is not valid", "invalid_link");
+    }
+
+    const [profileRow] = await tx
+      .select({ status: residentProfile.status })
+      .from(residentProfile)
+      .where(eq(residentProfile.id, profileId));
+    if (!profileRow || profileRow.status !== "active") {
+      throw new JoinError("Join code is not valid", "invalid_link");
+    }
+
+    // THEN account, same order as phase 1's own re-check.
+    const [accountRow] = await tx.select().from(account).where(eq(account.id, accountId)).for("update");
+    if (!accountRow || accountRow.email !== null) {
+      throw new JoinError("Join code is not valid", "invalid_link");
+    }
 
     const { error: updateError } = await supabaseAdmin().auth.admin.updateUserById(accountId, { password });
     if (updateError) {
