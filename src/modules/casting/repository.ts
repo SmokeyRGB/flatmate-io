@@ -794,6 +794,10 @@ export async function getStartOverview(context: SessionContext): Promise<StartOv
               AND round_id IN (${sql.join(votingRoundIds.map((id: string) => sql`${id}::uuid`), sql`, `)})
               AND deleted_at IS NULL
               AND state IN ('new', 'screened')
+              -- V-1 here too (PR #22 review, test f5): an application that became the viewer can
+              -- walk back to 'screened' along the declared P-4 path, and became_resident_id
+              -- survives it (G-D9). 03-PRD.md §4.1.2: it creates no vote task for that profile.
+              AND became_resident_id IS DISTINCT FROM ${profileId}::uuid
               AND ${notVotedByViewer()}
             GROUP BY round_id`,
       );

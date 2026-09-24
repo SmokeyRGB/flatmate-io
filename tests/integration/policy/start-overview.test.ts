@@ -3,7 +3,7 @@ import type { SessionContext } from "@/db/session-context";
 import { withSessionContext } from "@/db/session-context";
 import { claimResidentProfile } from "@/modules/identity/auth";
 import { createResidentProfile } from "@/modules/identity/repository";
-import { createRoom, createRound, getStartOverview, openRound } from "@/modules/casting/repository";
+import { createRoom, createRound, getStartOverview, openRound, transitionApplication } from "@/modules/casting/repository";
 import { application, roundParticipation } from "@/modules/casting/schema";
 import type { ApplicationState } from "@/modules/casting/transitions";
 import { eq } from "drizzle-orm";
@@ -179,6 +179,36 @@ describe("getStartOverview (start-screen design.md Decision 4)", () => {
 
     const overview = await getStartOverview(founder.context);
     expect(overview?.standing?.stateCounts.moved_in).toBe(1);
+  });
+
+  // PR #22 review (Copilot, confirmed): the T-5 count lacked the V-1 predicate on the claim that
+  // `new`/`screened` never carry became_resident_id. False: the declared backward path
+  // moved_in -> offer_made -> interviewed -> scheduled -> invited -> screened is ordinary app code
+  // (P-4), and G-D9 guarantees became_resident_id survives it. 03-PRD.md §4.1.2 has the criterion
+  // outright: an Application with became_resident_id == the active profile creates no vote task.
+  it("(f5) the viewer's own application walked back to screened creates no vote task for them", async () => {
+    hh = await registerTestHousehold();
+    const founder = await claim(hh, "Founder");
+    const other = await claim(hh, "Other");
+    const room = await createRoom(hh.context, "Room A", { accountId: hh.accountId, profileId: null });
+    const round = await createRound(hh.context, "Round", [room.id], { accountId: hh.accountId, profileId: null });
+    await openRound(hh.context, round.id, { accountId: hh.accountId, profileId: null });
+
+    const own = await insertApplication(hh, other.context, {
+      roundId: round.id,
+      state: "moved_in",
+      becameResidentId: founder.profileId,
+    });
+    const actor = { accountId: other.accountId, profileId: other.profileId };
+    for (const to of ["offer_made", "interviewed", "scheduled", "invited", "screened"] as const) {
+      await transitionApplication(other.context, own.id, to, actor);
+    }
+    await insertApplication(hh, other.context, { roundId: round.id, state: "new" });
+
+    const founderView = await getStartOverview(founder.context);
+    expect(founderView?.openRounds[0].voteCount).toBe(1);
+    const otherView = await getStartOverview(other.context);
+    expect(otherView?.openRounds[0].voteCount).toBe(2);
   });
 
   it("(f3) a removed participation while a round is open: anyOpenRound true, no state counts", async () => {
