@@ -127,6 +127,13 @@
       "when": 1790102304340,
       "tag": "0017_resident_profile_removal_final",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1790247330913,
+      "tag": "0018_milky_famine",
+      "breakpoints": true
     }
   ]
 }

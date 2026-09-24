@@ -49,8 +49,16 @@ function buildHouseholdCleanupStatement(id: string) {
 // register-session-setup-not-atomic.test.ts's "retried" registration. Its Auth user is tracked
 // and deleted separately (that test pushes onto its own accountIds array and calls
 // deleteTestAccount), so this only removes the DB rows, mirroring makeCleanup's own CTE exactly.
+// G-D15 (openspec application-requires-resident-profile, design Decision 6): `application` now
+// carries a RESTRICTIVE policy requiring a resident profile to be present (drizzle/0018). A
+// profile-less context here would make the CTE's `application` arm match zero rows and report no
+// error — exactly the silent-orphan class this function exists to prevent (see the comment above).
+// Sound only because Decision 1's policy checks PRESENCE, not identity: any UUID clears it, so a
+// synthetic profile id used only to satisfy this DELETE is safe — this is test-only teardown of
+// rows the test itself created, confined to a household about to be deleted anyway.
 export async function cleanupHousehold(context: SessionContext, householdId: string): Promise<void> {
-  await withSessionContext(context, async (tx) => {
+  const cleanupContext = { ...context, profileId: context.profileId ?? uuid() };
+  await withSessionContext(cleanupContext, async (tx) => {
     await tx.execute(buildHouseholdCleanupStatement(householdId));
   });
 }

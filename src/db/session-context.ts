@@ -41,9 +41,16 @@ function assertUuid(value: string, label: string): void {
  * guarded pool-reuse test (G-D10/AC-0.7) exists to catch.
  *
  * `profileId` is set via `SET LOCAL` only when non-null — a household-account session (ADR-013)
- * leaves `app.profile_id` unset entirely, so `current_setting('app.profile_id', true)` returns
- * real SQL `NULL` (never an empty string), matching what `docs/domain/invarianten.md` §5.5's
- * `app_profile_id()` expects to distinguish a household-account session (`research.md` §1).
+ * leaves `app.profile_id` unset entirely. On a FRESH connection `current_setting('app.profile_id',
+ * true)` then returns real SQL `NULL`. **That holds only on a fresh connection.** Once a
+ * transaction on a physical connection has set the `app.profile_id` placeholder, a later
+ * transaction that leaves it unset reads it back as `''` (empty string), not `NULL` — the
+ * Supavisor transaction pooler reuses physical connections across transactions
+ * (`tests/integration/raw-sql/pool-reuse.test.ts` covers exactly this and accepts both values).
+ * Every policy that gates on profile presence must therefore wrap the read in
+ * `nullif(current_setting('app.profile_id', true), '')`, matching
+ * `docs/domain/invarianten.md` §5.5's `app_profile_id()` definition (`research.md` §1;
+ * openspec application-requires-resident-profile).
  *
  * `SET LOCAL` does not accept bind parameters at the protocol level, so every value is validated
  * as a UUID (a closed, SQL-metacharacter-free format) before being interpolated into the

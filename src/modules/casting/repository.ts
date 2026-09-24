@@ -18,9 +18,26 @@ export interface Actor {
 // createAndOpenRound below) stays in sync with withSessionContext's own signature.
 type Tx = Parameters<Parameters<typeof withSessionContext>[1]>[0];
 
+// G-D15/ADR-014 (openspec application-requires-resident-profile, design Decision 4): a
+// household-account session (no resident profile acting) refuses before any query runs, in the
+// shape of getRoundParticipants above. Without this, RLS alone would hide the row and the caller
+// would see "Application not found" — a refusal reached by the wrong path (CLAUDE.md, "Tests that
+// can fail"). The RESTRICTIVE policy in schema.ts enforces the same rule underneath, for every
+// path this function does not cover (raw SQL, a future repository function).
+export class ProfileRequiredError extends Error {
+  readonly code = "profile_required";
+  constructor(action: string) {
+    super(`${action} requires a resident profile (G-D15)`);
+    this.name = "ProfileRequiredError";
+  }
+}
+
 // FR-0.1: the only sanctioned entry point for reading/writing Application — every call opens its
 // transaction through the session-context helper (FR-0.3), never queries the raw client directly.
 export async function getApplication(context: SessionContext, id: string) {
+  // G-D15/ADR-014: a household-account session sees no Application row. Checked here, before
+  // opening a transaction, rather than left to the RESTRICTIVE policy alone (Decision 4).
+  if (context.profileId === null) return null;
   return withSessionContext(context, async (tx) => {
     const [row] = await tx.select().from(application).where(eq(application.id, id));
     return row ?? null;
@@ -36,6 +53,12 @@ export async function transitionApplication(
   toState: ApplicationState,
   actor: Actor,
 ) {
+  // G-D15/ADR-014: a household-account session may not transition an Application. Refused here,
+  // before any query, so the error names the missing profile instead of arriving as "Application
+  // not found" once RLS hides the row (Decision 4).
+  if (context.profileId === null) {
+    throw new ProfileRequiredError("transitionApplication");
+  }
   return withSessionContext(context, async (tx) => {
     const [current] = await tx
       .select()
