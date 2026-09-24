@@ -88,6 +88,12 @@ const NOT_APPLICABLE_CASTING: Record<string, string> = {
   getRoundParticipants: "read-only",
   listRoundsForSession: "read-only",
   hasProcedureChangedNotice: "read-only",
+  // start-screen design.md Decision 4: read-only; G-D15 visibility tested in
+  // tests/integration/policy/start-overview.test.ts.
+  getStartOverview: "read-only",
+  // start-screen design.md Decision 4: read-only; carries no application-derived value (not a
+  // G-D15 read), visibility tested in tests/integration/policy/organisation-tasks.test.ts.
+  listOrganisationTasks: "read-only",
 };
 
 const KNOWN_OPEN_CASTING: Record<string, string> = {
@@ -135,6 +141,9 @@ const NOT_APPLICABLE_IDENTITY: Record<string, string> = {
     "founding link before any Membership row exists to authorize against).",
   listJoinCodeIssuances: "read-only (already enforces its own admin/moderator gate inline)",
   assertHasResidentProfile: "pure sync assertion helper — no DB access",
+  // start-screen design.md Decision 4: read-only; decides visibility only, never authorization —
+  // tested in tests/integration/policy/navigation-access.test.ts.
+  getNavigationAccess: "read-only",
 };
 
 const KNOWN_OPEN_IDENTITY: Record<string, string> = {};

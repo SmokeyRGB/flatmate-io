@@ -2,6 +2,7 @@
 
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
+import { landingPathFor } from "@/app/landing";
 import { JOIN_PASSWORD_MIN_LENGTH, JoinError, joinAttemptSourceHash, joinHousehold } from "@/modules/identity/auth";
 import {
   buildJoinUrl,
@@ -115,10 +116,15 @@ export async function joinHouseholdAction(
             fieldError: "password",
             refusal: null,
           };
-        case "already_member":
-          // EC-2.4: no inline error at all — taken to Start (the temporary /dashboard landing
-          // target, proposal Assumption 4) with a note, exactly like the page's own GET refusal.
-          redirect("/dashboard?note=already_member");
+        case "already_member": {
+          // EC-2.4: no inline error at all — taken to the caller's OWN landing (design.md
+          // Decision 3: Start for a resident, the household settings screen for the household
+          // account) with a note, exactly like the page's own GET refusal. `already_member` is
+          // only ever thrown when `current` was passed to joinHousehold as the acting session
+          // (the branch above), so it is never null here.
+          const landingPath = landingPathFor(current!.context);
+          redirect(`${landingPath}?note=already_member`);
+        }
         case "other_household":
           // design.md Decision 10 (EC-2.5 met again at submit time): the same sign-out way forward
           // as the page's own Keine-Berechtigung state.
@@ -139,6 +145,9 @@ export async function joinHouseholdAction(
     throw err;
   }
 
+  // start-screen design.md Decision 3: a join always yields a resident, whose landing is fixed —
+  // landingPathFor(...) would answer the same thing, but this site knows its identity statically.
+  // `/dashboard` is B1 (Start) everywhere now, not the "temporary Start stand-in" it used to be.
   redirect("/dashboard");
 }
 

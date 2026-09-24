@@ -18,7 +18,7 @@ export default async function RoomsPage() {
 
   return (
     <div className="mx-auto max-w-2xl space-y-6 p-6">
-      <Link href="/dashboard" className="back-link">
+      <Link href="/organization" className="back-link">
         <ArrowLeft className="size-4" /> {de.nav.organisation}
       </Link>
       <h1 className="font-serif text-2xl font-semibold">{t.heading}</h1>

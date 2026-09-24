@@ -11,27 +11,20 @@ const t = de.whoLivesHere;
 // parity for admin+moderator) and from the round participant list (FR-1.19) — no actions, no
 // contact detail, no join dates, current (`active`) members only. Purpose: lets a resident notice
 // and report — outside the app — someone who joined via the code without actually living there.
+//
+// start-screen change: moved into the `(resident)` route group, same URL. Its
+// `profileId === null` branch is gone — the `(resident)` layout now redirects such a session to
+// its own landing before this page ever runs, so getCurrentHouseholdMembers' own resident-only
+// refusal (FR-1.31) is unreachable here and does not need a second check.
 export default async function WhoLivesHerePage() {
   const current = await getCurrentSession();
   if (!current) redirect("/sign-in");
 
   const backLink = (
     <Link href="/dashboard" className="back-link">
-      <ArrowLeft className="size-4" /> {de.nav.organisation}
+      <ArrowLeft className="size-4" /> {de.nav.start}
     </Link>
   );
-
-  // FR-1.31: this view is for residents, not the household (administration) account — matches
-  // FR-1.23's administration boundary rather than the O16 resident-list permission model.
-  if (current.context.profileId === null) {
-    return (
-      <div className="mx-auto max-w-md space-y-4 p-6">
-        {backLink}
-        <h1 className="font-serif text-2xl font-semibold">{t.heading}</h1>
-        <p className="text-sm text-muted-foreground">{t.householdAccountNotice}</p>
-      </div>
-    );
-  }
 
   const members = await getCurrentHouseholdMembers(current.context);
 

@@ -433,7 +433,7 @@ Kontrollkästchen **„Auf diesem Gerät angemeldet bleiben"**, vorbelegt an.
 - [ ] **Korrigiert 2026-09-21:** Ein abgelaufener, aufgebrauchter oder rotierter Code zeigt **eine einzige** Meldung, die den Grund **nicht** nennt, und benennt, wen die Person kontaktieren soll. Was dieses Kriterium schützt, ist der Weg zurück, nicht das Wort: eine Sackgasse ohne Ausweg bleibt verboten, während die Aufschlüsselung nach Grund verrät, ob es den Code je gab. F2 **FR-2.8**
 - [ ] Passkey wird nie während der Registrierung angeboten
 - [ ] Weder das PWA-Install-Banner noch die Resident-E-Mail-Nachfrage erscheinen im Beitrittsformular oder auf einem Zwischenbildschirm davor
-- [ ] **Geändert ggü. V0.5 (U-22):** Die Bewohnerliste ist für ein frisch beigetretenes Bewohner-Profil auf keinem Weg erreichbar. Erreichbar ist die **Teilnehmendenliste** (nur Namen der Runden-Teilnehmenden, keine Handlungen) über den Beteiligungsstand auf dem Start-Bildschirm — nicht unmittelbar nach dem Beitritt als eigener Schritt
+- [ ] **Geändert ggü. V0.5 (U-22):** Die Bewohnerliste ist für ein frisch beigetretenes Bewohner-Profil auf keinem Weg erreichbar. Erreichbar ist die **Teilnehmendenliste** (nur Namen der Runden-Teilnehmenden, keine Handlungen) über den Beteiligungsstand im Casting-Tab (D1) — nicht unmittelbar nach dem Beitritt als eigener Schritt *(geändert 2026-09-24, Menschliche Entscheidung: vorher „auf dem Start-Bildschirm")*
 - [ ] Ein neuer Beitritt erzeugt einen `ActivityEvent`, der im Feed aller Bewohnenden erscheint
 
 #### 4.1.2 Start — ersetzt „Rundenkopf" (Startbildschirm für Bewohnende)
@@ -457,13 +457,16 @@ zuerst?**
 | Zimmerstand | „3 Zimmer · 1 vergeben" |
 | **Primärer CTA** | **genau einer**, mit konkreter Zahl, direktem Ziel und genanntem Grund (z. B. „Notiz zu Lea schreiben — 4 andere warten darauf"). Sortiert nach **Zeitdruck** (`CastingRound.phase_deadline_at` wo vorhanden, S-44), nicht nach fester Rangliste — Details Screen-Inventar §2 |
 | Weitere Aufgaben | bis zu drei Zeilen darunter, Rest eingeklappt als „und N weitere" |
-| Beteiligungsstand | **„5 von 7 haben abgestimmt"** (Nenner ohne `moved_out`, E-14) |
 | Seit dem letzten Besuch | ausschließlich `outcome`-Ereignisse (§4.1.12), maximal fünf Zeilen, mit „alles ansehen" ins Activity Center |
 | **Moderations-Brücke** (nur mit Rechten) | **eine** Zeile am Fuß, nie in die persönliche Aufgabenliste gemischt: „N Dinge brauchen deine Moderation →" (U-5) |
 | **PWA-Install-Band** (S-45) | eigenes, optisch abgesetztes Band **unter** dem primären CTA — sichtbar und wiederkehrend, aber **nie** auf dem CTA-Platz und nie über einer fristgebundenen Aufgabe (löst B-2, Konflikt 2 aus dem Plan V5; korrigiert `04-Domaenenmodell.md`, siehe Nachzug dort) |
 | Resident-E-Mail-Nachfrage (optional) | siehe §4.1.13 |
 
 **Ist nichts offen**, steht dort der Rundenstand — nie eine leere Fläche (unverändert ggü. V0.5).
+
+> **Menschliche Entscheidung (2026-09-24):** Der Beteiligungsstand steht nicht auf Start, sondern
+> im Casting-Tab (D1) nach dem Screening. Begründung und die vollständige Liste der geänderten
+> Stellen im Offene-Punkte-Register, `review-log.md` §Offene-Punkte-Register.
 
 **Akzeptanzkriterien §4.1.2**
 
@@ -473,8 +476,8 @@ zuerst?**
 - [ ] Eine `Application` mit `became_resident_id == aktives Profil` erzeugt keine Stimmaufgabe für dieses Profil
 - [ ] Die Phasenanzeige erscheint nie ohne ihre Frist und nie eine Frist ohne ihre Phase; nach einem Phasenwechsel ist eine stehengebliebene Frist als „aus der vorherigen Phase" gekennzeichnet (Screen-Inventar §3)
 - [ ] Eine abgelaufene `phase_deadline_at` blockiert keine Handlung — sie ändert nur Sortierung und Text (analog S-13, §4.2.4)
-- [ ] Der Beteiligungsstand nennt Zähler und Nenner und schließt `moved_out`-Profile aus **beiden** aus
-- [ ] Der Beteiligungsstand nennt keine Namen der Personen, die noch nicht abgestimmt haben
+- ~~Der Beteiligungsstand nennt Zähler und Nenner und schließt `moved_out`-Profile aus **beiden** aus~~ — *verschoben nach §4.1.6 (Menschliche Entscheidung 2026-09-24: der Beteiligungsstand steht im Casting-Tab D1, nicht auf Start)*
+- ~~Der Beteiligungsstand nennt keine Namen der Personen, die noch nicht abgestimmt haben~~ — *verschoben nach §4.1.6, ebenso*
 - [ ] Gibt es keine offene Handlung, erscheint ein Leerzustand mit dem aktuellen Rundenstand — keine leere Fläche
 - [ ] Der Bildschirm ist ohne Vorkenntnis der letzten Sitzung verständlich (keine Formulierung, die auf „wie beim letzten Mal" verweist)
 - [ ] Die Moderations-Brücke erscheint ausschließlich für Profile mit entsprechenden Rechten und nie vermischt mit der persönlichen Aufgabenliste
@@ -698,6 +701,8 @@ Einzelansicht **nur** das Sachprofil, mit einem ehrlichen Hinweis:
 - [ ] Diese Ausblendung gilt unabhängig davon, ob die Runde `open`, `closed` oder wiedereröffnet ist
 - [ ] Diese `Application` erscheint für das betroffene Profil auch nicht in der Rangliste, nicht im Abschnitt „Warten auf Stimmen" und nicht in einer Sortierung, aus der sich ihr Rangplatz ableiten ließe
 - [ ] Der Stimmungsbalken hat eine textliche Entsprechung, die von einem Screenreader vollständig erfasst wird
+- [ ] **Verschoben aus §4.1.2 (2026-09-24):** Der Beteiligungsstand („5 von 7 haben abgestimmt") steht im Casting-Tab (D1), nennt Zähler und Nenner und schließt `moved_out`-Profile aus **beiden** aus
+- [ ] **Verschoben aus §4.1.2 (2026-09-24):** Der Beteiligungsstand nennt keine Namen der Personen, die noch nicht abgestimmt haben
 
 #### 4.1.7 Pipeline (Statusverwaltung)
 
@@ -999,7 +1004,7 @@ den Zeitpunkt der Push-Berechtigungsanfrage und §6.2 für das Rückfallverhalte
 |-----------|-------|--------|
 | Registrierung (Haushalt) | `Household` + `Account` anlegen, Hinweis auf gemeinsam genutzte Adresse | Organisation |
 | Organisation → Haushalt | Zimmer, Beitrittscode, Aufbewahrung, Abstimmungsverfahren, Rundenidentität und -Lebenszyklus — **kein** Zugriff auf alles aus `Application` Abgeleitete ohne eigenes `ResidentProfile` (S-50/U-20, präzisiert durch ADR-014) | Organisation |
-| **Teilnehmendenliste** (ersetzt „Bewohnerliste" für Bewohnende) | Information — wer nimmt an dieser Runde teil; **nur Namen**, keine Handlungen, keine Angabe, wer schon abgestimmt hat. Einstieg über den Beteiligungsstand auf dem Start-Bildschirm (K-11) | Beteiligung |
+| **Teilnehmendenliste** (ersetzt „Bewohnerliste" für Bewohnende) | Information — wer nimmt an dieser Runde teil; **nur Namen**, keine Handlungen, keine Angabe, wer schon abgestimmt hat. Einstieg über den Beteiligungsstand im Casting-Tab (D1) (K-11; geändert 2026-09-24, vorher über Start) | Beteiligung |
 | **Bewohnerliste** (ersetzt „Bewohnerliste" für Verwaltung/Moderation) | Verwaltung — wer gehört zum Haushalt: Name, Beitrittsdatum, Kontakt, Status. **Geändert ggü. V0.5 (U-22):** Verwaltung voll, Moderator lesend, Bewohnende **gar nicht** — bisher „für alle sichtbar, Duplikatsschutz S-05"; die Begründung von S-05/E-06 wird in `02-SRD.md` nachgezogen | Organisation |
 | **Einstellungen** (ersetzt „Haushalts-Einstellungen" + „Persönliche Einstellungen") | *Ein* Bildschirm mit Abschnitten: Benachrichtigungen (inkl. Push und E-Mail nachtragen), Konto (Passwort, Passkey), Abmelden — siehe §4.3 für die Haushalts-seitigen Einstellungen, die in Organisation → Haushalt bleiben | Beteiligung |
 | Aufbewahrungs-/Datenauskunftsansicht | siehe §4.3 | Organisation |

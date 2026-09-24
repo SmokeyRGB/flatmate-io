@@ -2,7 +2,7 @@ import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import { isUuid, withSessionContext, type SessionContext } from "@/db/session-context";
 import { recordActivityEvent } from "@/modules/audit/repository";
 import { activityEvent } from "@/modules/audit/schema";
-import { assertHasPermission } from "@/modules/identity/repository";
+import { assertHasPermission, PermissionDeniedError } from "@/modules/identity/repository";
 import { householdSettings, membership, residentProfile } from "@/modules/identity/schema";
 import { application, castingRound, room, roundParticipation } from "./schema";
 import { assertTransitionAllowed, type ApplicationState } from "./transitions";
@@ -665,6 +665,189 @@ export async function listRoundsForSession(context: SessionContext) {
       .from(castingRound)
       .where(eq(castingRound.householdId, context.householdId))
       .orderBy(sql`created_at DESC`);
+  });
+}
+
+// start-screen design.md Decision 4: the room-covered-by-a-round check for listOrganisationTasks
+// below and getStartOverview's own reads share the "open round" concept but nothing else, so this
+// stays local rather than becoming a third exported helper.
+export interface OrganisationTask {
+  kind: "open_round_for_room";
+  roomId: string;
+  label: string;
+}
+
+// start-screen design.md Decision 4/Assumption 3 (tasks.md 3.2): a room open for letting and not
+// covered by any draft/open/paused round is v0.1's one organisation task. Returns `[]` for a
+// viewer who does not hold `close_round` — the permission `rounds/new`'s own action already
+// requires — so the bridge's count never promises something the destination action would refuse.
+// Carries no application-derived value, so it is not a G-D15 read (design.md Decision 9's finding
+// is scoped to `application`, not `room`/`casting_round`).
+export async function listOrganisationTasks(context: SessionContext): Promise<OrganisationTask[]> {
+  try {
+    await assertHasPermission(context, context.accountId, "close_round");
+  } catch (err) {
+    if (err instanceof PermissionDeniedError) return [];
+    throw err;
+  }
+
+  return withSessionContext(context, async (tx) => {
+    const rows = await tx.execute<{ id: string; label: string }>(
+      sql`SELECT room.id, room.label
+          FROM room
+          WHERE room.household_id = ${context.householdId}::uuid
+            AND room.status = 'open' AND room.deleted_at IS NULL
+            AND NOT EXISTS (
+              SELECT 1 FROM casting_round cr
+              WHERE cr.household_id = ${context.householdId}::uuid
+                AND cr.status IN ('draft', 'open', 'paused')
+                AND room.id = ANY(cr.room_ids)
+            )`,
+    );
+    return rows.map((r: { id: string; label: string }) => ({
+      kind: "open_round_for_room" as const,
+      roomId: r.id,
+      label: r.label,
+    }));
+  });
+}
+
+export interface StartOpenRound {
+  roundId: string;
+  title: string;
+  phaseDeadlineAt: Date | null;
+  canVote: boolean;
+  // Only meaningful when canVote is true — 0 otherwise (no vote task is offered, EC-2.12).
+  voteCount: number;
+}
+
+export interface StartStanding {
+  roundId: string;
+  stateCounts: Partial<Record<ApplicationState, number>>;
+}
+
+export interface StartOverview {
+  anyOpenRound: boolean;
+  openRounds: StartOpenRound[];
+  standing: StartStanding | null;
+}
+
+// start-screen design.md Decision 9: a constant TRUE stand-in for "not yet voted by the viewer" —
+// there is no Vote table until F4. Kept as a private, non-exported helper (never inlined at each
+// call site) so F4's replacement with a `NOT EXISTS` against Vote is a one-place change, forced by
+// this file's own test asserting the T-5 count equals the raw application count (tasks.md 3.5,
+// design.md Risks).
+function notVotedByViewer() {
+  return sql`TRUE`;
+}
+
+// start-screen design.md Decision 4/7/9 (FR-2.20-2.24, G-D15, V-1): the Start screen's one read.
+// `null` for a profile-less (household-account) session, checked as the FIRST statement — before
+// withSessionContext, so no query is issued at all for such a session (Decision 9's own test pins
+// this with a spy on withSessionContext). No participation counter is read (human decision,
+// 2026-09-24 — it left Start).
+export async function getStartOverview(context: SessionContext): Promise<StartOverview | null> {
+  if (context.profileId === null) return null;
+  const profileId = context.profileId;
+
+  return withSessionContext(context, async (tx) => {
+    // Identity/lifecycle only — no application data — so this half of the read is safe even for
+    // the "round runs without you" case below.
+    const [{ exists: anyOpenRound }] = await tx.execute<{ exists: boolean }>(
+      // household_id stated as well as RLS-scoped, like listRooms/listRoundsForSession, so the
+      // answer stays this household's even under a connection that bypasses RLS (review finding).
+      sql`SELECT EXISTS (
+            SELECT 1 FROM casting_round
+            WHERE household_id = ${context.householdId}::uuid AND status = 'open'
+          ) AS exists`,
+    );
+
+    // Every open round the viewer actively takes part in (EC-2.2/EC-2.3: joining after open
+    // counts via the auto-join trigger the same as the founding snapshot).
+    const participationRows = await tx.execute<{
+      round_id: string;
+      title: string;
+      phase_deadline_at: string | null;
+      can_vote: boolean;
+    }>(
+      sql`SELECT cr.id AS round_id, cr.title, cr.phase_deadline_at, rp.can_vote
+          FROM round_participation rp
+          JOIN casting_round cr ON cr.id = rp.round_id
+          WHERE rp.resident_profile_id = ${profileId}::uuid
+            AND rp.household_id = ${context.householdId}::uuid
+            AND rp.removed_at IS NULL
+            AND cr.status = 'open'
+          ORDER BY cr.created_at DESC`,
+    );
+
+    // T-5 per round in ONE grouped query, not one COUNT per round in a sequential loop (review
+    // finding): applications still on the main path at the voting stage, not deleted, not yet
+    // voted on by the viewer (notVotedByViewer above), for every round the viewer may vote in.
+    const votingRoundIds = participationRows
+      .filter((row: { can_vote: boolean }) => row.can_vote)
+      .map((row: { round_id: string }) => row.round_id);
+    const voteCounts = new Map<string, number>();
+    if (votingRoundIds.length > 0) {
+      const countRows = await tx.execute<{ round_id: string; count: number }>(
+        sql`SELECT round_id, count(*)::int AS count FROM application
+            WHERE household_id = ${context.householdId}::uuid
+              AND round_id IN (${sql.join(votingRoundIds.map((id: string) => sql`${id}::uuid`), sql`, `)})
+              AND deleted_at IS NULL
+              AND state IN ('new', 'screened')
+              -- V-1 here too (PR #22 review, test f5): an application that became the viewer can
+              -- walk back to 'screened' along the declared P-4 path, and became_resident_id
+              -- survives it (G-D9). 03-PRD.md §4.1.2: it creates no vote task for that profile.
+              AND became_resident_id IS DISTINCT FROM ${profileId}::uuid
+              AND ${notVotedByViewer()}
+            GROUP BY round_id`,
+      );
+      for (const row of countRows as { round_id: string; count: number }[]) {
+        voteCounts.set(row.round_id, row.count);
+      }
+    }
+
+    const openRounds: StartOpenRound[] = participationRows.map(
+      (row: { round_id: string; title: string; phase_deadline_at: string | null; can_vote: boolean }) => ({
+        roundId: row.round_id,
+        title: row.title,
+        phaseDeadlineAt: row.phase_deadline_at ? new Date(row.phase_deadline_at) : null,
+        canVote: row.can_vote,
+        // Only meaningful when canVote is true, and 0 otherwise (no vote task is offered, EC-2.12).
+        voteCount: row.can_vote ? (voteCounts.get(row.round_id) ?? 0) : 0,
+      }),
+    );
+
+    // EC-1.5: the standing's round is the most recently created open round THE VIEWER TAKES PART
+    // IN — openRounds is already in that order (participationRows' ORDER BY). Not the household's
+    // newest open round: a viewer taking part only in an older one would otherwise get no standing
+    // and be told the round runs without them, which is false (review finding, test f4). Only a
+    // viewer in no open round at all gets no standing (spec.md "A round runs without the resident").
+    const activeRound = openRounds[0] ? { id: openRounds[0].roundId } : undefined;
+
+    let standing: StartStanding | null = null;
+    if (activeRound) {
+      // §3.1's phase/distribution, computed from state counts. Excludes deleted applications
+      // and — V-1, design.md Decision 7 — the viewer's own past application: `IS DISTINCT FROM`,
+      // never Drizzle's `ne()` (which compiles to `<>` and silently drops every NULL row, i.e.
+      // nearly every application, since `became_resident_id` is null until `moved_in`). Under
+      // A-2.4 (one account per membership) the profile id is the account's whole redaction set
+      // in this slice — full V-1 (`redaction_subjects()`) is not built.
+      const stateRows = await tx.execute<{ state: ApplicationState; count: number }>(
+        sql`SELECT state, count(*)::int AS count FROM application
+            WHERE round_id = ${activeRound.id}::uuid
+              AND household_id = ${context.householdId}::uuid
+              AND deleted_at IS NULL
+              AND became_resident_id IS DISTINCT FROM ${profileId}::uuid
+            GROUP BY state`,
+      );
+      const stateCounts: Partial<Record<ApplicationState, number>> = {};
+      for (const row of stateRows as { state: ApplicationState; count: number }[]) {
+        stateCounts[row.state] = row.count;
+      }
+      standing = { roundId: activeRound.id, stateCounts };
+    }
+
+    return { anyOpenRound, openRounds, standing };
   });
 }
 

@@ -2,7 +2,9 @@ import type { applicationStateEnum } from "./schema";
 
 export type ApplicationState = (typeof applicationStateEnum.enumValues)[number];
 
-const MAIN_PATH = [
+// Exported for task-precedence.ts's phaseOf/distributionOf (start-screen design.md Decision 6) —
+// the furthest-main-path-state rule reuses this list rather than re-declaring it.
+export const MAIN_PATH = [
   "new",
   "screened",
   "invited",

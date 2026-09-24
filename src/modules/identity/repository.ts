@@ -387,6 +387,32 @@ export async function getIdentityLabel(context: SessionContext): Promise<Identit
   });
 }
 
+// start-screen design.md Decision 4, proposal Assumptions 1 and 3: decides what the resident
+// frame's avatar menu and Start's moderation bridge SHOW, and decides nothing else — `/members`
+// and every action keep their own authorization checks (this function is not one of them). Goes
+// through getMembershipForAccount, so a revoked membership gives both `false` the same way every
+// other check in this file already does.
+export async function getNavigationAccess(
+  context: SessionContext,
+): Promise<{ organisation: boolean; membersList: boolean }> {
+  const membershipRow = await getMembershipForAccount(context, context.accountId);
+  if (!membershipRow) return { organisation: false, membersList: false };
+
+  // proposal Assumption 3: "may act on organisation tasks" = household_admin/moderator, or any
+  // individually granted permission — the avatar menu's "Organisation" item uses the same test
+  // listOrganisationTasks' own count-vs-permission filter relies on (design.md Decision 4).
+  const organisation =
+    membershipRow.role === "household_admin" ||
+    membershipRow.role === "moderator" ||
+    membershipRow.permissions.length > 0;
+
+  // proposal Assumption 1: "may see the members list" = the rule O1 applies today (O16's own
+  // access rule, U-30) — household_admin or moderator, not every permission holder.
+  const membersList = membershipRow.role === "household_admin" || membershipRow.role === "moderator";
+
+  return { organisation, membersList };
+}
+
 export async function getHousehold(context: SessionContext) {
   return withSessionContext(context, async (tx) => {
     const [row] = await tx.select().from(household).where(eq(household.id, context.householdId));

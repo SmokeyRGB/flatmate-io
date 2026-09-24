@@ -181,7 +181,7 @@ export default async function MembersPage() {
   ) : null;
 
   const backLink = (
-    <Link href="/dashboard" className="back-link">
+    <Link href="/organization" className="back-link">
       <ArrowLeft className="size-4" /> {de.nav.organisation}
     </Link>
   );

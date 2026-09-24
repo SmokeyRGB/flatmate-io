@@ -16,7 +16,8 @@ screen showing the single next thing to do.
 
 **In scope:** the household join link and its protections · one-step registration with two
 required fields · optional email added later · staying signed in · the Start screen with exactly
-one primary action and its reason · the participation counter · the task precedence rule.
+one primary action and its reason · the task precedence rule.
+~~the participation counter~~ *(withdrawn 2026-09-24: moved to D1, after screening — see FR-2.22)*
 
 **Out of scope:** per-person invitations · magic-link login (rejected: not device-bound) · SMS
 verification · a mandatory email field · multi-step verification · any app-install or
@@ -42,7 +43,7 @@ invite token (that is S-42, v0.2).
 | **US-2.9** | As a resident, I want to add an email later, so that I can recover access if I lose my password. |
 | **US-2.10** | As a resident, I want to see one screen that tells me what to do next, so that I do not have to work out what the group needs. |
 | **US-2.11** | As a resident, I want to see exactly one main action, so that there is no decision before the decision. |
-| **US-2.12** | As a resident, I want to see "5 of 7 have voted", so that I know whether the group is waiting on me. |
+| **US-2.12** *(amended 2026-09-24)* | As a resident, I want to see "5 of 7 have voted", so that I know whether the group is waiting on me. Served on D1, delivered with F4 — not on Start; see FR-2.22. |
 | **US-2.13** | As a resident, I want to see where the round stands rather than a blank screen when nothing is open. |
 
 ---
@@ -86,7 +87,7 @@ invite token (that is S-42, v0.2).
 
 - **FR-2.20** The Start screen shall display exactly one primary action at a time.
 - **FR-2.21** The primary action shall be accompanied by the reason it is first.
-- **FR-2.22** *(corrected 2026-09-21)* Where a round is open, the Start screen shall display how many eligible residents have cast at least one vote, against the **quorum denominator**: participations with `removed_at = null` **and** `can_vote = true` **and** profile `status = 'active'`. Not the round's raw participant count — a participant with `can_vote = false` never belonged in it, and a resident who moves out mid-round leaves both sides of the fraction rather than one. Source: `domain/invarianten.md` §5.3 **V-3**, part (b) (`quorum_denominator`, `quorum_numerator`), and **S-32**: „die Person fällt aber aus **Zähler und Nenner**". Reducing the denominator alone lets the participation rate exceed 100 %, which §5.3 rejects by name.
+- ~~**FR-2.22**~~ *(corrected 2026-09-21, withdrawn 2026-09-24)* ~~Where a round is open, the Start screen shall display how many eligible residents have cast at least one vote, against the **quorum denominator**: participations with `removed_at = null` **and** `can_vote = true` **and** profile `status = 'active'`. Not the round's raw participant count — a participant with `can_vote = false` never belonged in it, and a resident who moves out mid-round leaves both sides of the fraction rather than one.~~ **Withdrawn (2026-09-24, human decision):** the counter moved to D1, after screening (F4) — Start shows no participation count. The denominator correction below still governs it wherever it is shown. Source: `domain/invarianten.md` §5.3 **V-3**, part (b) (`quorum_denominator`, `quorum_numerator`), and **S-32**: „die Person fällt aber aus **Zähler und Nenner**". Reducing the denominator alone lets the participation rate exceed 100 %, which §5.3 rejects by name.
 - **FR-2.23** Where no action is open for this resident, the Start screen shall display the round's current standing and shall not display an empty surface.
 - **FR-2.24** The system shall select the primary action by exactly one precedence rule: actions with a real due date first, ordered by that date; actions without a due date after them, in a fixed order.
 - **FR-2.25** No promotional or install-related element shall occupy the primary action position, and none shall be ordered above an action that has a due date.
@@ -134,8 +135,8 @@ Given I am a resident with an open vote and any number of other pending items, w
 **AC-2.13 — The reason is shown beside the action**
 Given a primary action is displayed, when I read it, then the reason it is first is visible without interaction.
 
-**AC-2.14 — The participation counter is present and correct**
-Given an open round with 7 participants of whom 5 have cast at least one vote, when I open Start, then it shows 5 of 7.
+~~**AC-2.14 — The participation counter is present and correct**~~ *(withdrawn 2026-09-24)*
+~~Given an open round with 7 participants of whom 5 have cast at least one vote, when I open Start, then it shows 5 of 7.~~ **Withdrawn (2026-09-24, human decision):** the counter moved to D1, after screening — not shown on Start. See FR-2.22.
 
 **AC-2.15 — Empty state shows standing, not blankness**
 Given I have completed everything asked of me, when I open Start, then the round's current standing is displayed and no empty surface appears.

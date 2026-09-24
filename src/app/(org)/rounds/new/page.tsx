@@ -24,7 +24,7 @@ export default async function NewRoundPage() {
     if (err instanceof PermissionDeniedError) {
       return (
         <div className="mx-auto max-w-md space-y-4 p-6">
-          <Link href="/dashboard" className="back-link">
+          <Link href="/organization" className="back-link">
             <ArrowLeft className="size-4" /> {de.nav.organisation}
           </Link>
           <h1 className="font-serif text-2xl font-semibold">{t.heading}</h1>
@@ -39,7 +39,7 @@ export default async function NewRoundPage() {
 
   return (
     <div className="mx-auto max-w-md space-y-6 p-6">
-      <Link href="/dashboard" className="back-link">
+      <Link href="/organization" className="back-link">
         <ArrowLeft className="size-4" /> {de.nav.organisation}
       </Link>
       <h1 className="font-serif text-2xl font-semibold">{t.heading}</h1>

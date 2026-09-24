@@ -64,5 +64,5 @@ export async function createAndOpenRoundAction(
     throw err;
   }
 
-  redirect("/dashboard");
+  redirect("/organization");
 }

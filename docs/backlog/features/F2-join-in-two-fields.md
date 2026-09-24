@@ -82,7 +82,8 @@ registration — it exists only afterwards, as an optional and revocable add-on.
 - As a resident, I want to **see exactly one main action, not a list I have to sort myself**, so
   that there is no decision before the decision.
 - As a resident, I want to **see "5 of 7 have voted"**, so that I know whether the group is
-  waiting on me.
+  waiting on me. *(amended 2026-09-24: served on D1, delivered with F4 — not on Start; see
+  `requirements/F2-requirements.md` FR-2.22.)*
 - As a resident, I want to **see where the round stands rather than a blank screen** when nothing
   is open, so that the product does not look broken when I am simply done.
 

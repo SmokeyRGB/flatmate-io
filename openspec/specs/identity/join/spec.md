@@ -6,9 +6,7 @@ fields buy them, what a completed join creates and records, how a refusal reads,
 somebody who already belongs here or belongs somewhere else, how long staying signed in lasts, and
 the limit on how often this route will check a code at all. The link is the household's only
 remaining access control (C-2.4), and this is the one route that exposes it to the public.
-
 ## Requirements
-
 ### Requirement: The household is named before anything is asked
 
 Opening a valid join link SHALL display the household's name before any field is requested, so that
@@ -240,16 +238,22 @@ Sources: FR-2.13, FR-2.14, C-2.2, AC-2.4, AC-2.5; `03-PRD.md` §4.1.1.
 ### Requirement: Someone who already belongs is not made to join again
 
 A visitor who opens a join link while already signed in as a member of that household SHALL NOT get
-a second account or profile; they SHALL be taken to Start and told they are already a member. A
+a second account or profile; they SHALL be taken to their own landing — Start for a resident, the
+household settings screen for the household account — and told they are already a member. A
 visitor signed in as a resident of a **different** household SHALL be refused with an explanation,
 and SHALL be offered to sign out on the spot; signing out there SHALL end only their own session and
 SHALL bring them back to the same invitation, now as a visitor who may join. Sources: EC-2.4,
 EC-2.5, A-2.4; `rahmenwerk.md` §6 (Keine Berechtigung: *„Erklärung warum plus wer helfen kann"*).
 
 #### Scenario: An existing member follows the link
-- **WHEN** a signed-in member of this household opens its join link
+- **WHEN** a signed-in resident of this household opens its join link
 - **THEN** no second account or profile is created and they are taken to Start with a note that
   they are already a member
+
+#### Scenario: The household account follows its own link
+- **WHEN** the household account of this household, signed in, opens one of its join links
+- **THEN** no account or profile is created and it is taken to the household settings screen with
+  the same note
 
 #### Scenario: A resident of another household follows the link
 - **WHEN** a signed-in resident of a different household opens this link
@@ -452,3 +456,4 @@ household, and entering a join code by hand. Neither SHALL require knowing a URL
 #### Scenario: Hand entry is reachable from the resident side of sign-in
 - **WHEN** a visitor on the resident side of sign-in has a code but no account
 - **THEN** one link from that screen takes them to the screen where a code is typed
+
