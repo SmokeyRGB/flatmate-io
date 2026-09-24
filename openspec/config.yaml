@@ -66,7 +66,8 @@ rules:
     - "Every read-then-write names what serializes it - a unique constraint, a row lock, or an advisory lock. A passing concurrency test is not the answer."
     - "A migration that changes data under a constraint argues its statement order against the constraints live at each statement, including those it is about to drop."
     - "Where the change widens something an earlier design justified by its narrowness (a SECURITY DEFINER function's joins or return shape, a public route's inputs), repeat that justification against the new shape and cite the earlier design."
-    - "Where a predicate or join relies on a relationship between columns or tables (which membership belongs to a resident, which account a profile has), name the constraint that enforces that relationship. If there is none, the design adds one. See CLAUDE.md, The relationship a predicate joins through must itself be enforced."
+    - "Where a predicate or join relies on a relationship between columns or tables (which membership belongs to a resident, which account a profile has), name the constraints that enforce that relationship, covering both which rows pair up and how many there may be. If there are none, the design adds them. See CLAUDE.md, The relationship a predicate joins through must itself be enforced."
+    - "Where a step calls an external system (Supabase Auth) during a database transaction, list each failure point and the state it leaves on both sides. The provider is not rolled back with the transaction. See CLAUDE.md, No transaction spans Postgres and Supabase Auth."
     - "For each state the change writes (a row set such as live sessions, a password, a provider-side address), list every other function in the codebase that writes the same state, and name what serializes each pair. See CLAUDE.md, Every writer of the same state, pairwise."
   tasks:
     - "Every task names the files it touches."

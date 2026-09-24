@@ -150,9 +150,17 @@ the TypeScript that states the rule:
 **The relationship a predicate joins through must itself be enforced.** With no foreign keys, a
 pairing between columns is true only where a constraint says so. Before a predicate or a
 `SECURITY DEFINER` join relies on one, check that it is a constraint. If it isn't, add the
-constraint once rather than a predicate in every reader. `membership`'s `is_resident` ⇔
-`resident_profile_id` pairing was trusted by the reset-link SQL for exactly one PR before
-`drizzle/0020` made it a `CHECK`.
+constraint once rather than a predicate in every reader. Enforce all of the relationship, not the
+one property a reviewer named: which rows pair up (`membership_resident_pairing`, `drizzle/0020`)
+**and** how many there may be. A lookup that takes `[row]` from a query with no unique index
+behind it is ambiguous (`membership` per profile and per account, `drizzle/0021`). PR #23 needed
+two review rounds because the first fix covered only the pairing.
+
+**No transaction spans Postgres and Supabase Auth.** A provider call inside `withSessionContext`
+is not rolled back with it. Order the steps so that every failure point leaves a safe state, and
+write down which state each one leaves. For a reset, that means ending the sessions and spending
+the link first, then setting the password, then signing in (`redeemPasswordReset`). Don't claim
+atomicity in a comment.
 
 **Every writer of the same state, pairwise.** When two functions write the same thing (a password,
 a provider address, the set of live sessions), each pair has to be serialized against each other,
