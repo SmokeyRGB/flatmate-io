@@ -5,9 +5,7 @@ The lifecycle of a household's join links: how one is issued, how long it stays 
 times it may be redeemed, how a code presented by a visitor resolves to a household, what a
 moderating person can see and change, and what the record of a dead link preserves. The link is the
 household's only remaining access control (C-2.4), so this capability is where its limits live.
-
 ## Requirements
-
 ### Requirement: A household holds several join links at once
 
 A household SHALL be able to have more than one usable join link at a time, each issued separately
@@ -284,14 +282,23 @@ independently of the client. Source: C-2.10, **G-C7**.
 
 ### Requirement: A link may name the person it was issued for
 
-A join link SHALL optionally name one prepared resident profile of its own household. A link that
-names none SHALL behave exactly as every link did before. A link that names one SHALL be issued for
-exactly that person, SHALL carry a maximum of one redemption, and SHALL be refused once it has been
-spent, like any other exhausted link. Naming a profile SHALL NOT change anything else about a link:
-its expiry, its cap, its count, its deletion and its refusal all behave identically. Sources: the
-human decision of 2026-09-22; C-2.4; FR-2.5, FR-2.7.
+A join link SHALL optionally name one resident profile of its own household. Every link SHALL carry
+a purpose: joining, or resetting a password.
 
-A link is the only way a prepared profile can be claimed, which is what makes the household's link
+- A link that names no profile SHALL behave exactly as every link did before, and SHALL always have
+  the joining purpose.
+- A joining link that names a profile SHALL name a prepared one, and redeeming it SHALL claim that
+  profile.
+- A password-reset link SHALL name an active profile whose account has no email address. Redeeming
+  it SHALL reset that profile's password (capability `identity/password-reset`).
+
+A link that names a profile SHALL be issued for exactly that person and SHALL carry a maximum of
+one redemption. It SHALL be refused once it has been spent, like any other exhausted link. Neither
+the name nor the purpose SHALL change anything else about a link: its expiry, its cap, its count,
+its deletion and its refusal all behave identically. Sources: the human decisions of 2026-09-22 and
+2026-09-24; C-2.4; FR-2.5, FR-2.7; O-16.
+
+A link is the only way a prepared profile can be claimed. That is what makes the household's link
 its access control in fact and not only in principle.
 
 #### Scenario: A moderating person issues an invitation for a prepared profile
@@ -311,3 +318,13 @@ its access control in fact and not only in principle.
 - **WHEN** a link is issued naming a profile
 - **THEN** that profile belongs to the same household as the link, and no link can name a profile
   of another household
+
+#### Scenario: A joining link cannot name an active profile
+- **WHEN** a joining link is issued naming an active profile
+- **THEN** it is refused and no link is created
+
+#### Scenario: A reset link never creates or claims a profile
+- **WHEN** a password-reset link is redeemed
+- **THEN** no profile, account or membership is created or claimed
+- **AND** no use of the link is attributed to a membership
+

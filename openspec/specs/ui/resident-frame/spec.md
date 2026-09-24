@@ -74,18 +74,6 @@ SHALL say so rather than appearing broken. Sources: `rahmenwerk.md` §4.1; human
 - **WHEN** a resident with no application awaiting their vote opens the Casting tab
 - **THEN** the placeholder is shown
 
-### Requirement: The resident's own settings screen exists as a placeholder
-
-The resident's own settings screen (E1) SHALL be reachable from the profile menu. Until its content
-is built, it SHALL say that adding an email address and changing the password arrive in a later
-step, and SHALL offer a way back to Start. It SHALL NOT show or link to the household settings.
-Sources: `screens/E-einstellungen.md` E1; FR-2.17 (delivered by a later change); human decision
-2026-09-24.
-
-#### Scenario: Opening own settings today
-- **WHEN** a resident opens their own settings screen
-- **THEN** they see that its content follows in a later step, and a way back to Start
-
 ### Requirement: The organisation surface has its own address
 
 The organisation surface (O1) SHALL be reached at its own address, distinct from Start's. Its
@@ -100,4 +88,16 @@ back to Start. Sources: `screens/O-organisation.md` O1; `rahmenwerk.md` §4.1; h
 #### Scenario: Back from "who lives here"
 - **WHEN** a resident follows the back link on "who lives here"
 - **THEN** they arrive on Start
+
+### Requirement: The resident's own settings screen is reached from the profile menu
+
+The resident's own settings screen (E1) SHALL be reachable from the profile menu and SHALL offer a
+way back to Start. It SHALL NOT show or link to the household settings. `identity/account-settings`
+specifies its content. Sources: `screens/E-einstellungen.md` E1 (*„Aus dem Avatar-Menü"*); human
+decision 2026-09-24.
+
+#### Scenario: Opening own settings
+- **WHEN** a resident opens their own settings from the profile menu
+- **THEN** they reach the settings screen, which has a way back to Start and no link to the
+  household settings
 
