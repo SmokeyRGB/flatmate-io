@@ -144,6 +144,11 @@ const NOT_APPLICABLE_IDENTITY: Record<string, string> = {
   // start-screen design.md Decision 4: read-only; decides visibility only, never authorization —
   // tested in tests/integration/policy/navigation-access.test.ts.
   getNavigationAccess: "read-only",
+  // resident-settings design.md Decision 8: self-service, own account only — the account read is
+  // ALWAYS context.accountId, never a caller-supplied value; refused entirely for a household
+  // session (profileId null). Read-only, tested in
+  // tests/integration/policy/account-settings-email.test.ts.
+  getOwnAccountEmail: "self-service read, own account only (identity/account-settings)",
 };
 
 const KNOWN_OPEN_IDENTITY: Record<string, string> = {};
@@ -426,6 +431,26 @@ describe("authorization matrix (M6): every exported casting/identity mutator dec
         identityRepo.revokeSession(residentCtx, adminSignIn.session.id),
       ).rejects.toThrow(PermissionDeniedError);
     });
+
+    // resident-settings design.md Decision 6 (O-16, proposal Assumption 5): the household account
+    // ONLY may issue a reset link — a plain resident AND a moderator are both refused, unlike the
+    // resident-list actions above (U-30 parity), which a moderator may perform.
+    it("issuePasswordResetLink refuses a plain resident", async () => {
+      const target = await claim(hh, "ResidentResetTarget1", extraAccountIds);
+      await expect(
+        identityRepo.issuePasswordResetLink(residentCtx, resident.accountId, target.profileId),
+      ).rejects.toThrow(ResidentListActionDeniedError);
+    });
+
+    it("issuePasswordResetLink refuses a moderator", async () => {
+      const moderator = await claim(hh, "ModeratorResetIssuer", extraAccountIds);
+      await identityRepo.setMemberRole(hh.context, hh.accountId, moderator.accountId, "moderator");
+      const moderatorCtx = residentContext(hh, moderator);
+      const target = await claim(hh, "ResidentResetTarget2", extraAccountIds);
+      await expect(
+        identityRepo.issuePasswordResetLink(moderatorCtx, moderator.accountId, target.profileId),
+      ).rejects.toThrow(ResidentListActionDeniedError);
+    });
   });
 });
 
@@ -459,4 +484,5 @@ const IDENTITY_CASE_NAMES = [
   "setMemberRole",
   "triggerSubjectAccessExport",
   "revokeSession",
+  "issuePasswordResetLink",
 ];

@@ -83,6 +83,7 @@ describe("resolve_account_household — raw SQL (M3/P1)", () => {
     const rows = await db.execute<Record<string, unknown>>(sql`SELECT * FROM resolve_join_code(${link.code}) AS t`);
 
     expect(rows).toHaveLength(1);
+    // resident-settings design.md Decision 4: widened from five to six columns — `purpose` is new.
     expect(Object.keys(rows[0]).sort()).toEqual(
       [
         "household_id",
@@ -90,6 +91,7 @@ describe("resolve_account_household — raw SQL (M3/P1)", () => {
         "household_name",
         "bound_resident_profile_id",
         "bound_resident_display_name",
+        "purpose",
       ].sort(),
     );
   });

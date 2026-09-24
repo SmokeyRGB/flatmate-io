@@ -101,27 +101,34 @@ describe("Join code issuance household isolation — raw SQL (C-2.10)", () => {
       );
 
       expect(rows).toHaveLength(1);
+      // resident-settings design.md Decision 4: widened from five to six columns — `purpose` is
+      // new, every other column is unchanged (drizzle/0019).
       expect(Object.keys(rows[0]).sort()).toEqual([
         "bound_resident_display_name",
         "bound_resident_profile_id",
         "household_id",
         "household_name",
         "issuance_id",
+        "purpose",
       ]);
       expect(rows[0].bound_resident_profile_id).toBeNull();
       expect(rows[0].bound_resident_display_name).toBeNull();
       expect(rows[0].household_id).toBe(hhA.householdId);
       expect(rows[0].issuance_id).toBe(link.id);
       expect(rows[0].household_name).toBe("WG");
+      expect(rows[0].purpose).toBe("join");
     });
 
-    it("claim_join_code returns exactly its five declared columns, bound ones null for a neutral link", async () => {
+    it("claim_join_code returns exactly its six declared columns, bound ones null for a neutral link", async () => {
       hhA = await registerTestHousehold();
       const link = await issueJoinCode(hhA.context, hhA.accountId, { validDays: 7, maxUses: 1 });
 
       hhB = await registerTestHousehold();
+      // resident-settings design.md Decision 4: claim_join_code is now two-argument — the caller
+      // states which purpose it redeems (drizzle/0019); the old one-argument overload no longer
+      // exists at all (6.1(i)).
       const rows = await withSessionContext(hhB.context, (tx) =>
-        tx.execute<Record<string, unknown>>(sql`SELECT * FROM claim_join_code(${link.code})`),
+        tx.execute<Record<string, unknown>>(sql`SELECT * FROM claim_join_code(${link.code}, 'join')`),
       );
 
       expect(rows).toHaveLength(1);
@@ -131,11 +138,13 @@ describe("Join code issuance household isolation — raw SQL (C-2.10)", () => {
         "household_id",
         "household_name",
         "issuance_id",
+        "purpose",
       ]);
       expect(rows[0].bound_resident_profile_id).toBeNull();
       expect(rows[0].bound_resident_display_name).toBeNull();
       expect(rows[0].household_id).toBe(hhA.householdId);
       expect(rows[0].issuance_id).toBe(link.id);
+      expect(rows[0].purpose).toBe("join");
     });
   });
 });

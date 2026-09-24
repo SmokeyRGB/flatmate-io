@@ -1,14 +1,16 @@
 import { createHmac, randomUUID } from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
-import { and, eq, notInArray } from "drizzle-orm";
+import { and, eq, isNull, ne, notInArray } from "drizzle-orm";
 import { isUuid, withSessionContext, type SessionContext } from "@/db/session-context";
 import { recordActivityEvent } from "@/modules/audit/repository";
+import type { CurrentSession } from "./session-cookie";
 import {
   claimJoinCodeTx,
   isDisplayNameTaken,
   issueJoinCodeTx,
   resolveAccountHousehold,
   resolveJoinCode,
+  revokeSession,
 } from "./repository";
 import {
   account,
@@ -45,6 +47,30 @@ function supabaseAdmin() {
 // delivered.
 export function deriveResidentEmail(residentProfileId: string): string {
   return `resident-${residentProfileId}@accounts.flatmate.invalid`;
+}
+
+// resident-settings design.md Decisions 2/3: Supabase Auth's own duplicate-address refusal —
+// `email_exists` on recent Supabase Auth versions, a bare 422 on older/self-hosted ones ("any 422
+// duplicate shape", design.md D2). Never distinguishes further: every duplicate collapses to the
+// same `email_taken` code regardless of which account holds the address (proposal Assumption 2).
+// A 422 counts only when the provider gives no more specific code: a 422 carrying another code
+// (e.g. `email_address_invalid`, `weak_password`) is a different refusal and must not be reported
+// as "taken".
+function isEmailTakenError(
+  error: { code?: string; status?: number; message?: string } | null,
+  path: "create" | "update",
+): boolean {
+  if (!error) return false;
+  if (error.code === "email_exists") return true;
+  if (error.status === 422 && !error.code) return true;
+  // Observed against flatmate-io-dev (probed 2026-09-24): `createUser`'s duplicate refusal is a
+  // clean 422/email_exists, but `updateUserById`'s is a generic `AuthRetryableFetchError`, status
+  // 500, message "Error updating user", with no machine-readable code at all — GoTrue's own update
+  // path does not classify a unique-constraint violation the way its create path does. Matched on
+  // the exact message this project's GoTrue version returns, and on the update path only. Known
+  // cost: a genuine update failure with that same message is also reported as "taken"; the user
+  // then sees a refusal instead of an error page, and nothing is written either way.
+  return path === "update" && error.status === 500 && error.message === "Error updating user";
 }
 
 // german-ui-vocabulary (design.md Decision 4): a `code` discriminant, not `message`, is what an
@@ -415,18 +441,29 @@ export async function signIn(
       throw new SignInError("Invalid household", "invalid_household");
     }
 
-    // Resolve display_name -> ResidentProfile.id within the already-known household. This read
-    // is legitimately RLS-scoped (household_id is a real input here, not something being
-    // discovered), unlike the account_id -> household_id bootstrap below.
+    // Resolve display_name -> ResidentProfile.id -> Membership.account_id within the already-known
+    // household. This read is legitimately RLS-scoped (household_id is a real input here, not
+    // something being discovered), unlike the account_id -> household_id bootstrap below.
+    //
+    // resident-settings design.md Decision 1: the provider is the authority for its own sign-in
+    // identifier — this no longer rebuilds the derived address from the profile id. A resident who
+    // has since added a real address (at join or in E1) had it REPLACE the derived one at the
+    // provider (identity/account-settings), so rebuilding the derived address here would sign in
+    // against an address the provider no longer recognises for that account. Asking the provider
+    // for its CURRENT email instead has no invariant to keep — it costs one extra Auth call per
+    // name sign-in, and is immune to `account.email` and the Auth address ever diverging (a
+    // resident who joined with an email before this change, or a commit that failed after the Auth
+    // update but before `account.email` was written).
     const bootstrapContext: SessionContext = {
       accountId: randomUUID(), // no account is acting yet; only householdId matters for this scan
       householdId: input.householdId,
       profileId: null,
     };
-    const [profile] = await withSessionContext(bootstrapContext, (tx) =>
+    const [resolvedAccount] = await withSessionContext(bootstrapContext, (tx) =>
       tx
-        .select()
+        .select({ accountId: membership.accountId })
         .from(residentProfile)
+        .innerJoin(membership, eq(membership.residentProfileId, residentProfile.id))
         .where(
           and(
             eq(residentProfile.householdId, input.householdId),
@@ -437,9 +474,19 @@ export async function signIn(
     );
     // design.md Decision 5 / proposal.md Assumption 6: converges with the "Invalid credentials"
     // throw below on the single code `invalid_credentials` — this is the change's one
-    // user-visible behaviour change (tasks.md 2.2).
-    if (!profile) throw new SignInError("No such resident in this household", "invalid_credentials");
-    email = deriveResidentEmail(profile.id);
+    // user-visible behaviour change (tasks.md 2.2). A profile with no membership yet (still
+    // `prepared`, never claimed) has no account to resolve either, and fails the same way.
+    if (!resolvedAccount) throw new SignInError("No such resident in this household", "invalid_credentials");
+
+    // Every failure past this point stays invalid_credentials too — a missing Auth user is exactly
+    // as uninformative to the caller as a wrong password would be.
+    const { data: userData, error: userError } = await supabaseAdmin().auth.admin.getUserById(
+      resolvedAccount.accountId,
+    );
+    if (userError || !userData.user?.email) {
+      throw new SignInError("Invalid credentials", "invalid_credentials");
+    }
+    email = userData.user.email;
   }
 
   const { data, error } = await supabaseAdmin().auth.signInWithPassword({
@@ -519,7 +566,11 @@ export type JoinErrorCode =
   | "password_too_short"
   | "already_member"
   | "other_household"
-  | "signup_failed";
+  | "signup_failed"
+  // resident-settings design.md Decision 3: the provider's duplicate-email refusal, thrown before
+  // anything is committed — the link's use rolls back with the rest (spent only by a join that
+  // completes).
+  | "email_taken";
 
 export class JoinError extends Error {
   constructor(message: string, readonly code: JoinErrorCode) {
@@ -590,6 +641,16 @@ export async function joinHousehold(
   const resolved = await resolveJoinCode(code);
   if (!resolved) throw new JoinError("Join code is not valid", "invalid_link");
 
+  // resident-settings design.md Decision 3 (pre-mortem fix, 2026-09-24): a reset link also resolves
+  // with a bound profile (identity/password-reset), so without this check the join path would treat
+  // it as an invitation and fail at createUser — the derived address of an existing, active profile
+  // is already registered there. That failure would be signup_failed, not invalid_link (FR-2.8),
+  // which is why this runs FIRST, immediately after resolving, before the bound/neutral split below
+  // ever looks at `resolved.boundResidentProfile`.
+  if (resolved.purpose !== "join") {
+    throw new JoinError("Join code is not valid", "invalid_link");
+  }
+
   // design.md Decision 9 (EC-2.4/EC-2.5): a visitor already signed in gets no second identity.
   // The route's own GET render already refuses to show the form in either case (page.tsx), so
   // this is a defence-in-depth re-check for the submit path itself (e.g. a session established in
@@ -632,17 +693,22 @@ export async function joinHousehold(
   // than generating a second one, since the claim below activates that SAME row.
   const residentProfileId = bound ? bound.id : randomUUID();
   const derivedEmail = deriveResidentEmail(residentProfileId);
+  // resident-settings design.md Decision 3: the SUPPLIED address (if any) goes to the provider too
+  // now, exactly as an address added later in E1 does (identity/join: "the address also becomes the
+  // resident's sign-in address at the provider") — never the derived one when a real address is
+  // given. `account.email` keeps storing the supplied address either way (unchanged below).
+  const authEmail = email ?? derivedEmail;
 
   const { data, error } = await supabaseAdmin().auth.admin.createUser({
-    // task 7.3: ALWAYS the derived address, NEVER the optional supplied email — resident sign-in
-    // resolves display name -> derived address (signIn's "resident" mode above), so a real
-    // address here would break it. The supplied email (if any) is stored on account.email only.
-    email: derivedEmail,
+    email: authEmail,
     password,
     email_confirm: true, // identity.md: a technical precondition for the sign-in path, not a
     // claim about a real mailbox — same reasoning as registerHousehold/claimResidentProfile.
   });
   if (error || !data.user) {
+    if (isEmailTakenError(error, "create")) {
+      throw new JoinError("Email address is already in use", "email_taken");
+    }
     throw new JoinError(error?.message ?? "Supabase Auth did not return a user", "signup_failed");
   }
 
@@ -650,7 +716,7 @@ export async function joinHousehold(
 
   try {
     const { data: signInData, error: signInError } = await supabaseAdmin().auth.signInWithPassword({
-      email: derivedEmail,
+      email: authEmail,
       password,
     });
     if (signInError || !signInData.user || !signInData.session) {
@@ -668,7 +734,7 @@ export async function joinHousehold(
       // half-spent state to arbitrate — a failure anywhere else in this transaction rolls the
       // increment back with everything else, and the count is still never decremented on any
       // other path (a failed attempt simply never incremented it in the first place).
-      const claimed = await claimJoinCodeTx(tx, code);
+      const claimed = await claimJoinCodeTx(tx, code, "join");
       if (!claimed) throw new JoinError("Join code is not valid", "invalid_link");
 
       // design.md Decision 13: branch exactly once on the CONSUMING claim's own answer (not the
@@ -719,7 +785,8 @@ export async function joinHousehold(
       await tx.insert(account).values({
         id: accountId,
         householdId: resolved.householdId,
-        email, // the optional supplied email, or null — never the derived address (task 7.3)
+        email, // the optional supplied email, or null — this DB column, unlike the provider
+        // address above, has always stored exactly this and is unaffected by design.md Decision 3
       });
 
       // design.md Decision 7 (identity/permissions capability's "no permission is inferred from
@@ -775,4 +842,327 @@ export async function joinHousehold(
     }
     throw err;
   }
+}
+
+// resident-settings design.md Decisions 2/7: E1's own settings errors. One class, several codes —
+// changeResidentEmail uses missing_email/invalid_email/email_taken/not_a_resident,
+// changeResidentPassword uses missing_fields/password_too_short/wrong_current_password/
+// not_a_resident. german-ui-vocabulary (design.md Decision 4): a `code` discriminant, never a
+// message, same convention as JoinError/SignInError/ClaimError above.
+export type AccountSettingsErrorCode =
+  | "missing_email"
+  | "invalid_email"
+  | "email_taken"
+  | "not_a_resident"
+  | "missing_fields"
+  | "password_too_short"
+  | "wrong_current_password";
+
+export class AccountSettingsError extends Error {
+  constructor(message: string, readonly code: AccountSettingsErrorCode) {
+    super(message);
+  }
+}
+
+// design.md Decision 2: one plain shape check (x@y.z, no whitespace), no library — matches
+// identity/account-settings' "well-formed address" without inventing a stricter rule than any
+// requirement asks for (same reasoning as JOIN_PASSWORD_MIN_LENGTH above). Exported, like
+// repository.ts's normalizeJoinCode/isWellFormedJoinCode, so it is directly unit-testable without
+// a database or Supabase Auth round trip.
+const EMAIL_SHAPE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+// design.md Decision 2 step 1: trim, then lower-case — the stored/provider address is always
+// lower-case, so two submissions differing only by case are the same "unchanged address" (D2's
+// no-write, no-audit branch) rather than a spurious change.
+export function normalizeEmail(raw: string): string {
+  return raw.trim().toLowerCase();
+}
+
+export function isWellFormedEmail(normalized: string): boolean {
+  return EMAIL_SHAPE.test(normalized);
+}
+
+// design.md Decision 2: DB row locked first, Auth updated inside the transaction.
+//   1. validate (trim, lower-case; empty is refused whether or not an address exists already —
+//      this is how "change but not remove", proposal Assumption 3, is enforced);
+//   2. identity: resident-only, account is ALWAYS current.context.accountId, never a form value;
+//   3. SELECT account ... FOR UPDATE (serializes against a concurrent change of the same account,
+//      and against D5's redemption, which locks the same row); unchanged address writes nothing;
+//      auth.admin.updateUserById(email, email_confirm: true) — email_confirm is a technical
+//      precondition for the provider's sign-in path (identity.md provider rule 2), never a claim
+//      about delivery, which stays account.email_verified_at's alone; on email_exists, throw
+//      email_taken; then UPDATE account SET email, email_verified_at = null, and record
+//      account.email_changed.
+// A failed commit after a successful provider update leaves Auth ahead of account.email — D1
+// makes sign-in immune to that (it always asks the provider), and saving again repairs the DB row.
+// Accepted and documented rather than compensated (design.md Decision 2).
+export async function changeResidentEmail(current: CurrentSession, rawEmail: string): Promise<void> {
+  const email = normalizeEmail(rawEmail);
+  if (!email) {
+    throw new AccountSettingsError("Email address is required", "missing_email");
+  }
+  if (!isWellFormedEmail(email)) {
+    throw new AccountSettingsError("That does not look like a well-formed email address", "invalid_email");
+  }
+
+  const { context } = current;
+  if (context.profileId === null) {
+    throw new AccountSettingsError(
+      "Only a resident may change their own email address (identity/account-settings)",
+      "not_a_resident",
+    );
+  }
+
+  await withSessionContext(context, async (tx) => {
+    const [row] = await tx.select().from(account).where(eq(account.id, context.accountId)).for("update");
+    if (!row || row.email === email) return; // no account, or unchanged — no write, no audit
+
+    const { error } = await supabaseAdmin().auth.admin.updateUserById(context.accountId, {
+      email,
+      email_confirm: true,
+    });
+    if (error) {
+      if (isEmailTakenError(error, "update")) {
+        throw new AccountSettingsError("Email address is already in use", "email_taken");
+      }
+      throw error;
+    }
+
+    await tx
+      .update(account)
+      .set({ email, emailVerifiedAt: null })
+      .where(eq(account.id, context.accountId));
+
+    await recordActivityEvent(tx, {
+      householdId: context.householdId,
+      eventType: "account.email_changed",
+      subjectType: "account",
+      subjectId: context.accountId,
+      actorAccountId: context.accountId,
+      actorProfileId: context.profileId,
+      payload: {},
+    });
+  });
+}
+
+// design.md Decision 7: resident-only, as changeResidentEmail above.
+//   1. validate the new password with the join rule (JOIN_PASSWORD_MIN_LENGTH);
+//   2. check the current password by calling signInWithPassword with the provider's CURRENT
+//      address (D1's own lookup, auth.admin.getUserById) — the session it returns is discarded, as
+//      signIn already does on refusal. A failure is wrong_current_password;
+//   3. updateUserById(password);
+//   4. in a transaction, revoke every OTHER session of the account (current.sessionId is kept) and
+//      record account.password_changed.
+// Order matters (provider first, sessions second): if the revoke fails after the provider change,
+// the password is changed and other devices stay signed in until the resident retries — the benign
+// direction. The reverse order could end sessions for a password that never actually changed.
+export async function changeResidentPassword(
+  current: CurrentSession,
+  currentPassword: string,
+  newPassword: string,
+): Promise<void> {
+  const { context, sessionId } = current;
+  if (context.profileId === null) {
+    throw new AccountSettingsError(
+      "Only a resident may change their own password (identity/account-settings)",
+      "not_a_resident",
+    );
+  }
+  if (!currentPassword || !newPassword) {
+    throw new AccountSettingsError("Current and new password are required", "missing_fields");
+  }
+  if (newPassword.length < JOIN_PASSWORD_MIN_LENGTH) {
+    throw new AccountSettingsError(
+      `Password must be at least ${JOIN_PASSWORD_MIN_LENGTH} characters`,
+      "password_too_short",
+    );
+  }
+
+  const { data: userData, error: userError } = await supabaseAdmin().auth.admin.getUserById(context.accountId);
+  if (userError || !userData.user?.email) {
+    throw new AccountSettingsError("Current password is incorrect", "wrong_current_password");
+  }
+
+  const { error: signInError } = await supabaseAdmin().auth.signInWithPassword({
+    email: userData.user.email,
+    password: currentPassword,
+  });
+  if (signInError) {
+    throw new AccountSettingsError("Current password is incorrect", "wrong_current_password");
+  }
+
+  const { error: updateError } = await supabaseAdmin().auth.admin.updateUserById(context.accountId, {
+    password: newPassword,
+  });
+  if (updateError) throw updateError;
+
+  await withSessionContext(context, async (tx) => {
+    await tx
+      .update(session)
+      .set({ revokedAt: new Date() })
+      .where(and(eq(session.accountId, context.accountId), ne(session.id, sessionId), isNull(session.revokedAt)));
+
+    await recordActivityEvent(tx, {
+      householdId: context.householdId,
+      eventType: "account.password_changed",
+      subjectType: "account",
+      subjectId: context.accountId,
+      actorAccountId: context.accountId,
+      actorProfileId: context.profileId,
+      payload: {},
+    });
+  });
+}
+
+// resident-settings design.md Decision 5: redeeming an administration-issued reset link
+// (identity/password-reset) — mirrors joinHousehold's bound branch, reusing JoinError/JoinErrorCode
+// (the same "one invalid-link message" convention, FR-2.8) rather than a new error class, since
+// nothing about a reset's refusals differs from a join's from the caller's point of view.
+//
+//   1. validate the password (same rule as join: missing_fields, password_too_short);
+//   2. resolveJoinCode(code) (the route already recorded the attempt) — must return
+//      purpose = 'password_reset', else invalid_link;
+//   3. one transaction, in the household's own bootstrap context:
+//      a. claimJoinCodeTx(tx, code, 'password_reset') — no row means invalid_link;
+//      b. SELECT membership ... FOR UPDATE, then SELECT account ... FOR UPDATE — re-check that the
+//         membership is live, the profile is active, and the account still has no email; anything
+//         else is invalid_link. The locks serialize against changeResidentEmail's own account lock
+//         and against a concurrent removal (which locks membership) — the re-check makes the SQL
+//         predicate's own snapshot irrelevant;
+//      c. revoke EVERY session of the account;
+//      d. record account.password_reset_by_admin: subject is the resident profile, actor account
+//         is the issuance's OWN created_by_account_id (the reset is the administration's act; the
+//         redeemer only completes it), actor profile null, payload {};
+//      e. auth.admin.updateUserById(password) — a failure throws and the whole transaction rolls
+//         back, including the claim, so the link is not spent;
+//   4. after commit: signInWithPassword with the account's current Auth email (D1's lookup), then
+//      insertSessionTx with rememberMe, acting as the reset profile.
+//
+// Lock order: membership -> account, then session (an UPDATE, no lock needed on it) — never
+// resident_profile. No path here takes these in reverse, so no deadlock with joinHousehold's bound
+// branch (resident_profile only), signIn (membership only) or changeResidentEmail (account only).
+export async function redeemPasswordReset(
+  code: string,
+  input: { password: string },
+  options: { rememberMe?: boolean; currentSession?: CurrentSession | null } = {},
+): Promise<JoinHouseholdResult> {
+  const password = input.password;
+  if (!password) {
+    throw new JoinError("Password is required", "missing_fields");
+  }
+  if (password.length < JOIN_PASSWORD_MIN_LENGTH) {
+    throw new JoinError(
+      `Password must be at least ${JOIN_PASSWORD_MIN_LENGTH} characters`,
+      "password_too_short",
+    );
+  }
+
+  const resolved = await resolveJoinCode(code);
+  if (!resolved || resolved.purpose !== "password_reset") {
+    throw new JoinError("Join code is not valid", "invalid_link");
+  }
+
+  const bootstrapContext: SessionContext = {
+    accountId: randomUUID(),
+    householdId: resolved.householdId,
+    profileId: null,
+  };
+
+  const { accountId, profileId } = await withSessionContext(bootstrapContext, async (tx) => {
+    const claimed = await claimJoinCodeTx(tx, code, "password_reset");
+    const claimedProfileId = claimed?.boundResidentProfile?.id;
+    if (!claimed || !claimedProfileId) {
+      throw new JoinError("Join code is not valid", "invalid_link");
+    }
+
+    const [membershipRow] = await tx
+      .select()
+      .from(membership)
+      .where(eq(membership.residentProfileId, claimedProfileId))
+      .for("update");
+    if (!membershipRow || membershipRow.revokedAt) {
+      throw new JoinError("Join code is not valid", "invalid_link");
+    }
+
+    const [profileRow] = await tx
+      .select()
+      .from(residentProfile)
+      .where(eq(residentProfile.id, claimedProfileId));
+    if (!profileRow || profileRow.status !== "active") {
+      throw new JoinError("Join code is not valid", "invalid_link");
+    }
+
+    const [accountRow] = await tx
+      .select()
+      .from(account)
+      .where(eq(account.id, membershipRow.accountId))
+      .for("update");
+    if (!accountRow || accountRow.email !== null) {
+      throw new JoinError("Join code is not valid", "invalid_link");
+    }
+
+    await tx
+      .update(session)
+      .set({ revokedAt: new Date() })
+      .where(and(eq(session.accountId, accountRow.id), isNull(session.revokedAt)));
+
+    const [issuanceRow] = await tx
+      .select({ createdByAccountId: joinCodeIssuance.createdByAccountId })
+      .from(joinCodeIssuance)
+      .where(eq(joinCodeIssuance.id, claimed.issuanceId));
+
+    await recordActivityEvent(tx, {
+      householdId: resolved.householdId,
+      eventType: "account.password_reset_by_admin",
+      subjectType: "resident_profile",
+      subjectId: claimedProfileId,
+      actorAccountId: issuanceRow?.createdByAccountId ?? null,
+      actorProfileId: null,
+      payload: {},
+    });
+
+    const { error: updateError } = await supabaseAdmin().auth.admin.updateUserById(accountRow.id, { password });
+    if (updateError) throw updateError;
+
+    return { accountId: accountRow.id, profileId: claimedProfileId };
+  });
+
+  // design.md Decision 8 (pre-mortem fix, 2026-09-24): a visitor already signed in (the household
+  // account opening the link to check it, say, or the resident's own stale session on the SAME
+  // device that lost the password) has their PREVIOUS session revoked now, before the new one is
+  // created below — own session only (revokeSession enforces that). Otherwise the cookie the
+  // caller is about to overwrite would leave that old session row valid and orphaned. Placed here,
+  // once the redemption itself has unconditionally succeeded, not inside the transaction above:
+  // this has nothing to do with the reset's own invariants and must never make an otherwise-valid
+  // redemption roll back.
+  if (options.currentSession) {
+    await revokeSession(options.currentSession.context, options.currentSession.sessionId);
+  }
+
+  const { data: userData, error: userError } = await supabaseAdmin().auth.admin.getUserById(accountId);
+  if (userError || !userData.user?.email) {
+    throw new JoinError("Sign-in immediately after reset failed", "signup_failed");
+  }
+
+  const { data: signInData, error: signInError } = await supabaseAdmin().auth.signInWithPassword({
+    email: userData.user.email,
+    password,
+  });
+  if (signInError || !signInData.session) {
+    throw new JoinError("Sign-in immediately after reset failed", "signup_failed");
+  }
+
+  const context: SessionContext = { accountId, householdId: resolved.householdId, profileId };
+
+  const sessionRow = await withSessionContext(context, (tx) =>
+    insertSessionTx(tx, {
+      householdId: resolved.householdId,
+      accountId,
+      actingProfileId: profileId,
+      accessToken: signInData.session!.access_token,
+      rememberMe: options.rememberMe ?? true,
+    }),
+  );
+
+  return { session: sessionRow, context };
 }

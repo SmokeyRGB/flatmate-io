@@ -79,6 +79,10 @@ export const de = {
       // sign-in itself, offered as links beneath the card — `.btn-link` (design.md Decision 8).
       foundHousehold: "WG gründen",
       enterJoinCode: "Beitrittscode eingeben",
+      // resident-settings design.md Decision 8/human decision 2026-09-24: a resident whose account
+      // has an email may sign in on this (the household/email) tab too — signIn's email path is
+      // already identity-agnostic (D1), so this is copy only, no behaviour change.
+      residentEmailHint: "Bewohner:innen mit hinterlegter E-Mail-Adresse können sich auch hier anmelden.",
     },
     register: {
       heading: "WG gründen",
@@ -221,6 +225,22 @@ export const de = {
       // section (expired, used up or deleted) — states the count so the section is informative
       // even collapsed.
       deadLinksSummary: (n: number) => `Nicht mehr nutzbare Links (${n})`,
+      // resident-settings design.md Decision 8 (O16, identity/password-reset): the row action for
+      // a profile whose account has no email yet — household sessions only.
+      issueResetLink: "Passwort-Link erstellen",
+      // E-03/K-18 ("Nicht als Sicherheitsgrenze darstellen"): states plainly what the link can do,
+      // shown once a reset link is issued — never framed as protection.
+      resetLinkIssuedCaution: "Wer diesen Link öffnet, kann das Passwort dieser Person setzen.",
+      // The link-history label for a reset row, replacing the invitation label (design.md
+      // Decision 8: "Passwort-Link für <Name>" instead of an invitation).
+      resetLinkForName: (displayName: string) => `Passwort-Link für ${displayName}`,
+      errors: {
+        // identity/repository.ts's ResidentProfileNotEligibleForResetError — one throw site, one
+        // message, mapped by class (same convention as members.errors.nameMismatch).
+        notEligibleForReset:
+          "Für dieses Profil kann kein Passwort-Link erstellt werden — es ist entweder nicht " +
+          "aktiv, oder hat bereits eine E-Mail-Adresse hinterlegt.",
+      },
     },
     moderationBadge: "Moderation",
     makeModerator: "Zur Moderation ernennen",
@@ -324,6 +344,15 @@ export const de = {
     // link's heading is now just the greeting — the invitation itself is the shared household chip
     // above, so the two are never duplicated in one sentence as the old single-string version did.
     boundHeading: (displayName: string) => `Hi ${displayName}!`,
+    // identity/password-reset (O-16, screens/A-zugang.md A3 bound shape): a third screen shape,
+    // shown when purpose = 'password_reset'. Same greeting as an ordinary bound link — the person
+    // is asked only for a new password (spec: "SHALL NOT ask for a name or an email").
+    reset: {
+      heading: (displayName: string) => `Hi ${displayName}!`,
+      newPasswordLabel: "Neues Passwort",
+      submit: "Passwort setzen",
+      submitPending: "Wird gesetzt…",
+    },
     nameLabel: "Name",
     passwordLabel: "Passwort",
     // FR-2.10a/AC-2.20: the requirement is stated, not discovered by failing once.
@@ -360,6 +389,9 @@ export const de = {
       // server-function log prints on the next submit, and the name already stands in its own
       // field right above it (join-screen design.md Decision 4).
       nameTaken: "Dieser Name ist in dieser WG bereits vergeben. Wähle einen anderen.",
+      // resident-settings design.md Decision 3: the provider's duplicate-email refusal — names no
+      // account, household or person (proposal Assumption 2), same wording style as E1's own.
+      emailTaken: "Diese E-Mail-Adresse kann nicht verwendet werden.",
       // EC-2.5/A-2.4: deliberately NOT the invalid-link message — the link is fine.
       otherHousehold:
         "Du bist bei einem anderen Haushalt angemeldet. Melde dich ab, um diesem Haushalt beizutreten.",
@@ -465,11 +497,52 @@ export const de = {
         : `${count} Bewerbungen warten auf deine Stimme. Das Sichten selbst wird in F4 gebaut.`,
     backToStart: "Zurück zu Start",
   },
-  // start-screen: E1, the resident's own settings — a placeholder until change 5 fills it.
+  // resident-settings (E1): the resident's own settings screen — email, password, sign-out.
   account: {
     heading: "Einstellungen",
-    placeholderBody: "E-Mail-Adresse hinzufügen und Passwort ändern folgen im nächsten Schritt.",
     backToStart: "Zurück zu Start",
+    noPermissionBody: "Diese Seite ist für Bewohner:innen. Deine Einstellungen findest du hier:",
+    noPermissionLink: "Einstellungen",
+    email: {
+      heading: "E-Mail",
+      currentLabel: "Deine hinterlegte Adresse",
+      // FR-2.17/E1 ("nie als Sperre formuliert"): framed as a way back in, never a requirement.
+      pitch: "Trage eine E-Mail-Adresse nach, um dir einen Weg zurück zu sichern, falls du dein Passwort vergisst.",
+      // EC-2.6/O-16 (corrected 2026-09-24): stated plainly while the gap exists, not hidden.
+      noRecoveryNotice:
+        "Ohne eigene E-Mail-Adresse kannst du ein vergessenes Passwort nicht selbst zurücksetzen — " +
+        "nur die Verwaltung kann dir dann per Link weiterhelfen.",
+      fieldLabel: "E-Mail-Adresse",
+      submit: "Speichern",
+      submitPending: "Wird gespeichert…",
+      saved: "Gespeichert.",
+      errors: {
+        missingEmail: "E-Mail-Adresse ist erforderlich.",
+        invalidEmail: "Das sieht nicht nach einer gültigen E-Mail-Adresse aus.",
+        emailTaken: "Diese E-Mail-Adresse kann nicht verwendet werden.",
+        notAResident: "Nur Bewohner:innen können ihre E-Mail-Adresse ändern.",
+        genericFailure: "Das hat nicht geklappt. Bitte versuche es erneut.",
+      },
+    },
+    password: {
+      heading: "Passwort ändern",
+      currentLabel: "Aktuelles Passwort",
+      newLabel: "Neues Passwort",
+      requirement: (minLength: number) => `Mindestens ${minLength} Zeichen.`,
+      submit: "Passwort ändern",
+      submitPending: "Wird geändert…",
+      saved: "Passwort geändert. Andere Sitzungen wurden abgemeldet.",
+      errors: {
+        missingFields: "Aktuelles und neues Passwort sind erforderlich.",
+        passwordTooShort: (minLength: number) => `Das neue Passwort muss mindestens ${minLength} Zeichen haben.`,
+        wrongCurrentPassword: "Das aktuelle Passwort ist nicht richtig.",
+        notAResident: "Nur Bewohner:innen können ihr Passwort ändern.",
+        genericFailure: "Das hat nicht geklappt. Bitte versuche es erneut.",
+      },
+    },
+    signOut: {
+      heading: "Abmelden",
+    },
   },
   // start-screen: the shared error boundary for every `(resident)` screen — same reasoning as
   // `de.join.unexpectedError` (generic on purpose, G-A5: never the failure's own text).

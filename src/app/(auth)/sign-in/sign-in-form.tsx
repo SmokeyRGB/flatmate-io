@@ -47,6 +47,9 @@ export function SignInForm() {
               {t.emailLabel}
             </label>
             <input id="email" name="email" type="email" required className="field-input" />
+            {/* resident-settings design.md Decision 8: a resident with an email may sign in here
+                too — signIn's email path is already identity-agnostic (D1), so this is copy only. */}
+            <p className="field-helper">{t.residentEmailHint}</p>
           </div>
         ) : (
           <>

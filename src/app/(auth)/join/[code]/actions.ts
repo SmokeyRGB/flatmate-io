@@ -3,7 +3,13 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { landingPathFor } from "@/app/landing";
-import { JOIN_PASSWORD_MIN_LENGTH, JoinError, joinAttemptSourceHash, joinHousehold } from "@/modules/identity/auth";
+import {
+  JOIN_PASSWORD_MIN_LENGTH,
+  JoinError,
+  joinAttemptSourceHash,
+  joinHousehold,
+  redeemPasswordReset,
+} from "@/modules/identity/auth";
 import {
   buildJoinUrl,
   isWellFormedJoinCode,
@@ -129,6 +135,12 @@ export async function joinHouseholdAction(
           // design.md Decision 10 (EC-2.5 met again at submit time): the same sign-out way forward
           // as the page's own Keine-Berechtigung state.
           return { error: t.errors.otherHousehold, fieldError: null, refusal: "other_household" };
+        case "email_taken":
+          // resident-settings design.md Decision 3: names no one (proposal Assumption 2). Rendered
+          // as the form's generic error (JoinFormState's fieldError has no "email" variant — the
+          // field itself has no per-field error slot, unlike name/password), never a way-forward
+          // component.
+          return { error: t.errors.emailTaken, fieldError: null, refusal: null };
         case "signup_failed":
           // design.md I1: unchanged from before this change — a JoinError's own message never
           // contains the code (join-code-never-in-query-or-log.test.ts, extended by task 7.4), so
@@ -179,4 +191,83 @@ export async function signOutAndReturnAction(formData: FormData): Promise<void> 
     redirect(buildJoinUrl(null, normalised));
   }
   redirect("/join");
+}
+
+// identity/password-reset (O-16): A3's `reset` shape submit. german-ui-vocabulary: a `code`
+// discriminant, never a typed value, in the action state (design.md constraint 5).
+export interface ResetFormState {
+  error: string | null;
+  fieldError: "password" | null;
+}
+
+// FR-2.28/EC-2.14: the attempt is recorded on page load (page.tsx's resolve) AND here, on submit —
+// a redemption is itself an attempt, exactly as joinHouseholdAction records a second one on top of
+// the page's own GET. The code arrives as a hidden form field (G-A5), never a query parameter.
+export async function redeemPasswordResetAction(
+  _prevState: ResetFormState,
+  formData: FormData,
+): Promise<ResetFormState> {
+  const code = String(formData.get("code") ?? "");
+  const password = String(formData.get("password") ?? "");
+  const rememberMe = formData.get("rememberMe") === "on";
+
+  const ip = getClientIp(await headers());
+  const allowed = await recordJoinAttempt(joinAttemptSourceHash(ip));
+  if (!allowed) {
+    return { error: t.errors.rateLimited, fieldError: null };
+  }
+
+  // design.md Decision 8 (pre-mortem fix, 2026-09-24): captured BEFORE redemption so the visitor's
+  // OWN previous session (own account only, revokeSession enforces that) can be revoked once the
+  // redemption itself succeeds — otherwise the cookie this action is about to overwrite would
+  // leave a valid, orphaned session row behind. redeemPasswordReset itself does the revoke
+  // (own session only, via repository.ts's revokeSession) once the redemption has unconditionally
+  // succeeded, mirroring joinHousehold's own `options.currentSession`.
+  const current = await getCurrentSession();
+
+  try {
+    const result = await redeemPasswordReset(code, { password }, { rememberMe, currentSession: current });
+
+    await setSessionCookie(
+      result.session.id,
+      result.context.householdId,
+      sessionCookieMaxAge(result.session.expiresAt),
+    );
+  } catch (err) {
+    if (err instanceof JoinError) {
+      // Exhaustive switch (design.md Decision 4): a missed code is a compile error.
+      const errCode = err.code;
+      switch (errCode) {
+        case "invalid_link":
+          return { error: t.errors.invalidLink, fieldError: null };
+        case "missing_fields":
+          return { error: t.errors.missingFields, fieldError: null };
+        case "password_too_short":
+          return {
+            error: t.errors.passwordTooShort(JOIN_PASSWORD_MIN_LENGTH),
+            fieldError: "password",
+          };
+        case "rate_limited":
+          return { error: t.errors.rateLimited, fieldError: null };
+        case "signup_failed":
+          console.error(err);
+          return { error: t.errors.genericFailure, fieldError: null };
+        // The remaining JoinErrorCode members belong to joinHousehold's own refusals
+        // (name collisions, an already-signed-in visitor, a duplicate email) and redeemPasswordReset
+        // never throws them — covered here only so this switch stays exhaustive.
+        case "name_taken":
+        case "already_member":
+        case "other_household":
+        case "email_taken":
+          return { error: t.errors.genericFailure, fieldError: null };
+        default: {
+          const _exhaustive: never = errCode;
+          return _exhaustive;
+        }
+      }
+    }
+    throw err;
+  }
+
+  redirect("/dashboard");
 }

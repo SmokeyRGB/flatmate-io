@@ -3,10 +3,12 @@
 import { revalidatePath } from "next/cache";
 import {
   DisplayNameConfirmationMismatchError,
+  ResidentProfileNotEligibleForResetError,
   createResidentProfile,
   deleteJoinCode,
   extendJoinCode,
   issueJoinCode,
+  issuePasswordResetLink,
   reactivateMember,
   removeMember,
   setMemberRole,
@@ -139,6 +141,31 @@ export async function issueJoinCodeForProfileAction(formData: FormData): Promise
     maxUses: 1,
     residentProfileId,
   });
+  revalidatePath("/members");
+}
+
+// identity/password-reset (O-16, human decision 2026-09-24): household sessions only —
+// issuePasswordResetLink itself refuses a moderator (assertIsAdministration). Errors surface via
+// Next's default error boundary, same convention as createResidentProfileAction's own
+// duplicate-name case: not worth a client-component reducer for one message.
+export async function issuePasswordResetLinkAction(formData: FormData): Promise<void> {
+  const current = await getCurrentSession();
+  if (!current) throw new Error("Not signed in");
+  const residentProfileId = String(formData.get("residentProfileId") ?? "");
+  if (!residentProfileId) return;
+
+  try {
+    await issuePasswordResetLink(current.context, current.context.accountId, residentProfileId);
+  } catch (err) {
+    if (err instanceof ResidentProfileNotEligibleForResetError) {
+      // One throw site, one message (design.md Decision 6's precedent) — surfaced the same way
+      // removeMemberAction's own genericRemoveFailure is, since this action has no reducer of its
+      // own to carry a coded error into.
+      throw new Error(de.members.joinCode.errors.notEligibleForReset);
+    }
+    throw err;
+  }
+
   revalidatePath("/members");
 }
 

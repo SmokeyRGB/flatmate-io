@@ -19,7 +19,10 @@ describe("Join code claim atomicity (EC-2.1)", () => {
     hh = await registerTestHousehold();
     const link = await issueJoinCode(hh.context, hh.accountId, { validDays: 7, maxUses: 1 });
 
-    const results = await Promise.allSettled([claimJoinCode(link.code), claimJoinCode(link.code)]);
+    const results = await Promise.allSettled([
+      claimJoinCode(link.code, "join"),
+      claimJoinCode(link.code, "join"),
+    ]);
 
     // Both promises resolve regardless of outcome (claimJoinCode's refusal is `null`, not a
     // rejection) — the race is in the VALUE, not in which promise settles which way.
@@ -37,7 +40,7 @@ describe("Join code claim atomicity (EC-2.1)", () => {
     hh = await registerTestHousehold();
     const link = await issueJoinCode(hh.context, hh.accountId, { validDays: 7, maxUses: 3 });
 
-    const attempts = Array.from({ length: 10 }, () => claimJoinCode(link.code));
+    const attempts = Array.from({ length: 10 }, () => claimJoinCode(link.code, "join"));
     const results = await Promise.allSettled(attempts);
     const successes = results.filter(
       (r): r is PromiseFulfilledResult<Awaited<ReturnType<typeof claimJoinCode>>> =>

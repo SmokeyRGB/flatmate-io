@@ -81,7 +81,7 @@ describe("Join atomicity (EC-2.1, design.md Decision 2)", () => {
 
     await expect(
       withSessionContext(wouldBeJoinerContext, async (tx) => {
-        const claimed = await claimJoinCodeTx(tx, link.code);
+        const claimed = await claimJoinCodeTx(tx, link.code, "join");
         expect(claimed).not.toBeNull(); // the claim itself succeeds...
 
         // ...but the very next statement in the SAME transaction violates the display-name

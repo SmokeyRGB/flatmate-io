@@ -188,6 +188,12 @@ export async function resolveAccountHousehold(accountId: string): Promise<string
 // of them (FR-2.8). `null` is the only failure value on both functions below — no reason, no
 // error subclass.
 //
+// resident-settings design.md Decision 4: every link now carries a purpose — 'join' is every link
+// this table has ever held, 'password_reset' is the new administration-issued reset link
+// (identity/password-reset). Kept as a plain string union here rather than imported from
+// schema.ts's pgEnum: this type describes the SQL function's output column, not the Drizzle table.
+export type JoinCodePurpose = "join" | "password_reset";
+
 // join-by-link design.md Decision 13: `boundResidentProfile` carries the bound profile's id and
 // display name when the resolved/claimed link names one, `null` for a neutral link — never a
 // second lookup, since drizzle/0015's resolve_join_code/claim_join_code already LEFT JOIN
@@ -197,6 +203,7 @@ export type JoinCodeResolution = {
   issuanceId: string;
   householdName: string;
   boundResidentProfile: { id: string; displayName: string } | null;
+  purpose: JoinCodePurpose;
 } | null;
 
 type JoinCodeFunctionRow = {
@@ -205,6 +212,7 @@ type JoinCodeFunctionRow = {
   household_name: string;
   bound_resident_profile_id: string | null;
   bound_resident_display_name: string | null;
+  purpose: JoinCodePurpose;
 };
 
 function toJoinCodeResolution(rows: JoinCodeFunctionRow[]): JoinCodeResolution {
@@ -218,6 +226,7 @@ function toJoinCodeResolution(rows: JoinCodeFunctionRow[]): JoinCodeResolution {
       row.bound_resident_profile_id && row.bound_resident_display_name
         ? { id: row.bound_resident_profile_id, displayName: row.bound_resident_display_name }
         : null,
+    purpose: row.purpose,
   };
 }
 
@@ -246,9 +255,14 @@ export async function resolveJoinCode(code: string): Promise<JoinCodeResolution>
 // three join-code tests that need a standalone statement — `join-code-atomicity.test.ts` races
 // concurrent claims against each other, which is precisely what a Tx-scoped variant cannot do
 // from outside its own (single) transaction.
-export async function claimJoinCode(code: string): Promise<JoinCodeResolution> {
+// resident-settings design.md Decision 4: the caller now STATES which purpose it redeems — so a
+// joining redemption can never spend a reset link and a reset redemption can never spend a joining
+// one, and neither needs a rollback to find out (the SQL function's own WHERE filters on
+// p_purpose). No default: every caller must say which purpose it means, deliberately, rather than
+// silently redeeming whatever the code happens to be.
+export async function claimJoinCode(code: string, purpose: JoinCodePurpose): Promise<JoinCodeResolution> {
   const rows = await db.execute<JoinCodeFunctionRow>(
-    sql`SELECT * FROM claim_join_code(${normalizeJoinCode(code)})`,
+    sql`SELECT * FROM claim_join_code(${normalizeJoinCode(code)}, ${purpose}::join_code_purpose)`,
   );
   return toJoinCodeResolution(rows);
 }
@@ -263,9 +277,13 @@ export async function claimJoinCode(code: string): Promise<JoinCodeResolution> {
 // control on it is the route's attempt limit (recordJoinAttempt), checked BEFORE any code lookup
 // (AC-2.25), not an identity check here. Adding an assert here would be tautological: there is no
 // identity yet to assert against.
-export async function claimJoinCodeTx(tx: Tx, code: string): Promise<JoinCodeResolution> {
+export async function claimJoinCodeTx(
+  tx: Tx,
+  code: string,
+  purpose: JoinCodePurpose,
+): Promise<JoinCodeResolution> {
   const rows = await tx.execute<JoinCodeFunctionRow>(
-    sql`SELECT * FROM claim_join_code(${normalizeJoinCode(code)})`,
+    sql`SELECT * FROM claim_join_code(${normalizeJoinCode(code)}, ${purpose}::join_code_purpose)`,
   );
   return toJoinCodeResolution(rows);
 }
@@ -360,6 +378,20 @@ export async function getMembershipForAccount(context: SessionContext, accountId
       .from(membership)
       .where(and(eq(membership.accountId, accountId), isNull(membership.revokedAt)));
     return row ?? null;
+  });
+}
+
+// resident-settings design.md Decision 8 (identity/account-settings): E1's own "current address, if
+// any" read. Self-service, own account only — the account acted on is ALWAYS context.accountId,
+// never a value the caller supplies (authorization-matrix.test.ts records this exemption). A
+// household session (profileId null) is refused, same shape as every other resident-only path.
+export async function getOwnAccountEmail(context: SessionContext): Promise<string | null> {
+  if (context.profileId === null) {
+    throw new PermissionDeniedError("this reads a resident's own account only (identity/account-settings)");
+  }
+  return withSessionContext(context, async (tx) => {
+    const [row] = await tx.select({ email: account.email }).from(account).where(eq(account.id, context.accountId));
+    return row?.email ?? null;
   });
 }
 
@@ -467,6 +499,10 @@ export type ResidentListEntry = {
   status: ResidentProfileStatus;
   contactDetail: null; // no contact-detail field exists on ResidentProfile in F1's scope
   role: MembershipRole | null; // null alongside accountId === null (not yet claimed)
+  // resident-settings design.md Decision 8 (data minimisation): the administration learns WHETHER
+  // a profile's account has an email, for O16's "Passwort-Link erstellen" row action — never the
+  // address itself. `false` alongside accountId === null (not yet claimed, no Account to carry one).
+  hasEmail: boolean;
 };
 
 // FR-1.25/FR-1.26/FR-1.27 (revised 2026-09-17, U-30)/FR-1.29: full parity for administration AND
@@ -496,19 +532,24 @@ export async function getResidentList(
         joinDate: residentProfile.movedInOn,
         status: residentProfile.status,
         role: membership.role,
+        accountEmail: account.email,
       })
       .from(residentProfile)
       .leftJoin(membership, eq(membership.residentProfileId, residentProfile.id))
+      .leftJoin(account, eq(account.id, membership.accountId))
       .where(
         and(eq(residentProfile.householdId, context.householdId), ne(residentProfile.status, "removed")),
       );
 
     const members: ResidentListEntry[] = rows.map((r) => ({
-      ...r,
+      id: r.id,
+      displayName: r.displayName,
+      status: r.status,
       accountId: r.accountId ?? null,
       joinDate: r.joinDate ? new Date(r.joinDate) : null,
       contactDetail: null,
       role: r.role ?? null,
+      hasEmail: r.accountEmail !== null,
     }));
 
     // AC-1.22/FR-1.29: administration is the only member -> lead with the join-code action
@@ -811,7 +852,17 @@ export interface IssueJoinCodeOptions {
   // verifies both conditions (same household, status "prepared") before it ever reaches the
   // insert; a bound link is always issued with maxUses forced to 1 regardless of what is passed.
   residentProfileId?: string;
+  // resident-settings design.md Decision 4/6: internal-only — omitted (defaults to 'join') for
+  // every ordinary invitation. 'password_reset' reaches this function only through
+  // issuePasswordResetLink below; issueJoinCode's own public options type (below) has no such
+  // field at all, so a route can never mint a reset link by passing this in directly.
+  purpose?: JoinCodePurpose;
 }
+
+// The public, route-reachable shape of IssueJoinCodeOptions — omits `purpose` entirely (D6:
+// "issueJoinCode's public options type stays without purpose"), so the only way to mint a
+// password-reset link is issuePasswordResetLink below, never issueJoinCode with a crafted option.
+export type PublicIssueJoinCodeOptions = Omit<IssueJoinCodeOptions, "purpose">;
 
 export class ResidentProfileNotEligibleForBindingError extends Error {
   constructor(residentProfileId: string) {
@@ -855,6 +906,14 @@ export class ResidentProfileNotEligibleForBindingError extends Error {
 // read-then-insert has the same race as the read-then-update Decision 1 rejected for claiming. A
 // SAVEPOINT (not a fresh transaction) is what lets a collision retry without aborting the rest of
 // the caller's transaction.
+//
+// resident-settings design.md Decision 6: `options.purpose` defaults to 'join'. For 'join' with a
+// residentProfileId, the `prepared` check below still applies — an invitation may only bind a
+// profile that hasn't been claimed yet. For 'password_reset' the check is SKIPPED: the public
+// caller (issuePasswordResetLink) has already verified the profile is `active`, its membership is
+// live, and its account has no email, inside the SAME transaction as this insert — re-deriving
+// that check here would just be the same read twice. Either purpose with a residentProfileId set
+// forces maxUses to 1 (a reset link is single-use by the same rule a bound invitation already is).
 export async function issueJoinCodeTx(
   tx: Tx,
   householdId: string,
@@ -862,6 +921,7 @@ export async function issueJoinCodeTx(
   options: IssueJoinCodeOptions,
 ): Promise<typeof joinCodeIssuance.$inferSelect> {
   const expiresAt = new Date(Date.now() + options.validDays * 24 * 60 * 60 * 1000);
+  const purpose: JoinCodePurpose = options.purpose ?? "join";
 
   // join-by-link design.md Decision 13: a bound link names one prepared profile of THIS
   // household — verified here, before any row is written, rather than trusted from the caller.
@@ -873,17 +933,19 @@ export async function issueJoinCodeTx(
   // maximum of one redemption"), regardless of what options.maxUses says.
   let maxUses = options.maxUses;
   if (options.residentProfileId) {
-    const [profile] = await tx
-      .select({ id: residentProfile.id })
-      .from(residentProfile)
-      .where(
-        and(
-          eq(residentProfile.id, options.residentProfileId),
-          eq(residentProfile.householdId, householdId),
-          eq(residentProfile.status, "prepared"),
-        ),
-      );
-    if (!profile) throw new ResidentProfileNotEligibleForBindingError(options.residentProfileId);
+    if (purpose === "join") {
+      const [profile] = await tx
+        .select({ id: residentProfile.id })
+        .from(residentProfile)
+        .where(
+          and(
+            eq(residentProfile.id, options.residentProfileId),
+            eq(residentProfile.householdId, householdId),
+            eq(residentProfile.status, "prepared"),
+          ),
+        );
+      if (!profile) throw new ResidentProfileNotEligibleForBindingError(options.residentProfileId);
+    }
     maxUses = 1;
   }
 
@@ -900,6 +962,7 @@ export async function issueJoinCodeTx(
           maxUses,
           createdByAccountId: actingAccountId,
           residentProfileId: options.residentProfileId ?? null,
+          purpose,
         })
         .returning();
       await tx.execute(sql`RELEASE SAVEPOINT join_code_issue`);
@@ -933,12 +996,71 @@ export async function issueJoinCodeTx(
 export async function issueJoinCode(
   context: SessionContext,
   actingAccountId: string,
-  options: IssueJoinCodeOptions,
+  options: PublicIssueJoinCodeOptions,
 ): Promise<typeof joinCodeIssuance.$inferSelect> {
   await assertIsAdministrationOrModerator(context, actingAccountId);
   return withSessionContext(context, (tx) =>
     issueJoinCodeTx(tx, context.householdId, actingAccountId, options),
   );
+}
+
+export class ResidentProfileNotEligibleForResetError extends Error {
+  constructor(residentProfileId: string) {
+    super(
+      `ResidentProfile ${residentProfileId} is not eligible for a password-reset link: not an ` +
+        `active, live member of this household, or its account already has an email`,
+    );
+    this.name = "ResidentProfileNotEligibleForResetError";
+  }
+}
+
+// resident-settings design.md Decision 6 (O-16, human decision 2026-09-24): the household
+// account — and ONLY the household account, proposal Assumption 5 — may issue a single-use
+// password-reset link for an ACTIVE profile of its own household whose account has no email yet.
+// One class, no distinguishable reason (the issueJoinCodeTx precedent above): a prepared,
+// moved-out or removed profile, a revoked membership, and a profile whose account already has an
+// email all refuse identically.
+//
+// Deliberately unserialized against a concurrent email add (design.md's "What serializes the
+// check-then-insert: nothing, deliberately") — an email added right after this check makes the
+// resulting link dead at resolve and at claim time (drizzle/0019's predicate, redeemPasswordReset's
+// own re-check), so a stale link this function issues costs nothing.
+const PASSWORD_RESET_LINK_VALID_DAYS = 7;
+
+export async function issuePasswordResetLink(
+  context: SessionContext,
+  actingAccountId: string,
+  residentProfileId: string,
+): Promise<typeof joinCodeIssuance.$inferSelect> {
+  await assertIsAdministration(context, actingAccountId);
+
+  return withSessionContext(context, async (tx) => {
+    const [row] = await tx
+      .select({ accountEmail: account.email })
+      .from(residentProfile)
+      .innerJoin(
+        membership,
+        and(eq(membership.residentProfileId, residentProfile.id), isNull(membership.revokedAt)),
+      )
+      .innerJoin(account, eq(account.id, membership.accountId))
+      .where(
+        and(
+          eq(residentProfile.id, residentProfileId),
+          eq(residentProfile.householdId, context.householdId),
+          eq(residentProfile.status, "active"),
+        ),
+      );
+    if (!row || row.accountEmail !== null) {
+      throw new ResidentProfileNotEligibleForResetError(residentProfileId);
+    }
+
+    return issueJoinCodeTx(tx, context.householdId, actingAccountId, {
+      validDays: PASSWORD_RESET_LINK_VALID_DAYS,
+      maxUses: 1,
+      residentProfileId,
+      purpose: "password_reset",
+    });
+  });
 }
 
 export class JoinCodeIssuanceNotFoundError extends Error {

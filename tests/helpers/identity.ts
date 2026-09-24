@@ -63,7 +63,10 @@ export async function cleanupHousehold(context: SessionContext, householdId: str
   });
 }
 
-function adminClient() {
+// Exported for resident-settings' own tests, which read/write a test account's Auth-side email
+// directly (getUserById/updateUserById) — the same service-role client this file already uses for
+// deleteUser, just no longer private to it.
+export function adminClient() {
   return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
     auth: { autoRefreshToken: false, persistSession: false },
   });

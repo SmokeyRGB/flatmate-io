@@ -16,6 +16,7 @@ import {
   extendJoinCodeAction,
   issueJoinCodeAction,
   issueJoinCodeForProfileAction,
+  issuePasswordResetLinkAction,
   reactivateMemberAction,
   setMemberRoleAction,
   setMovedOutAction,
@@ -60,15 +61,30 @@ function joinCodeStatusLabel(issuance: JoinCodeIssuanceRow, now: Date): string {
 // One card for one issuance, shared by the live list and the collapsed dead-links section below
 // (design.md Decision 9 revised: "dead-link rendering inside is unchanged" — same label, controls,
 // caution and joiner names either way).
-function renderJoinCodeCard(issuance: JoinCodeIssuanceRow, host: string | null, now: Date) {
+function renderJoinCodeCard(
+  issuance: JoinCodeIssuanceRow,
+  host: string | null,
+  now: Date,
+  profileNameById: Map<string, string>,
+) {
   const isDeleted = issuance.deletedAt !== null;
   const url = buildJoinUrl(host, issuance.code);
+  // identity/password-reset (O-16, design.md Decision 8): a reset row names the profile it was
+  // issued for, "Passwort-Link für <Name>", instead of the ordinary "who joined through this link"
+  // line below — a reset link never creates or claims a profile (spec), so that line would always
+  // read "noch niemand beigetreten" for it, which is not the fact this card should state.
+  const isReset = issuance.purpose === "password_reset";
+  const resetTargetName = isReset && issuance.residentProfileId
+    ? profileNameById.get(issuance.residentProfileId)
+    : undefined;
   return (
     <li key={issuance.id} className="card space-y-2">
       <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
         <span>{joinCodeStatusLabel(issuance, now)}</span>
         <span className="text-muted-foreground">{t.joinCode.usageCount(issuance.uses, issuance.maxUses)}</span>
       </div>
+
+      {resetTargetName && <p className="text-sm font-medium">{t.joinCode.resetLinkForName(resetTargetName)}</p>}
 
       {!isDeleted && (
         <div className="flex flex-wrap items-center gap-3">
@@ -97,12 +113,15 @@ function renderJoinCodeCard(issuance: JoinCodeIssuanceRow, host: string | null, 
       <JoinCodeCopyButtons code={issuance.code} url={url} />
 
       {/* AC-2.26: every link names who joined through it — live, used-up, or deleted
-          alike — and a link nobody used names nobody rather than rendering nothing. */}
-      <p className="text-xs text-muted-foreground">
-        {issuance.joinedResidentNames.length > 0
-          ? t.joinCode.joinedNames(issuance.joinedResidentNames)
-          : t.joinCode.joinedNoneYet}
-      </p>
+          alike — and a link nobody used names nobody rather than rendering nothing. A reset link
+          never creates or claims a profile (spec), so it never gets this line at all. */}
+      {!isReset && (
+        <p className="text-xs text-muted-foreground">
+          {issuance.joinedResidentNames.length > 0
+            ? t.joinCode.joinedNames(issuance.joinedResidentNames)
+            : t.joinCode.joinedNoneYet}
+        </p>
+      )}
     </li>
   );
 }
@@ -155,11 +174,23 @@ export default async function MembersPage() {
   // profile's own row renders its most recent bound issuance beside the "issue an invitation"
   // action, so the link is reachable without hunting through the general list below.
   const boundIssuancesByProfile = new Map<string, JoinCodeIssuanceRow>();
+  // identity/password-reset (O-16, design.md Decision 8): the most recent reset-purpose issuance
+  // per profile, so the row that just issued one can reveal it (the same "reachable without
+  // hunting through the general list" reasoning as boundIssuancesByProfile above).
+  const resetIssuancesByProfile = new Map<string, JoinCodeIssuanceRow>();
   for (const issuance of joinCodeIssuances) {
-    if (issuance.residentProfileId && !boundIssuancesByProfile.has(issuance.residentProfileId)) {
+    if (!issuance.residentProfileId) continue;
+    if (issuance.purpose === "password_reset") {
+      if (!resetIssuancesByProfile.has(issuance.residentProfileId)) {
+        resetIssuancesByProfile.set(issuance.residentProfileId, issuance);
+      }
+      continue;
+    }
+    if (!boundIssuancesByProfile.has(issuance.residentProfileId)) {
       boundIssuancesByProfile.set(issuance.residentProfileId, issuance);
     }
   }
+  const profileNameById = new Map(members.map((m) => [m.id, m.displayName]));
 
   // design.md Decision 9 (revised 2026-09-23): live links first as today, dead ones (expired,
   // used up or deleted) collapsed below — order within each part stays created_at DESC, since
@@ -242,7 +273,7 @@ export default async function MembersPage() {
         <p className="text-sm text-muted-foreground">{t.joinCode.empty}</p>
       ) : (
         <>
-          <ul className="space-y-3">{liveIssuances.map((issuance) => renderJoinCodeCard(issuance, host, now))}</ul>
+          <ul className="space-y-3">{liveIssuances.map((issuance) => renderJoinCodeCard(issuance, host, now, profileNameById))}</ul>
 
           {/* design.md Decision 9 (revised 2026-09-23, human decision from the 8.3 walkthrough):
               dead links (expired, used up or deleted) are still listed — "Ein toter Link
@@ -255,7 +286,7 @@ export default async function MembersPage() {
               <summary className="cursor-pointer text-sm text-muted-foreground">
                 {t.joinCode.deadLinksSummary(deadIssuances.length)}
               </summary>
-              <ul className="space-y-3 pt-3">{deadIssuances.map((issuance) => renderJoinCodeCard(issuance, host, now))}</ul>
+              <ul className="space-y-3 pt-3">{deadIssuances.map((issuance) => renderJoinCodeCard(issuance, host, now, profileNameById))}</ul>
             </details>
           )}
         </>
@@ -347,6 +378,18 @@ export default async function MembersPage() {
                         <UserMinus className="size-4" /> {t.markMovedOut}
                       </button>
                     </form>
+                    {/* identity/password-reset (O-16, proposal Assumption 5): household sessions
+                        only — issuePasswordResetLink itself refuses a moderator, so the button is
+                        not even offered to one (isAdmin, not canAct). Only while the gap it closes
+                        still exists: active, live, and no email yet. */}
+                    {isAdmin && m.status === "active" && !m.hasEmail && (
+                      <form action={issuePasswordResetLinkAction}>
+                        <input type="hidden" name="residentProfileId" value={m.id} />
+                        <button type="submit" className="btn btn-secondary">
+                          {t.joinCode.issueResetLink}
+                        </button>
+                      </form>
+                    )}
                   </div>
                 ) : (
                   <div className="flex flex-wrap items-center gap-2">
@@ -358,6 +401,28 @@ export default async function MembersPage() {
                     </form>
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* identity/password-reset (O-16, design.md Decision 8): reveals the most recently
+                issued reset link for this profile, with the E-03/K-18 caution (spec: "The screen
+                that issues it SHALL state that whoever holds the link can set this person's
+                password") — never presented as a security measure. */}
+            {isAdmin && m.status === "active" && !m.hasEmail && resetIssuancesByProfile.get(m.id) && (
+              <div className="mt-3 space-y-2">
+                <p className="field-helper">{t.joinCode.issuedForProfileHeading}</p>
+                <p className="text-xs text-muted-foreground">
+                  {joinCodeStatusLabel(resetIssuancesByProfile.get(m.id)!, now)}
+                </p>
+                <p className="font-mono text-sm font-semibold">{resetIssuancesByProfile.get(m.id)!.code}</p>
+                <JoinCodeCopyButtons
+                  code={resetIssuancesByProfile.get(m.id)!.code}
+                  url={buildJoinUrl(host, resetIssuancesByProfile.get(m.id)!.code)}
+                />
+                <div className="callout callout-caution">
+                  <TriangleAlert className="size-4" />
+                  <p>{t.joinCode.resetLinkIssuedCaution}</p>
+                </div>
               </div>
             )}
 

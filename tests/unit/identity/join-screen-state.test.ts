@@ -2,14 +2,15 @@ import { describe, expect, it } from "vitest";
 import { decideJoinScreen } from "@/app/(auth)/join/[code]/join-screen-state";
 import type { JoinCodeResolution } from "@/modules/identity/repository";
 
-const neutralResolution: JoinCodeResolution = {
+const neutralResolution: NonNullable<JoinCodeResolution> = {
   householdId: "11111111-1111-1111-1111-111111111111",
   issuanceId: "issuance-1",
   householdName: "WG Hauptstraße 12",
   boundResidentProfile: null,
+  purpose: "join",
 };
 
-const boundResolution: JoinCodeResolution = {
+const boundResolution: NonNullable<JoinCodeResolution> = {
   ...neutralResolution,
   boundResidentProfile: { id: "profile-1", displayName: "Robin" },
 };
