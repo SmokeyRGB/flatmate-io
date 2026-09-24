@@ -82,7 +82,7 @@
 | | |
 |---|---|
 | **Zweck** | Beantwortet „wer sind die sieben?" — nicht „wer wohnt hier?" (zweite, getrennte Frage: O16) |
-| **Zugang** | Tippen auf „5 von 7 haben abgestimmt" auf B1 oder D1 |
+| **Zugang** | Tippen auf „5 von 7 haben abgestimmt" auf D1 |
 
 **Kernelemente**
 
@@ -90,6 +90,10 @@
 - Keine Handlungen — reine Information
 - **Zeigt ausdrücklich nicht**, wer schon abgestimmt hat und wer nicht (kein „Pranger"; bereits
   heute Akzeptanzkriterium und SRD §10)
+
+> **Entschieden (2026-09-24):** B1 zeigt keinen Beteiligungsstand. Die Teilnehmendenliste gehört
+> zu D1, nach dem Screening. Begründung im Offene-Punkte-Register, `review-log.md`
+> §Offene-Punkte-Register.
 
 > **Unterschied zu O16 Mitglieder.** „Wer macht gerade mit" und „wer wohnt hier" sind nicht
 > dieselbe Frage (K-11, U-22, siehe Vergleichstabelle in §7-Einleitung zu O16).

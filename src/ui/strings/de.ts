@@ -27,6 +27,18 @@ export const de = {
     // used in screens/O-organisation.md and the prototype's own back-link pattern); every
     // sub-screen's back link points there under the same label.
     organisation: "Organisation",
+    // start-screen: the resident frame's bottom bar / header nav (rahmenwerk.md §4.1) and every
+    // back-link that now points at B1 instead of O1.
+    start: "Start",
+    casting: "Casting",
+    whoLivesHere: "Wer hier wohnt",
+    members: "Mitglieder",
+    toOrganisation: "Zur Organisation",
+    accountSettings: "Einstellungen",
+    // The menu trigger's accessible name carries the identity (AC-1.6), not just the action;
+    // <details> exposes its own expanded/collapsed state, so the label does not say "öffnen".
+    menuFor: (displayName: string) => `Menü für ${displayName}`,
+    mainNavigation: "Hauptnavigation",
   },
   status: {
     // Room states (data-model.md "Room", six states, FR-1.10) are read by a resident whenever a
@@ -394,10 +406,79 @@ export const de = {
   },
   whoLivesHere: {
     heading: "Wer hier wohnt",
-    householdAccountNotice:
-      'Diese Ansicht ist für Bewohner:innen. Die Verwaltung sieht die vollständige ' +
-      'Mitgliederliste unter „Mitglieder".',
     strangerNotice: "Erkennst du jemanden auf dieser Liste nicht wieder, sag es einer moderierenden Person — außerhalb der App.",
+  },
+  // start-screen (FR-2.20–2.24, `rahmenwerk.md` §2–§3): B1, the resident's Start screen.
+  start: {
+    // rahmenwerk.md §4.1: "Moin {Name}", household name muted beneath (design.md Decision 10).
+    greeting: (displayName: string) => `Moin ${displayName}`,
+    eyebrowAsNext: "ALS NÄCHSTES",
+    // T-5: how many applications await the viewer's vote, and where the task leads.
+    // rahmenwerk.md §8.6 binds this wording (`Notification.type = vote_pending` → „{N} Bewerbungen
+    // warten auf deine Stimme") — the same fact, so the same words on Start as in a notification.
+    voteTaskHeading: (count: number) =>
+      count === 1 ? "1 Bewerbung wartet auf deine Stimme" : `${count} Bewerbungen warten auf deine Stimme`,
+    voteTaskButton: "Jetzt sichten",
+    reasonDated: (dateLabel: string) => `Stimme ab bis ${dateLabel}.`,
+    reasonOverdue: "Die Frist ist abgelaufen — deine Stimme zählt trotzdem noch.",
+    reasonUndated: (roundTitle: string) => `In der Runde „${roundTitle}" wird gerade abgestimmt.`,
+    andNMore: (n: number) => `und ${n} weitere`,
+    // rahmenwerk.md §3.1's phase labels — the round's standing, shown when nothing is open.
+    phase: {
+      waiting_for_applications: "Warten auf Bewerbungen",
+      voting_round_1: "Abstimmung Runde 1",
+      scheduling: "Terminfindung",
+      voting_round_2: "Abstimmung Runde 2",
+      offer: "Zusage läuft",
+    },
+    // design.md Decision 6: the four display buckets beneath the phase, non-zero only.
+    distribution: {
+      in_screening: (n: number) => `${n} in Sichtung`,
+      in_scheduling: (n: number) => `${n} im Termin`,
+      interviewed: (n: number) => `${n} gecastet`,
+      in_offer: (n: number) => `${n} in Zusage`,
+    },
+    noRoundSentence: "Gerade läuft keine Runde.",
+    runningWithoutYouSentence: "Eine Runde läuft, aber (noch) ohne dich.",
+    // U-5, `rahmenwerk.md` §2.3: the moderation bridge — visually distinct from the resident's own
+    // task list, never mixed into it.
+    bridge: {
+      eyebrow: "MODERATION",
+      headingSingular: "1 Sache wartet auf dich",
+      headingPlural: (n: number) => `${n} Sachen warten auf dich`,
+      body: "Ein Zimmer ist bereit für eine neue Runde.",
+      allDone: "Alles erledigt – gut gemacht",
+      button: "Zur Organisation →",
+    },
+  },
+  // start-screen: the Casting tab (placeholder until F4/F5) and its screening step placeholder.
+  casting: {
+    placeholderHeading: "Casting",
+    placeholderBody: "Wird in F4 & F5 gebaut.",
+    backToStart: "Zurück zu Start",
+  },
+  screening: {
+    placeholderHeading: "Sichten",
+    placeholderBody: (count: number) =>
+      count === 1
+        ? "1 Bewerbung wartet auf deine Stimme. Das Sichten selbst wird in F4 gebaut."
+        : `${count} Bewerbungen warten auf deine Stimme. Das Sichten selbst wird in F4 gebaut.`,
+    backToStart: "Zurück zu Start",
+  },
+  // start-screen: E1, the resident's own settings — a placeholder until change 5 fills it.
+  account: {
+    heading: "Einstellungen",
+    placeholderBody: "E-Mail-Adresse hinzufügen und Passwort ändern folgen im nächsten Schritt.",
+    backToStart: "Zurück zu Start",
+  },
+  // start-screen: the shared error boundary for every `(resident)` screen — same reasoning as
+  // `de.join.unexpectedError` (generic on purpose, G-A5: never the failure's own text).
+  resident: {
+    unexpectedError: {
+      heading: "Das hat gerade nicht geklappt.",
+      body: "Nichts ist verloren gegangen — du kannst es einfach noch einmal versuchen.",
+      retry: "Erneut versuchen",
+    },
   },
   document: {
     description: "Das Tool, mit dem die WG entscheidet.",

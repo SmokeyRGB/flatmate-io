@@ -44,7 +44,7 @@ context: |
   entities, fields, states, enums, functions, tables, commit messages, code comments, plus
   docs/backlog/**, docs/COVERAGE.md, tools/** and everything under openspec/.
 
-  BEFORE A CHANGE IS DONE: `npm run verify` must pass. That is eslint, the four hand-written
+  BEFORE A CHANGE IS DONE: `npm run verify` must pass. That is eslint, the six hand-written
   guardrail lints in scripts/lint/, tools/check-refs.ts, and the full vitest suite against the
   flatmate-io-dev Supabase project. Not `npm test` — the lints are the guardrails.
 

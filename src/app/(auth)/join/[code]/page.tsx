@@ -1,5 +1,6 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
+import { landingPathFor } from "@/app/landing";
 import { JOIN_PASSWORD_MIN_LENGTH, joinAttemptSourceHash } from "@/modules/identity/auth";
 import { recordJoinAttempt, resolveJoinCode } from "@/modules/identity/repository";
 import { getCurrentSession } from "@/modules/identity/session-cookie";
@@ -61,10 +62,15 @@ export default async function JoinPage({ params }: { params: Promise<{ code: str
         </div>
       );
 
-    case "already_member":
-      // design.md Decision 9 (EC-2.4): a visitor already signed in as a member of THIS household
-      // gets no second identity — taken to Start with a note (proposal.md Assumption 4).
-      redirect("/dashboard?note=already_member");
+    case "already_member": {
+      // start-screen design.md Decision 8/3 (EC-2.4): a visitor already signed in as a member of
+      // THIS household gets no second identity — taken to their OWN landing (Start for a
+      // resident, the household settings screen for the household account) with a note.
+      // `already_member` is only reached when `sessionHouseholdId` matched the resolved
+      // household, so `current` is never null here.
+      const landingPath = landingPathFor(current!.context);
+      redirect(`${landingPath}?note=already_member`);
+    }
 
     case "other_household":
       return (

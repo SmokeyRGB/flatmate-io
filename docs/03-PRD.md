@@ -457,13 +457,16 @@ zuerst?**
 | Zimmerstand | „3 Zimmer · 1 vergeben" |
 | **Primärer CTA** | **genau einer**, mit konkreter Zahl, direktem Ziel und genanntem Grund (z. B. „Notiz zu Lea schreiben — 4 andere warten darauf"). Sortiert nach **Zeitdruck** (`CastingRound.phase_deadline_at` wo vorhanden, S-44), nicht nach fester Rangliste — Details Screen-Inventar §2 |
 | Weitere Aufgaben | bis zu drei Zeilen darunter, Rest eingeklappt als „und N weitere" |
-| Beteiligungsstand | **„5 von 7 haben abgestimmt"** (Nenner ohne `moved_out`, E-14) |
 | Seit dem letzten Besuch | ausschließlich `outcome`-Ereignisse (§4.1.12), maximal fünf Zeilen, mit „alles ansehen" ins Activity Center |
 | **Moderations-Brücke** (nur mit Rechten) | **eine** Zeile am Fuß, nie in die persönliche Aufgabenliste gemischt: „N Dinge brauchen deine Moderation →" (U-5) |
 | **PWA-Install-Band** (S-45) | eigenes, optisch abgesetztes Band **unter** dem primären CTA — sichtbar und wiederkehrend, aber **nie** auf dem CTA-Platz und nie über einer fristgebundenen Aufgabe (löst B-2, Konflikt 2 aus dem Plan V5; korrigiert `04-Domaenenmodell.md`, siehe Nachzug dort) |
 | Resident-E-Mail-Nachfrage (optional) | siehe §4.1.13 |
 
 **Ist nichts offen**, steht dort der Rundenstand — nie eine leere Fläche (unverändert ggü. V0.5).
+
+> **Menschliche Entscheidung (2026-09-24):** Der Beteiligungsstand steht nicht auf Start, sondern
+> im Casting-Tab (D1) nach dem Screening. Begründung und die vollständige Liste der geänderten
+> Stellen im Offene-Punkte-Register, `review-log.md` §Offene-Punkte-Register.
 
 **Akzeptanzkriterien §4.1.2**
 

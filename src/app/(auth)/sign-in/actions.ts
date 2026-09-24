@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { SignInError, signIn } from "@/modules/identity/auth";
 import { sessionCookieMaxAge, setSessionCookie } from "@/modules/identity/session-cookie";
 import { de } from "@/ui/strings";
+import { landingPathFor } from "@/app/landing";
 
 export interface SignInFormState {
   error: string | null;
@@ -16,6 +17,7 @@ export async function signInAction(
   formData: FormData,
 ): Promise<SignInFormState> {
   const mode = String(formData.get("mode") ?? "household");
+  let landingPath: "/dashboard" | "/settings";
 
   try {
     const result =
@@ -37,6 +39,7 @@ export async function signInAction(
       result.context.householdId,
       sessionCookieMaxAge(result.session.expiresAt),
     );
+    landingPath = landingPathFor(result.context);
   } catch (err) {
     if (err instanceof SignInError) {
       // Exhaustive switch (design.md Decision 4): a missed code is a compile error.
@@ -61,5 +64,5 @@ export async function signInAction(
     throw err;
   }
 
-  redirect("/dashboard");
+  redirect(landingPath);
 }

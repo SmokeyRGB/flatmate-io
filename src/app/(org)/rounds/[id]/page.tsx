@@ -27,7 +27,7 @@ export default async function RoundDetailPage({ params }: { params: Promise<{ id
 
   return (
     <div className="mx-auto max-w-2xl space-y-6 p-6">
-      <Link href="/dashboard" className="back-link">
+      <Link href="/organization" className="back-link">
         <ArrowLeft className="size-4" /> {de.nav.organisation}
       </Link>
 
