@@ -42,23 +42,27 @@ function walk(dir: string, pattern: RegExp): string[] {
 //   - `SET [LOCAL|SESSION] <any identifier> =`: any identifier, as the original rule had it. The
 //     first rewrite required a dotted name and so let `SET search_path = …` / `SET role = …` pass
 //     (code review of this change).
-//   - `SET [LOCAL|SESSION] <identifier> TO`: only with a dotted (namespaced) identifier, or with
-//     both keywords in capitals. English prose in comments ("… set it to `true` …") must not
-//     match, and prose never capitalises both or names `app.household_id`.
+//   - `SET [LOCAL|SESSION] <identifier> TO`: any identifier, any case. Comments are blanked
+//     first (blankComments below), so prose in them never matches.
 // `UPDATE <table> SET col = …` is an ordinary column assignment, not a setting, and is excluded.
 const NOT_AFTER_UPDATE = String.raw`(?<!\bUPDATE\s+(?:ONLY\s+)?[\w."]+(?:\s+(?:AS\s+)?\w+)?\s+)`;
 const SET_EQ_RE = new RegExp(
   NOT_AFTER_UPDATE + String.raw`\bSET\s+(?:(LOCAL|SESSION)\s+)?"?[\w.]+"?\s*=`,
   "gi",
 );
-const SET_TO_DOTTED_RE = new RegExp(
-  NOT_AFTER_UPDATE + String.raw`\bSET\s+(?:(LOCAL|SESSION)\s+)?"?\w+"?\."?\w+"?\s+TO\b`,
+const SET_TO_RE = new RegExp(
+  NOT_AFTER_UPDATE + String.raw`\bSET\s+(?:(LOCAL|SESSION)\s+)?"?[\w.]+"?\s+TO\b`,
   "gi",
 );
-const SET_TO_UPPER_RE = new RegExp(
-  NOT_AFTER_UPDATE + String.raw`\bSET\s+(?:(LOCAL|SESSION)\s+)?"?[\w.]+"?\s+TO\b`,
-  "g",
-);
+
+// Comments are blanked before the SET check, keeping every newline so reported line numbers stay
+// right. That is what lets the TO form be case-insensitive (Copilot review of PR #26: `SET
+// search_path to public` passed): English prose such as "... set it to `true` ..." lives in
+// comments, not in code.
+function blankComments(source: string): string {
+  const keepNewlines = (text: string) => text.replace(/[^\n]/g, " ");
+  return source.replace(/\/\*[\s\S]*?\*\//g, keepNewlines).replace(/\/\/.*$/gm, keepNewlines);
+}
 
 // `set_config(...)`, case-insensitive, tolerating optional quotes and whitespace around the name
 // (`"set_config"(...)`) — matches even a call whose argument list spans multiple lines (`[^)]*`
@@ -67,10 +71,11 @@ const SET_CONFIG_RE = /"?set_config"?\s*\(([^)]*)\)/gi;
 
 function checkSetStatements(content: string, relPath: string, violations: LintViolation[]): void {
   const seen = new Set<number>();
-  for (const re of [SET_EQ_RE, SET_TO_DOTTED_RE, SET_TO_UPPER_RE]) {
+  const code = blankComments(content);
+  for (const re of [SET_EQ_RE, SET_TO_RE]) {
     re.lastIndex = 0;
     let match: RegExpExecArray | null;
-    while ((match = re.exec(content)) !== null) {
+    while ((match = re.exec(code)) !== null) {
       if (seen.has(match.index)) continue;
       seen.add(match.index);
       const line = content.slice(0, match.index).split("\n").length;

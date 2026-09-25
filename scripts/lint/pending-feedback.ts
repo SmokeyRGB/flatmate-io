@@ -80,11 +80,22 @@ function lineOf(source: string, index: number): number {
   return source.slice(0, index).split("\n").length;
 }
 
-// Whether a loading.tsx's content imports the shared skeleton shapes. A `loading.tsx` returning
-// `null` (or anything else that never touches @/ui/skeletons) would satisfy a mere-presence check
-// while showing a blank screen — the spec forbids that, so presence alone is not enough.
+// Whether a loading.tsx renders at least one of the shared skeleton shapes. A `loading.tsx`
+// returning `null` would satisfy a mere-presence check while showing a blank screen, which the
+// spec forbids. An import alone isn't enough either (Copilot review of PR #26): the file must
+// import from @/ui/skeletons AND render one of the imported names as a JSX element.
 export function importsSkeletons(loadingContent: string): boolean {
-  return /@\/ui\/skeletons/.test(stripComments(loadingContent));
+  const code = stripComments(loadingContent);
+  const importRe = /import\s*\{([^}]*)\}\s*from\s*["']@\/ui\/skeletons["']/g;
+  const names: string[] = [];
+  let match: RegExpExecArray | null;
+  while ((match = importRe.exec(code)) !== null) {
+    for (const part of match[1].split(",")) {
+      const local = part.trim().split(/\s+as\s+/).pop()?.trim();
+      if (local) names.push(local);
+    }
+  }
+  return names.some((name) => new RegExp(`<${name}\\b`).test(code));
 }
 
 export function checkPendingFeedbackLint(rootDir: string): LintViolation[] {
@@ -127,7 +138,7 @@ export function checkPendingFeedbackLint(rootDir: string): LintViolation[] {
         file: relLoadingPath,
         line: 1,
         rule: "loading-missing-skeleton-import",
-        text: "does not import @/ui/skeletons",
+        text: "renders no skeleton from @/ui/skeletons",
       });
     }
   }

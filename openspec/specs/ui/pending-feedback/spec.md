@@ -9,7 +9,8 @@ so that nothing a person clicks looks unresponsive.
 
 While a form is submitting, its submit button SHALL:
 - show a pending indicator inside itself;
-- be disabled, so it cannot be submitted a second time;
+- ignore further clicks, so it cannot be submitted a second time, while keeping keyboard focus (it
+  is marked as unavailable to assistive technology rather than natively disabled);
 - expose the pending state to assistive technology.
 
 It SHALL keep its size, so nothing around it moves. The indicator SHALL NOT cover the page or any
@@ -19,7 +20,8 @@ visible. Sources: `screens/rahmenwerk.md` §6 (*„Nie Vollbild-Spinner, nie Lay
 
 #### Scenario: Submitting shows the pending state
 - **WHEN** a person submits any form
-- **THEN** its submit button shows a pending indicator and is disabled until the submission ends
+- **THEN** its submit button shows a pending indicator and accepts no further submission until the
+  submission ends
 
 #### Scenario: No double submission
 - **WHEN** a person, once the page is interactive, clicks a submit button a second time while the

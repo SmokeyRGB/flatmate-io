@@ -101,6 +101,20 @@ describe("pending-feedback lint (ui/pending-feedback)", () => {
     expect(violations.some((v) => v.rule === "missing-loading")).toBe(true);
   });
 
+  it("flags a loading.tsx that imports a skeleton but renders none", () => {
+    // Copilot review of PR #26. Break: accept a bare import again, and this fixture passes.
+    expect(
+      importsSkeletons(
+        `import { SkeletonHeading } from "@/ui/skeletons";\nexport default function L() { return null; }`,
+      ),
+    ).toBe(false);
+    expect(
+      importsSkeletons(
+        `import { SkeletonHeading as H } from "@/ui/skeletons";\nexport default function L() { return <H />; }`,
+      ),
+    ).toBe(true);
+  });
+
   it("flags a loading.tsx that imports no skeleton", () => {
     fixtureDir = mkdtempSync(join(tmpdir(), "flatmate-lint-"));
     writeFixture("src/app/(org)/settings/page.tsx", `export default function P() { return null; }`);

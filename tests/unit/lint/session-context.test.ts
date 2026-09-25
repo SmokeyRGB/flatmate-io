@@ -171,6 +171,17 @@ describe("session-context lint — SET coverage after the code review", () => {
     expect(checkSessionContextLint(fixtureDir)).toHaveLength(0);
   });
 
+  it("flags SET ... to with a lowercase to", () => {
+    // Copilot review of PR #26. Break: make the TO form case-sensitive again, and this fails.
+    fixtureDir = mkdtempSync(join(tmpdir(), "flatmate-lint-"));
+    writeFixture(
+      "src/modules/casting/repository.ts",
+      ["await tx.execute(sql`SET search_path to public`);", "await tx.execute(sql`set role to postgres`);"].join("\n"),
+    );
+    const lines = checkSessionContextLint(fixtureDir).filter((v) => v.rule === "bare-set").map((v) => v.line);
+    expect(lines).toEqual([1, 2]);
+  });
+
   it("does not flag English prose in a comment", () => {
     fixtureDir = mkdtempSync(join(tmpdir(), "flatmate-lint-"));
     writeFixture(
