@@ -15,6 +15,7 @@ import {
   adminClient,
   cleanupAll,
   cleanupHousehold,
+  deleteTestAccount,
   registerTestHousehold,
   testEmail,
   type TestHousehold,
@@ -53,7 +54,7 @@ async function findAuthUserIdByEmail(email: string): Promise<string | null> {
 
 async function deleteAuthUserByEmail(email: string): Promise<void> {
   const id = await findAuthUserIdByEmail(email);
-  if (id) await adminClient().auth.admin.deleteUser(id);
+  if (id) await deleteTestAccount(id);
 }
 
 let hh: TestHousehold | undefined;
@@ -173,12 +174,19 @@ describe("A provider user created before a failing transaction is deleted again"
       () => (settled = true),
       () => (settled = true),
     );
-    // The Auth user existing means the pre-check already passed.
+    // The Auth user existing means the pre-check already passed. Asserted, so a claim that failed
+    // before createUser (or a poll that timed out) cannot pass this test by the wrong path.
     const deadline = Date.now() + 30_000;
-    while (!settled && Date.now() < deadline && (await findAuthUserIdByEmail(derivedEmail)) === null) {
+    let sawAuthUser = false;
+    while (!settled && Date.now() < deadline) {
+      if ((await findAuthUserIdByEmail(derivedEmail)) !== null) {
+        sawAuthUser = true;
+        break;
+      }
       await new Promise((resolve) => setTimeout(resolve, 200));
     }
     release();
+    expect(sawAuthUser).toBe(true);
     await holder;
 
     await expect(claim).rejects.toBeInstanceOf(ClaimError);

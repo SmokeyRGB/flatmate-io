@@ -75,10 +75,13 @@ function isEmailTakenError(
 }
 
 // Best-effort, no retry loop: a failure deleting the Auth user must not mask the error that made
-// the deletion necessary, or crash the request.
+// the deletion necessary, or crash the request. The client reports an API refusal as a returned
+// `error`, not a rejection (Copilot, PR #25) — only a transport failure rejects — so both are
+// checked; either way the address stays taken, and the log is the only trace of it.
 async function deleteAuthUserBestEffort(accountId: string): Promise<void> {
   try {
-    await supabaseAdmin().auth.admin.deleteUser(accountId);
+    const { error } = await supabaseAdmin().auth.admin.deleteUser(accountId);
+    if (error) console.error(error);
   } catch (err) {
     console.error(err);
   }
