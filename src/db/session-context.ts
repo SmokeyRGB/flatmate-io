@@ -32,46 +32,69 @@ function assertUuid(value: string, label: string): void {
 /**
  * The ONE place `account_id`/`household_id`/`profile_id` may be set for row-level security to
  * read (FR-1's extension of F0's FR-0.3, `docs/GUARDRAILS.md` G-C8, `docs/adr/0004-*.md`'s
- * canonical variable names). No other file may call `SET`/`SET LOCAL` on this context.
+ * canonical variable names). No other file may call `SET`/`SET LOCAL`/`set_config` for this
+ * context.
  *
- * Uses `SET LOCAL`, never bare `SET` (FR-0.4): `LOCAL` scopes the setting to the current
- * transaction, so it is discarded at COMMIT/ROLLBACK — exactly when a transaction-mode pooler
- * reclaims the physical connection for the next tenant (`research.md` §1). Splitting the
- * `SET LOCAL` and the dependent query across two transactions would defeat this; that is what the
- * guarded pool-reuse test (G-D10/AC-0.7) exists to catch.
+ * loading-feedback design.md D9 (human approval 2026-09-25): runs ONE statement,
+ * `SELECT set_config(…, true), …`, instead of up to three separate `SET LOCAL` statements — three
+ * round trips become one. `set_config` with its third (`is_local`) argument literally `true` IS
+ * `SET LOCAL`: the setting is scoped to the current transaction and is discarded at COMMIT/ROLLBACK,
+ * exactly when a
+ * transaction-mode pooler reclaims the physical connection for the next tenant (`research.md`
+ * §1). Unlike `SET LOCAL`, `set_config` is a function, so several calls fit into one `SELECT`,
+ * which is what makes collapsing the three statements into one possible. Splitting the context-setting statement and
+ * the dependent query across two transactions would defeat this; that is what the guarded
+ * pool-reuse test (G-D10/AC-0.7) exists to catch, and `applySessionContext` itself now has a
+ * sibling test through the real mechanism
+ * (`tests/integration/raw-sql/session-context-set-config.test.ts`).
  *
- * `profileId` is set via `SET LOCAL` only when non-null — a household-account session (ADR-013)
- * leaves `app.profile_id` unset entirely. On a FRESH connection `current_setting('app.profile_id',
- * true)` then returns real SQL `NULL`. **That holds only on a fresh connection.** Once a
- * transaction on a physical connection has set the `app.profile_id` placeholder, a later
- * transaction that leaves it unset reads it back as `''` (empty string), not `NULL` — the
- * Supavisor transaction pooler reuses physical connections across transactions
+ * `profileId`'s `set_config` call is omitted entirely when it is null — a household-account
+ * session (ADR-013) leaves `app.profile_id` unset, exactly as before. On a FRESH connection
+ * `current_setting('app.profile_id', true)` then returns real SQL `NULL`. **That holds only on a
+ * fresh connection.** Once a transaction on a physical connection has set the `app.profile_id`
+ * placeholder, a later transaction that leaves it unset reads it back as `''` (empty string), not
+ * `NULL` — the Supavisor transaction pooler reuses physical connections across transactions
  * (`tests/integration/raw-sql/pool-reuse.test.ts` covers exactly this and accepts both values).
  * Every policy that gates on profile presence must therefore wrap the read in
  * `nullif(current_setting('app.profile_id', true), '')`, matching
  * `docs/domain/invarianten.md` §5.5's `app_profile_id()` definition (`research.md` §1;
  * openspec application-requires-resident-profile).
  *
- * `SET LOCAL` does not accept bind parameters at the protocol level, so every value is validated
- * as a UUID (a closed, SQL-metacharacter-free format) before being interpolated into the
- * statement — never passed through unchecked.
+ * `assertUuid` is what makes inlining the values safe (see the comment in the body): each one is
+ * checked against a closed UUID format before it reaches the statement. The design first chose
+ * bound parameters; measurement showed they cost an extra round trip per call under
+ * `prepare: false`, so the values are inlined behind the same check the `SET LOCAL` version used.
  */
-export async function withSessionContext<T>(
-  context: SessionContext,
-  fn: (tx: Tx) => Promise<T>,
-): Promise<T> {
+export async function applySessionContext(tx: Tx, context: SessionContext): Promise<void> {
   assertUuid(context.accountId, "accountId");
   assertUuid(context.householdId, "householdId");
   if (context.profileId !== null) {
     assertUuid(context.profileId, "profileId");
   }
 
+  // The values are inlined, not bound: each was just checked by assertUuid, a closed format with
+  // no quote or SQL metacharacter, which is the same guarantee the earlier SET LOCAL statements
+  // relied on. A bound parameter costs an extra round trip here, because the driver runs with
+  // `prepare: false` (required by the Supavisor transaction pooler) and first asks Postgres for
+  // the parameter types. Measured from the dev machine: ~95 ms for the inlined statement inside a
+  // transaction, ~125 ms bound. Each set_config stays on its own line with a literal `true`, so
+  // scripts/lint/session-context.ts can see that it is transaction-local.
+  const statement = [
+    `SELECT set_config('app.account_id', '${context.accountId}', true) AS account_id,`,
+    `       set_config('app.household_id', '${context.householdId}', true) AS household_id`,
+    ...(context.profileId !== null
+      ? [`     , set_config('app.profile_id', '${context.profileId}', true) AS profile_id`]
+      : []),
+  ].join("\n");
+  await tx.execute(sql.raw(statement));
+}
+
+export async function withSessionContext<T>(
+  context: SessionContext,
+  fn: (tx: Tx) => Promise<T>,
+): Promise<T> {
   return db.transaction(async (tx) => {
-    await tx.execute(sql.raw(`SET LOCAL app.account_id = '${context.accountId}'`));
-    await tx.execute(sql.raw(`SET LOCAL app.household_id = '${context.householdId}'`));
-    if (context.profileId !== null) {
-      await tx.execute(sql.raw(`SET LOCAL app.profile_id = '${context.profileId}'`));
-    }
+    await applySessionContext(tx as unknown as Tx, context);
     return fn(tx as unknown as Tx);
   });
 }

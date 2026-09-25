@@ -3,6 +3,7 @@
 import { Lock } from "lucide-react";
 import { useActionState } from "react";
 import { de } from "@/ui/strings";
+import { SubmitButton } from "@/ui/submit-button";
 import { updateSettingsAction, type SettingsFormState } from "./actions";
 
 const initialState: SettingsFormState = { error: null };
@@ -15,7 +16,7 @@ export function SettingsForm({
   quorumShare: string;
   openRoundTitle: string | null;
 }) {
-  const [state, formAction, pending] = useActionState(updateSettingsAction, initialState);
+  const [state, formAction] = useActionState(updateSettingsAction, initialState);
 
   return (
     <div className="space-y-4">
@@ -37,9 +38,9 @@ export function SettingsForm({
 
           {state.error && <p className="field-error">{state.error}</p>}
 
-          <button type="submit" disabled={pending} className="btn btn-primary">
-            {pending ? t.savePending : t.save}
-          </button>
+          <SubmitButton className="btn btn-primary" pendingLabel={t.savePending}>
+            {t.save}
+          </SubmitButton>
         </fieldset>
       </form>
     </div>

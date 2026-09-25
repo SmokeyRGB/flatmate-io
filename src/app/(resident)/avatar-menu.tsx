@@ -5,6 +5,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef } from "react";
 import { de } from "@/ui/strings";
+import { LinkPendingHint } from "@/ui/link-pending-hint";
+import { SubmitButton } from "@/ui/submit-button";
 import { menuItems, type MenuItem } from "./menu-items";
 
 const ICONS = { Users, Home } as const;
@@ -87,17 +89,19 @@ export function AvatarMenu({
           return (
             <Link key={item.key} href={item.href} className="avatar-menu-item">
               <Icon className="size-4" /> {item.label}
+              <LinkPendingHint />
             </Link>
           );
         })}
         <div className="avatar-menu-divider" />
         <Link href="/account" className="avatar-menu-item">
           <Settings className="size-4" /> {de.nav.accountSettings}
+          <LinkPendingHint />
         </Link>
         <form action={signOutAction}>
-          <button type="submit" className="avatar-menu-item">
-            <LogOut className="size-4" /> {de.common.signOut}
-          </button>
+          <SubmitButton className="avatar-menu-item" icon={<LogOut className="size-4" />}>
+            {de.common.signOut}
+          </SubmitButton>
         </form>
       </div>
     </details>

@@ -65,10 +65,11 @@ builds the pieces once, and adds a check that makes every later change use them.
 - **Fewer round trips per database call (human approval 2026-09-25).** `withSessionContext`
   currently sets the RLS context with up to three separate `SET LOCAL` statements, three round
   trips before the actual query.
-  - They become **one** `SELECT set_config(…, true), …` with bound parameters. `set_config` with
-    `is_local = true` is exactly `SET LOCAL`: it ends with the transaction.
-  - A call then takes four round trips instead of six (BEGIN, context, query, COMMIT), about 190 →
-    125 ms measured from the human's machine.
+  - They become **one** `SELECT set_config(…, true), …`, with the values checked by `assertUuid`
+    as before. `set_config` with `is_local = true` is exactly `SET LOCAL`: it ends with the
+    transaction.
+  - A call then takes four round trips instead of six (BEGIN, context, query, COMMIT). Measured
+    from the human's machine: about 190 → 135 ms (design D9, "Measured during the apply").
   - The G-C8 lint (`scripts/lint/session-context.ts`) learns `set_config`. Today it doesn't
     recognise it at all, so a session-wide `set_config(…, false)` anywhere in `src/` would pass
     unnoticed. It allows `set_config` only in `src/db/session-context.ts`, only with

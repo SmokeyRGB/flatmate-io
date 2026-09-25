@@ -5,6 +5,7 @@ import { listRoundsForSession } from "@/modules/casting/repository";
 import { getNavigationAccess } from "@/modules/identity/repository";
 import { getCurrentSession } from "@/modules/identity/session-cookie";
 import { de } from "@/ui/strings";
+import { LinkPendingHint } from "@/ui/link-pending-hint";
 
 const t = de.org.dashboard;
 
@@ -38,6 +39,7 @@ export default async function OrganizationPage() {
       {current.context.profileId !== null && (
         <Link href="/dashboard" className="back-link">
           <ArrowLeft className="size-4" /> {de.nav.start}
+          <LinkPendingHint />
         </Link>
       )}
       <h1 className="font-serif text-2xl font-semibold">{t.heading}</h1>
@@ -47,6 +49,7 @@ export default async function OrganizationPage() {
           <p className="eyebrow">{t.activeRoundEyebrow}</p>
           <p className="mt-1 text-lg font-medium">{active.title}</p>
           <span className="badge mt-2">{de.status.round[active.status as keyof typeof de.status.round]}</span>
+          <LinkPendingHint />
         </Link>
       ) : (
         // The single most important prompt on this page when nothing else is going on yet —
@@ -60,6 +63,7 @@ export default async function OrganizationPage() {
             <p className="text-sm text-muted-foreground">{t.openFirstRoundBody}</p>
             <Link href="/rounds/new" className="btn btn-primary">
               {t.openNewRound} <ArrowRight className="size-4" />
+              <LinkPendingHint />
             </Link>
           </div>
         </div>
@@ -68,6 +72,7 @@ export default async function OrganizationPage() {
       {active && (
         <Link href="/rounds/new" className="btn-link">
           {t.openAnotherRound}
+          <LinkPendingHint />
         </Link>
       )}
 
@@ -79,6 +84,7 @@ export default async function OrganizationPage() {
               <li key={r.id} className="text-sm text-muted-foreground">
                 <Link href={`/rounds/${r.id}`} className="btn-link">
                   {r.title} — {de.status.round[r.status as keyof typeof de.status.round]}
+                  <LinkPendingHint />
                 </Link>
               </li>
             ))}
@@ -89,18 +95,22 @@ export default async function OrganizationPage() {
       <div className="flex flex-wrap gap-4 border-t border-border pt-4 text-sm">
         <Link href="/rooms" className="btn-link">
           {t.roomsLink}
+          <LinkPendingHint />
         </Link>
         {canSeeMembersList && (
           <Link href="/members" className="btn-link">
             {t.membersLink}
+            <LinkPendingHint />
           </Link>
         )}
         <Link href="/settings" className="btn-link">
           {t.settingsLink}
+          <LinkPendingHint />
         </Link>
         {current.context.profileId !== null && (
           <Link href="/who-lives-here" className="btn-link">
             {t.whoLivesHereLink}
+            <LinkPendingHint />
           </Link>
         )}
       </div>

@@ -572,4 +572,66 @@ h3 {
     font-size: 0.875rem;
     font-weight: 500;
   }
+
+  /* loading-feedback design.md D1/D2: SubmitButton's pending spinner — small, inline, spins via a
+     CSS animation, and stays visible (just not spinning) under reduced motion, same pattern as
+     `.skeleton` and `.toast` above. */
+  .spinner {
+    display: inline-block;
+    width: 1em;
+    height: 1em;
+    flex-shrink: 0;
+    border: 2px solid currentColor;
+    border-right-color: transparent;
+    border-radius: 9999px;
+    animation: spinner-spin 0.6s linear infinite;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .spinner {
+      animation: none;
+    }
+  }
+  @keyframes spinner-spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  /* loading-feedback design.md D1: a one-cell grid holding the idle layer (icon + label) and the
+     pending layer (spinner + pendingLabel) on top of each other — only `visibility` toggles
+     (keyed off the button's own `aria-busy`, which SubmitButton already sets for a11y), so the
+     button's width is always the wider layer's width and nothing jumps between idle and pending. */
+  .submit-stack {
+    display: grid;
+    align-items: center;
+    justify-items: center;
+  }
+  .submit-stack > span {
+    grid-area: 1 / 1;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  button:not([aria-busy="true"]) .submit-stack-pending {
+    visibility: hidden;
+  }
+  button[aria-busy="true"] .submit-stack-idle {
+    visibility: hidden;
+  }
+
+  /* loading-feedback design.md D5: LinkPendingHint's fixed-size slot beside a navigation link's
+     label — always rendered at this size, so the spinner appearing/disappearing never shifts the
+     surrounding line. */
+  .link-pending-hint {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 0.875rem;
+    height: 0.875rem;
+    flex-shrink: 0;
+  }
+  .link-pending-hint .spinner {
+    width: 0.875rem;
+    height: 0.875rem;
+  }
 }

@@ -5,6 +5,7 @@ import { useActionState, useState } from "react";
 import { de } from "@/ui/strings";
 import { registerHouseholdAction, type RegisterFormState } from "./actions";
 import { PasswordInput } from "@/ui/password-input";
+import { SubmitButton } from "@/ui/submit-button";
 
 const initialState: RegisterFormState = { error: null, fieldError: null };
 const t = de.auth.register;
@@ -16,7 +17,7 @@ const t = de.auth.register;
 // unmounted), so switching steps never loses what was typed and the credentials leave the browser
 // in exactly one request, whichever step the user is looking at when they finally submit.
 export function RegisterForm() {
-  const [state, formAction, pending] = useActionState(registerHouseholdAction, initialState);
+  const [state, formAction] = useActionState(registerHouseholdAction, initialState);
   const [step, setStep] = useState<1 | 2>(1);
 
   // A server-side refusal must be visible on the step whose field it names — if the household-name
@@ -87,9 +88,9 @@ export function RegisterForm() {
             <button type="button" className="btn btn-secondary" onClick={() => setStep(1)}>
               {t.back}
             </button>
-            <button type="submit" disabled={pending} className="btn btn-primary flex-1">
-              {pending ? t.submitPending : t.submit}
-            </button>
+            <SubmitButton className="btn btn-primary flex-1" pendingLabel={t.submitPending}>
+              {t.submit}
+            </SubmitButton>
           </div>
         )}
       </form>

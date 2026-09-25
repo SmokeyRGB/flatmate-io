@@ -5,6 +5,8 @@ import { JOIN_PASSWORD_MIN_LENGTH } from "@/modules/identity/auth";
 import { getOwnAccountEmail } from "@/modules/identity/repository";
 import { getCurrentSession } from "@/modules/identity/session-cookie";
 import { de } from "@/ui/strings";
+import { LinkPendingHint } from "@/ui/link-pending-hint";
+import { SubmitButton } from "@/ui/submit-button";
 import { signOutAction } from "../../(org)/sign-out-action";
 import { EmailForm } from "./email-form";
 import { PasswordForm } from "./password-form";
@@ -44,6 +46,7 @@ export default async function AccountPage() {
     <div className="mx-auto max-w-md space-y-6 p-6">
       <Link href="/dashboard" className="back-link">
         <ArrowLeft className="size-4" /> {t.backToStart}
+        <LinkPendingHint />
       </Link>
       <h1 className="font-serif text-2xl font-semibold">{t.heading}</h1>
 
@@ -72,9 +75,7 @@ export default async function AccountPage() {
       <section className="card space-y-3">
         <h2 className="font-serif text-lg font-semibold">{t.signOut.heading}</h2>
         <form action={signOutAction}>
-          <button type="submit" className="btn btn-secondary w-full">
-            {de.common.signOut}
-          </button>
+          <SubmitButton className="btn btn-secondary w-full">{de.common.signOut}</SubmitButton>
         </form>
       </section>
     </div>

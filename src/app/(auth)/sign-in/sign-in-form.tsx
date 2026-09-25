@@ -5,6 +5,8 @@ import { useActionState, useState } from "react";
 import { de } from "@/ui/strings";
 import { signInAction, type SignInFormState } from "./actions";
 import { PasswordInput } from "@/ui/password-input";
+import { SubmitButton } from "@/ui/submit-button";
+import { LinkPendingHint } from "@/ui/link-pending-hint";
 
 const initialState: SignInFormState = { error: null };
 const t = de.auth.signIn;
@@ -20,7 +22,7 @@ export function SignInForm() {
   const [residentBy, setResidentBy] = useState<"name" | "email">("name");
   const submittedMode = mode === "resident" && residentBy === "email" ? "resident_email" : mode;
   const showEmail = mode === "household" || residentBy === "email";
-  const [state, formAction, pending] = useActionState(signInAction, initialState);
+  const [state, formAction] = useActionState(signInAction, initialState);
 
   return (
     <div className="space-y-6">
@@ -104,9 +106,9 @@ export function SignInForm() {
 
         {state.error && <p className="field-error">{state.error}</p>}
 
-        <button type="submit" disabled={pending} className="btn btn-primary w-full">
-          {pending ? t.submitPending : t.submit}
-        </button>
+        <SubmitButton className="btn btn-primary w-full" pendingLabel={t.submitPending}>
+          {t.submit}
+        </SubmitButton>
       </form>
 
       {/* join-screen design.md Decision 8/proposal.md: the two ways in that are not sign-in itself
@@ -116,10 +118,12 @@ export function SignInForm() {
       <div className="flex flex-col items-center gap-2">
         <Link href="/register" className="btn-link">
           {t.foundHousehold}
+          <LinkPendingHint />
         </Link>
         {mode === "resident" && (
           <Link href="/join" className="btn-link">
             {t.enterJoinCode}
+            <LinkPendingHint />
           </Link>
         )}
       </div>

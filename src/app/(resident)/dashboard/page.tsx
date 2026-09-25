@@ -5,6 +5,7 @@ import { getStartOverview, listOrganisationTasks } from "@/modules/casting/repos
 import { getCurrentSession } from "@/modules/identity/session-cookie";
 import { de } from "@/ui/strings";
 import { landingPathFor } from "@/app/landing";
+import { LinkPendingHint } from "@/ui/link-pending-hint";
 import { householdFor, identityLabelFor, navigationAccessFor } from "../session-data";
 import { buildDashboardView } from "./dashboard-view";
 
@@ -59,6 +60,7 @@ export default async function DashboardPage({
             <p className="text-sm text-muted-foreground">{view.primary.reason}</p>
             <Link href={view.primary.href} className="btn btn-primary">
               {de.start.voteTaskButton} <ArrowRight className="size-4" />
+              <LinkPendingHint />
             </Link>
           </div>
         </div>
@@ -91,6 +93,7 @@ export default async function DashboardPage({
                   <span className="block text-xs text-muted-foreground">{row.reason}</span>
                 </span>
                 <ArrowRight className="size-4 shrink-0" />
+                <LinkPendingHint />
               </Link>
             </li>
           ))}
@@ -111,6 +114,7 @@ export default async function DashboardPage({
                     <span className="block text-xs text-muted-foreground">{task.reason}</span>
                   </span>
                   <ArrowRight className="size-4 shrink-0" />
+                  <LinkPendingHint />
                 </Link>
               </li>
             ))}
@@ -125,6 +129,7 @@ export default async function DashboardPage({
           {view.bridge.body && <p className="mt-1 text-sm">{view.bridge.body}</p>}
           <Link href={view.bridge.buttonHref} className="btn btn-primary mt-3">
             {de.start.bridge.button}
+            <LinkPendingHint />
           </Link>
         </div>
       )}

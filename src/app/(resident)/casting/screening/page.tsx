@@ -5,6 +5,7 @@ import { getStartOverview } from "@/modules/casting/repository";
 import { getCurrentSession } from "@/modules/identity/session-cookie";
 import { de } from "@/ui/strings";
 import { landingPathFor } from "@/app/landing";
+import { LinkPendingHint } from "@/ui/link-pending-hint";
 import { pendingVoteCount } from "../../dashboard/dashboard-view";
 
 const t = de.screening;
@@ -23,6 +24,7 @@ export default async function ScreeningPage() {
     <div className="mx-auto max-w-md space-y-4 p-6">
       <Link href="/dashboard" className="back-link">
         <ArrowLeft className="size-4" /> {t.backToStart}
+        <LinkPendingHint />
       </Link>
       <h1 className="font-serif text-2xl font-semibold">{t.placeholderHeading}</h1>
       <p className="text-sm text-muted-foreground">{t.placeholderBody(count)}</p>

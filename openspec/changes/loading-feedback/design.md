@@ -24,7 +24,7 @@ reductions, such as one transaction per page, are separate.
 - **Layouts block navigation.** `(resident)/layout.tsx` awaits `getCurrentSession()` plus three
   reads (identity, household, navigation access), and `(org)/layout.tsx` awaits the session plus
   `getIdentityLabel`, before either renders anything. Next.js's own docs
-  (`node_modules/next/dist/docs/01-app/03-api-reference/03-file-conventions/loading.md`) say: *"If
+  (the `loading` file-convention page under `node_modules/next/dist/docs/`) say: *"If
   the layout accesses uncached or runtime data (e.g. `cookies()`, …), `loading.js` will not show a
   fallback for it … Navigation blocks until the layout finishes rendering."* So entering a route
   group (after sign-in, or from Start to the organisation surface) shows nothing for the whole
@@ -228,7 +228,8 @@ three `SET LOCAL` statements: `app.account_id`, `app.household_id`, and `app.pro
 set. Each is a round trip, with `sql.raw` interpolation guarded by `assertUuid`.
 
 **New:** `session-context.ts` exports `applySessionContext(tx, context)`, which `withSessionContext`
-calls. It runs one statement with bound parameters and aliased columns:
+calls. It runs one statement with aliased columns. The values are inlined behind `assertUuid`,
+not bound (see "Measured during the apply" below):
 
 ```
 SELECT set_config('app.account_id', ${accountId}, true) AS account_id,
@@ -241,13 +242,28 @@ SELECT set_config('app.account_id', ${accountId}, true) AS account_id,
 - outside a transaction it would last only for its own implicit transaction, but it always runs
   inside `db.transaction`;
 - an error aborts the transaction exactly as before;
-- binding plain strings to text parameters is fine with `prepare: false`;
 - omitting the profile call keeps today's behaviour (`''` versus NULL is handled by `nullif`,
   `drizzle/0018`);
 - the returned row is discarded.
 
 `assertUuid` stays as defence in depth. Round trips go from 6 to 4 (5 to 4 without a profile),
 measured before and after (tasks 7.1/7.3).
+
+**Measured during the apply (2026-09-25), and why the values are inlined.**
+- The first version bound the three values as parameters. That brought a call from ~190 ms to only
+  ~155 ms, one round trip saved instead of two.
+- The reason is the driver: with `prepare: false`, which the Supavisor transaction pooler requires,
+  postgres-js first asks Postgres for the types of a parameterized query. That makes it two round
+  trips. Measured: `select 1` ~30 ms, `select $1` ~60 ms; the bound `set_config` in a transaction
+  ~125 ms, inlined ~95 ms.
+- So `applySessionContext` inlines the values with `sql.raw`, each one checked by `assertUuid`
+  first: a closed UUID format with no quote or metacharacter. That is the same guarantee the old
+  `SET LOCAL` code relied on, so it gives up no safety the bound form had.
+- Result: ~135 ms per call (from ~190 ms).
+
+**Finding for the round-trip follow-up:** *every* parameterized Drizzle query in the app pays this
+extra round trip, not only the session context. A different pooler mode, a direct connection, or
+explicit parameter types would halve the cost of every read. That is outside this change.
 
 **The lint** `scripts/lint/session-context.ts`, fixing the whole class (the pre-mortem showed the
 existing rules could already be bypassed):
@@ -293,10 +309,11 @@ break evidence, and the human confirms.
 (German, verbatim quotes untouched, no citation into `openspec/`):
 - `GUARDRAILS.md` G-C8: the *Regel*, its heading, and its row in the status table;
 - `backlog/requirements/F0-requirements.md` AC-0.7, with a *(precision 2026-09-25)* note;
-- `adr/0004-…md:66`: a precision note in the confirmed-tier ADR, which records the human
+- ADR-004, where it names the mechanism: a precision note in the confirmed-tier ADR, which records the human
   decision and is not new wording chosen by the applier;
 - `domain/invarianten.md` §5.5: the sample SQL shows the `set_config` form;
-- `adr/0006-…md:141` and `domain/identity.md:133`: "(oder gleichwertig `set_config(…, true)`)".
+- ADR-006 and `domain/identity.md` (`Session.acting_profile_id`), where each names `SET LOCAL`:
+  "(oder gleichwertig `set_config(…, true)`)".
 
 The explanations of *why* the value must be transaction-local stay as they are: the G-C8
 *Begründung*, the ADR-004 pooling pitfall, and R-0.3.

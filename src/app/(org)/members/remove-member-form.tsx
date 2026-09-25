@@ -3,6 +3,7 @@
 import { Trash2, TriangleAlert } from "lucide-react";
 import { useActionState, useEffect, useRef, useState } from "react";
 import { de } from "@/ui/strings";
+import { SubmitButton } from "@/ui/submit-button";
 import { removeMemberAction, type RemoveMemberFormState } from "./actions";
 
 const initialState: RemoveMemberFormState = { error: null };
@@ -15,7 +16,7 @@ const t = de.members.remove;
 // until the name matches — not the always-visible inline control this replaces
 // (003-remove-resident-modal).
 export function RemoveMemberForm({ accountId, displayName }: { accountId: string; displayName: string }) {
-  const [state, formAction, pending] = useActionState(removeMemberAction, initialState);
+  const [state, formAction] = useActionState(removeMemberAction, initialState);
   const [typedName, setTypedName] = useState("");
   const dialogRef = useRef<HTMLDialogElement>(null);
 
@@ -71,13 +72,13 @@ export function RemoveMemberForm({ accountId, displayName }: { accountId: string
           </div>
           {state.error && <p className="field-error">{state.error}</p>}
           <div className="flex items-center gap-4">
-            <button
-              type="submit"
-              disabled={pending || typedName !== displayName}
+            <SubmitButton
               className="btn btn-destructive"
+              disabled={typedName !== displayName}
+              pendingLabel={t.submitPending}
             >
-              {pending ? t.submitPending : t.submit}
-            </button>
+              {t.submit}
+            </SubmitButton>
             <button type="button" onClick={() => dialogRef.current?.close()} className="btn-link">
               {t.cancel}
             </button>

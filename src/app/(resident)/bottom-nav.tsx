@@ -4,6 +4,7 @@ import { CalendarCheck, Home } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { de } from "@/ui/strings";
+import { LinkPendingHint } from "@/ui/link-pending-hint";
 
 const ITEMS = [
   { href: "/dashboard", label: de.nav.start, Icon: Home },
@@ -30,6 +31,7 @@ export function BottomNav() {
           >
             <Icon className="size-5" />
             <span className="hidden md:inline">{label}</span>
+            <LinkPendingHint />
           </Link>
         );
       })}

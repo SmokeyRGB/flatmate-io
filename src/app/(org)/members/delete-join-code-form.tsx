@@ -3,6 +3,7 @@
 import { Trash2 } from "lucide-react";
 import { useRef } from "react";
 import { de } from "@/ui/strings";
+import { SubmitButton } from "@/ui/submit-button";
 import { deleteJoinCodeAction } from "./actions";
 
 const t = de.members.joinCode;
@@ -33,9 +34,7 @@ export function DeleteJoinCodeForm({ issuanceId, code }: { issuanceId: string; c
 
         <form action={deleteJoinCodeAction} className="mt-4 flex items-center gap-4">
           <input type="hidden" name="issuanceId" value={issuanceId} />
-          <button type="submit" className="btn btn-destructive">
-            {de.common.delete}
-          </button>
+          <SubmitButton className="btn btn-destructive">{de.common.delete}</SubmitButton>
           <button type="button" onClick={() => dialogRef.current?.close()} className="btn-link">
             {de.common.cancel}
           </button>
