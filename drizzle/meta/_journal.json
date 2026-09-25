@@ -134,6 +134,34 @@
       "when": 1790247330913,
       "tag": "0018_milky_famine",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1790263448769,
+      "tag": "0019_join_code_purpose",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1790274059635,
+      "tag": "0020_membership_resident_pairing",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1790276163170,
+      "tag": "0021_membership_uniqueness",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1790324456761,
+      "tag": "0022_account_password_changed_at",
+      "breakpoints": true
     }
   ]
 }

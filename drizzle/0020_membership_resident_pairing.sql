@@ -1,0 +1,35 @@
+-- Review fix (Copilot findings, PR #23) on drizzle/0019 (~line 110) and
+-- repository.ts's issuePasswordResetLink: there are no foreign keys in this schema (CLAUDE.md
+-- "Migrations"), so nothing before this migration stopped a membership row from carrying
+-- `is_resident = false` alongside a set `resident_profile_id`, or `is_resident = true` with a
+-- null one. Dev data was checked (see the raw-sql predicate re-run below, and the group-by check
+-- run before this migration was applied): only (false, no profile) and (true, profile) rows
+-- exist, and the three writers of this table (registerHousehold, claimResidentProfile,
+-- joinHousehold, all in src/modules/identity/auth.ts) already only ever write one of those two
+-- consistent pairs.
+--
+-- This CHECK is what makes drizzle/0019's `resolve_join_code`/`claim_join_code` (both
+-- SECURITY DEFINER, unauthenticated-reachable) resident-only JOINs onto membership sound WITHOUT
+-- re-creating either function: both join membership to resident_profile through
+-- `resident_profile_id`, trusting that a row naming a profile is in fact a resident's row and
+-- vice versa. issuePasswordResetLink's own eligibility query (repository.ts) makes the same
+-- assumption when it inner-joins membership to account through a resident_profile_id match. With
+-- this constraint in place, a corrupt or hand-written row can no longer decouple "is a resident
+-- membership" from "names a resident profile" — the pairing is enforced in raw SQL too, not only
+-- by the application code that happens to write it consistently today.
+--
+-- Re-runnable per CLAUDE.md "Migrations": DROP CONSTRAINT IF EXISTS before ADD CONSTRAINT, so a
+-- second run after a partial apply does not fail on a duplicate constraint name. `ADD CONSTRAINT`
+-- takes no `IF NOT EXISTS` in this Postgres version (scripts/lint/migration-shape.ts rule 2
+-- excludes it from the ADD-needs-IF-NOT-EXISTS check for the same reason) — the DROP-first idiom
+-- is what stands in for it here.
+--
+-- Copilot review round 2 (PR #23): drizzle/0019 now carries its own re-runnable copy of this exact
+-- statement pair at the top of that file (fresh-database migration-order fix), so on dev — which
+-- already applied 0019 before those lines existed — the statement below is now an idempotent
+-- RE-ASSERTION of a constraint dev already has, not new work. Left in place rather than removed:
+-- a database that somehow reaches 0020 without 0019's new top section (a hand-edited history,
+-- say) still gets the constraint from here.
+ALTER TABLE "membership" DROP CONSTRAINT IF EXISTS "membership_resident_pairing";
+--> statement-breakpoint
+ALTER TABLE "membership" ADD CONSTRAINT "membership_resident_pairing" CHECK ("membership"."is_resident" = ("membership"."resident_profile_id" IS NOT NULL));

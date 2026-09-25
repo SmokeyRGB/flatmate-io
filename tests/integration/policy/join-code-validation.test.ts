@@ -77,10 +77,10 @@ describe("Join code validation (FR-2.3/FR-2.7/FR-2.8)", () => {
     // claim_join_code refuses identically for the same four reasons (EC-2.7: no precedence rule
     // needed when a link is both expired and used up).
     const claimOutcomes = await Promise.all([
-      claimJoinCode(expired.code),
-      claimJoinCode(usedUp.code),
-      claimJoinCode(deleted.code),
-      claimJoinCode("NEVER-EXISTED"),
+      claimJoinCode(expired.code, "join"),
+      claimJoinCode(usedUp.code, "join"),
+      claimJoinCode(deleted.code, "join"),
+      claimJoinCode("NEVER-EXISTED", "join"),
     ]);
     for (const outcome of claimOutcomes) {
       expect(outcome).toBeNull();
@@ -94,7 +94,7 @@ describe("Join code validation (FR-2.3/FR-2.7/FR-2.8)", () => {
     const closed = await insertIssuance(hh, { maxUses: 0, uses: 0 });
 
     expect(await resolveJoinCode(closed.code)).toBeNull();
-    expect(await claimJoinCode(closed.code)).toBeNull();
+    expect(await claimJoinCode(closed.code, "join")).toBeNull();
   });
 
   // spec.md "Every link is stored with a maximum, on every path": the column itself refuses a

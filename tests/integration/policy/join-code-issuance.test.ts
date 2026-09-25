@@ -27,7 +27,7 @@ describe("Join code issuance lifecycle (FR-2.1/FR-2.5 as amended)", () => {
 
     expect(linkA.code).not.toBe(linkB.code);
 
-    const claimed = await claimJoinCode(linkA.code);
+    const claimed = await claimJoinCode(linkA.code, "join");
     expect(claimed?.issuanceId).toBe(linkA.id);
 
     const issuances = await listJoinCodeIssuances(hh.context, hh.accountId);
@@ -57,8 +57,8 @@ describe("Join code issuance lifecycle (FR-2.1/FR-2.5 as amended)", () => {
 
     await deleteJoinCode(hh.context, hh.accountId, linkA.id);
 
-    expect(await claimJoinCode(linkA.code)).toBeNull(); // refused
-    expect((await claimJoinCode(linkB.code))?.issuanceId).toBe(linkB.id); // untouched
+    expect(await claimJoinCode(linkA.code, "join")).toBeNull(); // refused
+    expect((await claimJoinCode(linkB.code, "join"))?.issuanceId).toBe(linkB.id); // untouched
 
     const [membershipAfter] = await withSessionContext(hh.context, (tx) =>
       tx.select().from(membership).where(eq(membership.id, existingMembership.id)),

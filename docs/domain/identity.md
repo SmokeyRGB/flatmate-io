@@ -23,6 +23,7 @@ ab und neu an — es gibt keinen Wechsel innerhalb einer Sitzung.
 | `id` | `uuid` | ⚙️ | |
 | `email` | `text?` | 🟠 | **Pflicht beim Haushalts-Admin-Account** (der erste, bei der Registrierung angelegte Account, `Membership.is_resident = false`) — eindeutig, dort als **gemeinsam genutzte Adresse** empfohlen (Hinweis im Registrierungsformular), damit das Eigentum am Zugang beim Auszug nicht mitwandert. **Nullable bei Resident-Accounts** (`Membership.is_resident = true`, angelegt beim Beitritt per Code): nicht mehr Pflichtfeld im Beitrittsformular, nach dem Onboarding optional nachpflegbar — Voraussetzung dafür, dass `web_push` als bevorzugter Kanal tragfähig ist (§2.5). Nicht zu verwechseln mit `Household.contact_email` oben, das davon unberührt bleibt |
 | `email_verified_at` | `timestamptz?` | 🟠 | Verifikation ist **nachgelagert** und blockiert die erste Abstimmung nicht — aber Voraussetzung für jeden Benachrichtigungsversand und für Mailinhalte mit Beratungsbezug. **Die alleinige Autorität für die Zustellung**, siehe Kasten „Anmeldung beim Anbieter" |
+| `password_changed_at` | `timestamptz?` | ⚙️ | Zeitpunkt der letzten Passwortänderung, in der Uhr der Datenbank. Gesetzt bei jeder eigenen Passwortänderung und beim Einlösen eines Reset-Links (O-16, Kasten unten). Eine Anmeldung, deren Passwortprüfung **vor** diesem Zeitpunkt begann, legt keine `Session` mehr an — sonst überlebte eine mit dem alten Passwort begonnene Anmeldung den Reset, der alle Sitzungen beendet |
 | `passkey_enabled` | `bool` | ⚙️ | optionaler Komfort-Aufsatz, jederzeit abschaltbar (ADR-007) |
 | `locale` | `text` | ⚙️ | v1 nur `de` |
 | `last_seen_at` | `timestamptz?` | 🟠 | speist „was ist passiert, während ich weg war" |
@@ -53,8 +54,12 @@ ab und neu an — es gibt keinen Wechsel innerhalb einer Sitzung.
 >    Zustellung an das Kennzeichen des Anbieters hängt, verschickt Mail an eine Adresse, die es
 >    nicht gibt.
 >
-> Trägt eine Person später eine **echte** `email` nach, steht sie neben der abgeleiteten Kennung —
-> und erst dann greifen Selbst-Wiederherstellung (Kasten unten) und Passkey (§2.1,
+> Trägt eine Person später eine **echte** `email` nach, ersetzt sie beim Anbieter die abgeleitete
+> Kennung — von da an meldet sich die Person auch mit dieser Adresse und ihrem Passwort an (O-12).
+> `email_verified_at` bleibt davon unberührt die alleinige Autorität für den Benachrichtigungsversand
+> (Regel 3 oben). Mit der hinterlegten Adresse greift die Selbst-Wiederherstellung (Kasten unten) —
+> eine Rücksetz-Mail belegt den Besitz der Adresse im Moment ihrer Nutzung und setzt deshalb keine
+> vorherige Bestätigung voraus; erst eine **bestätigte** Adresse schaltet den Passkey frei (§2.1,
 > `PasskeyCredential`).
 
 > **Womit meldet sich ein Resident-Account ohne E-Mail an — entschieden (O-D → O-12, §10.2).**
@@ -73,25 +78,33 @@ ab und neu an — es gibt keinen Wechsel innerhalb einer Sitzung.
 >
 > **Was das für den Haushalts-Account nicht ändert:** Er bleibt bei `email` + Passwort (Pflichtfeld,
 > siehe oben) — die neue Anmeldekennung betrifft ausschließlich Resident-Accounts ohne `email`.
+>
+> **Trägt ein Resident-Account eine eigene `email` ein** — beim Beitritt angegeben oder nachträglich
+> hinterlegt (Kasten oben) —, kann sich die Person zusätzlich mit dieser Adresse und ihrem Passwort
+> anmelden. Die Anmeldung über `(Household, display_name) + Passwort` bleibt daneben immer möglich;
+> das Passwort bleibt die universelle Methode (P-2).
 
 > **Passwort-Reset ohne E-Mail — ein bewusster Tauschhandel, kein Versehen (O-16, §10.2; vormals
 > Plan-O-A).** Ohne
 > `email` gibt es **keine Wiederherstellung durch die Person selbst**. Auflösung: Die Verwaltung
-> (`Membership.is_resident = false`, `manage_members`) kann das Passwort eines `ResidentProfile`
-> zurücksetzen — und verschafft sich damit Zugang zu diesem Profil, einschließlich seiner Stimmen.
-> Das ist der Preis dafür, dass ein Beitritt ohne E-Mail überhaupt möglich ist **und** ein
-> vergessenes Passwort nicht zum dauerhaften Verlust des Profils führt.
+> (`Membership.is_resident = false`, `manage_members`) kann für ein aktives `ResidentProfile` ohne
+> `email` einen **einmal verwendbaren Link** ausstellen, über den die Person selbst ein neues
+> Passwort setzt — und verschafft sich damit, solange der Link nicht eingelöst ist, Zugang zu
+> diesem Profil, einschließlich seiner Stimmen. Das ist der Preis dafür, dass ein Beitritt ohne
+> E-Mail überhaupt möglich ist **und** ein vergessenes Passwort nicht zum dauerhaften Verlust des
+> Profils führt.
 >
 > **Nicht als Härtung darstellen** — dieselbe Regel wie beim Verwaltungskontext selbst (§2.1,
 > Kasten „Klarstellung"): E-03 hält fest, dass die Trennung Verwaltung/Bewohner keine
 > Sicherheitsgrenze ist, und ein Passwort-Reset-Recht der Verwaltung ändert daran nichts.
 >
 > **Die Lücke schließt sich selbst**, sobald eine Person eine eigene `email` hinterlegt: ab diesem
-> Moment läuft die Wiederherstellung über diese Adresse, und die Verwaltung kann das Passwort nicht
-> mehr zurücksetzen. Das ist das eigentliche Argument dafür, die E-Mail später zu erfragen — nicht
+> Moment läuft die Wiederherstellung über diese Adresse, und die Verwaltung kann keinen Reset-Link
+> mehr für dieses Profil ausstellen — ein bereits ausgestellter, noch nicht eingelöster Link wird
+> damit ungültig. Das ist das eigentliche Argument dafür, die E-Mail später zu erfragen — nicht
 > Benachrichtigungs-Komfort.
 >
-> **Solange die Lücke besteht, bleibt sie sichtbar:** jeder administrative Reset erzeugt einen
+> **Solange die Lücke besteht, bleibt sie sichtbar:** jedes Einlösen eines Reset-Links erzeugt einen
 > `ActivityEvent` im Feed aller Bewohnenden (`account.password_reset_by_admin`) und beendet **alle**
 > aktiven `Session`s des betroffenen Profils (§2.1, `Session.revoked_at`) — keine stille
 > Zugriffsübernahme.

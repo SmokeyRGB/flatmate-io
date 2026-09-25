@@ -1,0 +1,375 @@
+import { and, eq } from "drizzle-orm";
+import { afterEach, describe, expect, it } from "vitest";
+import { withSessionContext, type SessionContext } from "@/db/session-context";
+import {
+  SignInError,
+  changeResidentEmail,
+  claimResidentProfile,
+  signIn,
+} from "@/modules/identity/auth";
+import { createResidentProfile, getOwnAccountEmail, setMovedOut } from "@/modules/identity/repository";
+import { account, session } from "@/modules/identity/schema";
+import { activityEvent } from "@/modules/audit/schema";
+import type { CurrentSession } from "@/modules/identity/session-cookie";
+import {
+  adminClient,
+  cleanupAll,
+  deleteTestAccount,
+  registerTestHousehold,
+  type TestHousehold,
+} from "../../helpers/identity";
+
+const PASSWORD = "test-password-not-real-1234";
+
+let hh: TestHousehold | undefined;
+const accountIds: string[] = [];
+
+afterEach(async () => {
+  await cleanupAll(...accountIds.map(deleteTestAccount), hh?.cleanup());
+  accountIds.length = 0;
+  hh = undefined;
+});
+
+async function claimResident(household: TestHousehold, name: string) {
+  const profile = await createResidentProfile(household.context, name, {
+    accountId: household.accountId,
+    profileId: null,
+  });
+  const { accountId } = await claimResidentProfile(household.context, profile.id, PASSWORD);
+  accountIds.push(accountId);
+  return { profileId: profile.id, accountId, displayName: name };
+}
+
+// Copilot review round 4 (PR #23), FIX 1: changeResidentEmail now looks up `session` by
+// `current.sessionId` — a placeholder "n/a" sessionId (this helper's previous shape) fails that
+// lookup with a driver-level error instead of the intended `session_ended` refusal, since a real
+// session row is what every caller in production always has (getCurrentSession never returns a
+// non-UUID sessionId). So this signs in for real and returns the REAL session id/context.
+async function residentSession(
+  household: TestHousehold,
+  resident: { profileId: string; accountId: string; displayName: string },
+): Promise<CurrentSession> {
+  const signedIn = await signIn({
+    kind: "resident",
+    householdId: household.householdId,
+    displayName: resident.displayName,
+    password: PASSWORD,
+  });
+  return { sessionId: signedIn.session.id, context: signedIn.context };
+}
+
+async function emailChangedEvents(context: SessionContext, subjectId: string) {
+  return withSessionContext(context, (tx) =>
+    tx
+      .select()
+      .from(activityEvent)
+      .where(and(eq(activityEvent.eventType, "account.email_changed"), eq(activityEvent.subjectId, subjectId))),
+  );
+}
+
+// resident-settings design.md Decision 2 (identity/account-settings): adding or changing a
+// resident's own email address.
+describe("changeResidentEmail (identity/account-settings, design.md Decision 2)", () => {
+  it("adding an address updates account.email, keeps email_verified_at null, and matches the provider (getUserById)", async () => {
+    hh = await registerTestHousehold();
+    const resident = await claimResident(hh, "EmailAdder");
+    const current = await residentSession(hh, resident);
+
+    await changeResidentEmail(current, "Lea@Example.Test");
+
+    const [row] = await withSessionContext(current.context, (tx) =>
+      tx.select().from(account).where(eq(account.id, resident.accountId)),
+    );
+    expect(row.email).toBe("lea@example.test");
+    expect(row.emailVerifiedAt).toBeNull();
+
+    const { data } = await adminClient().auth.admin.getUserById(resident.accountId);
+    expect(data.user?.email).toBe("lea@example.test");
+  });
+
+  it("email sign-in then acts as the profile (acting_profile_id = profile, not null; G-D14 style)", async () => {
+    hh = await registerTestHousehold();
+    const resident = await claimResident(hh, "EmailSignIn");
+    const current = await residentSession(hh, resident);
+    await changeResidentEmail(current, "signin-check@example.test");
+
+    const result = await signIn({
+      kind: "household",
+      email: "signin-check@example.test",
+      password: PASSWORD,
+    });
+    expect(result.context.profileId).toBe(resident.profileId);
+    expect(result.context.accountId).toBe(resident.accountId);
+  });
+
+  it("name sign-in still works after adding an address", async () => {
+    hh = await registerTestHousehold();
+    const resident = await claimResident(hh, "NameStillWorks");
+    const current = await residentSession(hh, resident);
+    await changeResidentEmail(current, "namestillworks@example.test");
+
+    const result = await signIn({
+      kind: "resident",
+      householdId: hh.householdId,
+      displayName: "NameStillWorks",
+      password: PASSWORD,
+    });
+    expect(result.context.accountId).toBe(resident.accountId);
+  });
+
+  it("changing to a new address means the old address gets invalid_credentials and the new one works", async () => {
+    hh = await registerTestHousehold();
+    const resident = await claimResident(hh, "ChangeAddress");
+    const current = await residentSession(hh, resident);
+    await changeResidentEmail(current, "old-address@example.test");
+    await changeResidentEmail(current, "new-address@example.test");
+
+    let caught: unknown;
+    try {
+      await signIn({ kind: "household", email: "old-address@example.test", password: PASSWORD });
+    } catch (err) {
+      caught = err;
+    }
+    expect(caught).toBeInstanceOf(SignInError);
+    expect((caught as SignInError).code).toBe("invalid_credentials");
+
+    const result = await signIn({ kind: "household", email: "new-address@example.test", password: PASSWORD });
+    expect(result.context.accountId).toBe(resident.accountId);
+  });
+
+  it("empty gives missing_email and malformed gives invalid_email, both with account.email unchanged", async () => {
+    hh = await registerTestHousehold();
+    const resident = await claimResident(hh, "BadInput");
+    const current = await residentSession(hh, resident);
+
+    await expect(changeResidentEmail(current, "")).rejects.toMatchObject({ code: "missing_email" });
+    await expect(changeResidentEmail(current, "not-an-email")).rejects.toMatchObject({ code: "invalid_email" });
+
+    const [row] = await withSessionContext(current.context, (tx) =>
+      tx.select().from(account).where(eq(account.id, resident.accountId)),
+    );
+    expect(row.email).toBeNull();
+  });
+
+  // Copilot review round 3 (PR #23): changeResidentEmail now writes account.email and the
+  // account.email_changed event BEFORE calling the provider (the provider call is the LAST
+  // statement of the transaction, so a refusal rolls both back with it) — the previous shape
+  // called the provider FIRST and never reached either write on a refusal. Both orders leave the
+  // same observable state here (nothing persists either way, since a thrown error inside
+  // withSessionContext rolls the whole transaction back regardless of which statement came first),
+  // so this test cannot by itself distinguish the two orders — see the deliberate-break note below
+  // for what CAN and cannot be observed from outside the transaction.
+  it("the household account's own address gives email_taken, with nothing changed on either side, and no email_changed event", async () => {
+    hh = await registerTestHousehold();
+    const resident = await claimResident(hh, "TakenAddress");
+    const current = await residentSession(hh, resident);
+
+    await expect(changeResidentEmail(current, hh.email)).rejects.toMatchObject({ code: "email_taken" });
+
+    const [row] = await withSessionContext(current.context, (tx) =>
+      tx.select().from(account).where(eq(account.id, resident.accountId)),
+    );
+    expect(row.email).toBeNull();
+
+    const { data } = await adminClient().auth.admin.getUserById(hh.accountId);
+    expect(data.user?.email).toBe(hh.email);
+
+    // Proves the DB side really did roll back with the provider refusal — not merely that it was
+    // never reached (see the reorder in auth.ts: the DB write and the event now happen BEFORE the
+    // provider call, so this is the assertion that actually exercises the rollback rather than a
+    // path that was simply never taken).
+    const events = await emailChangedEvents(current.context, resident.accountId);
+    expect(events).toHaveLength(0);
+  });
+
+  // Copilot review round 3 (PR #23), deliberate break (argued, not executed — CLAUDE.md forbids
+  // weakening a test to prove a regression, and "you cannot make Supabase or the commit fail
+  // without mocking" (CLAUDE.md) means the ONE case a broken order would show up in — a failed
+  // COMMIT after a successful provider call — cannot be forced here regardless): moving the
+  // provider call back to BEFORE the account UPDATE and the recordActivityEvent call (auth.ts's
+  // pre-round-3 shape) would NOT make the test above fail. Both orders throw before ever reaching
+  // a commit, and Postgres rolls back a transaction that never committed regardless of which
+  // statement inside it threw — so "account.email unchanged, no email_changed event" holds either
+  // way, and this test's real job is proving that invariant, not discriminating the order. The
+  // order only matters for the window neither order can avoid without a cross-system transaction:
+  // a commit failing AFTER the provider call already succeeded. That window needs Supabase or
+  // Postgres to fail on command, which would require mocking — forbidden by CLAUDE.md — so it is
+  // not exercised by an automated test here; changeResidentEmail's own comment states the
+  // compensating transaction and the `change_incomplete` code that covers it instead.
+
+  it("a household session gives not_a_resident, and changes nothing", async () => {
+    hh = await registerTestHousehold();
+    const current: CurrentSession = { sessionId: "n/a", context: hh.context };
+
+    await expect(changeResidentEmail(current, "whatever@example.test")).rejects.toMatchObject({
+      code: "not_a_resident",
+    });
+
+    const { data } = await adminClient().auth.admin.getUserById(hh.accountId);
+    expect(data.user?.email).toBe(hh.email);
+  });
+
+  it("one account.email_changed event per change, with payload {}", async () => {
+    hh = await registerTestHousehold();
+    const resident = await claimResident(hh, "AuditedChange");
+    const current = await residentSession(hh, resident);
+    await changeResidentEmail(current, "audited@example.test");
+
+    const events = await emailChangedEvents(current.context, resident.accountId);
+    expect(events).toHaveLength(1);
+    expect(events[0].payload).toEqual({});
+    expect(events[0].actorAccountId).toBe(resident.accountId);
+  });
+
+  it("an unchanged address writes no event", async () => {
+    hh = await registerTestHousehold();
+    const resident = await claimResident(hh, "Unchanged");
+    const current = await residentSession(hh, resident);
+    await changeResidentEmail(current, "unchanged@example.test");
+    await changeResidentEmail(current, "unchanged@example.test");
+
+    const events = await emailChangedEvents(current.context, resident.accountId);
+    expect(events).toHaveLength(1); // still just the one from the first, actual change
+  });
+
+  // resident-settings design.md Decision 2 step 2: "The account is always
+  // current.context.accountId. No id is taken from the form" — unlike createResidentProfile or
+  // setMemberRole, this function has no separate actor/target-account parameter at all for a
+  // caller to spoof; the only identity it ever reads is the session's own context. This proves the
+  // isolation that guarantee is meant to buy: two residents' sessions never cross-contaminate.
+  // Copilot review round 2 (PR #23), CLAUDE.md "A concurrent request": a move-out or removal that
+  // commits AFTER this action read CurrentSession must still be caught — context.profileId alone
+  // is a claim the session made at sign-in (ADR-013) and can go stale. This uses the STALE
+  // CurrentSession captured before the revocation, exactly the race the fix closes.
+  it("using a stale CurrentSession after the membership is revoked gives not_a_resident, with nothing changed", async () => {
+    hh = await registerTestHousehold();
+    const resident = await claimResident(hh, "RevokedThenEmail");
+    const current = await residentSession(hh, resident); // captured BEFORE the revocation below
+
+    await setMovedOut(hh.context, hh.accountId, resident.accountId);
+
+    await expect(changeResidentEmail(current, "should-not-apply@example.test")).rejects.toMatchObject({
+      code: "not_a_resident",
+    });
+
+    const [row] = await withSessionContext(hh.context, (tx) =>
+      tx.select().from(account).where(eq(account.id, resident.accountId)),
+    );
+    expect(row.email).toBeNull();
+
+    const { data } = await adminClient().auth.admin.getUserById(resident.accountId);
+    expect(data.user?.email).toMatch(/^resident-.*@accounts\.flatmate\.invalid$/);
+
+    const events = await emailChangedEvents(current.context, resident.accountId);
+    expect(events).toHaveLength(0);
+  });
+
+  it("acts only on the session's own account — two residents' changes never cross-contaminate", async () => {
+    hh = await registerTestHousehold();
+    const residentA = await claimResident(hh, "IsolationA");
+    const residentB = await claimResident(hh, "IsolationB");
+
+    await changeResidentEmail(await residentSession(hh, residentA), "isolation-a@example.test");
+    await changeResidentEmail(await residentSession(hh, residentB), "isolation-b@example.test");
+
+    const [rowA] = await withSessionContext(hh.context, (tx) =>
+      tx.select().from(account).where(eq(account.id, residentA.accountId)),
+    );
+    const [rowB] = await withSessionContext(hh.context, (tx) =>
+      tx.select().from(account).where(eq(account.id, residentB.accountId)),
+    );
+    expect(rowA.email).toBe("isolation-a@example.test");
+    expect(rowB.email).toBe("isolation-b@example.test");
+  });
+
+  // Copilot review round 4 (PR #23), FIX 1: the membership/account locks re-check that the
+  // ACCOUNT is still a live resident, but not that THIS SESSION still is what it claims to be — a
+  // password reset (or changeResidentPassword) ends every OTHER session while leaving the
+  // membership itself untouched, so a request riding a session that a reset already ended (an
+  // intruder's, say) must be refused before it can add/change the recovery address. Uses a REAL
+  // signed-in session (unlike residentSession's placeholder "n/a" above), then revokes that
+  // session row directly — standing in for what redeemPasswordReset's/changeResidentPassword's own
+  // session revoke would have done, while the membership stays live.
+  it("a session already ended (e.g. by a password reset) gives session_ended, with nothing changed", async () => {
+    hh = await registerTestHousehold();
+    const resident = await claimResident(hh, "SessionEndedEmail");
+    const signedIn = await signIn({
+      kind: "resident",
+      householdId: hh.householdId,
+      displayName: "SessionEndedEmail",
+      password: PASSWORD,
+    });
+    const current: CurrentSession = { sessionId: signedIn.session.id, context: signedIn.context };
+
+    await withSessionContext(hh.context, (tx) =>
+      tx.update(session).set({ revokedAt: new Date() }).where(eq(session.id, signedIn.session.id)),
+    );
+
+    await expect(changeResidentEmail(current, "should-not-apply@example.test")).rejects.toMatchObject({
+      code: "session_ended",
+    });
+
+    const [row] = await withSessionContext(hh.context, (tx) =>
+      tx.select().from(account).where(eq(account.id, resident.accountId)),
+    );
+    expect(row.email).toBeNull();
+
+    const { data } = await adminClient().auth.admin.getUserById(resident.accountId);
+    expect(data.user?.email).toMatch(/^resident-.*@accounts\.flatmate\.invalid$/);
+
+    const events = await emailChangedEvents(current.context, resident.accountId);
+    expect(events).toHaveLength(0);
+  });
+
+  // Deliberate break, RUN (per CLAUDE.md's own instruction for this fix): removing the session
+  // check (the `SELECT session ... FOR UPDATE` / `session_ended` throw added by FIX 1) from
+  // changeResidentEmail and running this test file made the test above fail — the promise
+  // resolved instead of rejecting (membership alone still passes for a revoked session), and
+  // account.email ended up set to "should-not-apply@example.test" instead of staying null. The
+  // check was restored immediately afterwards; this comment records the observed failure rather
+  // than leaving the break in the tree.
+});
+
+// Copilot review round 5 (PR #23), FIX 2: getOwnAccountEmail used to return the address on
+// `context.profileId` alone — a claim the SESSION made at sign-in (ADR-013) which can go stale,
+// exactly the same staleness changeResidentEmail's/changeResidentPassword's own membership locks
+// above already guard against. This is the test authorization-matrix.test.ts's own
+// NOT_APPLICABLE_IDENTITY entry for `getOwnAccountEmail` already claimed existed here.
+describe("getOwnAccountEmail (identity/account-settings, Copilot review round 5, PR #23, FIX 2)", () => {
+  it("returns the address for a live resident membership", async () => {
+    hh = await registerTestHousehold();
+    const resident = await claimResident(hh, "OwnEmailLive");
+    const current = await residentSession(hh, resident);
+    await changeResidentEmail(current, "own-email-live@example.test");
+
+    await expect(getOwnAccountEmail(current.context)).resolves.toBe("own-email-live@example.test");
+  });
+
+  // Uses the STALE context captured before the revocation, exactly the race
+  // changeResidentEmail's own "using a stale CurrentSession" test above exercises — the fix is
+  // that the membership join inside getOwnAccountEmail catches this even though context.profileId
+  // itself is still non-null.
+  it("no longer returns the address once the membership is revoked, even with a stale non-null profileId", async () => {
+    hh = await registerTestHousehold();
+    const resident = await claimResident(hh, "OwnEmailRevoked");
+    const current = await residentSession(hh, resident); // captured BEFORE the revocation below
+    await changeResidentEmail(current, "own-email-revoked@example.test");
+
+    await setMovedOut(hh.context, hh.accountId, resident.accountId);
+
+    await expect(getOwnAccountEmail(current.context)).resolves.toBeNull();
+  });
+
+  it("still throws PermissionDeniedError for a household (non-resident) session", async () => {
+    hh = await registerTestHousehold();
+    await expect(getOwnAccountEmail(hh.context)).rejects.toThrow();
+  });
+
+  // Deliberate break (CLAUDE.md's own instruction for this fix — RUN and report it failing):
+  // removing the membership join/predicate from getOwnAccountEmail (reverting to a plain
+  // `SELECT email FROM account WHERE id = context.accountId`) and running this file made the
+  // "no longer returns the address once the membership is revoked" test above fail — it resolved
+  // to "own-email-revoked@example.test" instead of `null`, since the stale profileId alone was
+  // enough to pass the old check. The join was restored immediately afterwards; this comment
+  // records the observed failure rather than leaving the break in the tree.
+});

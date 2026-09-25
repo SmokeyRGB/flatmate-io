@@ -7,6 +7,11 @@
 // entries are functions rather than a template-substitution helper.
 export const de = {
   common: {
+    // src/ui/password-input.tsx: the eye toggle beside every password field.
+    showPassword: "Passwort anzeigen",
+    hidePassword: "Passwort verbergen",
+    // src/ui/success-toast.tsx: closes the success notice.
+    close: "Schließen",
     save: "Speichern",
     saving: "Wird gespeichert…",
     cancel: "Abbrechen",
@@ -79,6 +84,16 @@ export const de = {
       // sign-in itself, offered as links beneath the card — `.btn-link` (design.md Decision 8).
       foundHousehold: "WG gründen",
       enterJoinCode: "Beitrittscode eingeben",
+      // resident-settings (human decision 2026-09-24, walkthrough): a resident with an email signs
+      // in on the resident tab, switching between the name fields and the email field. The
+      // household tab still accepts a resident's address, but no longer advertises it.
+      residentUseEmail: "Mit E-Mail-Adresse anmelden",
+      residentUseName: "Mit Name anmelden",
+      // Copilot review round 2 (PR #23), auth.ts redeemPasswordReset's `reset_done_sign_in_failed`
+      // (phase 3): the reset itself already succeeded (password set in phase 2, prior sessions
+      // revoked in phase 1, link spent) — only the immediate sign-in afterwards failed, so this is
+      // a note beside the ordinary form, not an error. Recreated exactly as in commit a95bbb9.
+      passwordResetNote: "Dein neues Passwort ist gesetzt. Melde dich damit an.",
     },
     register: {
       heading: "WG gründen",
@@ -221,6 +236,30 @@ export const de = {
       // section (expired, used up or deleted) — states the count so the section is informative
       // even collapsed.
       deadLinksSummary: (n: number) => `Nicht mehr nutzbare Links (${n})`,
+      // resident-settings design.md Decision 8 (O16, identity/password-reset): the row action for
+      // a profile whose account has no email yet — household sessions only.
+      issueResetLink: "Passwort-Link erstellen",
+      // E-03/K-18 ("Nicht als Sicherheitsgrenze darstellen"): states plainly what the link can do,
+      // shown once a reset link is issued — never framed as protection.
+      // Walkthrough fix 2026-09-24: a reset link is not an invitation, so it gets its own heading
+      // instead of issuedForProfileHeading.
+      resetLinkIssuedHeading: "Ausgestellter Passwort-Link für dieses Profil:",
+      resetLinkIssuedCaution: "Wer diesen Link öffnet, kann das Passwort dieser Person setzen.",
+      // The link-history label for a reset row, replacing the invitation label (design.md
+      // Decision 8: "Passwort-Link für <Name>" instead of an invitation).
+      resetLinkForName: (displayName: string) => `Passwort-Link für ${displayName}`,
+      // review fix (PR #23 finding): getResidentList (PR #18 decision) hides a removed profile's
+      // name entirely (O16 never shows who a removed person was) — so a reset link whose target
+      // was later removed cannot look the name up in profileNameById. Never fall back to showing
+      // the name some other way (that would contradict #18); this neutral label names no one.
+      resetLinkForRemovedPerson: "Passwort-Link für eine entfernte Person",
+      errors: {
+        // identity/repository.ts's ResidentProfileNotEligibleForResetError — one throw site, one
+        // message, mapped by class (same convention as members.errors.nameMismatch).
+        notEligibleForReset:
+          "Für dieses Profil kann kein Passwort-Link erstellt werden — es ist entweder nicht " +
+          "aktiv, oder hat bereits eine E-Mail-Adresse hinterlegt.",
+      },
     },
     moderationBadge: "Moderation",
     makeModerator: "Zur Moderation ernennen",
@@ -324,6 +363,18 @@ export const de = {
     // link's heading is now just the greeting — the invitation itself is the shared household chip
     // above, so the two are never duplicated in one sentence as the old single-string version did.
     boundHeading: (displayName: string) => `Hi ${displayName}!`,
+    // identity/password-reset (O-16, screens/A-zugang.md A3 bound shape): a third screen shape,
+    // shown when purpose = 'password_reset'. Same greeting as an ordinary bound link — the person
+    // is asked only for a new password (spec: "SHALL NOT ask for a name or an email").
+    reset: {
+      heading: (displayName: string) => `Hi ${displayName}!`,
+      // Walkthrough fix 2026-09-24: the join chip ("Du trittst … bei") is wrong here, since the
+      // person already belongs. FR-2.9 only needs the household named.
+      householdChip: (householdName: string) => `Neues Passwort für ${householdName}`,
+      newPasswordLabel: "Neues Passwort",
+      submit: "Passwort setzen",
+      submitPending: "Wird gesetzt…",
+    },
     nameLabel: "Name",
     passwordLabel: "Passwort",
     // FR-2.10a/AC-2.20: the requirement is stated, not discovered by failing once.
@@ -360,6 +411,12 @@ export const de = {
       // server-function log prints on the next submit, and the name already stands in its own
       // field right above it (join-screen design.md Decision 4).
       nameTaken: "Dieser Name ist in dieser WG bereits vergeben. Wähle einen anderen.",
+      // resident-settings design.md Decision 3: the provider's duplicate-email refusal — names no
+      // account, household or person (proposal Assumption 2), same wording style as E1's own.
+      emailTaken: "Diese E-Mail-Adresse kann nicht verwendet werden.",
+      // review fix: joinHousehold now validates the optional email itself (normalizeEmail/
+      // isWellFormedEmail) — same wording style as account.email.errors.invalidEmail (E1's own).
+      invalidEmail: "Das sieht nicht nach einer gültigen E-Mail-Adresse aus.",
       // EC-2.5/A-2.4: deliberately NOT the invalid-link message — the link is fine.
       otherHousehold:
         "Du bist bei einem anderen Haushalt angemeldet. Melde dich ab, um diesem Haushalt beizutreten.",
@@ -370,6 +427,12 @@ export const de = {
       // best-effort (auth.ts joinHousehold).
       genericFailure:
         "Der Beitritt hat nicht geklappt. Deine Einladung ist dadurch nicht verbraucht — versuch es einfach noch einmal.",
+      // Copilot review round 2 (PR #23): redeemPasswordReset's phase 2 (the provider password
+      // write) failed AFTER phase 1 already committed — the link is spent and every prior session
+      // is dead, but the password itself never changed. Distinct from genericFailure, which
+      // promises the invitation is unconsumed — that would be false here.
+      resetIncomplete:
+        "Der Link ist jetzt verbraucht, aber dein neues Passwort konnte nicht gesetzt werden. Bitte die Verwaltung um einen neuen Link.",
     },
     // EC-2.4: rendered on the dashboard (task 8.5) when the join redirect carries the note —
     // "taken to Start with a note", the temporary /dashboard landing target (proposal Assumption 4).
@@ -465,11 +528,68 @@ export const de = {
         : `${count} Bewerbungen warten auf deine Stimme. Das Sichten selbst wird in F4 gebaut.`,
     backToStart: "Zurück zu Start",
   },
-  // start-screen: E1, the resident's own settings — a placeholder until change 5 fills it.
+  // resident-settings (E1): the resident's own settings screen — email, password, sign-out.
   account: {
     heading: "Einstellungen",
-    placeholderBody: "E-Mail-Adresse hinzufügen und Passwort ändern folgen im nächsten Schritt.",
     backToStart: "Zurück zu Start",
+    noPermissionBody: "Diese Seite ist für Bewohner:innen. Deine Einstellungen findest du hier:",
+    noPermissionLink: "Einstellungen",
+    email: {
+      heading: "E-Mail",
+      currentLabel: "Deine hinterlegte Adresse",
+      // FR-2.17/E1 ("nie als Sperre formuliert"): framed as a way back in, never a requirement.
+      pitch: "Trage eine E-Mail-Adresse nach, um dir einen Weg zurück zu sichern, falls du dein Passwort vergisst.",
+      // EC-2.6/O-16 (corrected 2026-09-24): stated plainly while the gap exists, not hidden.
+      noRecoveryNotice:
+        "Ohne eigene E-Mail-Adresse kannst du ein vergessenes Passwort nicht selbst zurücksetzen — " +
+        "nur die Verwaltung kann dir dann per Link weiterhelfen.",
+      fieldLabel: "E-Mail-Adresse",
+      submit: "Speichern",
+      submitPending: "Wird gespeichert…",
+      saved: "Gespeichert.",
+      errors: {
+        missingEmail: "E-Mail-Adresse ist erforderlich.",
+        invalidEmail: "Das sieht nicht nach einer gültigen E-Mail-Adresse aus.",
+        emailTaken: "Diese E-Mail-Adresse kann nicht verwendet werden.",
+        notAResident: "Nur Bewohner:innen können ihre E-Mail-Adresse ändern.",
+        // Copilot review round 4 (PR #23): the session this request came in on has been ended
+        // (e.g. by a password reset) — the honest remedy is signing in again, not a retry.
+        sessionEnded: "Deine Sitzung ist abgelaufen. Bitte melde dich erneut an.",
+        genericFailure: "Das hat nicht geklappt. Bitte versuche es erneut.",
+        // Copilot review round 3 (PR #23): the provider write succeeded but the commit that should
+        // have followed it failed, and the best-effort repair (auth.ts changeResidentEmail's own
+        // comment) also failed — distinct from genericFailure, which would wrongly imply nothing
+        // happened at all.
+        changeIncomplete:
+          "Die Änderung wurde möglicherweise nur teilweise übernommen. Bitte versuche es erneut.",
+      },
+    },
+    password: {
+      heading: "Passwort ändern",
+      currentLabel: "Aktuelles Passwort",
+      newLabel: "Neues Passwort",
+      requirement: (minLength: number) => `Mindestens ${minLength} Zeichen.`,
+      submit: "Passwort ändern",
+      submitPending: "Wird geändert…",
+      saved: "Passwort geändert. Andere Sitzungen wurden abgemeldet.",
+      errors: {
+        missingFields: "Aktuelles und neues Passwort sind erforderlich.",
+        passwordTooShort: (minLength: number) => `Das neue Passwort muss mindestens ${minLength} Zeichen haben.`,
+        wrongCurrentPassword: "Das aktuelle Passwort ist nicht richtig.",
+        notAResident: "Nur Bewohner:innen können ihr Passwort ändern.",
+        // Copilot review round 4 (PR #23): see email.errors.sessionEnded above — same situation,
+        // changeResidentPassword's own new session check.
+        sessionEnded: "Deine Sitzung ist abgelaufen. Bitte melde dich erneut an.",
+        genericFailure: "Das hat nicht geklappt. Bitte versuche es erneut.",
+        // Copilot review round 3 (PR #23): see email.errors.changeIncomplete above — same
+        // situation, changeResidentPassword's own compensating transaction also failed.
+        changeIncomplete:
+          "Die Änderung wurde möglicherweise nur teilweise übernommen. Bitte versuche es erneut.",
+      },
+    },
+    signOut: {
+      heading: "Abmelden",
+    },
   },
   // start-screen: the shared error boundary for every `(resident)` screen — same reasoning as
   // `de.join.unexpectedError` (generic on purpose, G-A5: never the failure's own text).

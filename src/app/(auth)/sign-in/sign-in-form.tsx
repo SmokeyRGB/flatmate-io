@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useActionState, useState } from "react";
 import { de } from "@/ui/strings";
 import { signInAction, type SignInFormState } from "./actions";
+import { PasswordInput } from "@/ui/password-input";
 
 const initialState: SignInFormState = { error: null };
 const t = de.auth.signIn;
@@ -13,6 +14,12 @@ const t = de.auth.signIn;
 // for the whole session; there is no in-session switch afterwards.
 export function SignInForm() {
   const [mode, setMode] = useState<"household" | "resident">("household");
+  // resident-settings (human decision 2026-09-24, walkthrough): on the resident tab, a resident
+  // with an email may use it instead of household + name. The tab still decides the identity:
+  // the server refuses a household account's address on this path (auth.ts `resident_email`).
+  const [residentBy, setResidentBy] = useState<"name" | "email">("name");
+  const submittedMode = mode === "resident" && residentBy === "email" ? "resident_email" : mode;
+  const showEmail = mode === "household" || residentBy === "email";
   const [state, formAction, pending] = useActionState(signInAction, initialState);
 
   return (
@@ -39,14 +46,14 @@ export function SignInForm() {
       </div>
 
       <form action={formAction} className="card space-y-4">
-        <input type="hidden" name="mode" value={mode} />
+        <input type="hidden" name="mode" value={submittedMode} />
 
-        {mode === "household" ? (
+        {showEmail ? (
           <div>
             <label htmlFor="email" className="field-label">
               {t.emailLabel}
             </label>
-            <input id="email" name="email" type="email" required className="field-input" />
+            <input id="email" name="email" type="email" required autoComplete="email" className="field-input" />
           </div>
         ) : (
           <>
@@ -82,14 +89,18 @@ export function SignInForm() {
           <label htmlFor="password" className="field-label">
             {t.passwordLabel}
           </label>
-          <input
-            id="password"
-            name="password"
-            type="password"
-            required
-            className="field-input"
-          />
+          <PasswordInput id="password" name="password" required autoComplete="current-password" />
         </div>
+
+        {mode === "resident" && (
+          <button
+            type="button"
+            className="btn-link"
+            onClick={() => setResidentBy(residentBy === "name" ? "email" : "name")}
+          >
+            {residentBy === "name" ? t.residentUseEmail : t.residentUseName}
+          </button>
+        )}
 
         {state.error && <p className="field-error">{state.error}</p>}
 

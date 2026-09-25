@@ -44,8 +44,9 @@ tables:
   account:
     id: { category: "⚙️" }
     household_id: { category: "⚙️", purpose: "RLS-Anker (denormalisiert, wie Application.household_id)" }
-    email: { category: "🟠", purpose: "Anmeldeadresse (FR-1.1); abgeleitet/nicht zustellbar bei Resident-Accounts", legal_basis: "Art. 6(1)(b) DSGVO (Vertrag)", retention: "bis Account-Löschung" }
+    email: { category: "🟠", purpose: "Anmeldeadresse; bei Resident-Accounts abgeleitet/nicht zustellbar, bis eine eigene Adresse hinterlegt ist (dann beim Anbieter gespeichert, unbestätigt)", legal_basis: "Art. 6(1)(b) DSGVO (Vertrag)", retention: "bis Account-Löschung" }
     email_verified_at: { category: "🟠", purpose: "Zustellungs-Autorität (identity.md §2.1)", legal_basis: "Art. 6(1)(b) DSGVO", retention: "bis Account-Löschung" }
+    password_changed_at: { category: "⚙️", purpose: "Anmeldegeneration: eine vor diesem Zeitpunkt begonnene Anmeldung legt keine Session an (identity.md §2.1)" }
     locale: { category: "⚙️" }
     created_at: { category: "⚙️" }
     deleted_at: { category: "⚙️" }

@@ -1,0 +1,19 @@
+-- Copilot review round 5 (PR #23), FIX 1: signIn checked the password with Supabase
+-- (signInWithPassword) BEFORE taking the membership row lock, so a sign-in that authenticated
+-- with the OLD password just before a concurrent password reset/change could insert its session
+-- AFTER that reset/change had already revoked every other session — and that old authentication
+-- would outlive it. Closed with a credentials generation stamped in the DATABASE clock (never a
+-- JS Date, per CLAUDE.md's "compare in SQL or with the DB-returned values, never mixing JS clock
+-- and DB clock"): every password writer (changeResidentPassword, redeemPasswordReset phases 1/2)
+-- sets this to `clock_timestamp()` (the DB clock at the instant of that write — never plain
+-- `now()`, which is fixed at the writer's own transaction start and would understate the real
+-- write instant whenever that transaction does other work, e.g. a provider round-trip, first)
+-- inside the same transaction that holds the account row lock; signIn reads
+-- the database clock once, before its own signInWithPassword call, and refuses
+-- (`invalid_credentials`) if `password_changed_at IS NOT NULL AND password_changed_at >= <that
+-- read>`.
+--
+-- Nullable, no default: an account that has never changed its password (registration/join's
+-- initial one) has no generation yet, and the comparison above is false unconditionally for such
+-- an account. `IF NOT EXISTS` per CLAUDE.md's migration re-runnability rule (files after 0017).
+ALTER TABLE "account" ADD COLUMN IF NOT EXISTS "password_changed_at" timestamp with time zone;

@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 import {
   boolean,
+  check,
   date,
   index,
   integer,
@@ -39,6 +40,12 @@ export const membershipRoleEnum = pgEnum("membership_role", [
   "member",
 ]);
 
+// resident-settings design.md Decision 4: every join link now carries a purpose. `join` is every
+// link this table has ever held; `password_reset` is the new administration-issued, single-use
+// link bound to an ACTIVE profile whose account has no email (identity/password-reset). Default
+// 'join' on the column below makes every existing row a joining link without a backfill.
+export const joinCodePurposeEnum = pgEnum("join_code_purpose", ["join", "password_reset"]);
+
 // data-model.md "Account". `household_id` is a deliberate denormalization not in
 // docs/domain/identity.md's field list — added under the same documented pattern
 // docs/domain/casting.md already uses for Application.household_id ("redundant zur Runde, aber
@@ -51,12 +58,25 @@ export const account = pgTable(
   {
     id: uuid("id").primaryKey().defaultRandom(),
     householdId: uuid("household_id").notNull(),
-    // Required + unique for the household-admin account (FR-1.1); nullable + a derived,
-    // non-deliverable address for a resident account (research.md §2). Uniqueness is enforced at
-    // the Supabase Auth layer (the actual sign-in identifier), not duplicated here as a DB
-    // constraint — this column is a local cache of what Auth already guarantees unique.
+    // Required + unique for the household-admin account (FR-1.1); nullable for a resident
+    // account, which starts out on a derived, non-deliverable address (research.md §2) and may
+    // later gain a real one — added at join or in the resident's own settings
+    // (identity/account-settings) — at which point it REPLACES the derived address at the
+    // provider (resident-settings design.md Decision 1/2) and becomes usable for email sign-in
+    // (identity/sign-in). Uniqueness is enforced at the Supabase Auth layer (the actual sign-in
+    // identifier), not duplicated here as a DB constraint — this column is a local cache of what
+    // Auth already guarantees unique.
     email: text("email"),
     emailVerifiedAt: timestamp("email_verified_at", { withTimezone: true }),
+    // Copilot review round 5 (PR #23), FIX 1: a credentials generation stamped in the DATABASE
+    // clock, not a JS Date — signIn compares against this using a database-clock read taken before
+    // its own signInWithPassword call, so a password change/reset that commits between that read
+    // and signIn's later membership lock is still caught (see auth.ts's signIn and
+    // repository.ts's readDatabaseClock). Nullable, no default: an account that has never changed
+    // its password (registration/join's initial one) has no generation to compare against yet, and
+    // signIn's check (`password_changed_at IS NOT NULL AND password_changed_at >= <clock read>`)
+    // is false for every such account unconditionally.
+    passwordChangedAt: timestamp("password_changed_at", { withTimezone: true }),
     locale: text("locale").notNull().default("de"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     deletedAt: timestamp("deleted_at", { withTimezone: true }),
@@ -212,7 +232,31 @@ export const membership = pgTable(
   },
   (t) => [
     index("membership_household_id_idx").on(t.householdId),
-    index("membership_account_id_idx").on(t.accountId),
+    // drizzle/0021 (Copilot review round 2, PR #23): one membership per profile and one per
+    // account are invariants the reset path and signIn both rely on — the reset path picks
+    // `[membershipRow]` by resident_profile_id (issuePasswordResetLink/redeemPasswordReset) and
+    // signIn picks it by account_id, so a second row for either would make that pick ambiguous.
+    // These UNIQUE indexes replace the plain `membership_account_id_idx` (drizzle-kit generates a
+    // unique index for a unique column constraint, so the old non-unique one is redundant — a
+    // unique index is usable for every plain equality lookup the old one served). The profile
+    // index is partial (`WHERE resident_profile_id IS NOT NULL`) because a household account's
+    // membership row always has a null one (ADR-013) and there may legitimately be many such rows
+    // across different households — nothing about "one membership per profile" applies to null.
+    uniqueIndex("membership_resident_profile_id_unique")
+      .on(t.residentProfileId)
+      .where(sql`${t.residentProfileId} IS NOT NULL`),
+    uniqueIndex("membership_account_id_unique").on(t.accountId),
+    // drizzle/0020 (review fix, Copilot PR #23): there are no foreign keys in this schema, so
+    // nothing previously stopped a membership row from carrying `is_resident = false` alongside a
+    // set `resident_profile_id`, or `is_resident = true` with a null one — a pairing that
+    // resolve_join_code/claim_join_code's (drizzle/0019) resident-only joins, and
+    // issuePasswordResetLink's own SQL predicate (repository.ts), both trust without re-checking.
+    // This CHECK makes that pairing a database invariant instead of an assumption held only by the
+    // three writers (registerHousehold, claimResidentProfile, joinHousehold in auth.ts).
+    check(
+      "membership_resident_pairing",
+      sql`${t.isResident} = (${t.residentProfileId} IS NOT NULL)`,
+    ),
     pgPolicy("membership_household_isolation", {
       as: "permissive",
       for: "all",
@@ -262,10 +306,24 @@ export const joinCodeIssuance = pgTable(
     // and its refusal all behave identically (spec.md identity/join-code "A link may name the
     // person it was issued for").
     residentProfileId: uuid("resident_profile_id"),
+    // resident-settings design.md Decision 4: every link now carries a purpose. Default 'join'
+    // makes every row that predates this column a joining link, unconditionally — no backfill
+    // needed. A `password_reset` link is minted only by issuePasswordResetLink (repository.ts),
+    // never by issueJoinCode's public, moderator-reachable options type.
+    purpose: joinCodePurposeEnum("purpose").notNull().default("join"),
   },
   (t) => [
     index("join_code_issuance_household_id_idx").on(t.householdId),
     uniqueIndex("join_code_issuance_code_idx").on(t.code),
+    // A password-reset link always names a profile — there is no such thing as a neutral reset
+    // link, unlike a joining link, which may or may not be bound (design.md Decision 4). Holds in
+    // raw SQL too: nothing but this constraint stops a corrupt or hand-written row from minting a
+    // reset link naming nobody, which `resolve_join_code`/`claim_join_code` would then have to
+    // refuse defensively instead of by construction.
+    check(
+      "join_code_issuance_reset_names_profile",
+      sql`${t.purpose} = 'join' OR ${t.residentProfileId} IS NOT NULL`,
+    ),
     pgPolicy("join_code_issuance_household_isolation", {
       as: "permissive",
       for: "all",

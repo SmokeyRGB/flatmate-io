@@ -3,7 +3,13 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { landingPathFor } from "@/app/landing";
-import { JOIN_PASSWORD_MIN_LENGTH, JoinError, joinAttemptSourceHash, joinHousehold } from "@/modules/identity/auth";
+import {
+  JOIN_PASSWORD_MIN_LENGTH,
+  JoinError,
+  joinAttemptSourceHash,
+  joinHousehold,
+  redeemPasswordReset,
+} from "@/modules/identity/auth";
 import {
   buildJoinUrl,
   isWellFormedJoinCode,
@@ -25,7 +31,9 @@ import { getClientIp } from "./request-ip";
 // the previous state is what next dev's action log prints on the NEXT submit).
 export interface JoinFormState {
   error: string | null;
-  fieldError: "displayName" | "password" | null;
+  // review fix: "email" added alongside displayName/password — invalid_email below needs somewhere
+  // to point the inline error at, following the exact same fieldError convention.
+  fieldError: "displayName" | "password" | "email" | null;
   refusal: "invalid_link" | "other_household" | null;
 }
 
@@ -129,12 +137,29 @@ export async function joinHouseholdAction(
           // design.md Decision 10 (EC-2.5 met again at submit time): the same sign-out way forward
           // as the page's own Keine-Berechtigung state.
           return { error: t.errors.otherHousehold, fieldError: null, refusal: "other_household" };
+        case "email_taken":
+          // resident-settings design.md Decision 3: names no one (proposal Assumption 2). Shown on
+          // the email field itself (review fix: JoinFormState now has an "email" fieldError variant,
+          // added for invalid_email below and reused here).
+          return { error: t.errors.emailTaken, fieldError: "email", refusal: null };
+        case "invalid_email":
+          // review fix: auth.ts's joinHousehold now validates the optional email itself
+          // (normalizeEmail/isWellFormedEmail) — a malformed value is refused here, before any Auth
+          // user is created or any link is claimed. Name and email stay typed in the browser's own
+          // draft (join-form.tsx), never the password.
+          return { error: t.errors.invalidEmail, fieldError: "email", refusal: null };
         case "signup_failed":
           // design.md I1: unchanged from before this change — a JoinError's own message never
           // contains the code (join-code-never-in-query-or-log.test.ts, extended by task 7.4), so
           // logging the error itself here is not a G-A5 violation. The join is one transaction, so
           // a failed one created nothing (t.errors.genericFailure states that now, task 2.2).
           console.error(err);
+          return { error: t.errors.genericFailure, fieldError: null, refusal: null };
+        // reset_incomplete/reset_done_sign_in_failed belong to redeemPasswordReset's own
+        // refusals (Copilot review round 2, PR #23) — joinHousehold never throws either, covered
+        // here only so this switch stays exhaustive.
+        case "reset_incomplete":
+        case "reset_done_sign_in_failed":
           return { error: t.errors.genericFailure, fieldError: null, refusal: null };
         default: {
           const _exhaustive: never = errCode;
@@ -179,4 +204,111 @@ export async function signOutAndReturnAction(formData: FormData): Promise<void> 
     redirect(buildJoinUrl(null, normalised));
   }
   redirect("/join");
+}
+
+// identity/password-reset (O-16): A3's `reset` shape submit. german-ui-vocabulary: a `code`
+// discriminant, never a typed value, in the action state (design.md constraint 5).
+export interface ResetFormState {
+  error: string | null;
+  fieldError: "password" | null;
+  // review fix: mirrors JoinFormState's own refusal field — invalid_link needs the same way-forward
+  // component (HandEntryWayBack) the join form renders, not just an inline error.
+  refusal: "invalid_link" | null;
+}
+
+// FR-2.28/EC-2.14: the attempt is recorded on page load (page.tsx's resolve) AND here, on submit —
+// a redemption is itself an attempt, exactly as joinHouseholdAction records a second one on top of
+// the page's own GET. The code arrives as a hidden form field (G-A5), never a query parameter.
+export async function redeemPasswordResetAction(
+  _prevState: ResetFormState,
+  formData: FormData,
+): Promise<ResetFormState> {
+  const code = String(formData.get("code") ?? "");
+  const password = String(formData.get("password") ?? "");
+  const rememberMe = formData.get("rememberMe") === "on";
+
+  const ip = getClientIp(await headers());
+  const allowed = await recordJoinAttempt(joinAttemptSourceHash(ip));
+  if (!allowed) {
+    return { error: t.errors.rateLimited, fieldError: null, refusal: null };
+  }
+
+  // design.md Decision 8 (pre-mortem fix, 2026-09-24): captured BEFORE redemption so the visitor's
+  // OWN previous session (own account only, revokeSession enforces that) can be revoked once the
+  // redemption itself succeeds — otherwise the cookie this action is about to overwrite would
+  // leave a valid, orphaned session row behind. redeemPasswordReset itself does the revoke
+  // (own session only, via repository.ts's revokeSession) once the redemption has unconditionally
+  // succeeded, mirroring joinHousehold's own `options.currentSession`.
+  const current = await getCurrentSession();
+
+  try {
+    const result = await redeemPasswordReset(code, { password }, { rememberMe, currentSession: current });
+
+    await setSessionCookie(
+      result.session.id,
+      result.context.householdId,
+      sessionCookieMaxAge(result.session.expiresAt),
+    );
+  } catch (err) {
+    if (err instanceof JoinError) {
+      // Exhaustive switch (design.md Decision 4): a missed code is a compile error.
+      const errCode = err.code;
+      switch (errCode) {
+        case "invalid_link":
+          // review fix: the same refusal shape joinHouseholdAction gives — an inline message PLUS
+          // the way forward (hand entry), rendered by reset-form.tsx reusing HandEntryWayBack.
+          return { error: t.errors.invalidLink, fieldError: null, refusal: "invalid_link" };
+        case "missing_fields":
+          return { error: t.errors.missingFields, fieldError: null, refusal: null };
+        case "password_too_short":
+          return {
+            error: t.errors.passwordTooShort(JOIN_PASSWORD_MIN_LENGTH),
+            fieldError: "password",
+            refusal: null,
+          };
+        case "rate_limited":
+          return { error: t.errors.rateLimited, fieldError: null, refusal: null };
+        case "signup_failed":
+          console.error(err);
+          return { error: t.errors.genericFailure, fieldError: null, refusal: null };
+        // Copilot review round 2 (PR #23): redeemPasswordReset is now three separate
+        // transactions, not one — phase 1 (claim + revoke-all + audit) always commits before any
+        // provider call, so a failure past that point can no longer roll the whole reset back.
+        case "reset_incomplete":
+          // Phase 2 (the provider password write) failed AFTER phase 1 committed: the link is
+          // spent, every prior session is dead, but the password never changed. The safe
+          // direction (auth.ts's own comment): nobody's session survives and no half-known
+          // password exists. Tell the person to ask the administration for a new link — a fresh
+          // one can be issued immediately, since the account still has no email.
+          console.error(err);
+          return { error: t.errors.resetIncomplete, fieldError: null, refusal: null };
+        case "reset_done_sign_in_failed":
+          // Phase 3's sign-in failed AFTER phase 2 already committed the new password — reporting
+          // the generic failure text here would be a lie (it promises the invitation is not
+          // consumed, which is false for a spent reset link with its password already changed).
+          // Redirect to sign-in with a note instead, recreated exactly as in commit a95bbb9 (this
+          // outcome is materially the same as the one that shape covered — a provider sign-in
+          // failing after a committed password change — even though the code path that reaches it
+          // is now phase 3's re-acquired membership lock, not a post-commit step).
+          console.error(err);
+          redirect("/sign-in?note=password_reset");
+        // The remaining JoinErrorCode members belong to joinHousehold's own refusals
+        // (name collisions, an already-signed-in visitor, a duplicate email) and redeemPasswordReset
+        // never throws them — covered here only so this switch stays exhaustive.
+        case "name_taken":
+        case "already_member":
+        case "other_household":
+        case "email_taken":
+        case "invalid_email":
+          return { error: t.errors.genericFailure, fieldError: null, refusal: null };
+        default: {
+          const _exhaustive: never = errCode;
+          return _exhaustive;
+        }
+      }
+    }
+    throw err;
+  }
+
+  redirect("/dashboard");
 }

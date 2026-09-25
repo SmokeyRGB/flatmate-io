@@ -44,6 +44,13 @@ const PAYLOAD_ALLOWLIST: Readonly<Record<string, readonly string[]>> = {
   // membership.joined_via_issuance_id COLUMN, never a second copy here (a second copy would be a
   // second thing to redact, G-D8, for no added answer), and the code never enters a payload (G-A5).
   "membership.joined": [],
+  // resident-settings design.md Decision 9 (G-D7): all three empty — no address, password or code
+  // ever enters a payload. account.email_changed covers both adding and changing the address (one
+  // event type, per identity/account-settings); account.password_reset_by_admin never carries the
+  // code either (G-A5), only the subject/actor/time the row already carries structurally.
+  "account.email_changed": [],
+  "account.password_changed": [],
+  "account.password_reset_by_admin": [],
 };
 
 export class PayloadValidationError extends Error {}

@@ -9,6 +9,7 @@ import { JoinForm } from "./join-form";
 import { HandEntryWayBack, SignOutAndReturnForm } from "./join-ways-forward";
 import { decideJoinScreen } from "./join-screen-state";
 import { getClientIp } from "./request-ip";
+import { ResetForm } from "./reset-form";
 
 const t = de.join;
 
@@ -102,6 +103,17 @@ export default async function JoinPage({ params }: { params: Promise<{ code: str
             passwordMinLength={JOIN_PASSWORD_MIN_LENGTH}
             boundDisplayName={screen.displayName}
           />
+        </div>
+      );
+
+    // identity/password-reset (O-16): A3's reset shape, judged before "bound" (join-screen-
+    // state.ts) — greeting, one password field, remember-me, no name and no email.
+    case "reset":
+      return (
+        <div className="space-y-6">
+          <h1 className="font-serif text-2xl font-semibold">{t.reset.heading(screen.displayName)}</h1>
+          <span className="context-chip">{t.reset.householdChip(screen.householdName)}</span>
+          <ResetForm code={code} passwordMinLength={JOIN_PASSWORD_MIN_LENGTH} />
         </div>
       );
 
