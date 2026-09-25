@@ -7,7 +7,7 @@ import {
   claimResidentProfile,
   signIn,
 } from "@/modules/identity/auth";
-import { createResidentProfile, setMovedOut } from "@/modules/identity/repository";
+import { createResidentProfile, getOwnAccountEmail, setMovedOut } from "@/modules/identity/repository";
 import { account, session } from "@/modules/identity/schema";
 import { activityEvent } from "@/modules/audit/schema";
 import type { CurrentSession } from "@/modules/identity/session-cookie";
@@ -328,4 +328,48 @@ describe("changeResidentEmail (identity/account-settings, design.md Decision 2)"
   // account.email ended up set to "should-not-apply@example.test" instead of staying null. The
   // check was restored immediately afterwards; this comment records the observed failure rather
   // than leaving the break in the tree.
+});
+
+// Copilot review round 5 (PR #23), FIX 2: getOwnAccountEmail used to return the address on
+// `context.profileId` alone — a claim the SESSION made at sign-in (ADR-013) which can go stale,
+// exactly the same staleness changeResidentEmail's/changeResidentPassword's own membership locks
+// above already guard against. This is the test authorization-matrix.test.ts's own
+// NOT_APPLICABLE_IDENTITY entry for `getOwnAccountEmail` already claimed existed here.
+describe("getOwnAccountEmail (identity/account-settings, Copilot review round 5, PR #23, FIX 2)", () => {
+  it("returns the address for a live resident membership", async () => {
+    hh = await registerTestHousehold();
+    const resident = await claimResident(hh, "OwnEmailLive");
+    const current = await residentSession(hh, resident);
+    await changeResidentEmail(current, "own-email-live@example.test");
+
+    await expect(getOwnAccountEmail(current.context)).resolves.toBe("own-email-live@example.test");
+  });
+
+  // Uses the STALE context captured before the revocation, exactly the race
+  // changeResidentEmail's own "using a stale CurrentSession" test above exercises — the fix is
+  // that the membership join inside getOwnAccountEmail catches this even though context.profileId
+  // itself is still non-null.
+  it("no longer returns the address once the membership is revoked, even with a stale non-null profileId", async () => {
+    hh = await registerTestHousehold();
+    const resident = await claimResident(hh, "OwnEmailRevoked");
+    const current = await residentSession(hh, resident); // captured BEFORE the revocation below
+    await changeResidentEmail(current, "own-email-revoked@example.test");
+
+    await setMovedOut(hh.context, hh.accountId, resident.accountId);
+
+    await expect(getOwnAccountEmail(current.context)).resolves.toBeNull();
+  });
+
+  it("still throws PermissionDeniedError for a household (non-resident) session", async () => {
+    hh = await registerTestHousehold();
+    await expect(getOwnAccountEmail(hh.context)).rejects.toThrow();
+  });
+
+  // Deliberate break (CLAUDE.md's own instruction for this fix — RUN and report it failing):
+  // removing the membership join/predicate from getOwnAccountEmail (reverting to a plain
+  // `SELECT email FROM account WHERE id = context.accountId`) and running this file made the
+  // "no longer returns the address once the membership is revoked" test above fail — it resolved
+  // to "own-email-revoked@example.test" instead of `null`, since the stale profileId alone was
+  // enough to pass the old check. The join was restored immediately afterwards; this comment
+  // records the observed failure rather than leaving the break in the tree.
 });

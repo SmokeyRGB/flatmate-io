@@ -68,6 +68,15 @@ export const account = pgTable(
     // Auth already guarantees unique.
     email: text("email"),
     emailVerifiedAt: timestamp("email_verified_at", { withTimezone: true }),
+    // Copilot review round 5 (PR #23), FIX 1: a credentials generation stamped in the DATABASE
+    // clock, not a JS Date — signIn compares against this using a database-clock read taken before
+    // its own signInWithPassword call, so a password change/reset that commits between that read
+    // and signIn's later membership lock is still caught (see auth.ts's signIn and
+    // repository.ts's readDatabaseClock). Nullable, no default: an account that has never changed
+    // its password (registration/join's initial one) has no generation to compare against yet, and
+    // signIn's check (`password_changed_at IS NOT NULL AND password_changed_at >= <clock read>`)
+    // is false for every such account unconditionally.
+    passwordChangedAt: timestamp("password_changed_at", { withTimezone: true }),
     locale: text("locale").notNull().default("de"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     deletedAt: timestamp("deleted_at", { withTimezone: true }),

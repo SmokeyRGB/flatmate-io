@@ -55,6 +55,18 @@ function freshCode(): string {
   return `RESET${codeCounter}-TESTX`;
 }
 
+type PgError = { code?: string; message?: string };
+
+// Copilot review round 5 (PR #23), FIX 3: same direct/`cause` extraction as
+// membership-resident-pairing.test.ts's own pgErrorOf — postgres.js (src/db/client.ts) throws its
+// own error with `.code` set to the raw SQLSTATE directly; drizzle's own wrapping sometimes nests
+// the driver error under `.cause` instead, so this checks both rather than coupling the test to
+// which layer happens to surface it.
+function pgErrorOf(caught: unknown): PgError {
+  const err = caught as { code?: string; message?: string; cause?: PgError };
+  return err.code ? err : (err.cause ?? err);
+}
+
 // resident-settings design.md Decision 4 (G-C7, raw side): resolve_join_code/claim_join_code
 // exercised directly as SQL, calling both by name (definer-coverage.ts requires it).
 describe("resolve_join_code / claim_join_code — the password_reset branch, raw SQL (G-C7)", () => {
@@ -250,18 +262,23 @@ describe("resolve_join_code / claim_join_code — the password_reset branch, raw
   });
 
   // (h) inserting a password_reset row with a null resident_profile_id violates the CHECK.
-  it("(h) a password_reset row naming no profile violates the CHECK constraint", async () => {
+  it("(h) a password_reset row naming no profile violates the CHECK constraint (SQLSTATE 23514)", async () => {
     hhA = await registerTestHousehold();
-    await expect(
-      withSessionContext(hhA.context, (tx) =>
+    let caught: unknown;
+    try {
+      await withSessionContext(hhA.context, (tx) =>
         tx.execute(sql`
           INSERT INTO join_code_issuance
             (household_id, code, expires_at, max_uses, uses, created_by_account_id, resident_profile_id, purpose)
           VALUES
             (${hhA!.householdId}::uuid, ${freshCode()}, now() + interval '7 days', 1, 0, ${hhA!.accountId}::uuid, NULL, 'password_reset')
         `),
-      ),
-    ).rejects.toThrow();
+      );
+    } catch (err) {
+      caught = err;
+    }
+    expect(caught).toBeInstanceOf(Error);
+    expect(pgErrorOf(caught).code).toBe("23514");
   });
 
   // (i) the one-argument claim_join_code(text) no longer exists.

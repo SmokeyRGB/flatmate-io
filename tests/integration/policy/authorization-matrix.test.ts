@@ -149,6 +149,10 @@ const NOT_APPLICABLE_IDENTITY: Record<string, string> = {
   // session (profileId null). Read-only, tested in
   // tests/integration/policy/account-settings-email.test.ts.
   getOwnAccountEmail: "self-service read, own account only (identity/account-settings)",
+  // Copilot review round 5 (PR #23), FIX 1: pre-session bootstrap, same class as
+  // resolveAccountHousehold above — signIn calls this BEFORE it has authenticated anyone (before
+  // its own signInWithPassword), to read a clock value with no tenant/row to authorize against.
+  readDatabaseClock: "pre-session bootstrap — a bare clock read with no row or tenant to authorize against; called by signIn before its own signInWithPassword.",
 };
 
 const KNOWN_OPEN_IDENTITY: Record<string, string> = {};

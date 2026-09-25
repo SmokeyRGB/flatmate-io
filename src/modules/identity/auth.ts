@@ -1,6 +1,6 @@
 import { createHmac, randomUUID } from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
-import { and, eq, isNull, lt, ne, notInArray } from "drizzle-orm";
+import { and, eq, isNull, lt, ne, notInArray, sql } from "drizzle-orm";
 import { isUuid, withSessionContext, type SessionContext } from "@/db/session-context";
 import { recordActivityEvent } from "@/modules/audit/repository";
 import type { CurrentSession } from "./session-cookie";
@@ -8,6 +8,7 @@ import {
   claimJoinCodeTx,
   isDisplayNameTaken,
   issueJoinCodeTx,
+  readDatabaseClock,
   resolveAccountHousehold,
   resolveJoinCode,
   revokeSession,
@@ -494,6 +495,16 @@ export async function signIn(
     email = userData.user.email;
   }
 
+  // Copilot review round 5 (PR #23), FIX 1: read the DATABASE clock ONCE, here, BEFORE
+  // signInWithPassword ever runs — so the credentials-generation check below (after the
+  // membership lock) compares against the instant this sign-in attempt STARTED verifying the
+  // password, never a later one. Reading it after signInWithPassword would let a password
+  // change/reset that commits during the Supabase Auth round-trip itself (network latency, not
+  // just the time between this read and the membership lock) slip in on the "new" side of the
+  // generation and be wrongly refused — reading it first means only a generation truly stamped
+  // BEFORE this attempt even began can pass.
+  const credentialsCheckedAt = await readDatabaseClock();
+
   const { data, error } = await supabaseAdmin().auth.signInWithPassword({
     email,
     password: input.password,
@@ -523,8 +534,9 @@ export async function signIn(
     //    session inserted here.
     //
     // No deadlock: removeMember/setMovedOut take row locks in the order resident_profile (the
-    // status UPDATE) → membership → session; signIn takes only the membership lock and then
-    // INSERTs, never touching resident_profile, so the two never wait on each other in reverse.
+    // status UPDATE) → membership → account → session; signIn takes membership → account (FOR
+    // SHARE, below) and then INSERTs, never touching resident_profile, so the two never wait on
+    // each other in reverse.
     const [membershipRow] = await tx
       .select()
       .from(membership)
@@ -540,6 +552,28 @@ export async function signIn(
     // is never revoked (C-1.4), so this can never lock out administration.
     if (membershipRow.revokedAt) {
       throw new SignInError("Membership revoked", "invalid_credentials");
+    }
+
+    // Copilot review round 5 (PR #23), FIX 1: lock order membership -> account, same as
+    // changeResidentEmail/changeResidentPassword/redeemPasswordReset. `FOR SHARE`, not `FOR
+    // UPDATE` — signIn never writes this row, it only needs to serialize against a concurrent
+    // writer's own `FOR UPDATE` (a plain read here would see the pre-commit snapshot and race
+    // it), so the weaker read lock is enough and does not block two concurrent sign-ins against
+    // each other.
+    const [accountRow] = await tx.select().from(account).where(eq(account.id, accountId)).for("share");
+
+    // The credentials-generation check: a password writer stamps `password_changed_at =
+    // clock_timestamp()` (the DB clock, at the instant of that statement — never plain `now()`,
+    // which is fixed at the writer's OWN transaction start and would understate the real write
+    // instant whenever that transaction does other work, e.g. a provider round-trip, first; see
+    // changeResidentPassword's own comment) inside the SAME transaction that holds this same
+    // account row lock, so if that stamp is at or after the DB-clock read this call took BEFORE
+    // its own signInWithPassword above, this authentication cannot be trusted — it may have
+    // verified a password that was already superseded by the time (or during the time) it ran.
+    // Same code as a wrong password: an intruder who authenticated with a password moments before
+    // it was changed learns nothing beyond "invalid credentials".
+    if (accountRow?.passwordChangedAt && accountRow.passwordChangedAt >= credentialsCheckedAt) {
+      throw new SignInError("Invalid credentials", "invalid_credentials");
     }
 
     // resident_email: the same refusal as a wrong password, so the resident tab says nothing about
@@ -1052,7 +1086,9 @@ export function isWellFormedEmail(normalized: string): boolean {
 // the full cross-path analysis). The new session lock (step 5) sits AFTER account, matching
 // redeemPasswordReset's phase 1/3 (membership -> account, then session) and changeResidentPassword
 // (membership -> account, then session) — so this reorder introduces no new lock-order pair and no
-// new deadlock risk.
+// new deadlock risk. Copilot review round 5 (PR #23), FIX 1: signIn now also takes membership ->
+// account (FOR SHARE, not FOR UPDATE — it only reads) before its own session INSERT, the same
+// relative order as every writer here, so it never waits on any of these in reverse either.
 export async function changeResidentEmail(current: CurrentSession, rawEmail: string): Promise<void> {
   const email = normalizeEmail(rawEmail);
   if (!email) {
@@ -1267,7 +1303,9 @@ export async function changeResidentEmail(current: CurrentSession, rawEmail: str
 // takes a prefix-compatible subsequence of resident_profile -> membership -> account -> session,
 // never the reverse, so there is no deadlock cycle across any pair of them. Step 3's new session
 // lock does not change this: it sits in the same relative position (after account, before any
-// provider call) the other functions already use.
+// provider call) the other functions already use. Copilot review round 5 (PR #23), FIX 1: signIn
+// also takes membership -> account (FOR SHARE) before its session INSERT — same relative order,
+// so it introduces no new cycle either.
 export async function changeResidentPassword(
   current: CurrentSession,
   currentPassword: string,
@@ -1359,6 +1397,27 @@ export async function changeResidentPassword(
         .set({ revokedAt: new Date() })
         .where(and(eq(session.accountId, context.accountId), ne(session.id, sessionId), isNull(session.revokedAt)));
 
+      // Copilot review round 5 (PR #23), FIX 1: stamp the credentials generation in the DATABASE
+      // clock, never a JS Date (CLAUDE.md: "compare in SQL or with the DB-returned values, never
+      // mixing JS clock and DB clock"), inside this same transaction, holding the same account row
+      // lock — alongside the session revoke and the audit entry, before the provider call. This is
+      // what signIn's own credentials-generation check (auth.ts's signIn) compares against.
+      //
+      // `clock_timestamp()`, deliberately NOT plain `now()`: Postgres's `now()` returns the
+      // TRANSACTION's start timestamp (fixed for the whole transaction), not the instant this
+      // statement runs — and this transaction does two provider round-trips (getUserById,
+      // signInWithPassword, above) before reaching this UPDATE, so `now()` would understate the
+      // real write instant by however long those calls took. That gap is exactly the window a
+      // concurrent signIn's own `readDatabaseClock()` read could land in, reopening the very race
+      // this stamp exists to close (confirmed by running this fix's own break test against
+      // `now()`: the race test failed — see sign-in-credential-generation.test.ts's own history).
+      // `clock_timestamp()` returns the actual current instant at each call, matching the moment
+      // this write takes effect.
+      await tx
+        .update(account)
+        .set({ passwordChangedAt: sql`clock_timestamp()` })
+        .where(eq(account.id, context.accountId));
+
       await recordActivityEvent(tx, {
         householdId: context.householdId,
         eventType: "account.password_changed",
@@ -1402,6 +1461,16 @@ export async function changeResidentPassword(
               lt(session.createdAt, startedAt),
             ),
           );
+
+        // Copilot review round 5 (PR #23), FIX 1: the compensation also sets the generation stamp
+        // again — the main transaction's own write to this same row rolled back with the rest of
+        // its failed commit, so this repair must re-apply it too, or signIn's check would compare
+        // against a generation that never actually survived. `clock_timestamp()`, not `now()` —
+        // see the main transaction's own comment above for why.
+        await tx
+          .update(account)
+          .set({ passwordChangedAt: sql`clock_timestamp()` })
+          .where(eq(account.id, context.accountId));
 
         await recordActivityEvent(tx, {
           householdId: context.householdId,
@@ -1478,10 +1547,18 @@ export async function changeResidentPassword(
 //      issued immediately;
 //   d. COMMIT (releases the locks). STATE LEFT if the commit itself fails, AFTER step (c) already
 //      returned success (`providerUpdated` is `true` when this transaction throws): Supabase has
-//      the new password, but this phase's own re-check locks and its own transaction leave nothing
-//      behind in Postgres either way — phase 2 writes no row of its own, so there is nothing here
-//      for a repair to redo, unlike changeResidentEmail/changeResidentPassword's compensations.
-//      Phase 1's commit already stands (link spent, every prior session dead) regardless. OUTCOME:
+//      the new password, but this phase's own re-check locks leave nothing else behind in Postgres
+//      either way — Copilot review round 5 (PR #23), FIX 1: this phase now ALSO re-stamps
+//      `account.password_changed_at` (step c.1, right after the provider write), which would roll
+//      back with this same failed commit; no repair re-applies it here, unlike
+//      changeResidentEmail's/changeResidentPassword's own compensations, because phase 1's OWN
+//      stamp (committed earlier, in its own separate transaction, and therefore never affected by
+//      THIS commit's failure) already covers the invariant that matters: any sign-in whose
+//      credentials-check read predates phase 1's commit is refused regardless; one landing between
+//      phase 1 and here falls in the documented "old password is still valid between the phases"
+//      window either way (see phase 2's re-check comment above), which is unaffected by whether
+//      this phase's own, slightly later stamp survived. Phase 1's commit already stands (link
+//      spent, every prior session dead) regardless. OUTCOME:
 //      logged (console.error) and treated as a SUCCESSFUL phase 2 — the caller falls through to
 //      phase 3 exactly as if the commit had not failed, because the one fact that matters (the
 //      password IS set) is true either way. Distinguishing "commit failed" from "callback threw
@@ -1550,7 +1627,9 @@ export async function changeResidentPassword(
 // never the reverse. Splitting phase 1/2/3 into separate transactions does not change this
 // analysis — it only means the membership lock is acquired and released TWICE (phase 1, then
 // phase 3) instead of held continuously, which is what opens (and phase 3's own re-check is what
-// closes) the removal-window named in phase 3(a) above.
+// closes) the removal-window named in phase 3(a) above. Copilot review round 5 (PR #23), FIX 1:
+// signIn takes membership -> account (FOR SHARE) before its own session INSERT — same relative
+// order as every phase here, so it introduces no new cycle either.
 export async function redeemPasswordReset(
   code: string,
   input: { password: string },
@@ -1627,6 +1706,21 @@ export async function redeemPasswordReset(
       .set({ revokedAt: new Date() })
       .where(and(eq(session.accountId, accountRow.id), isNull(session.revokedAt)));
 
+    // Copilot review round 5 (PR #23), FIX 1: stamp the generation here too, in PHASE 1 — the old
+    // password is still valid between phase 1 and phase 2 (the big comment above already notes
+    // this for the email/removal re-checks), so without this a sign-in landing in exactly that
+    // window would authenticate with a password this reset already committed to ending and could
+    // still slip a session in ahead of phase 2's own provider write. Phase 3 additionally revokes
+    // every live session before inserting its own, which already covers a sign-in that raced in
+    // between — this stamp is what makes signIn refuse such a sign-in in the first place, rather
+    // than relying solely on that later revoke. `clock_timestamp()`, not `now()` — see
+    // changeResidentPassword's own comment for why plain `now()` (the transaction's START time,
+    // not the statement's) would understate this write's real instant.
+    await tx
+      .update(account)
+      .set({ passwordChangedAt: sql`clock_timestamp()` })
+      .where(eq(account.id, accountRow.id));
+
     await recordActivityEvent(tx, {
       householdId: resolved.householdId,
       eventType: "account.password_reset_by_admin",
@@ -1687,13 +1781,22 @@ export async function redeemPasswordReset(
         );
       }
       providerUpdated = true;
+
+      // Copilot review round 5 (PR #23), FIX 1: re-stamp the generation here too, AFTER the
+      // successful provider write, before this transaction's own commit — phase 1's stamp already
+      // covers the window between phase 1 and phase 2 (see that phase's own comment), but this
+      // phase writes the ACTUAL new password, so the generation must also reflect the instant
+      // THAT write took effect, not only phase 1's earlier one. `clock_timestamp()`, not `now()` —
+      // see changeResidentPassword's own comment for why.
+      await tx.update(account).set({ passwordChangedAt: sql`clock_timestamp()` }).where(eq(account.id, accountId));
     });
   } catch (err) {
     if (!providerUpdated) throw err;
     // The provider password write already succeeded; only this transaction's own COMMIT failed
-    // afterwards. Phase 2 writes no row of its own, so there is nothing in Postgres to repair —
-    // log and fall through to phase 3 exactly as a normal phase 2 success would. See the big
-    // comment above (PHASE 2, step d).
+    // afterwards, taking this phase's own `password_changed_at` re-stamp down with it — no repair
+    // re-applies that here; phase 1's own, earlier-committed stamp already covers the invariant
+    // that matters (see the big comment above, PHASE 2 step d). Log and fall through to phase 3
+    // exactly as a normal phase 2 success would.
     console.error(err);
   }
 

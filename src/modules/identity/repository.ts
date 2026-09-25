@@ -182,6 +182,27 @@ export async function resolveAccountHousehold(accountId: string): Promise<string
   return rows[0]?.resolve_account_household ?? null;
 }
 
+// Copilot review round 5 (PR #23), FIX 1: signIn needs the DATABASE clock, read ONCE, BEFORE its
+// own signInWithPassword call — so it can later refuse a sign-in whose password_changed_at
+// generation is at or after this read, without ever mixing a JS Date into that comparison
+// (CLAUDE.md: "compare in SQL or with the DB-returned values, never mixing JS clock and DB
+// clock"). No household is known yet at that point in signIn (the household/resident_email input
+// kinds only resolve one AFTER a successful signInWithPassword), so this needs no RLS/tenant
+// context at all — same reasoning as resolveAccountHousehold's own bootstrap exception above,
+// and the same import-boundary rule (G-C1/FR-0.1) is what confines the raw `db` call to this file.
+export async function readDatabaseClock(): Promise<Date> {
+  // drizzle-orm's postgres-js driver (drizzle/driver.js `construct()`) installs a "transparent"
+  // parser for every timestamp-ish OID at the CONNECTION level, project-wide — it deliberately
+  // wants raw SQL to hand back the wire-format STRING, not a driver-parsed Date, so that typed
+  // queries (schema.ts's own `timestamp` columns) are the only place doing that conversion,
+  // consistently, via their own column type. A raw `db.execute()` call with no schema mapping (no
+  // `fields`/`customResultMapper`) therefore returns a plain postgres text value here — verified
+  // directly against this connection, not assumed — so this parses it into a `Date` itself, the
+  // same as drizzle's own `timestamp` column mapping would.
+  const rows = await db.execute<{ now: string }>(sql`SELECT clock_timestamp() AS now`);
+  return new Date(rows[0].now);
+}
+
 // join-code-protections (O-18) design.md Decision 3: the refusal type cannot carry a reason. A
 // discriminated union of causes plus a rule that every caller collapse it makes correctness a
 // matter of discipline at each call site; a type that never held the cause cannot leak it at any
@@ -385,12 +406,43 @@ export async function getMembershipForAccount(context: SessionContext, accountId
 // any" read. Self-service, own account only — the account acted on is ALWAYS context.accountId,
 // never a value the caller supplies (authorization-matrix.test.ts records this exemption). A
 // household session (profileId null) is refused, same shape as every other resident-only path.
+//
+// Copilot review round 5 (PR #23), FIX 2: the profileId !== null check above is a claim the
+// SESSION made at sign-in (ADR-013 — set once, never rewritten) and can go stale, exactly the same
+// staleness changeResidentEmail/changeResidentPassword's own membership locks already guard
+// against (auth.ts's big comments) — a move-out or a removal that commits AFTER this session's
+// CurrentSession was read still carries a non-null profileId in the cookie. So this now joins
+// membership on account_id = context.accountId, requiring a LIVE (revokedAt IS NULL) resident
+// (isResident = true) membership, inside the same transaction as the account read — no lock is
+// taken (this is a read, not a writer serializing against one), but the predicate itself is now
+// the authoritative, non-stale one rather than trusting the session's own claim.
+//
+// Returns `null` rather than throwing PermissionDeniedError for this specific case (unlike the
+// profileId === null branch above): E1's page (src/app/(resident)/account/page.tsx) calls this
+// directly, with no try/catch, after its own profileId === null branch already returned its own
+// fallback UI — a PermissionDeniedError thrown here would bubble past that page straight into
+// (resident)/error.tsx's shared boundary (a generic "unexpected error" state, and every retry
+// would throw again since the membership stays revoked). Returning null instead lets the existing
+// render proceed exactly as it does for "no email yet" — no address is disclosed either way, and
+// the page never crashes or shows an error state for what is, from the reader's side, simply "no
+// current address to show".
 export async function getOwnAccountEmail(context: SessionContext): Promise<string | null> {
   if (context.profileId === null) {
     throw new PermissionDeniedError("this reads a resident's own account only (identity/account-settings)");
   }
   return withSessionContext(context, async (tx) => {
-    const [row] = await tx.select({ email: account.email }).from(account).where(eq(account.id, context.accountId));
+    const [row] = await tx
+      .select({ email: account.email })
+      .from(account)
+      .innerJoin(
+        membership,
+        and(
+          eq(membership.accountId, account.id),
+          isNull(membership.revokedAt),
+          eq(membership.isResident, true),
+        ),
+      )
+      .where(eq(account.id, context.accountId));
     return row?.email ?? null;
   });
 }
