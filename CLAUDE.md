@@ -164,6 +164,14 @@ atomicity in a comment. The rule covers every provider call, not only the one a 
 a boundary fixed, `grep -n "supabaseAdmin()" src/` and check each call inside a transaction: the
 provider call goes last before the commit, and a failed commit after it is reconciled. PR #23 fixed
 the reset in one round and the password and email changes, three screens up, only in the next.
+Three more rules at that boundary, from PR #23's fourth round:
+- A repair after a failed commit reconciles to the authority's current state (the provider's
+  address), never replays its own write, since a later writer may have committed in between.
+- Every error after an external change maps to the state that change left behind, not only the
+  errors you expected: once the password is set, any failure means "set, please sign in".
+- A change to credentials (email, password) re-checks the caller's own `session` row under lock.
+  A reset or password change ends sessions without revoking the membership, so a membership
+  check alone lets a just-ended session through.
 
 **Every writer of the same state, pairwise.** When two functions write the same thing (a password,
 a provider address, the set of live sessions), each pair has to be serialized against each other,
