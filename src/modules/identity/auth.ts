@@ -93,6 +93,16 @@ export class RegistrationError extends Error {
 // IDs are generated here (not left to defaultRandom()) so the session context can be set to the
 // new household's id BEFORE the first insert — every new row's household_id must equal
 // current_setting('app.household_id') to satisfy each table's RLS WITH CHECK.
+//
+// No transaction spans Postgres and Supabase Auth (CLAUDE.md). The state each failure point
+// leaves:
+//   - createUser fails: nothing exists — signup_failed.
+//   - the transaction fails, or its commit does: the Auth user exists and blocks the address (a
+//     retry would fail at createUser as a duplicate). The catch below runs undoRegisterHousehold,
+//     which deletes this household's rows (a no-op after a rollback; the reconciliation when a
+//     commit landed but reported failure) and then the Auth user, and rethrows the original
+//     error. If undo's own DB phase fails too, the Auth user is left in place, never rows without
+//     their Auth user; that residual is logged.
 export async function registerHousehold(email: string, password: string, name: string) {
   if (!email) throw new RegistrationError("email is required", "missing_email");
   if (!password) throw new RegistrationError("password is required", "missing_password");
@@ -118,69 +128,79 @@ export async function registerHousehold(email: string, password: string, name: s
   const accountId = data.user.id; // Account.id == the Supabase Auth user id (1:1, standard pattern)
   const context: SessionContext = { accountId, householdId, profileId: null };
 
-  return withSessionContext(context, async (tx) => {
-    const [householdRow] = await tx
-      .insert(household)
-      .values({
-        id: householdId,
-        name: trimmedName,
-        ownerAccountId: accountId,
-        contactEmail: email,
-      })
-      .returning();
+  try {
+    return await withSessionContext(context, async (tx) => {
+      const [householdRow] = await tx
+        .insert(household)
+        .values({
+          id: householdId,
+          name: trimmedName,
+          ownerAccountId: accountId,
+          contactEmail: email,
+        })
+        .returning();
 
-    await tx.insert(householdSettings).values({
-      householdId,
-      updatedByAccountId: accountId,
-    });
-
-    // join-code-protections (O-18): the founding link, minted through the same generation/retry
-    // path issueJoinCode uses (issueJoinCodeTx), not a separate randomUUID() on the Household row
-    // itself — proposal.md's 2026-09-21 register decision: FR-2.4's founding-link usage-count
-    // prefill ("expected resident count") is not built in v0.1 (nobody collects that number), so
-    // the founding link takes the same default any other issued link would: 7 days, max 1 use.
-    await issueJoinCodeTx(tx, householdId, accountId, { validDays: 7, maxUses: 1 });
-
-    await tx.insert(account).values({
-      id: accountId,
-      householdId,
-      email,
-    });
-
-    // FR-1.7: the household account has is_resident = false and never occupies a profile
-    // (ADR-013). role = household_admin per identity.md's Membership entity.
-    const [membershipRow] = await tx
-      .insert(membership)
-      .values({
+      await tx.insert(householdSettings).values({
         householdId,
-        accountId,
-        residentProfileId: null,
-        isResident: false,
-        role: "household_admin",
-        permissions: [],
-      })
-      .returning();
+        updatedByAccountId: accountId,
+      });
 
-    await recordActivityEvent(tx, {
-      householdId,
-      eventType: "resident_profile.created", // reuses the same audit shape — no dedicated
-      // "household.registered" event type is registered (G-D7 allowlist) since no acceptance
-      // criterion in F1's scope reads one back; the household row's own created_at is the record.
-      subjectType: "household",
-      subjectId: householdId,
-      actorAccountId: accountId,
-      actorProfileId: null,
-      payload: {},
+      // join-code-protections (O-18): the founding link, minted through the same generation/retry
+      // path issueJoinCode uses (issueJoinCodeTx), not a separate randomUUID() on the Household row
+      // itself — proposal.md's 2026-09-21 register decision: FR-2.4's founding-link usage-count
+      // prefill ("expected resident count") is not built in v0.1 (nobody collects that number), so
+      // the founding link takes the same default any other issued link would: 7 days, max 1 use.
+      await issueJoinCodeTx(tx, householdId, accountId, { validDays: 7, maxUses: 1 });
+
+      await tx.insert(account).values({
+        id: accountId,
+        householdId,
+        email,
+      });
+
+      // FR-1.7: the household account has is_resident = false and never occupies a profile
+      // (ADR-013). role = household_admin per identity.md's Membership entity.
+      const [membershipRow] = await tx
+        .insert(membership)
+        .values({
+          householdId,
+          accountId,
+          residentProfileId: null,
+          isResident: false,
+          role: "household_admin",
+          permissions: [],
+        })
+        .returning();
+
+      await recordActivityEvent(tx, {
+        householdId,
+        eventType: "resident_profile.created", // reuses the same audit shape — no dedicated
+        // "household.registered" event type is registered (G-D7 allowlist) since no acceptance
+        // criterion in F1's scope reads one back; the household row's own created_at is the record.
+        subjectType: "household",
+        subjectId: householdId,
+        actorAccountId: accountId,
+        actorProfileId: null,
+        payload: {},
+      });
+
+      return { household: householdRow, membership: membershipRow, context };
     });
-
-    return { household: householdRow, membership: membershipRow, context };
-  });
+  } catch (err) {
+    try {
+      await undoRegisterHousehold(context, householdId, accountId);
+    } catch (undoErr) {
+      console.error(undoErr);
+    }
+    throw err;
+  }
 }
 
 // speckit-bug-fix register-action-not-atomic-with-signin: compensating cleanup for a registration
-// whose subsequent signIn/session-setup step failed, mirroring undoClaimResidentProfile below —
-// registerHousehold's DB transaction cannot simply be deferred until after signIn for the same
-// reason: signIn requires the Auth user (and its password) to already exist. Undoes exactly what
+// whose subsequent signIn/session-setup step failed, and (registerHousehold's own catch) for one
+// whose transaction failed after createUser — the deletes below are no-ops when nothing committed.
+// registerHousehold's DB transaction cannot simply be deferred until after signIn: signIn requires
+// the Auth user (and its password) to already exist. Undoes exactly what
 // registerHousehold just committed for THIS householdId/accountId (never a broader lookup), so a
 // retry with the same email doesn't hit Supabase Auth's "already registered" on createUser.
 export async function undoRegisterHousehold(
@@ -245,18 +265,28 @@ export class ClaimError extends Error {
 // caller) is deleted, and its logic is folded into joinHousehold's bound branch below (which does
 // its own equivalent work inline, inside the SAME transaction as the claim itself, rather than
 // calling this function — Decision 1's whole point is that nothing here runs across two separate
-// transactions). This function stays exported and unmodified purely because a broad set of
+// transactions). This function stays exported purely because a broad set of
 // unrelated tests (round/quorum/permission tests that need a quick second resident, nothing to do
 // with joining or claiming) still use it as a direct, no-HTTP fixture — verified by
 // `grep -rn "claimResidentProfile" src/`: every remaining call site outside this file is under
 // `tests/`, never under `src/app/`. If a future cleanup removes that reliance too, delete this
 // function then rather than leaving it "just in case".
+//
+// No transaction spans Postgres and Supabase Auth (CLAUDE.md), so this has joinHousehold's shape:
+// check, then createUser, then one transaction, with a catch that deletes the new Auth user. The
+// state each failure point leaves:
+//   - the pre-check refuses (not_found/not_prepared) or createUser fails (signup_failed): nothing.
+//   - the transaction or its commit fails: the Auth user at the profile's derived address exists
+//     and would block every retry for this profile as a duplicate. The catch deletes it
+//     best-effort and rethrows; the transaction rolled itself back. A commit that landed but
+//     reported failure leaves the rows without an Auth user — the same residual joinHousehold
+//     accepts.
 export async function claimResidentProfile(
   context: SessionContext,
   residentProfileId: string,
   password: string,
 ) {
-  return withSessionContext(context, async (tx) => {
+  await withSessionContext(context, async (tx) => {
     const [profile] = await tx
       .select()
       .from(residentProfile)
@@ -265,56 +295,76 @@ export async function claimResidentProfile(
     if (profile.status !== "prepared") {
       throw new ClaimError(`ResidentProfile ${residentProfileId} is not prepared for claiming`, "not_prepared");
     }
-
-    const derivedEmail = deriveResidentEmail(residentProfileId);
-    const { data, error } = await supabaseAdmin().auth.admin.createUser({
-      email: derivedEmail,
-      password,
-      email_confirm: true, // identity.md: "gilt beim Anbieter als bestätigt" — a technical
-      // precondition for the sign-in path, not a claim about a real mailbox.
-    });
-    if (error || !data.user) {
-      throw new ClaimError(error?.message ?? "Supabase Auth did not return a user", "signup_failed");
-    }
-
-    const accountId = data.user.id;
-
-    await tx.insert(account).values({ id: accountId, householdId: context.householdId });
-
-    // Human decision, 2026-09-22: no permission is inferred from being first, or from anything
-    // else about how a membership came about (docs/domain/identity.md §2.1's close_round note).
-    // close_round is now a role default (MODERATOR_DEFAULT_PERMISSIONS in this file) held by
-    // every household_admin and moderator — a plain member membership starts with permissions: []
-    // unconditionally, the same as any other newly created membership.
-    const [membershipRow] = await tx
-      .insert(membership)
-      .values({
-        householdId: context.householdId,
-        accountId,
-        residentProfileId,
-        isResident: true,
-        role: "member",
-        permissions: [],
-      })
-      .returning();
-
-    await tx
-      .update(residentProfile)
-      .set({ status: "active", movedInOn: new Date().toISOString().slice(0, 10) })
-      .where(eq(residentProfile.id, residentProfileId));
-
-    await recordActivityEvent(tx, {
-      householdId: context.householdId,
-      eventType: "resident_profile.status_changed",
-      subjectType: "resident_profile",
-      subjectId: residentProfileId,
-      actorAccountId: accountId,
-      actorProfileId: residentProfileId,
-      payload: { fromStatus: "prepared", toStatus: "active" },
-    });
-
-    return { accountId, membership: membershipRow };
   });
+
+  const derivedEmail = deriveResidentEmail(residentProfileId);
+  const { data, error } = await supabaseAdmin().auth.admin.createUser({
+    email: derivedEmail,
+    password,
+    email_confirm: true, // identity.md: "gilt beim Anbieter als bestätigt" — a technical
+    // precondition for the sign-in path, not a claim about a real mailbox.
+  });
+  if (error || !data.user) {
+    throw new ClaimError(error?.message ?? "Supabase Auth did not return a user", "signup_failed");
+  }
+
+  const accountId = data.user.id;
+
+  try {
+    return await withSessionContext(context, async (tx) => {
+      // The pre-check above ran in its own transaction, so `prepared` is re-decided here, under
+      // the row lock this conditional UPDATE takes — the predicate joinHousehold's bound branch
+      // uses.
+      const activated = await tx
+        .update(residentProfile)
+        .set({ status: "active", movedInOn: new Date().toISOString().slice(0, 10) })
+        .where(
+          and(eq(residentProfile.id, residentProfileId), eq(residentProfile.status, "prepared")),
+        )
+        .returning({ id: residentProfile.id });
+      if (activated.length === 0) {
+        throw new ClaimError(`ResidentProfile ${residentProfileId} is not prepared for claiming`, "not_prepared");
+      }
+
+      await tx.insert(account).values({ id: accountId, householdId: context.householdId });
+
+      // Human decision, 2026-09-22: no permission is inferred from being first, or from anything
+      // else about how a membership came about (docs/domain/identity.md §2.1's close_round note).
+      // close_round is now a role default (MODERATOR_DEFAULT_PERMISSIONS in this file) held by
+      // every household_admin and moderator — a plain member membership starts with permissions: []
+      // unconditionally, the same as any other newly created membership.
+      const [membershipRow] = await tx
+        .insert(membership)
+        .values({
+          householdId: context.householdId,
+          accountId,
+          residentProfileId,
+          isResident: true,
+          role: "member",
+          permissions: [],
+        })
+        .returning();
+
+      await recordActivityEvent(tx, {
+        householdId: context.householdId,
+        eventType: "resident_profile.status_changed",
+        subjectType: "resident_profile",
+        subjectId: residentProfileId,
+        actorAccountId: accountId,
+        actorProfileId: residentProfileId,
+        payload: { fromStatus: "prepared", toStatus: "active" },
+      });
+
+      return { accountId, membership: membershipRow };
+    });
+  } catch (err) {
+    try {
+      await supabaseAdmin().auth.admin.deleteUser(accountId);
+    } catch {
+      // ponytail: best-effort external cleanup, no retry loop — same as joinHousehold.
+    }
+    throw err;
+  }
 }
 
 // docs/GUARDRAILS.md:108 / Session.token_hash's documented "nur der Hash" contract: this column
