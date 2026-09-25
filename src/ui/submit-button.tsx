@@ -59,9 +59,15 @@ export function SubmitButton({
             {icon}
             {children}
           </span>
+          {/* Walkthrough fix 2026-09-25: without a pendingLabel the pending layer is the spinner
+              alone, centred where the label is. Spinner plus label made the layer wider than the
+              idle one, and since the stack takes the wider layer's width, every icon-less button
+              grew by the spinner's width at rest (a squeezed name field on the members screen at
+              375 px). With a pendingLabel, the text sits beside the spinner, as before this
+              change these buttons swapped their text too. */}
           <span className="submit-stack-pending">
             <span className="spinner" aria-hidden="true" />
-            {pendingLabel ?? children}
+            {pendingLabel}
           </span>
         </span>
       </button>
