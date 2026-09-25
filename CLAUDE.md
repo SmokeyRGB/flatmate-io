@@ -172,6 +172,11 @@ Three more rules at that boundary, from PR #23's fourth round:
 - A change to credentials (email, password) re-checks the caller's own `session` row under lock.
   A reset or password change ends sessions without revoking the membership, so a membership
   check alone lets a just-ended session through.
+- Authentication happens at the provider before any lock can be taken, so a sign-in that checked
+  the old password can arrive after a reset. `signIn` reads the database clock before
+  authenticating and refuses when `account.password_changed_at` is later (`drizzle/0022`).
+- A stamp written inside a long transaction uses `clock_timestamp()`, not `now()`. `now()` is
+  fixed at transaction start, so it predates the provider calls made in between.
 
 **Every writer of the same state, pairwise.** When two functions write the same thing (a password,
 a provider address, the set of live sessions), each pair has to be serialized against each other,
