@@ -1,145 +1,212 @@
 # Tasks
 
 Read `proposal.md`, `design.md` (D1–D9) and `specs/ui/pending-feedback/spec.md` first. Groups 1–6
-are UI only. Group 7 changes one database helper (`src/db/session-context.ts`), its G-C8 lint and
-the G-C8 guardrail text. Nothing else touches schema, repositories or authorization. If a task seems
-to need that, stop and report. Every user-facing string goes in `src/ui/strings/de.ts`. Next.js here differs from
-your training data: read `node_modules/next/dist/docs/01-app/03-api-reference/04-functions/use-link-status.md`,
+are UI only. Group 7 changes one database helper (`src/db/session-context.ts`) and its G-C8 lint.
+Group 8 changes guardrail and ADR wording by human decision. Nothing touches schema, repositories
+or authorization; if a task seems to need that, stop and report.
+
+Every user-facing string goes in `src/ui/strings/de.ts`. Next.js here differs from your training
+data: read `node_modules/next/dist/docs/01-app/03-api-reference/04-functions/use-link-status.md`,
 `…/03-file-conventions/loading.md` and `…/02-guides/forms.md` before using those APIs.
+
+Every test task names its deliberate break. RUN each break, see the test fail, restore, and
+report it.
 
 ## 1. Shared components (D1, D2, D3, D5, D8)
 
-- [ ] 1.1 `src/ui/submit-button.tsx` per D1: `useFormStatus`, disabled while pending,
-      `aria-busy`, `Loader2` in a reserved slot, idle and pending labels stacked in one grid cell
-      (width = the larger), and a visually hidden `role="status"` text. It never accepts `type`.
-- [ ] 1.2 `src/ui/link-pending-hint.tsx` per D5: `useLinkStatus`, a small spinner in a
+- [ ] 1.1 `src/ui/submit-button.tsx` per D1:
+      - props `children`, `icon?`, `pendingLabel?`, `className`, `disabled`, `aria-*`, and never
+        `type`;
+      - `useFormStatus`;
+      - pending means `aria-disabled` + `aria-busy` + an `onClick` guard, not `disabled`;
+      - a real `disabled` prop still disables;
+      - an inner `.submit-stack` grid with the idle layer (icon + label) and the pending layer
+        (spinner + `pendingLabel ?? label`), toggling only `visibility`;
+      - an always-rendered, visually hidden `<span role="status">` beside the button (not inside
+        it), holding `de.common.pending` only while pending.
+- [ ] 1.2 `src/ui/link-pending-hint.tsx` per D5: `useLinkStatus`, with a small spinner in a
       fixed-size slot.
 - [ ] 1.3 `src/ui/skeletons.tsx` per D3: `SkeletonHeading`, `SkeletonText`, `SkeletonCard`,
-      `SkeletonList`, `SkeletonForm`, plus `HeaderSkeleton` for D4. The container sets
-      `aria-busy` and carries a visually hidden `de.common.loading`.
+      `SkeletonList`, `SkeletonForm`, `HeaderSkeleton`. The container carries `aria-busy` and a
+      visually hidden `de.common.loading`.
 - [ ] 1.4 `src/app/globals.css`:
-      - `.spinner` (rotation, `prefers-reduced-motion: reduce` → no animation, still visible);
-      - the grid-stack classes for D1;
-      - a `.sr-only` utility, if the project does not already have one (check Tailwind first).
-- [ ] 1.5 `src/ui/strings/de.ts`: `common.pending`, `common.loading` (D8).
+      - `.spinner`, with rotation, and no animation under `prefers-reduced-motion: reduce` (still
+        visible);
+      - `.submit-stack` and its layers;
+      - a visually-hidden utility, unless Tailwind's `sr-only` is already usable here (check).
+- [ ] 1.5 `src/ui/strings/de.ts`: `common.pending` („Wird gesendet …") and `common.loading`
+      („Wird geladen …").
 
-## 2. Every submit button uses `SubmitButton` (D1)
+## 2. The lint first, so it can prove it bites (D6)
 
-- [ ] 2.1 Replace every submit button (explicit `type="submit"`, or `<button>` without `type`
-      inside a form) in:
+- [ ] 2.1 `scripts/lint/pending-feedback.ts` per D6:
+      - exported pure check functions, with the file walk and exit code kept separate;
+      - scope is all of `src/` except `src/ui/submit-button.tsx`;
+      - comments are stripped before matching;
+      - buttons: a finding for `type="submit"`, a missing `type`, or a non-literal `type`, read
+        across lines;
+      - pages: each `page.tsx` needs a sibling `loading.tsx` that imports `@/ui/skeletons`;
+      - exemption map: `src/app/page.tsx` → "redirects only, renders nothing".
+- [ ] 2.2 `tests/unit/lint/pending-feedback.test.ts` with D6's fixtures. Run D6's four breaks, one
+      at a time:
+      - only look for `type="submit"`;
+      - read line by line;
+      - accept any ancestor `loading.tsx`;
+      - skip the comment stripping.
+
+      Each must fail its fixture. Report all four.
+- [ ] 2.3 Run the lint on the real tree NOW, before groups 3 and 5. It must fail; report the
+      number of findings and a sample. Then add it to `package.json` `verify`, after the other
+      `scripts/lint` entries. `verify` stays red until groups 3 and 5 are done, which is expected.
+
+## 3. Every submit button uses `SubmitButton` (D1)
+
+- [ ] 3.1 Replace every submit button (explicit `type="submit"`, or an untyped `<button>` inside a
+      form) in:
       - `(auth)/join/join-code-form.tsx`, `(auth)/join/[code]/join-form.tsx`,
         `(auth)/join/[code]/join-ways-forward.tsx`, `(auth)/join/[code]/reset-form.tsx`;
-      - `(auth)/register/register-form.tsx`, `(auth)/sign-in/sign-in-form.tsx` (the two tab
-        buttons are `type="button"`: check them);
+      - `(auth)/register/register-form.tsx`, `(auth)/sign-in/sign-in-form.tsx`;
       - `(org)/layout.tsx`;
-      - `(org)/members/delete-join-code-form.tsx`, `(org)/members/page.tsx` (9),
+      - `(org)/members/delete-join-code-form.tsx`, `(org)/members/page.tsx`,
         `(org)/members/remove-member-form.tsx`;
-      - `(org)/rooms/page.tsx` (4);
-      - `(org)/rounds/new/round-form.tsx`, `(org)/rounds/[id]/page.tsx` (check it);
+      - `(org)/rooms/page.tsx`;
+      - `(org)/rounds/new/round-form.tsx`, `(org)/rounds/[id]/page.tsx`;
       - `(org)/settings/settings-form.tsx`;
       - `(resident)/account/email-form.tsx`, `(resident)/account/password-form.tsx`,
         `(resident)/account/page.tsx`;
       - `(resident)/avatar-menu.tsx`.
 
-      Forms with `useActionState` move their `pending ? a : b` label into `pendingLabel`.
-      Buttons that are NOT submit buttons get an explicit `type="button"`.
-- [ ] 2.2 Keep every button's existing classes, icons and label. Only the pending look is added.
+      Pass leading icons through `icon`. Move the `useActionState` forms' `pending ? a : b` label
+      into `pendingLabel`. Buttons that are not submit buttons (tabs, toggles, dialog openers) get
+      an explicit `type="button"`.
+- [ ] 3.2 Keep every button's classes, icon and label. At idle nothing may look different: no
+      reserved slot, the same width, the same alignment, including `w-full` buttons. Check the
+      type-to-confirm button in `remove-member-form.tsx`: it stays really `disabled` until the
+      name matches, and becomes pending on submit.
 
-## 3. The layouts stop blocking (D4)
+## 4. The layouts block less (D4)
 
-- [ ] 3.1 `src/app/(resident)/layout.tsx`: keep `getCurrentSession()` and both `redirect`s. Move
+- [ ] 4.1 `src/app/(resident)/layout.tsx`: keep `getCurrentSession()` and both `redirect`s. Move
       the identity, household and navigation-access reads plus `AvatarMenu` into a new async
-      server component, `src/app/(resident)/resident-header.tsx`, rendered inside `<Suspense
+      server component, `src/app/(resident)/resident-header.tsx`, inside `<Suspense
       fallback={<HeaderSkeleton />}>`. `BottomNav` stays outside the boundary.
-- [ ] 3.2 `src/app/(org)/layout.tsx`: the same, with `src/app/(org)/org-header.tsx` for the
-      identity label. The sign-out form stays usable (inside or outside the boundary: pick the
-      one that keeps it visible at once, and say which).
-- [ ] 3.3 Confirm that no authorization moved: every page still calls its own guards. List the
-      pages you checked in the report.
+- [ ] 4.2 `src/app/(org)/layout.tsx`: the same, with `src/app/(org)/org-header.tsx` for the
+      identity label. The sign-out form stays outside the boundary, so it is usable at once.
+- [ ] 4.3 Confirm that no authorization moved: every page still calls its own guards. List the
+      pages you checked.
 
-## 4. A `loading.tsx` for every page (D3)
+## 5. A `loading.tsx` for every page (D3)
 
-- [ ] 4.1 New `loading.tsx`, each composed from `src/ui/skeletons.tsx` in the page's own
-      container classes and content shape:
+- [ ] 5.1 A new `loading.tsx` from `src/ui/skeletons.tsx` in each of:
       - `(auth)/join`, `(auth)/register`, `(auth)/sign-in`;
       - `(org)/members`, `(org)/organization`, `(org)/rooms`, `(org)/rounds/new`,
         `(org)/rounds/[id]`, `(org)/settings`;
       - `(resident)/who-lives-here`.
 
-      Read each page first, so the skeleton matches what it renders.
+      Read each page first, and use its own container classes and content shape.
+- [ ] 5.2 The lint from group 2 now passes on the real tree. Report it.
 
-## 5. Pending hint on navigation links (D5)
+## 6. Pending hint on every link (D5)
 
-- [ ] 5.1 Add `<LinkPendingHint />` inside the `<Link>`s of `(resident)/bottom-nav.tsx`,
-      `(resident)/avatar-menu.tsx`, and every `className="back-link"` link in `src/app/`.
+- [ ] 6.1 Add `<LinkPendingHint />` inside EVERY `<Link>` in `src/app/`. Among them:
+      - `(resident)/bottom-nav.tsx` and `(resident)/avatar-menu.tsx`;
+      - every `.back-link`;
+      - the dashboard's primary, row, task and bridge links (`(resident)/dashboard/page.tsx`);
+      - all of `(org)/organization/page.tsx`;
+      - the sign-in page's `/register` and `/join` links;
+      - `join-ways-forward.tsx`.
 
-## 6. The lint (D6, D7)
-
-- [ ] 6.1 `scripts/lint/pending-feedback.ts` per D6. The two checks are exported pure functions
-      (content in, findings out), and the file walk and exit code are kept separate. Exemption map:
-      `src/app/page.tsx` → "redirects only, renders nothing".
-- [ ] 6.2 `tests/unit/lint/pending-feedback.test.ts`, with fixtures for:
-      - an explicit `type="submit"` (finding);
-      - an untyped `<button>` (finding);
-      - a multi-line tag with `type="submit"` on the second line (finding);
-      - `type="button"` (pass);
-      - a page directory with and without `loading.tsx`;
-      - the exempt page.
-
-      Deliberate break: make the untyped-button case pass (e.g. only look for `type="submit"`),
-      and the test must fail. RUN it and report.
-- [ ] 6.3 Add the lint to `package.json` `verify` (after the other `scripts/lint` entries) and run
-      it on the real tree. It must pass after groups 2 and 4. Before group 2 it must fail on the
-      real tree: run it once before migrating and report the findings count, which proves it
-      bites.
-- [ ] 6.4 `CLAUDE.md`: add the lint to the table under Commands ("The six custom lints …").
-      Correct the count to what the table then holds, and mention `sql-statements.ts` is a shared
-      helper, not a lint, if the text implies otherwise.
-- [ ] 6.5 `openspec/config.yaml` `rules.tasks`: add D7's line as a quoted string. Run
-      `openspec doctor`, and check with a YAML parse that `rules.tasks` is still a list of strings.
+      Report the count, and grep afterwards that no `<Link` in `src/app/` lacks one, listing any
+      you deliberately left out, with the reason.
 
 ## 7. The session context in one statement (D9, G-C8)
 
-- [ ] 7.1 Measure BEFORE any change: a scratch script (not committed, delete it afterwards) runs a
-      plain `select 1` and `withSessionContext` with one `select 1`, 3 times each, against
+- [ ] 7.1 Measure BEFORE any change. A scratch script, not committed (delete it afterwards), runs
+      a plain `select 1` and `withSessionContext` with one `select 1`, 3 times each, against
       `flatmate-io-dev` with `.env.local`. Report the numbers.
-- [ ] 7.2 `src/db/session-context.ts`: replace the three `SET LOCAL` statements with the one
-      `SELECT set_config(…, true)` statement of D9. Use bound parameters (the drizzle `sql`
-      template), not `sql.raw`. Put each `set_config(...)` on its own line. Omit the profile call
-      when `profileId` is null, and keep `assertUuid`. Update the file's doc comment (it explains
-      why `SET LOCAL` needed interpolation, which is no longer true).
+- [ ] 7.2 `src/db/session-context.ts` per D9:
+      - export `applySessionContext(tx, context)`, which runs the one aliased `SELECT
+        set_config(…, true)` statement with bound parameters (the drizzle `sql` template, not
+        `sql.raw`);
+      - each `set_config(...)` on its own line;
+      - the profile call omitted when it is null;
+      - `assertUuid` kept;
+      - `withSessionContext` calls it;
+      - the doc comment updated.
 - [ ] 7.3 Measure AFTER with the same script. Report before and after.
-- [ ] 7.4 `scripts/lint/session-context.ts`: add `set-config-outside-session-context` and
-      `set-config-not-local` (D9). `tests/unit/lint/session-context.test.ts`: fixtures for both
-      rules, plus the existing ones still passing. Break: make `set-config-not-local` accept
-      `false`, and a fixture must fail. RUN it and report.
-- [ ] 7.5 `tests/integration/raw-sql/session-context-set-config.test.ts` per D9 (the same-connection
-      technique of `pool-reuse.test.ts`). Break: `true` → `false` in `session-context.ts`, and the
-      test must fail. RUN it, restore, and report. Do NOT edit `pool-reuse.test.ts` (guarded).
-- [ ] 7.6 `docs/GUARDRAILS.md` G-C8 *Regel*: amend the wording per D9, in German, keeping the
-      *Begründung* untouched. Add a `docs/review-log.md` §Offene-Punkte-Register entry for the
-      human decision (2026-09-25), following the register's format. Update `CLAUDE.md`'s lint
-      table row for `session-context.ts`. Run `node tools/check-refs.ts`, which must report 0
-      findings.
-- [ ] 7.7 Run the FULL integration suite once after 7.2. Every repository call goes through the
-      changed function. Pause about 5 minutes before the run, because of the Supabase `/token`
-      rate limit. Report failures by kind: a 429 that surfaces as invalid_credentials/signup_failed
-      and passes on a re-run after a pause is not a regression.
+- [ ] 7.4 `scripts/lint/session-context.ts` per D9:
+      - the `set_config` regex (case-insensitive, optional quotes and whitespace);
+      - `set-config-outside-session-context`;
+      - `set-config-not-local`, where anything other than a literal `true` third argument on the
+        same line is a finding;
+      - `SET SESSION`, `SET … TO` and `SET LOCAL … TO` in the old rules;
+      - `drizzle/*.sql` scanned for non-local `set_config`.
 
-## 8. Verify
+      `tests/unit/lint/session-context.test.ts` gets a fixture per pattern, and the existing ones
+      must still pass. Run D9's four breaks:
+      - drop `/i`;
+      - accept `false`;
+      - stop scanning outside the helper;
+      - keep the old `SET` regex.
 
-- [ ] 8.1 Gate:
+      Report all four. The real tree must still pass.
+- [ ] 7.5 `tests/integration/raw-sql/session-context-set-config.test.ts` per D9:
+      - a dedicated `max: 1` client;
+      - `applySessionContext` in a transaction, recording `pg_backend_pid()`;
+      - read outside a transaction, retrying (max 20) until the pid matches; no match fails as
+        inconclusive;
+      - assert empty or null;
+      - `RESET app.household_id` in `afterEach`.
+
+      Break: `true → false` in `applySessionContext`. Run THIS FILE ALONE, see it fail, restore,
+      then run it again to confirm no stray setting remains. Do NOT edit `pool-reuse.test.ts`.
+- [ ] 7.6 **Human-gated, do not do it yourself:** in the report, PROPOSE adding the new file to
+      G-D10's `testFiles` in `test/guarded.manifest.json`, citing the break evidence. The human
+      confirms, and Opus makes the edit.
+
+## 8. Docs and config (D7, D9)
+
+- [ ] 8.1 The docs sweep of D9, in German, with verbatim quotes untouched and no citation into
+      `openspec/` (Rule 7):
+      - `docs/GUARDRAILS.md` G-C8 *Regel*, its heading and its status-table row;
+      - `docs/backlog/requirements/F0-requirements.md` AC-0.7, with a *(precision 2026-09-25)*
+        note;
+      - `docs/adr/0004-autorisierung-policy-und-rls.md` (line ~66), with a precision note
+        recording the human decision;
+      - `docs/domain/invarianten.md` §5.5, with the sample SQL in the `set_config` form;
+      - `docs/adr/0006-stack-nextjs-postgres-drizzle.md` (line ~141) and
+        `docs/domain/identity.md` (line ~133): „(oder gleichwertig `set_config(…, true)`)".
+
+      Leave the *why* explanations (G-C8 *Begründung*, ADR-004's pooling pitfall, R-0.3) as they
+      are.
+- [ ] 8.2 `docs/review-log.md` §Offene-Punkte-Register: one entry for the human decision of
+      2026-09-25, following the register's format. Then `node tools/check-refs.ts`, which must
+      report 0 findings.
+- [ ] 8.3 `CLAUDE.md`:
+      - add `pending-feedback.ts` to the lint table under Commands;
+      - update the `session-context.ts` row (it now also covers `set_config`, `SET SESSION`/`TO`
+        and `drizzle/*.sql`);
+      - correct the count ("six custom lints") to what the table holds.
+- [ ] 8.4 `openspec/config.yaml` `rules.tasks`: add D7's line as a quoted string. Then
+      `openspec doctor`, and a YAML parse confirming `rules.tasks` is still a list of strings.
+
+## 9. Verify
+
+- [ ] 9.1 Gate:
       - `npx eslint . --ignore-pattern ".claude/**"`;
       - `npx next typegen && npx tsc --noEmit`;
       - every `scripts/lint/*.ts` lint, including the new one;
       - `node tools/check-refs.ts`;
       - `npx vitest run tests/unit`.
-
-      The integration suite is unaffected (no server logic changes). Run
-      `tests/integration/policy/navigation-access.test.ts` and `start-overview.test.ts` once
-      anyway, since the layouts changed.
-- [ ] 8.2 `npm run build` must succeed. Next may report Suspense/streaming issues only at build
+- [ ] 9.2 The FULL integration suite, once. Every repository call goes through the changed
+      `withSessionContext`. Pause about 5 minutes first (the Supabase `/token` rate limit). Report
+      failures by kind: a 429 that surfaces as invalid_credentials/signup_failed and passes on a
+      re-run after a pause is not a regression.
+- [ ] 9.3 `npm run build` must succeed. Next may report Suspense/streaming problems only at build
       time.
-- [ ] 8.3 Stop and report. The browser walkthrough is Opus's and the human's: `next dev` and
-      `npm run build && npm start`; light, dark, 375 px and reduced motion; a slow action on the
-      members screen; entering `(resident)` after sign-in, and `(org)` from Start.
+- [ ] 9.4 Stop and report. The browser walkthrough is Opus's and the human's:
+      - `next dev` and `npm run build && npm start`;
+      - light, dark, 375 px, reduced motion;
+      - a slow action on the members screen;
+      - the removal dialog from the keyboard;
+      - entering `(resident)` after sign-in, and `(org)` from Start.
