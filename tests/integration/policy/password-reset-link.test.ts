@@ -49,19 +49,25 @@ async function claimResident(household: TestHousehold, name: string) {
   });
   const { accountId } = await claimResidentProfile(household.context, profile.id, PASSWORD);
   accountIds.push(accountId);
-  return { profileId: profile.id, accountId };
+  return { profileId: profile.id, accountId, displayName: name };
 }
 
-function residentCurrentSession(
+// Copilot review round 4 (PR #23), FIX 1: changeResidentEmail now looks up `session` by
+// `current.sessionId` — a placeholder "n/a" sessionId (this helper's previous shape) fails that
+// lookup with a driver-level error instead of the intended `session_ended` refusal, since a real
+// session row is what every caller in production always has (getCurrentSession never returns a
+// non-UUID sessionId). So this signs in for real and returns the REAL session id/context.
+async function residentCurrentSession(
   household: TestHousehold,
-  resident: { profileId: string; accountId: string },
-): CurrentSession {
-  const context: SessionContext = {
-    accountId: resident.accountId,
+  resident: { profileId: string; accountId: string; displayName: string },
+): Promise<CurrentSession> {
+  const signedIn = await signIn({
+    kind: "resident",
     householdId: household.householdId,
-    profileId: resident.profileId,
-  };
-  return { sessionId: "n/a", context }; // sessionId is unused by changeResidentEmail
+    displayName: resident.displayName,
+    password: PASSWORD,
+  });
+  return { sessionId: signedIn.session.id, context: signedIn.context };
 }
 
 async function sessionRowsFor(context: SessionContext, accountId: string) {
@@ -114,7 +120,7 @@ describe("issuePasswordResetLink (design.md Decision 6)", () => {
     ).rejects.toThrow(ResidentProfileNotEligibleForResetError);
 
     const hasEmail = await claimResident(hh, "HasEmailNotEligible");
-    await changeResidentEmail(residentCurrentSession(hh, hasEmail), "has-email-already@example.test");
+    await changeResidentEmail(await residentCurrentSession(hh, hasEmail), "has-email-already@example.test");
     await expect(
       issuePasswordResetLink(hh.context, hh.accountId, hasEmail.profileId),
     ).rejects.toThrow(ResidentProfileNotEligibleForResetError);
@@ -304,7 +310,7 @@ describe("redeemPasswordReset (design.md Decision 5)", () => {
     const resident = await claimResident(hh, "EmailClosesGap");
     const link = await issuePasswordResetLink(hh.context, hh.accountId, resident.profileId);
 
-    await changeResidentEmail(residentCurrentSession(hh, resident), "closes-the-gap@example.test");
+    await changeResidentEmail(await residentCurrentSession(hh, resident), "closes-the-gap@example.test");
 
     let caught: unknown;
     try {

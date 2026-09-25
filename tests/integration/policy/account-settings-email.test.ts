@@ -8,7 +8,7 @@ import {
   signIn,
 } from "@/modules/identity/auth";
 import { createResidentProfile, setMovedOut } from "@/modules/identity/repository";
-import { account } from "@/modules/identity/schema";
+import { account, session } from "@/modules/identity/schema";
 import { activityEvent } from "@/modules/audit/schema";
 import type { CurrentSession } from "@/modules/identity/session-cookie";
 import {
@@ -37,19 +37,25 @@ async function claimResident(household: TestHousehold, name: string) {
   });
   const { accountId } = await claimResidentProfile(household.context, profile.id, PASSWORD);
   accountIds.push(accountId);
-  return { profileId: profile.id, accountId };
+  return { profileId: profile.id, accountId, displayName: name };
 }
 
-function residentSession(
+// Copilot review round 4 (PR #23), FIX 1: changeResidentEmail now looks up `session` by
+// `current.sessionId` — a placeholder "n/a" sessionId (this helper's previous shape) fails that
+// lookup with a driver-level error instead of the intended `session_ended` refusal, since a real
+// session row is what every caller in production always has (getCurrentSession never returns a
+// non-UUID sessionId). So this signs in for real and returns the REAL session id/context.
+async function residentSession(
   household: TestHousehold,
-  resident: { profileId: string; accountId: string },
-): CurrentSession {
-  const context: SessionContext = {
-    accountId: resident.accountId,
+  resident: { profileId: string; accountId: string; displayName: string },
+): Promise<CurrentSession> {
+  const signedIn = await signIn({
+    kind: "resident",
     householdId: household.householdId,
-    profileId: resident.profileId,
-  };
-  return { sessionId: "n/a", context }; // sessionId is unused by changeResidentEmail
+    displayName: resident.displayName,
+    password: PASSWORD,
+  });
+  return { sessionId: signedIn.session.id, context: signedIn.context };
 }
 
 async function emailChangedEvents(context: SessionContext, subjectId: string) {
@@ -67,7 +73,7 @@ describe("changeResidentEmail (identity/account-settings, design.md Decision 2)"
   it("adding an address updates account.email, keeps email_verified_at null, and matches the provider (getUserById)", async () => {
     hh = await registerTestHousehold();
     const resident = await claimResident(hh, "EmailAdder");
-    const current = residentSession(hh, resident);
+    const current = await residentSession(hh, resident);
 
     await changeResidentEmail(current, "Lea@Example.Test");
 
@@ -84,7 +90,7 @@ describe("changeResidentEmail (identity/account-settings, design.md Decision 2)"
   it("email sign-in then acts as the profile (acting_profile_id = profile, not null; G-D14 style)", async () => {
     hh = await registerTestHousehold();
     const resident = await claimResident(hh, "EmailSignIn");
-    const current = residentSession(hh, resident);
+    const current = await residentSession(hh, resident);
     await changeResidentEmail(current, "signin-check@example.test");
 
     const result = await signIn({
@@ -99,7 +105,7 @@ describe("changeResidentEmail (identity/account-settings, design.md Decision 2)"
   it("name sign-in still works after adding an address", async () => {
     hh = await registerTestHousehold();
     const resident = await claimResident(hh, "NameStillWorks");
-    const current = residentSession(hh, resident);
+    const current = await residentSession(hh, resident);
     await changeResidentEmail(current, "namestillworks@example.test");
 
     const result = await signIn({
@@ -114,7 +120,7 @@ describe("changeResidentEmail (identity/account-settings, design.md Decision 2)"
   it("changing to a new address means the old address gets invalid_credentials and the new one works", async () => {
     hh = await registerTestHousehold();
     const resident = await claimResident(hh, "ChangeAddress");
-    const current = residentSession(hh, resident);
+    const current = await residentSession(hh, resident);
     await changeResidentEmail(current, "old-address@example.test");
     await changeResidentEmail(current, "new-address@example.test");
 
@@ -134,7 +140,7 @@ describe("changeResidentEmail (identity/account-settings, design.md Decision 2)"
   it("empty gives missing_email and malformed gives invalid_email, both with account.email unchanged", async () => {
     hh = await registerTestHousehold();
     const resident = await claimResident(hh, "BadInput");
-    const current = residentSession(hh, resident);
+    const current = await residentSession(hh, resident);
 
     await expect(changeResidentEmail(current, "")).rejects.toMatchObject({ code: "missing_email" });
     await expect(changeResidentEmail(current, "not-an-email")).rejects.toMatchObject({ code: "invalid_email" });
@@ -156,7 +162,7 @@ describe("changeResidentEmail (identity/account-settings, design.md Decision 2)"
   it("the household account's own address gives email_taken, with nothing changed on either side, and no email_changed event", async () => {
     hh = await registerTestHousehold();
     const resident = await claimResident(hh, "TakenAddress");
-    const current = residentSession(hh, resident);
+    const current = await residentSession(hh, resident);
 
     await expect(changeResidentEmail(current, hh.email)).rejects.toMatchObject({ code: "email_taken" });
 
@@ -206,7 +212,7 @@ describe("changeResidentEmail (identity/account-settings, design.md Decision 2)"
   it("one account.email_changed event per change, with payload {}", async () => {
     hh = await registerTestHousehold();
     const resident = await claimResident(hh, "AuditedChange");
-    const current = residentSession(hh, resident);
+    const current = await residentSession(hh, resident);
     await changeResidentEmail(current, "audited@example.test");
 
     const events = await emailChangedEvents(current.context, resident.accountId);
@@ -218,7 +224,7 @@ describe("changeResidentEmail (identity/account-settings, design.md Decision 2)"
   it("an unchanged address writes no event", async () => {
     hh = await registerTestHousehold();
     const resident = await claimResident(hh, "Unchanged");
-    const current = residentSession(hh, resident);
+    const current = await residentSession(hh, resident);
     await changeResidentEmail(current, "unchanged@example.test");
     await changeResidentEmail(current, "unchanged@example.test");
 
@@ -238,7 +244,7 @@ describe("changeResidentEmail (identity/account-settings, design.md Decision 2)"
   it("using a stale CurrentSession after the membership is revoked gives not_a_resident, with nothing changed", async () => {
     hh = await registerTestHousehold();
     const resident = await claimResident(hh, "RevokedThenEmail");
-    const current = residentSession(hh, resident); // captured BEFORE the revocation below
+    const current = await residentSession(hh, resident); // captured BEFORE the revocation below
 
     await setMovedOut(hh.context, hh.accountId, resident.accountId);
 
@@ -263,8 +269,8 @@ describe("changeResidentEmail (identity/account-settings, design.md Decision 2)"
     const residentA = await claimResident(hh, "IsolationA");
     const residentB = await claimResident(hh, "IsolationB");
 
-    await changeResidentEmail(residentSession(hh, residentA), "isolation-a@example.test");
-    await changeResidentEmail(residentSession(hh, residentB), "isolation-b@example.test");
+    await changeResidentEmail(await residentSession(hh, residentA), "isolation-a@example.test");
+    await changeResidentEmail(await residentSession(hh, residentB), "isolation-b@example.test");
 
     const [rowA] = await withSessionContext(hh.context, (tx) =>
       tx.select().from(account).where(eq(account.id, residentA.accountId)),
@@ -275,4 +281,51 @@ describe("changeResidentEmail (identity/account-settings, design.md Decision 2)"
     expect(rowA.email).toBe("isolation-a@example.test");
     expect(rowB.email).toBe("isolation-b@example.test");
   });
+
+  // Copilot review round 4 (PR #23), FIX 1: the membership/account locks re-check that the
+  // ACCOUNT is still a live resident, but not that THIS SESSION still is what it claims to be — a
+  // password reset (or changeResidentPassword) ends every OTHER session while leaving the
+  // membership itself untouched, so a request riding a session that a reset already ended (an
+  // intruder's, say) must be refused before it can add/change the recovery address. Uses a REAL
+  // signed-in session (unlike residentSession's placeholder "n/a" above), then revokes that
+  // session row directly — standing in for what redeemPasswordReset's/changeResidentPassword's own
+  // session revoke would have done, while the membership stays live.
+  it("a session already ended (e.g. by a password reset) gives session_ended, with nothing changed", async () => {
+    hh = await registerTestHousehold();
+    const resident = await claimResident(hh, "SessionEndedEmail");
+    const signedIn = await signIn({
+      kind: "resident",
+      householdId: hh.householdId,
+      displayName: "SessionEndedEmail",
+      password: PASSWORD,
+    });
+    const current: CurrentSession = { sessionId: signedIn.session.id, context: signedIn.context };
+
+    await withSessionContext(hh.context, (tx) =>
+      tx.update(session).set({ revokedAt: new Date() }).where(eq(session.id, signedIn.session.id)),
+    );
+
+    await expect(changeResidentEmail(current, "should-not-apply@example.test")).rejects.toMatchObject({
+      code: "session_ended",
+    });
+
+    const [row] = await withSessionContext(hh.context, (tx) =>
+      tx.select().from(account).where(eq(account.id, resident.accountId)),
+    );
+    expect(row.email).toBeNull();
+
+    const { data } = await adminClient().auth.admin.getUserById(resident.accountId);
+    expect(data.user?.email).toMatch(/^resident-.*@accounts\.flatmate\.invalid$/);
+
+    const events = await emailChangedEvents(current.context, resident.accountId);
+    expect(events).toHaveLength(0);
+  });
+
+  // Deliberate break, RUN (per CLAUDE.md's own instruction for this fix): removing the session
+  // check (the `SELECT session ... FOR UPDATE` / `session_ended` throw added by FIX 1) from
+  // changeResidentEmail and running this test file made the test above fail — the promise
+  // resolved instead of rejecting (membership alone still passes for a revoked session), and
+  // account.email ended up set to "should-not-apply@example.test" instead of staying null. The
+  // check was restored immediately afterwards; this comment records the observed failure rather
+  // than leaving the break in the tree.
 });

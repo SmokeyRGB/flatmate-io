@@ -34,11 +34,18 @@ describe("signIn resident_email (identity/sign-in)", () => {
     });
     const { accountId } = await claimResidentProfile(hh.context, profile.id, PASSWORD);
     accountIds.push(accountId);
+    // Copilot review round 4 (PR #23), FIX 1: changeResidentEmail now looks up `session` by
+    // `current.sessionId` — a placeholder "n/a" sessionId fails that lookup with a driver-level
+    // error instead of the intended `session_ended` refusal, since a real session row is what
+    // every caller in production always has. Signs in for real first.
+    const signedIn = await signIn({
+      kind: "resident",
+      householdId: hh.householdId,
+      displayName: "TabEmail",
+      password: PASSWORD,
+    });
     await changeResidentEmail(
-      {
-        sessionId: "n/a", // unused by changeResidentEmail
-        context: { accountId, householdId: hh.householdId, profileId: profile.id },
-      },
+      { sessionId: signedIn.session.id, context: signedIn.context },
       "tab-email@example.test",
     );
 

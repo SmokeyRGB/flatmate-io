@@ -41,6 +41,11 @@ export async function changeEmailAction(
           return { error: t.email.errors.emailTaken, saved: false };
         case "not_a_resident":
           return { error: t.email.errors.notAResident, saved: false };
+        // Copilot review round 4 (PR #23): the session this request rode in on was ended by a
+        // password reset/change (auth.ts's own new membership -> account -> session lock order) —
+        // told plainly, not as genericFailure, since "sign in again" is the actual remedy.
+        case "session_ended":
+          return { error: t.email.errors.sessionEnded, saved: false };
         // Copilot review round 3 (PR #23): a failed COMMIT after the provider call already
         // succeeded, where the best-effort compensating transaction (auth.ts's own big comment on
         // changeResidentEmail) also failed — a distinct, honest message, not genericFailure.
@@ -97,6 +102,10 @@ export async function changePasswordAction(
           return { error: t.password.errors.wrongCurrentPassword, saved: false };
         case "not_a_resident":
           return { error: t.password.errors.notAResident, saved: false };
+        // Copilot review round 4 (PR #23): see the matching case in changeEmailAction above — the
+        // session this request rode in on was ended by a concurrent reset/change.
+        case "session_ended":
+          return { error: t.password.errors.sessionEnded, saved: false };
         // Copilot review round 3 (PR #23): see the matching case in changeEmailAction above — the
         // compensating transaction in changeResidentPassword's own big comment also failed.
         case "change_incomplete":

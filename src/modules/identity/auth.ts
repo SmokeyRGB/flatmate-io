@@ -1,6 +1,6 @@
 import { createHmac, randomUUID } from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
-import { and, eq, isNull, ne, notInArray } from "drizzle-orm";
+import { and, eq, isNull, lt, ne, notInArray } from "drizzle-orm";
 import { isUuid, withSessionContext, type SessionContext } from "@/db/session-context";
 import { recordActivityEvent } from "@/modules/audit/repository";
 import type { CurrentSession } from "./session-cookie";
@@ -901,10 +901,11 @@ export async function joinHousehold(
 }
 
 // resident-settings design.md Decisions 2/7: E1's own settings errors. One class, several codes —
-// changeResidentEmail uses missing_email/invalid_email/email_taken/not_a_resident/change_incomplete,
-// changeResidentPassword uses missing_fields/password_too_short/wrong_current_password/
-// not_a_resident/change_incomplete. german-ui-vocabulary (design.md Decision 4): a `code`
-// discriminant, never a message, same convention as JoinError/SignInError/ClaimError above.
+// changeResidentEmail uses missing_email/invalid_email/email_taken/not_a_resident/session_ended/
+// change_incomplete, changeResidentPassword uses missing_fields/password_too_short/
+// wrong_current_password/not_a_resident/session_ended/change_incomplete. german-ui-vocabulary
+// (design.md Decision 4): a `code` discriminant, never a message, same convention as
+// JoinError/SignInError/ClaimError above.
 export type AccountSettingsErrorCode =
   | "missing_email"
   | "invalid_email"
@@ -913,6 +914,16 @@ export type AccountSettingsErrorCode =
   | "missing_fields"
   | "password_too_short"
   | "wrong_current_password"
+  // Copilot review round 4 (PR #23): the membership/account locks re-check that the SESSION'S
+  // OWN ACCOUNT is still a live resident, but not that the SESSION ITSELF is still the one the
+  // caller thinks it is. A password reset (redeemPasswordReset phase 1/3) or a removal ends every
+  // OTHER session but leaves the membership live — so a request arriving on a session that a
+  // reset just revoked (an intruder's session, say) would otherwise still pass the membership
+  // check and be free to change the email or password out from under the person who just reset
+  // it. Thrown when `session.id = current.sessionId AND session.account_id = context.accountId`
+  // finds no row, a revoked row, or an expired row — before any write or provider call in either
+  // function.
+  | "session_ended"
   // Copilot review round 3 (PR #23): both changeResidentEmail and changeResidentPassword now call
   // the provider LAST, right before commit — a provider failure (email_taken, or any other) rolls
   // the whole DB write back with it, which is what makes the account row's own state trustworthy.
@@ -972,35 +983,76 @@ export function isWellFormedEmail(normalized: string): boolean {
 //      could commit between the stale check and the account update with nothing to serialize
 //      against;
 //   4. SELECT account ... FOR UPDATE (serializes against a concurrent change of the same account,
-//      and against D5's redemption, which locks the same row); unchanged address returns — no
-//      write, no audit, no provider call;
-//   5. UPDATE account SET email, email_verified_at = null;
-//   6. record account.email_changed;
-//   7. LAST: auth.admin.updateUserById(email, email_confirm: true) — email_confirm is a technical
+//      and against D5's redemption, which locks the same row);
+//   5. Copilot review round 4 (PR #23), CLAUDE.md "Every writer of the same state, pairwise": the
+//      membership/account locks above re-check that the ACCOUNT is still a live resident, but not
+//      that THIS SESSION still is what it claims to be. A password reset (redeemPasswordReset
+//      phases 1/3) or `changeResidentPassword` ends every OTHER session of the account but leaves
+//      the membership itself untouched — so without this check a request arriving on a session
+//      the reset just revoked (an intruder's, say — the whole point of a reset is that the old
+//      sessions must die) would still pass step 3 above and be free to change the email, which
+//      matters most here: the intruder would come to own the recovery address, and the very
+//      reset link that was supposed to lock them out would then look unspent to nobody who can
+//      still use it. `SELECT session ... FOR UPDATE` where `id = current.sessionId AND
+//      account_id = context.accountId`; refuse (`session_ended`) if there is no row, if
+//      `revokedAt IS NOT NULL`, or if `expiresAt <= now()` — before the unchanged-address early
+//      return, so the check applies even to a no-write submission. Locked AFTER the account row
+//      (not before), so it takes the lock in the same relative position redeemPasswordReset's own
+//      phase 1/3 session UPDATE runs in — the reset's revoke and this check serialize on the same
+//      row rather than racing;
+//   6. unchanged address returns — no write, no audit, no provider call;
+//   7. UPDATE account SET email, email_verified_at = null;
+//   8. record account.email_changed;
+//   9. LAST: auth.admin.updateUserById(email, email_confirm: true) — email_confirm is a technical
 //      precondition for the provider's sign-in path (identity.md provider rule 2), never a claim
 //      about delivery, which stays account.email_verified_at's alone. On email_exists, throw
-//      email_taken — this now rolls the DB write (step 5/6) back WITH it, since it is thrown
+//      email_taken — this now rolls the DB write (step 7/8) back WITH it, since it is thrown
 //      before the transaction's own commit. Any other provider error rethrows the same way.
 //
-// The only window this discipline cannot close is a failed COMMIT after step 7's provider call
+// The only window this discipline cannot close is a failed COMMIT after step 9's provider call
 // already returned success: Postgres then rolls back everything (email/audit gone) while Supabase
 // already carries the new address. Handled by a best-effort RECONCILIATION, outside the
-// transaction: a local `providerUpdated` flag is set true immediately after step 7 succeeds; the
+// transaction: a local `providerUpdated` flag is set true immediately after step 9 succeeds; the
 // `withSessionContext(...)` call is wrapped in try/catch; if it throws AND `providerUpdated` is
 // true (meaning the throw can only be the commit itself failing, since every earlier throw path
 // leaves the flag false), a second, best-effort transaction re-applies the DB side under the same
-// locks (membership -> account) — the UPDATE and the audit insert, nothing else. If that
-// compensating transaction succeeds, this function returns normally: the change did take effect,
-// late. If it also fails, both errors are logged (console.error) and this throws
+// locks (membership -> account). Copilot review round 4 (PR #23): this compensation used to
+// re-write THIS REQUEST'S OWN address unconditionally — but a LATER change (a second
+// changeResidentEmail call) could have committed for real in the gap between this request's
+// provider write and its own failed commit, in which case blindly rewriting this request's address
+// would overwrite that newer, already-committed value while Supabase (the authority for the
+// sign-in address, design.md Decision 1) still holds the newer one. So the compensation instead
+// RECONCILES to the provider: it reads `getUserById(context.accountId)` under the same locks, and
+// writes account.email to THAT (normalised) address — never the address this request itself was
+// trying to set — clearing `email_verified_at` and recording `account.email_changed` only if the
+// row's value actually changes. Each path this leaves:
+//   - provider lookup fails: falls through to the outer catch exactly as a DB failure would —
+//     logged and reported as `change_incomplete` (Postgres and Supabase may still disagree, but
+//     nothing here makes a blind guess about which address is right);
+//   - provider lookup succeeds and the row is already at that address (this request's own commit
+//     failure, uncontested by a later write): no-op, matching "unchanged address" above;
+//   - provider lookup succeeds and the row differs (a later request won): the row is brought to
+//     the PROVIDER'S value, which may be this request's address (nobody else wrote after it) or a
+//     newer one (somebody did) — either way Postgres ends up agreeing with the system design.md
+//     Decision 1 names as authoritative.
+// If that compensating transaction succeeds, this function returns normally: the change did take
+// effect, late (possibly to a different, newer address than this call's own argument — see above).
+// If it also fails, both errors are logged (console.error) and this throws
 // AccountSettingsError("change_incomplete") — the account may now be ahead of Postgres, and the
 // caller is told the change may have applied only partly.
 //
 // This cannot be exercised by a real test without mocking Supabase or forcing a commit failure,
-// which CLAUDE.md forbids here (no DB/auth mocking) — see the test file's own note.
+// which CLAUDE.md forbids here (no DB/auth mocking) — see the test file's own note. FIX 2's own
+// reconciliation is the same: no new test, for the same reason (a real commit failure cannot be
+// forced without mocking).
 //
-// Lock order: membership -> account, then no further lock — every path in this file takes a
-// prefix-compatible subsequence of resident_profile -> membership -> account -> session, never the
-// reverse (see changeResidentPassword's own comment for the full cross-path analysis).
+// Lock order: membership -> account -> session, then no further lock — every path in this file
+// takes a prefix-compatible subsequence of resident_profile -> membership -> account -> session ->
+// (nothing further after session), never the reverse (see changeResidentPassword's own comment for
+// the full cross-path analysis). The new session lock (step 5) sits AFTER account, matching
+// redeemPasswordReset's phase 1/3 (membership -> account, then session) and changeResidentPassword
+// (membership -> account, then session) — so this reorder introduces no new lock-order pair and no
+// new deadlock risk.
 export async function changeResidentEmail(current: CurrentSession, rawEmail: string): Promise<void> {
   const email = normalizeEmail(rawEmail);
   if (!email) {
@@ -1010,7 +1062,7 @@ export async function changeResidentEmail(current: CurrentSession, rawEmail: str
     throw new AccountSettingsError("That does not look like a well-formed email address", "invalid_email");
   }
 
-  const { context } = current;
+  const { context, sessionId } = current;
   if (context.profileId === null) {
     throw new AccountSettingsError(
       "Only a resident may change their own email address (identity/account-settings)",
@@ -1042,6 +1094,20 @@ export async function changeResidentEmail(current: CurrentSession, rawEmail: str
       }
 
       const [row] = await tx.select().from(account).where(eq(account.id, context.accountId)).for("update");
+
+      // Copilot review round 4 (PR #23): FIX 1 — see the big comment above (step 5). Locked AFTER
+      // the account row, so this serializes against redeemPasswordReset's own phase 1/3 session
+      // revoke, which is what makes an intruder's session actually get caught here rather than
+      // racing ahead of it.
+      const [sessionRow] = await tx
+        .select()
+        .from(session)
+        .where(and(eq(session.id, sessionId), eq(session.accountId, context.accountId)))
+        .for("update");
+      if (!sessionRow || sessionRow.revokedAt || sessionRow.expiresAt <= new Date()) {
+        throw new AccountSettingsError("Your session has ended — please sign in again", "session_ended");
+      }
+
       if (!row || row.email === email) return; // no account, or unchanged — no write, no audit
 
       await tx
@@ -1076,15 +1142,30 @@ export async function changeResidentEmail(current: CurrentSession, rawEmail: str
     if (!providerUpdated) throw err;
 
     // The provider call succeeded but the transaction's own commit failed — best-effort
-    // reconciliation, re-applying the DB side under the same locks. See the big comment above.
+    // reconciliation, re-applying the DB side under the same locks. Copilot review round 4 (PR
+    // #23), FIX 2 — see the big comment above: RECONCILE TO THE PROVIDER rather than blindly
+    // rewriting this request's own address, which could otherwise clobber a later, already-
+    // committed change. `getUserById` is the read this reconciles against; a failure of that read
+    // falls through to the outer catch below (`change_incomplete`), same as any other failure of
+    // this compensating transaction.
     try {
       await withSessionContext(context, async (tx) => {
         await tx.select().from(membership).where(eq(membership.accountId, context.accountId)).for("update");
-        await tx.select().from(account).where(eq(account.id, context.accountId)).for("update");
+        const [row] = await tx.select().from(account).where(eq(account.id, context.accountId)).for("update");
+
+        const { data: userData, error: userError } = await supabaseAdmin().auth.admin.getUserById(
+          context.accountId,
+        );
+        if (userError || !userData.user?.email) {
+          throw userError ?? new Error("getUserById returned no email during changeResidentEmail's compensation");
+        }
+        const providerEmail = normalizeEmail(userData.user.email);
+
+        if (!row || row.email === providerEmail) return; // already reconciled — no write, no audit
 
         await tx
           .update(account)
-          .set({ email, emailVerifiedAt: null })
+          .set({ email: providerEmail, emailVerifiedAt: null })
           .where(eq(account.id, context.accountId));
 
         await recordActivityEvent(tx, {
@@ -1097,7 +1178,7 @@ export async function changeResidentEmail(current: CurrentSession, rawEmail: str
           payload: {},
         });
       });
-      return; // compensation succeeded — the change did take effect, late
+      return; // compensation succeeded — the account row now agrees with the provider
     } catch (compensationErr) {
       console.error(err);
       console.error(compensationErr);
@@ -1125,41 +1206,68 @@ export async function changeResidentEmail(current: CurrentSession, rawEmail: str
 //   2. `SELECT account ... FOR UPDATE`, so this serializes against redeemPasswordReset's own
 //      `account ... FOR UPDATE` (D5) and against changeResidentEmail's (D2) — whichever of the
 //      three gets there first finishes before the next one's lookup can start;
-//   3. WHILE HOLDING THAT LOCK: look up the provider's current address (getUserById, D1's lookup)
+//   3. Copilot review round 4 (PR #23), FIX 1 — CLAUDE.md "Every writer of the same state,
+//      pairwise": `SELECT session ... FOR UPDATE` where `id = current.sessionId AND account_id =
+//      context.accountId`, same reasoning and same code (`session_ended`) as changeResidentEmail's
+//      own new step — the membership lock re-checks the ACCOUNT is still a live resident but not
+//      that THIS SESSION still is, and a reset or an earlier password change ends every OTHER
+//      session while leaving membership untouched, so a request riding a session that reset just
+//      ended must be refused before it can spend a current password it should no longer be able to
+//      prove. Locked right after the account row, before any provider call — matching
+//      redeemPasswordReset's own phase 1/3 lock position for its session write, so the two
+//      serialize on the same row instead of racing;
+//   4. WHILE HOLDING THAT LOCK: look up the provider's current address (getUserById, D1's lookup)
 //      and verify the current password (signInWithPassword; the session it returns is discarded,
 //      as signIn already does on refusal) — a failure is wrong_current_password. Neither of these
 //      two provider calls changes any state, so putting them before the DB writes below is not the
 //      hazard round 3 fixes — see the next paragraph;
-//   4. Copilot review round 3 (PR #23), CLAUDE.md "No transaction spans Postgres and Supabase
+//   5. Copilot review round 3 (PR #23), CLAUDE.md "No transaction spans Postgres and Supabase
 //      Auth": revoke every OTHER session of the account (current.sessionId is kept) and record
 //      account.password_changed — moved BEFORE the provider password write, so the MUTATING
-//      provider call (step 5) is the LAST statement of the transaction, exactly
+//      provider call (step 6) is the LAST statement of the transaction, exactly
 //      changeResidentEmail's own reorder and redeemPasswordReset's phase 2 discipline;
-//   5. LAST: updateUserById(password). A failure here now rolls the session-revoke and the audit
+//   6. LAST: updateUserById(password). A failure here now rolls the session-revoke and the audit
 //      insert back WITH it — no half-known state where sessions ended for a password that never
 //      actually changed.
 // Validation that touches no row (missing fields, the new password's length rule) stays OUTSIDE
 // the lock, exactly as before.
 //
-// The only window this cannot close is a failed COMMIT after step 5's provider call already
+// The only window this cannot close is a failed COMMIT after step 6's provider call already
 // returned success: Postgres rolls back (the revoke and the audit entry are gone) while Supabase
 // already has the new password — the OTHER sessions would then still be live for a password that
 // did change. Handled the same way as changeResidentEmail: a local `providerUpdated` flag flips
 // true right after the provider call succeeds; the `withSessionContext(...)` call is wrapped in
 // try/catch; if it throws AND `providerUpdated` is true, a best-effort compensating transaction
 // re-applies the DB side under the same locks (membership -> account, then session) — revoking the
-// other sessions and recording the event again, nothing else. Success returns normally (the
-// change did take effect); failure logs both errors (console.error) and throws
-// AccountSettingsError("change_incomplete").
+// other sessions and recording the event again, nothing else. Copilot review round 4 (PR #23),
+// FIX 2 — the "revoke every other session" repair used to unconditionally re-run against
+// `isNull(session.revokedAt)`, which would also revoke a session legitimately created WITH THE NEW
+// PASSWORD in the gap between this call's own provider write and its failed commit (someone
+// signing in successfully right after the reset, before the repair runs). Closed by capturing
+// `const startedAt = new Date()` at the very top of this function, before the main transaction
+// even opens, and filtering the repair's revoke on `createdAt < startedAt` (in addition to
+// excluding `current.sessionId`, unchanged) — a session created at or after the moment this call
+// began cannot be one this call's own password write is responsible for un-knowing about, so the
+// repair leaves it alone. Each path this leaves:
+//   - the repair's own transaction fails too: both errors are logged (console.error) and this
+//     throws `AccountSettingsError("change_incomplete")` — Supabase already has the new password,
+//     but Postgres has neither the revoke nor the audit entry, and the caller is told so;
+//   - the repair succeeds: this returns normally — the change did take effect, late, and every
+//     session that existed before this call started (other than the caller's own) is now revoked,
+//     while a session created during the gap survives, exactly as an ordinary successful call
+//     would have left it.
 //
 // This cannot be exercised by a real test without mocking Supabase or forcing a commit failure,
-// which CLAUDE.md forbids here (no DB/auth mocking) — see the test file's own note.
+// which CLAUDE.md forbids here (no DB/auth mocking) — see the test file's own note. FIX 2's own
+// `startedAt` filter is the same: no new test, for the same reason.
 //
-// Lock order: membership -> account, then session — same as changeResidentEmail (account only,
-// no session write), redeemPasswordReset (D5: membership -> account, then session) and removal
-// (resident_profile -> membership -> session). Every path in this file takes a prefix-compatible
-// subsequence of resident_profile -> membership -> account -> session, never the reverse, so
-// there is no deadlock cycle across any pair of them.
+// Lock order: membership -> account -> session, then no further lock — same as changeResidentEmail
+// (now also membership -> account -> session), redeemPasswordReset (D5: membership -> account,
+// then session) and removal (resident_profile -> membership -> session). Every path in this file
+// takes a prefix-compatible subsequence of resident_profile -> membership -> account -> session,
+// never the reverse, so there is no deadlock cycle across any pair of them. Step 3's new session
+// lock does not change this: it sits in the same relative position (after account, before any
+// provider call) the other functions already use.
 export async function changeResidentPassword(
   current: CurrentSession,
   currentPassword: string,
@@ -1190,6 +1298,12 @@ export async function changeResidentPassword(
     );
   }
 
+  // Copilot review round 4 (PR #23), FIX 2: captured BEFORE the main transaction even opens, so
+  // the compensating transaction's own session-revoke (below) can distinguish a session that
+  // existed when this call started from one created legitimately, with the new password, in the
+  // gap between this call's provider write and a later failed commit. See the big comment above.
+  const startedAt = new Date();
+
   // See the big comment above: flips true only once the provider password write (the LAST
   // statement of the transaction below) has actually succeeded.
   let providerUpdated = false;
@@ -1215,6 +1329,16 @@ export async function changeResidentPassword(
       const [row] = await tx.select().from(account).where(eq(account.id, context.accountId)).for("update");
       if (!row) {
         throw new AccountSettingsError("Current password is incorrect", "wrong_current_password");
+      }
+
+      // Copilot review round 4 (PR #23), FIX 1 — see the big comment above (step 3).
+      const [sessionRow] = await tx
+        .select()
+        .from(session)
+        .where(and(eq(session.id, sessionId), eq(session.accountId, context.accountId)))
+        .for("update");
+      if (!sessionRow || sessionRow.revokedAt || sessionRow.expiresAt <= new Date()) {
+        throw new AccountSettingsError("Your session has ended — please sign in again", "session_ended");
       }
 
       const { data: userData, error: userError } = await supabaseAdmin().auth.admin.getUserById(context.accountId);
@@ -1256,7 +1380,12 @@ export async function changeResidentPassword(
     if (!providerUpdated) throw err;
 
     // The provider call succeeded but the transaction's own commit failed — best-effort
-    // reconciliation, re-applying the DB side under the same locks. See the big comment above.
+    // reconciliation, re-applying the DB side under the same locks. Copilot review round 4 (PR
+    // #23), FIX 2 — the revoke below is filtered on `createdAt < startedAt` (captured before the
+    // main transaction opened), so a session created WITH THE NEW PASSWORD in the gap between this
+    // call's own provider write and its failed commit survives this repair rather than being
+    // un-known along with everything that existed before this call started. See the big comment
+    // above.
     try {
       await withSessionContext(context, async (tx) => {
         await tx.select().from(membership).where(eq(membership.accountId, context.accountId)).for("update");
@@ -1266,7 +1395,12 @@ export async function changeResidentPassword(
           .update(session)
           .set({ revokedAt: new Date() })
           .where(
-            and(eq(session.accountId, context.accountId), ne(session.id, sessionId), isNull(session.revokedAt)),
+            and(
+              eq(session.accountId, context.accountId),
+              ne(session.id, sessionId),
+              isNull(session.revokedAt),
+              lt(session.createdAt, startedAt),
+            ),
           );
 
         await recordActivityEvent(tx, {
@@ -1327,38 +1461,63 @@ export async function changeResidentPassword(
 //      once an email exists (O-16) even in that gap. Consistent lock order, same as everywhere
 //      else in this file: `SELECT membership ... FOR UPDATE` FIRST, re-check live + resident +
 //      the named profile still active (plain SELECT, no lock, same as phase 1's own); THEN
-//      `SELECT account ... FOR UPDATE`, re-check it STILL has no email. Any failure throws
-//      `invalid_link` BEFORE the provider call — phase 1 already committed, so the link is spent
-//      and every session is already dead, which is the safe state;
+//      `SELECT account ... FOR UPDATE`, re-check it STILL has no email. STATE LEFT if either
+//      recheck fails: phase 1 already committed (link spent, every prior session dead, no
+//      provider call made yet in this phase) — OUTCOME: `invalid_link`, unchanged from before;
 //   b. the account lock is also what serializes against changeResidentPassword, which holds the
 //      very same lock while it verifies the current password and writes a new one (its own big
 //      comment states this explicitly now);
-//   c. auth.admin.updateUserById(password);
-//   d. COMMIT (releases the locks).
-//   If the provider call fails: throw `reset_incomplete`. Phase 1 already committed, so the link
-//   is spent and every session is dead — the password never changed. This is the SAFE direction
-//   stated above: nobody's session survives, and there is no password anyone half-knows. The
-//   action's message tells the person to ask the administration for a new link;
-//   issuePasswordResetLink's own eligibility check is unaffected (the account still has no email),
-//   so a fresh link can be issued immediately.
+//   c. auth.admin.updateUserById(password) — a local `providerUpdated` flag is set to `true`
+//      immediately after this call returns successfully (Copilot review round 4, PR #23, FIX 3).
+//      STATE LEFT if the provider call itself fails (`updateError`): logged (console.error), then
+//      thrown as `reset_incomplete` BEFORE `providerUpdated` is ever set — phase 1 already
+//      committed (link spent, every session dead), the password never changed. This is the SAFE
+//      direction: nobody's session survives, and no password sits half-known. OUTCOME: the action
+//      tells the person to ask the administration for a new link; issuePasswordResetLink's own
+//      eligibility check is unaffected (the account still has no email), so a fresh link can be
+//      issued immediately;
+//   d. COMMIT (releases the locks). STATE LEFT if the commit itself fails, AFTER step (c) already
+//      returned success (`providerUpdated` is `true` when this transaction throws): Supabase has
+//      the new password, but this phase's own re-check locks and its own transaction leave nothing
+//      behind in Postgres either way — phase 2 writes no row of its own, so there is nothing here
+//      for a repair to redo, unlike changeResidentEmail/changeResidentPassword's compensations.
+//      Phase 1's commit already stands (link spent, every prior session dead) regardless. OUTCOME:
+//      logged (console.error) and treated as a SUCCESSFUL phase 2 — the caller falls through to
+//      phase 3 exactly as if the commit had not failed, because the one fact that matters (the
+//      password IS set) is true either way. Distinguishing "commit failed" from "callback threw
+//      before setting the flag" is exactly what `providerUpdated` is for: only a throw from
+//      withSessionContext AFTER the callback's own last statement set it to `true` can be this
+//      case, since every earlier throw path (recheck failure, `updateError`) leaves it `false`.
 //
 // PHASE 3 (a third, separate transaction) — sign in and open the new session, UNDER THE SAME
-// MEMBERSHIP LOCK phase 1 took, taken again here:
+// MEMBERSHIP LOCK phase 1 took, taken again here. The whole phase is wrapped in one more
+// try/catch (Copilot review round 4, PR #23, FIX 3): an `invalid_link` `JoinError` (the membership
+// or profile rechecks below) passes through UNCHANGED — phases 1 and 2 already committed, the link
+// is spent, and refusing here changes nothing about that. ANY OTHER error — the provider calls
+// below, `insertSessionTx`, the session UPDATE, a lock-acquisition error, or this transaction's own
+// COMMIT failing — is logged (console.error) and rethrown as `JoinError("reset_done_sign_in_failed")`,
+// because by the time execution reaches this phase the password IS already set (phase 2 committed,
+// or its own commit failure was already treated as success above) and nothing here can make that
+// untrue again; the only question left is whether THIS device gets signed in automatically, never
+// whether the reset happened:
 //   a. SELECT membership ... FOR UPDATE, re-check it is STILL live, resident, with the profile
 //      still active — a removal that won this same lock between phase 1 and here (a real window,
 //      now that they are separate transactions) refuses here as invalid_link, and nothing is
-//      inserted;
+//      inserted. STATE LEFT: phases 1/2 stand; nothing new committed here. OUTCOME: `invalid_link`;
 //   b. WHILE STILL HOLDING THAT LOCK: getUserById, then signInWithPassword with the password
-//      phase 2 just wrote. A failure here means the password IS already set (phase 2 committed)
-//      but signing in with it failed anyway — thrown as `reset_done_sign_in_failed`, a DIFFERENT
-//      code from `reset_incomplete` because the right message is different ("your new password is
-//      set, sign in with it" rather than "ask for a new link"). This phase's own transaction rolls
-//      back (no session inserted), but phases 1 and 2 already committed and stay committed;
+//      phase 2 just wrote. STATE LEFT on a failure here: phases 1/2 stand (the password IS set);
+//      this phase's own transaction rolls back (no session inserted). OUTCOME:
+//      `reset_done_sign_in_failed` — a DIFFERENT code from `reset_incomplete` because the right
+//      message is different ("your new password is set, sign in with it" rather than "ask for a
+//      new link");
 //   c. revoke every OTHER live session of the account (there is no "new" row yet to exempt by id,
 //      so this is every session live at this instant — the insert below is what makes the
 //      redeeming device's own session the sole survivor);
 //   d. insertSessionTx(tx, ...) with actingProfileId = the reset profile and the caller's
-//      rememberMe;
+//      rememberMe — STATE LEFT if this itself fails, or if the COMMIT that follows fails: phases
+//      1/2 stand (the password IS set), this phase's transaction rolls back (no session survives
+//      from this attempt). OUTCOME: `reset_done_sign_in_failed`, same as (b) — the person is told
+//      their password is set even though this specific attempt to open a session for them failed;
 //   e. COMMIT.
 //   Doing the sign-in UNDER the membership lock, in its own phase-1-then-phase-3 pair of
 //   acquisitions, is what makes two concurrent resets for the same profile (two different
@@ -1369,21 +1528,29 @@ export async function changeResidentPassword(
 //   `reset_done_sign_in_failed` against a password it no longer recognises) — and it revokes every
 //   other live session as its own last act before inserting its own.
 //
-// After phase 3 (whether it ran to completion or phase 2 already threw `reset_incomplete`): the
-// visitor's own PREVIOUS session (design.md Decision 8) is revoked if one was passed in — own
-// session only (revokeSession enforces that), unconditionally on any successful phase 3, exactly
-// as before. This still has nothing to do with the reset's own invariants and must never make an
-// otherwise-valid redemption roll back — kept OUTSIDE every phase's transaction.
+// After phase 3 (whether it ran to completion, or phase 2's own callback threw `reset_incomplete`
+// before phase 3 was ever reached): the visitor's own PREVIOUS session (design.md Decision 8) is
+// revoked if one was passed in — own session only (revokeSession enforces that), unconditionally
+// on any successful phase 3, exactly as before. This still has nothing to do with the reset's own
+// invariants and must never make an otherwise-valid redemption roll back — kept OUTSIDE every
+// phase's transaction.
+//
+// Phase 1 itself: a non-`JoinError` thrown from its own callback (a lock-acquisition error, a
+// DB-level failure) leaves nothing committed — Postgres rolls the whole phase 1 transaction back,
+// no provider call was ever reached, and the generic (non-JoinError) error path this function
+// already has for such cases is unchanged; the caller sees whatever the ordinary unhandled-error
+// boundary shows for a non-JoinError throw, same as any other function in this file.
 //
 // Lock order (extends D2/D7's own analysis): membership -> account, then session — never
 // resident_profile — across all three phases, same order as before the split. changeResidentPassword
 // (D7) takes membership -> account, then session. changeResidentEmail (D2) takes membership ->
-// account. removal takes resident_profile -> membership -> session. No path here takes these in
-// reverse, so no deadlock: every path's own order is a prefix-compatible subsequence of
-// resident_profile -> membership -> account -> session, never the reverse. Splitting phase 1/2/3
-// into separate transactions does not change this analysis — it only means the membership lock is
-// acquired and released TWICE (phase 1, then phase 3) instead of held continuously, which is what
-// opens (and phase 3's own re-check is what closes) the removal-window named in phase 3(a) above.
+// account -> session (Copilot review round 4, PR #23). removal takes resident_profile ->
+// membership -> session. No path here takes these in reverse, so no deadlock: every path's own
+// order is a prefix-compatible subsequence of resident_profile -> membership -> account -> session,
+// never the reverse. Splitting phase 1/2/3 into separate transactions does not change this
+// analysis — it only means the membership lock is acquired and released TWICE (phase 1, then
+// phase 3) instead of held continuously, which is what opens (and phase 3's own re-check is what
+// closes) the removal-window named in phase 3(a) above.
 export async function redeemPasswordReset(
   code: string,
   input: { password: string },
@@ -1479,99 +1646,120 @@ export async function redeemPasswordReset(
   // (serializes with changeResidentPassword's own account lock). Nothing else is written here —
   // see the big comment above for why a failure of the provider call itself is `reset_incomplete`,
   // not `signup_failed`.
-  await withSessionContext(bootstrapContext, async (tx) => {
-    // Consistent lock order, same as phase 1 and everywhere else in this file: membership FIRST.
-    const [membershipRow] = await tx
-      .select()
-      .from(membership)
-      .where(eq(membership.residentProfileId, profileId))
-      .for("update");
-    if (!membershipRow || membershipRow.revokedAt || !membershipRow.isResident) {
-      throw new JoinError("Join code is not valid", "invalid_link");
-    }
+  //
+  // Copilot review round 4 (PR #23), FIX 3: `providerUpdated` distinguishes "the callback threw
+  // before the provider write ever succeeded" (recheck failure, or the provider call itself
+  // failing) from "the provider write succeeded and only the COMMIT that should have followed it
+  // failed" — see the big comment above for the full state/outcome analysis of each branch.
+  let providerUpdated = false;
+  try {
+    await withSessionContext(bootstrapContext, async (tx) => {
+      // Consistent lock order, same as phase 1 and everywhere else in this file: membership FIRST.
+      const [membershipRow] = await tx
+        .select()
+        .from(membership)
+        .where(eq(membership.residentProfileId, profileId))
+        .for("update");
+      if (!membershipRow || membershipRow.revokedAt || !membershipRow.isResident) {
+        throw new JoinError("Join code is not valid", "invalid_link");
+      }
 
-    const [profileRow] = await tx
-      .select({ status: residentProfile.status })
-      .from(residentProfile)
-      .where(eq(residentProfile.id, profileId));
-    if (!profileRow || profileRow.status !== "active") {
-      throw new JoinError("Join code is not valid", "invalid_link");
-    }
+      const [profileRow] = await tx
+        .select({ status: residentProfile.status })
+        .from(residentProfile)
+        .where(eq(residentProfile.id, profileId));
+      if (!profileRow || profileRow.status !== "active") {
+        throw new JoinError("Join code is not valid", "invalid_link");
+      }
 
-    // THEN account, same order as phase 1's own re-check.
-    const [accountRow] = await tx.select().from(account).where(eq(account.id, accountId)).for("update");
-    if (!accountRow || accountRow.email !== null) {
-      throw new JoinError("Join code is not valid", "invalid_link");
-    }
+      // THEN account, same order as phase 1's own re-check.
+      const [accountRow] = await tx.select().from(account).where(eq(account.id, accountId)).for("update");
+      if (!accountRow || accountRow.email !== null) {
+        throw new JoinError("Join code is not valid", "invalid_link");
+      }
 
-    const { error: updateError } = await supabaseAdmin().auth.admin.updateUserById(accountId, { password });
-    if (updateError) {
-      console.error(updateError);
-      throw new JoinError(
-        "Password reset committed but the provider write failed",
-        "reset_incomplete",
-      );
-    }
-  });
+      const { error: updateError } = await supabaseAdmin().auth.admin.updateUserById(accountId, { password });
+      if (updateError) {
+        console.error(updateError);
+        throw new JoinError(
+          "Password reset committed but the provider write failed",
+          "reset_incomplete",
+        );
+      }
+      providerUpdated = true;
+    });
+  } catch (err) {
+    if (!providerUpdated) throw err;
+    // The provider password write already succeeded; only this transaction's own COMMIT failed
+    // afterwards. Phase 2 writes no row of its own, so there is nothing in Postgres to repair —
+    // log and fall through to phase 3 exactly as a normal phase 2 success would. See the big
+    // comment above (PHASE 2, step d).
+    console.error(err);
+  }
 
   // PHASE 3: re-check under a FRESH membership lock, sign in, open the new session. See the big
   // comment above for why this is a separate acquisition from phase 1's, and how that is what
   // makes two concurrent resets converge on exactly one live session.
-  const sessionRow = await withSessionContext(bootstrapContext, async (tx) => {
-    const [membershipRow] = await tx
-      .select()
-      .from(membership)
-      .where(eq(membership.residentProfileId, profileId))
-      .for("update");
-    if (!membershipRow || membershipRow.revokedAt || !membershipRow.isResident) {
-      throw new JoinError("Join code is not valid", "invalid_link");
-    }
+  //
+  // Copilot review round 4 (PR #23), FIX 3: the whole phase is wrapped so that only an
+  // `invalid_link` `JoinError` passes through unchanged — any other failure (a provider call here,
+  // `insertSessionTx`, the session UPDATE, or this transaction's own commit) is logged and
+  // rethrown as `reset_done_sign_in_failed`, never left to fall through to a generic error
+  // boundary, because by this point the password IS already set (see the big comment above).
+  let sessionRow: Awaited<ReturnType<typeof insertSessionTx>>;
+  try {
+    sessionRow = await withSessionContext(bootstrapContext, async (tx) => {
+      const [membershipRow] = await tx
+        .select()
+        .from(membership)
+        .where(eq(membership.residentProfileId, profileId))
+        .for("update");
+      if (!membershipRow || membershipRow.revokedAt || !membershipRow.isResident) {
+        throw new JoinError("Join code is not valid", "invalid_link");
+      }
 
-    const [profileRow] = await tx
-      .select({ status: residentProfile.status })
-      .from(residentProfile)
-      .where(eq(residentProfile.id, profileId));
-    if (!profileRow || profileRow.status !== "active") {
-      throw new JoinError("Join code is not valid", "invalid_link");
-    }
+      const [profileRow] = await tx
+        .select({ status: residentProfile.status })
+        .from(residentProfile)
+        .where(eq(residentProfile.id, profileId));
+      if (!profileRow || profileRow.status !== "active") {
+        throw new JoinError("Join code is not valid", "invalid_link");
+      }
 
-    const { data: userData, error: userError } = await supabaseAdmin().auth.admin.getUserById(accountId);
-    if (userError || !userData.user?.email) {
-      console.error(userError ?? new Error("getUserById returned no email after password reset"));
-      throw new JoinError(
-        "Password is set; signing in with it failed",
-        "reset_done_sign_in_failed",
-      );
-    }
+      const { data: userData, error: userError } = await supabaseAdmin().auth.admin.getUserById(accountId);
+      if (userError || !userData.user?.email) {
+        throw userError ?? new Error("getUserById returned no email after password reset");
+      }
 
-    const { data: signInData, error: signInError } = await supabaseAdmin().auth.signInWithPassword({
-      email: userData.user.email,
-      password,
+      const { data: signInData, error: signInError } = await supabaseAdmin().auth.signInWithPassword({
+        email: userData.user.email,
+        password,
+      });
+      if (signInError || !signInData.session) {
+        throw signInError ?? new Error("signInWithPassword returned no session after password reset");
+      }
+
+      // Every session live AT THIS INSTANT — there is no "new" row yet to exempt by id, so "every
+      // OTHER" (design.md's own phrasing) is every one currently live. The insert right after this
+      // is what makes the redeeming device's own session the sole survivor.
+      await tx
+        .update(session)
+        .set({ revokedAt: new Date() })
+        .where(and(eq(session.accountId, accountId), isNull(session.revokedAt)));
+
+      return insertSessionTx(tx, {
+        householdId: resolved.householdId,
+        accountId,
+        actingProfileId: profileId,
+        accessToken: signInData.session.access_token,
+        rememberMe: options.rememberMe ?? true,
+      });
     });
-    if (signInError || !signInData.session) {
-      console.error(signInError ?? new Error("signInWithPassword returned no session after password reset"));
-      throw new JoinError(
-        "Password is set; signing in with it failed",
-        "reset_done_sign_in_failed",
-      );
-    }
-
-    // Every session live AT THIS INSTANT — there is no "new" row yet to exempt by id, so "every
-    // OTHER" (design.md's own phrasing) is every one currently live. The insert right after this
-    // is what makes the redeeming device's own session the sole survivor.
-    await tx
-      .update(session)
-      .set({ revokedAt: new Date() })
-      .where(and(eq(session.accountId, accountId), isNull(session.revokedAt)));
-
-    return insertSessionTx(tx, {
-      householdId: resolved.householdId,
-      accountId,
-      actingProfileId: profileId,
-      accessToken: signInData.session.access_token,
-      rememberMe: options.rememberMe ?? true,
-    });
-  });
+  } catch (err) {
+    if (err instanceof JoinError && err.code === "invalid_link") throw err;
+    console.error(err);
+    throw new JoinError("Password is set; signing in with it failed", "reset_done_sign_in_failed");
+  }
 
   // design.md Decision 8 (pre-mortem fix, 2026-09-24): a visitor already signed in (the household
   // account opening the link to check it, say, or the resident's own stale session on the SAME

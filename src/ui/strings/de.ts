@@ -552,6 +552,9 @@ export const de = {
         invalidEmail: "Das sieht nicht nach einer gültigen E-Mail-Adresse aus.",
         emailTaken: "Diese E-Mail-Adresse kann nicht verwendet werden.",
         notAResident: "Nur Bewohner:innen können ihre E-Mail-Adresse ändern.",
+        // Copilot review round 4 (PR #23): the session this request came in on has been ended
+        // (e.g. by a password reset) — the honest remedy is signing in again, not a retry.
+        sessionEnded: "Deine Sitzung ist abgelaufen. Bitte melde dich erneut an.",
         genericFailure: "Das hat nicht geklappt. Bitte versuche es erneut.",
         // Copilot review round 3 (PR #23): the provider write succeeded but the commit that should
         // have followed it failed, and the best-effort repair (auth.ts changeResidentEmail's own
@@ -574,6 +577,9 @@ export const de = {
         passwordTooShort: (minLength: number) => `Das neue Passwort muss mindestens ${minLength} Zeichen haben.`,
         wrongCurrentPassword: "Das aktuelle Passwort ist nicht richtig.",
         notAResident: "Nur Bewohner:innen können ihr Passwort ändern.",
+        // Copilot review round 4 (PR #23): see email.errors.sessionEnded above — same situation,
+        // changeResidentPassword's own new session check.
+        sessionEnded: "Deine Sitzung ist abgelaufen. Bitte melde dich erneut an.",
         genericFailure: "Das hat nicht geklappt. Bitte versuche es erneut.",
         // Copilot review round 3 (PR #23): see email.errors.changeIncomplete above — same
         // situation, changeResidentPassword's own compensating transaction also failed.

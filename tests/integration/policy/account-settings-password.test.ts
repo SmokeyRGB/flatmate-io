@@ -198,6 +198,54 @@ describe("changeResidentPassword (identity/account-settings, design.md Decision 
       code: "password_too_short",
     });
   });
+
+  // Copilot review round 4 (PR #23), FIX 1: mirrors account-settings-email.test.ts's own
+  // "session already ended" case — the membership lock re-checks the ACCOUNT, not THIS SESSION, so
+  // a request riding a session a password reset (or an earlier changeResidentPassword) already
+  // ended must be refused before it can spend a current password it should no longer be able to
+  // prove. Revokes the signed-in session's own row directly, while the membership stays live.
+  it("a session already ended (e.g. by a password reset) gives session_ended, with nothing changed", async () => {
+    hh = await registerTestHousehold();
+    const resident = await claimResident(hh, "SessionEndedPassword");
+    const signedIn = await residentSignIn(hh, "SessionEndedPassword");
+    const current: CurrentSession = { sessionId: signedIn.session.id, context: signedIn.context };
+
+    await withSessionContext(current.context, (tx) =>
+      tx.update(session).set({ revokedAt: new Date() }).where(eq(session.id, signedIn.session.id)),
+    );
+
+    await expect(
+      changeResidentPassword(current, PASSWORD, "should-not-apply-123"),
+    ).rejects.toMatchObject({ code: "session_ended" });
+
+    // Nothing changed: the provider password is still the original one.
+    const { error: signInError } = await adminClient().auth.signInWithPassword({
+      email: `resident-${resident.profileId}@accounts.flatmate.invalid`,
+      password: PASSWORD,
+    });
+    expect(signInError).toBeNull();
+
+    const events = await withSessionContext(hh.context, (tx) =>
+      tx
+        .select()
+        .from(activityEvent)
+        .where(
+          and(
+            eq(activityEvent.eventType, "account.password_changed"),
+            eq(activityEvent.subjectId, resident.accountId),
+          ),
+        ),
+    );
+    expect(events).toHaveLength(0);
+  });
+
+  // Deliberate break, RUN (per CLAUDE.md's own instruction for this fix): removing the session
+  // check (the `SELECT session ... FOR UPDATE` / `session_ended` throw added by FIX 1) from
+  // changeResidentPassword and running this test file made the test above fail — the promise
+  // resolved instead of rejecting, and the provider's password was actually overwritten with
+  // "should-not-apply-123" (the old-password sign-in assertion above then failed too). The check
+  // was restored immediately afterwards; this comment records the observed failure rather than
+  // leaving the break in the tree.
 });
 
 // review fix (Copilot finding, PR #23): changeResidentPassword used to verify the current password
@@ -217,7 +265,12 @@ describe("changeResidentPassword's account lock does not race a concurrent passw
   it("blocks behind an uncommitted concurrent write, then refuses instead of overwriting it", async () => {
     hh = await registerTestHousehold();
     const resident = await claimResident(hh, "PasswordLockRace");
-    const current = { sessionId: "n/a", context: { accountId: resident.accountId, householdId: hh.householdId, profileId: resident.profileId } } as CurrentSession;
+    // Copilot review round 4 (PR #23), FIX 1: changeResidentPassword now looks up `session` by
+    // `current.sessionId` — a placeholder "n/a" (the previous shape here) fails that lookup with a
+    // driver-level error instead of reaching the race this test means to exercise, since a real
+    // session row is what every caller in production always has.
+    const signedIn = await residentSignIn(hh, "PasswordLockRace");
+    const current: CurrentSession = { sessionId: signedIn.session.id, context: signedIn.context };
 
     let releaseRawTx: () => void = () => {};
     const rawTxGate = new Promise<void>((resolve) => {
