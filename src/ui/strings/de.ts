@@ -26,6 +26,12 @@ export const de = {
     remove: "Entfernen",
     // §8.6: "`join_code` ungültig machen (O16)" → „Löschen" — never a synonym.
     delete: "Löschen",
+    // loading-feedback design.md D8: SubmitButton's status-region text, announced only while a
+    // form is submitting (src/ui/submit-button.tsx).
+    pending: "Wird gesendet …",
+    // loading-feedback design.md D8: the skeleton container's visually hidden label
+    // (src/ui/skeletons.tsx, every new loading.tsx).
+    loading: "Wird geladen …",
   },
   nav: {
     // The organisation hub screen is titled "Organisation" (matches the shared vocabulary already

@@ -572,4 +572,77 @@ h3 {
     font-size: 0.875rem;
     font-weight: 500;
   }
+
+  /* loading-feedback design.md D1/D2: SubmitButton's pending spinner — small, inline, spins via a
+     CSS animation, and stays visible (just not spinning) under reduced motion, same pattern as
+     `.skeleton` and `.toast` above. */
+  .spinner {
+    display: inline-block;
+    width: 1em;
+    height: 1em;
+    flex-shrink: 0;
+    border: 2px solid currentColor;
+    border-right-color: transparent;
+    border-radius: 9999px;
+    animation: spinner-spin 0.6s linear infinite;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .spinner {
+      animation: none;
+    }
+  }
+  @keyframes spinner-spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  /* loading-feedback design.md D1: a one-cell grid holding the idle layer (icon + label) and the
+     pending layer (spinner + pendingLabel) on top of each other — only `visibility` toggles
+     (keyed off the button's own `aria-busy`, which SubmitButton already sets for a11y), so the
+     button's width is always the wider layer's width and nothing jumps between idle and pending. */
+  .submit-stack {
+    display: grid;
+    align-items: center;
+    justify-items: center;
+  }
+  .submit-stack > span {
+    grid-area: 1 / 1;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  button:not([aria-busy="true"]) .submit-stack-pending {
+    visibility: hidden;
+  }
+  button[aria-busy="true"] .submit-stack-idle {
+    visibility: hidden;
+  }
+
+  /* loading-feedback design.md D5, revised in the code review: the hint is an empty marker that
+     takes no space (display: none), so no link looks different at rest. While its link is pending,
+     the link itself dims and pulses gently, with a progress cursor; under reduced motion it only
+     dims. */
+  .link-pending-hint {
+    display: none;
+  }
+  a:has(.link-pending-hint[data-pending]) {
+    cursor: progress;
+    animation: link-pending-pulse 900ms ease-in-out infinite;
+  }
+  @keyframes link-pending-pulse {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.45;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    a:has(.link-pending-hint[data-pending]) {
+      animation: none;
+      opacity: 0.55;
+    }
+  }
 }

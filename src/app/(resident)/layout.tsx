@@ -1,11 +1,10 @@
+import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { landingPathFor } from "@/app/landing";
 import { getCurrentSession } from "@/modules/identity/session-cookie";
-import { de } from "@/ui/strings";
-import { signOutAction } from "../(org)/sign-out-action";
-import { AvatarMenu } from "./avatar-menu";
+import { HeaderSkeleton } from "@/ui/skeletons";
 import { BottomNav } from "./bottom-nav";
-import { householdFor, identityLabelFor, navigationAccessFor } from "./session-data";
+import { ResidentHeaderRight } from "./resident-header";
 
 // start-screen design.md Decision 1: the resident frame — everything B1, `/casting`,
 // `/casting/screening`, `/account` (E1) and `/who-lives-here` (B5) share. A session with no
@@ -13,20 +12,15 @@ import { householdFor, identityLabelFor, navigationAccessFor } from "./session-d
 // landing (O20) here, which is also this design's sixth "landing by identity" site (Decision 3).
 // AC-1.6 ("the interface states which identity I am signed in as") is satisfied the same way
 // `(org)/layout.tsx` satisfies it for the organisation side — the avatar menu's own header block.
+//
+// loading-feedback design.md D4: the session check and both redirects stay here — entering the
+// route group still waits for this one call. The identity/household/navigation-access reads plus
+// AvatarMenu moved into ResidentHeaderRight, inside its own <Suspense> boundary, off the layout's
+// blocking path. BottomNav needs no data and stays outside that boundary.
 export default async function ResidentLayout({ children }: { children: React.ReactNode }) {
   const current = await getCurrentSession();
   if (!current) redirect("/sign-in");
   if (current.context.profileId === null) redirect(landingPathFor(current.context));
-
-  const [identity, household, access] = await Promise.all([
-    identityLabelFor(current.context),
-    householdFor(current.context),
-    navigationAccessFor(current.context),
-  ]);
-
-  const displayName =
-    identity.kind === "resident" ? (identity.displayName ?? de.org.identityResidentFallback) : de.org.identityResidentFallback;
-  const householdName = household?.name ?? de.org.identityHouseholdFallback;
 
   return (
     <div className="flex min-h-full flex-col">
@@ -39,12 +33,9 @@ export default async function ResidentLayout({ children }: { children: React.Rea
           <span className="font-serif text-lg font-semibold text-primary">flatmate.io</span>
           <BottomNav />
         </div>
-        <AvatarMenu
-          displayName={displayName}
-          householdName={householdName}
-          access={access}
-          signOutAction={signOutAction}
-        />
+        <Suspense fallback={<HeaderSkeleton />}>
+          <ResidentHeaderRight context={current.context} />
+        </Suspense>
       </header>
       <main className="flex-1 pb-20 md:pb-6">{children}</main>
     </div>

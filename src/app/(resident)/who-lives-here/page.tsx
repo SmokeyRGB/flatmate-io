@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { getCurrentHouseholdMembers } from "@/modules/identity/repository";
 import { getCurrentSession } from "@/modules/identity/session-cookie";
 import { de } from "@/ui/strings";
+import { LinkPendingHint } from "@/ui/link-pending-hint";
 
 const t = de.whoLivesHere;
 
@@ -23,6 +24,7 @@ export default async function WhoLivesHerePage() {
   const backLink = (
     <Link href="/dashboard" className="back-link">
       <ArrowLeft className="size-4" /> {de.nav.start}
+      <LinkPendingHint />
     </Link>
   );
 

@@ -5,6 +5,7 @@ import { listRoundsForSession } from "@/modules/casting/repository";
 import { assertIsAdministration, getHouseholdSettings, ResidentListActionDeniedError } from "@/modules/identity/repository";
 import { getCurrentSession } from "@/modules/identity/session-cookie";
 import { de } from "@/ui/strings";
+import { LinkPendingHint } from "@/ui/link-pending-hint";
 import { SettingsForm } from "./settings-form";
 
 const t = de.settings;
@@ -38,6 +39,7 @@ export default async function SettingsPage({
         <div className="mx-auto max-w-md space-y-4 p-6">
           <Link href="/organization" className="back-link">
             <ArrowLeft className="size-4" /> {de.nav.organisation}
+            <LinkPendingHint />
           </Link>
           <h1 className="font-serif text-2xl font-semibold">{t.heading}</h1>
           <p className="text-sm text-muted-foreground">{t.accessDeniedBody}</p>
@@ -57,6 +59,7 @@ export default async function SettingsPage({
     <div className="mx-auto max-w-md space-y-6 p-6">
       <Link href="/organization" className="back-link">
         <ArrowLeft className="size-4" /> {de.nav.organisation}
+        <LinkPendingHint />
       </Link>
       {note === "already_member" && (
         <div role="note" className="callout callout-info">

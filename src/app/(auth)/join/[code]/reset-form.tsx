@@ -5,6 +5,7 @@ import { de } from "@/ui/strings";
 import { redeemPasswordResetAction, type ResetFormState } from "./actions";
 import { HandEntryWayBack } from "./join-ways-forward";
 import { PasswordInput } from "@/ui/password-input";
+import { SubmitButton } from "@/ui/submit-button";
 
 const initialState: ResetFormState = { error: null, fieldError: null, refusal: null };
 const t = de.join;
@@ -15,7 +16,7 @@ const t = de.join;
 // JoinForm's own draft does — the password itself is never captured into it.
 export function ResetForm({ code, passwordMinLength }: { code: string; passwordMinLength: number }) {
   const [draft, setDraft] = useState({ rememberMe: true });
-  const [state, formAction, pending] = useActionState(redeemPasswordResetAction, initialState);
+  const [state, formAction] = useActionState(redeemPasswordResetAction, initialState);
 
   return (
     <div className="space-y-4">
@@ -55,9 +56,9 @@ export function ResetForm({ code, passwordMinLength }: { code: string; passwordM
           </p>
         )}
 
-        <button type="submit" disabled={pending} className="btn btn-primary w-full">
-          {pending ? t.reset.submitPending : t.reset.submit}
-        </button>
+        <SubmitButton className="btn btn-primary w-full" pendingLabel={t.reset.submitPending}>
+          {t.reset.submit}
+        </SubmitButton>
       </form>
 
       {/* review fix: the same way forward the join form renders for an invalid link (design.md

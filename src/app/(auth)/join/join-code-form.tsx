@@ -2,6 +2,7 @@
 
 import { useActionState, useState } from "react";
 import { de } from "@/ui/strings";
+import { SubmitButton } from "@/ui/submit-button";
 import { enterJoinCodeAction, type JoinCodeFormState } from "./actions";
 
 const initialState: JoinCodeFormState = { error: null };
@@ -18,7 +19,7 @@ const t = de.join.joinByCode;
 // query string.
 export function JoinCodeForm() {
   const [draft, setDraft] = useState("");
-  const [state, formAction, pending] = useActionState(enterJoinCodeAction, initialState);
+  const [state, formAction] = useActionState(enterJoinCodeAction, initialState);
 
   return (
     <form
@@ -58,9 +59,9 @@ export function JoinCodeForm() {
         </p>
       </div>
 
-      <button type="submit" disabled={pending} className="btn btn-primary w-full">
-        {pending ? t.submitPending : t.submit}
-      </button>
+      <SubmitButton className="btn btn-primary w-full" pendingLabel={t.submitPending}>
+        {t.submit}
+      </SubmitButton>
     </form>
   );
 }

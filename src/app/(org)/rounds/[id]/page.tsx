@@ -8,6 +8,7 @@ import {
 } from "@/modules/casting/repository";
 import { getCurrentSession } from "@/modules/identity/session-cookie";
 import { de } from "@/ui/strings";
+import { LinkPendingHint } from "@/ui/link-pending-hint";
 
 // Convergence T084/T085: the round-detail screen FR-1.19 (participant names) and FR-1.22 (the
 // "procedure changed" notice) both need — `getRoundParticipants`/`hasProcedureChangedNotice`
@@ -29,6 +30,7 @@ export default async function RoundDetailPage({ params }: { params: Promise<{ id
     <div className="mx-auto max-w-2xl space-y-6 p-6">
       <Link href="/organization" className="back-link">
         <ArrowLeft className="size-4" /> {de.nav.organisation}
+        <LinkPendingHint />
       </Link>
 
       <div>

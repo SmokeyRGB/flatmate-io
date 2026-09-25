@@ -4,6 +4,7 @@ import { useActionState } from "react";
 import { de } from "@/ui/strings";
 import { changeEmailAction, type EmailFormState } from "./actions";
 import { SuccessToast } from "@/ui/success-toast";
+import { SubmitButton } from "@/ui/submit-button";
 
 const initialState: EmailFormState = { error: null, saved: false };
 const t = de.account.email;
@@ -11,7 +12,7 @@ const t = de.account.email;
 // design.md Decision 8: `currentEmail` pre-fills the field with the server's own current value —
 // not a typed draft from a previous submission (the action state itself carries no such value).
 export function EmailForm({ currentEmail }: { currentEmail: string | null }) {
-  const [state, formAction, pending] = useActionState(changeEmailAction, initialState);
+  const [state, formAction] = useActionState(changeEmailAction, initialState);
 
   return (
     // noValidate: the server action is the one validator, so every refusal is our German text
@@ -36,9 +37,9 @@ export function EmailForm({ currentEmail }: { currentEmail: string | null }) {
       )}
       {state.saved && !state.error && <p className="text-sm text-muted-foreground">{t.saved}</p>}
       <SuccessToast message={t.saved} trigger={state.saved && !state.error ? state : null} />
-      <button type="submit" disabled={pending} className="btn btn-primary w-full">
-        {pending ? t.submitPending : t.submit}
-      </button>
+      <SubmitButton className="btn btn-primary w-full" pendingLabel={t.submitPending}>
+        {t.submit}
+      </SubmitButton>
     </form>
   );
 }

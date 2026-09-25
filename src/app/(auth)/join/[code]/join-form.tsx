@@ -5,6 +5,7 @@ import { de } from "@/ui/strings";
 import { joinHouseholdAction, type JoinFormState } from "./actions";
 import { HandEntryWayBack, SignOutAndReturnForm } from "./join-ways-forward";
 import { PasswordInput } from "@/ui/password-input";
+import { SubmitButton } from "@/ui/submit-button";
 
 const initialState: JoinFormState = { error: null, fieldError: null, refusal: null };
 const t = de.join;
@@ -36,7 +37,7 @@ export function JoinForm({
   boundDisplayName?: string | null;
 }) {
   const [draft, setDraft] = useState({ displayName: "", email: "", rememberMe: true });
-  const [state, formAction, pending] = useActionState(joinHouseholdAction, initialState);
+  const [state, formAction] = useActionState(joinHouseholdAction, initialState);
 
   return (
     <div className="space-y-4">
@@ -128,9 +129,9 @@ export function JoinForm({
           </p>
         )}
 
-        <button type="submit" disabled={pending} className="btn btn-primary w-full">
-          {pending ? t.submitPending : t.submit}
-        </button>
+        <SubmitButton className="btn btn-primary w-full" pendingLabel={t.submitPending}>
+          {t.submit}
+        </SubmitButton>
       </form>
 
       {/* design.md Decision 10: a refusal reached at submit time carries the same way forward as

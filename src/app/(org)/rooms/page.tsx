@@ -5,6 +5,8 @@ import { f1TargetStatusesFor } from "@/modules/casting/room-transitions";
 import { listRooms } from "@/modules/casting/repository";
 import { getCurrentSession } from "@/modules/identity/session-cookie";
 import { de } from "@/ui/strings";
+import { LinkPendingHint } from "@/ui/link-pending-hint";
+import { SubmitButton } from "@/ui/submit-button";
 import { createRoomAction, removeRoomAction, renameRoomAction, transitionRoomAction } from "./actions";
 
 const t = de.rooms;
@@ -20,14 +22,13 @@ export default async function RoomsPage() {
     <div className="mx-auto max-w-2xl space-y-6 p-6">
       <Link href="/organization" className="back-link">
         <ArrowLeft className="size-4" /> {de.nav.organisation}
+        <LinkPendingHint />
       </Link>
       <h1 className="font-serif text-2xl font-semibold">{t.heading}</h1>
 
       <form action={createRoomAction} className="flex gap-2">
         <input name="label" placeholder={t.addPlaceholder} className="field-input flex-1" />
-        <button type="submit" className="btn btn-primary shrink-0">
-          {t.addSubmit}
-        </button>
+        <SubmitButton className="btn btn-primary shrink-0">{t.addSubmit}</SubmitButton>
       </form>
 
       <ul className="space-y-3">
@@ -42,9 +43,7 @@ export default async function RoomsPage() {
               <form action={renameRoomAction} className="flex gap-1">
                 <input type="hidden" name="roomId" value={r.id} />
                 <input name="label" defaultValue={r.label} className="field-input py-1 text-sm" />
-                <button type="submit" className="btn-link shrink-0">
-                  {de.common.rename}
-                </button>
+                <SubmitButton className="btn-link shrink-0">{de.common.rename}</SubmitButton>
               </form>
 
               <form action={transitionRoomAction} className="flex gap-1">
@@ -58,16 +57,12 @@ export default async function RoomsPage() {
                     </option>
                   ))}
                 </select>
-                <button type="submit" className="btn-link shrink-0">
-                  {t.changeState}
-                </button>
+                <SubmitButton className="btn-link shrink-0">{t.changeState}</SubmitButton>
               </form>
 
               <form action={removeRoomAction}>
                 <input type="hidden" name="roomId" value={r.id} />
-                <button type="submit" className="btn-link text-destructive">
-                  {t.remove}
-                </button>
+                <SubmitButton className="btn-link text-destructive">{t.remove}</SubmitButton>
               </form>
             </div>
           </li>

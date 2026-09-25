@@ -76,3 +76,4 @@ rules:
     - "Each test task names the deliberate break that must make it fail, and the applier reports having seen it fail."
     - "A test of a status transition asserts every column the statement writes, not only the status."
     - "Any statement the agent harness may refuse is its own task for the human. After the hand-off the applier checks that the database shows the expected result and stops if it does not - it never infers that the statement is merely not yet applied."
+    - "A task that adds a screen names its loading.tsx and skeleton shape; a task that adds a form uses SubmitButton. Enforced by scripts/lint/pending-feedback.ts."

@@ -138,7 +138,8 @@ Arbeit nicht ab und kann sie nicht abnehmen.
   nicht des Anmeldedienstes; `app.household_id` ist eine Beziehung über `Membership`, die der
   Anmeldedienst gar nicht kennt. Dass die Identität nicht mehr wechselt, macht das Füllen des
   Kontexts **nicht überflüssig, nur vorhersagbar**: Er muss weiterhin pro Request innerhalb der
-  Transaktion per `SET LOCAL` gesetzt werden, weil RLS ihn pro Transaktion liest (**G-C8**). Wer
+  Transaktion per `SET LOCAL` (oder gleichwertig `set_config(…, true)`) gesetzt werden, weil RLS ihn
+  pro Transaktion liest (**G-C8**). Wer
   diesen Record mit der Erwartung liest, RLS werde dadurch einfacher, liest ihn falsch: der Aufwand
   für den Sitzungskontext bleibt **unverändert**.
 - **Zwei Sitzungsbegriffe nebeneinander.** Supabase Auth führt eigene Sitzungen (Token, Erneuerung);

@@ -5,6 +5,7 @@ import { listRooms } from "@/modules/casting/repository";
 import { assertHasPermission, PermissionDeniedError } from "@/modules/identity/repository";
 import { getCurrentSession } from "@/modules/identity/session-cookie";
 import { de } from "@/ui/strings";
+import { LinkPendingHint } from "@/ui/link-pending-hint";
 import { RoundForm } from "./round-form";
 
 const t = de.rounds.new;
@@ -26,6 +27,7 @@ export default async function NewRoundPage() {
         <div className="mx-auto max-w-md space-y-4 p-6">
           <Link href="/organization" className="back-link">
             <ArrowLeft className="size-4" /> {de.nav.organisation}
+            <LinkPendingHint />
           </Link>
           <h1 className="font-serif text-2xl font-semibold">{t.heading}</h1>
           <p className="text-sm text-muted-foreground">{t.permissionDenied}</p>
@@ -41,6 +43,7 @@ export default async function NewRoundPage() {
     <div className="mx-auto max-w-md space-y-6 p-6">
       <Link href="/organization" className="back-link">
         <ArrowLeft className="size-4" /> {de.nav.organisation}
+        <LinkPendingHint />
       </Link>
       <h1 className="font-serif text-2xl font-semibold">{t.heading}</h1>
       <RoundForm rooms={rooms.map((r) => ({ id: r.id, label: r.label }))} />

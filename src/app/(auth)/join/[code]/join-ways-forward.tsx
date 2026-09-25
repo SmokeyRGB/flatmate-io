@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { de } from "@/ui/strings";
+import { LinkPendingHint } from "@/ui/link-pending-hint";
+import { SubmitButton } from "@/ui/submit-button";
 import { signOutAndReturnAction } from "./actions";
 
 const t = de.join;
@@ -15,6 +17,7 @@ export function HandEntryWayBack() {
   return (
     <Link href="/join" className="btn btn-secondary">
       {t.handEntryWayBack}
+      <LinkPendingHint />
     </Link>
   );
 }
@@ -26,9 +29,7 @@ export function SignOutAndReturnForm({ code }: { code: string }) {
   return (
     <form action={signOutAndReturnAction}>
       <input type="hidden" name="code" value={code} />
-      <button type="submit" className="btn btn-secondary">
-        {t.signOutAndReturn}
-      </button>
+      <SubmitButton className="btn btn-secondary">{t.signOutAndReturn}</SubmitButton>
     </form>
   );
 }

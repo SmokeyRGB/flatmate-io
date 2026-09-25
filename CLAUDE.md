@@ -26,25 +26,26 @@ npm run lint       # eslint
 npm test          # vitest run
 npx vitest run tests/unit/casting/room-transitions.test.ts   # single file
 npx vitest run -t "test name substring"                       # single test by name
-npm run verify     # the full gate: eslint + tsc + six guardrail lints + check-refs, then vitest run
+npm run verify     # the full gate: eslint + tsc + seven guardrail lints + check-refs, then vitest run
 npm run seed:demo # tsx --env-file=.env.local scripts/seed-demo-household.ts
 ```
 
 `npm run verify` is what CI/pre-push effectively require — run it, not just `npm test`, before
 treating a change as done. It type-checks (`next typegen && tsc --noEmit`; vitest alone does not
-enforce strict mode). The six custom lints under `scripts/lint/` are hand-written checks (not
+enforce strict mode). The seven custom lints under `scripts/lint/` are hand-written checks (not
 eslint plugins), each enforcing one guardrail mechanically:
 
 | Script | Guardrail | What it checks |
 |---|---|---|
 | `import-boundary.ts` | G-C1 / FR-0.1 | only `src/db/` and each module's own `repository.ts` may import the raw Postgres/Drizzle client |
-| `session-context.ts` | G-C8 / FR-0.4 | bare `SET` is never allowed; `SET LOCAL` for session context only in `src/db/session-context.ts` |
+| `session-context.ts` | G-C8 / FR-0.4 | bare `SET` is never allowed; `SET LOCAL`/`set_config(…, true)` for session context only in `src/db/session-context.ts`; also rejects `SET SESSION …`/`SET … TO` everywhere and a non-local `set_config` in `drizzle/*.sql` |
 | `rls-coverage.ts` | FR-0.2 / EC-0.1 | every table declaring `household_id` has a `pgPolicy` of its own — per table, not per schema file |
 | `definer-coverage.ts` | G-C7 | every `SECURITY DEFINER` function in `drizzle/` sets `search_path` and is called by name in a `tests/integration/raw-sql/` test |
 | `migration-shape.ts` | — (re-runnability) | migrations after `0017`: an enum `ADD VALUE` alone in its file, `ADD COLUMN IF NOT EXISTS`, `DROP FUNCTION IF EXISTS` before a bare or `RETURNS TABLE` create, `search_path` on `SECURITY DEFINER` |
 | `guarded-tests.ts` | G-D | every entry in `test/guarded.manifest.json` (G-D1…G-D15) stays honest: `pending`/`implemented` must match reality |
+| `pending-feedback.ts` | `ui/pending-feedback` | no plain submit button anywhere in `src/` (only `src/ui/submit-button.tsx`'s shared one); every `page.tsx` under `src/app/` has a sibling `loading.tsx` importing `@/ui/skeletons`, short named exemptions aside |
 
-`tests/unit/lint/cleanup-inventory.test.ts` is the seventh check, run inside vitest: it fails when
+`tests/unit/lint/cleanup-inventory.test.ts` is the eighth check, run inside vitest: it fails when
 a household-scoped table is missing from the delete set in `tests/helpers/identity.ts`, or when
 `undoRegisterHousehold` misses a table `registerHousehold` writes.
 
@@ -86,7 +87,9 @@ bun run format    # prettier --write .
   schema/repository directly — `import-boundary.ts` only enforces the raw-client rule, so respect
   the module boundary by convention too.
 - **`src/db/`**: `client.ts` (the one place the raw Postgres/Drizzle client is constructed) and
-  `session-context.ts` (the one place `SET LOCAL` sets RLS session context inside a transaction).
+  `session-context.ts` (the one place the RLS session context is set: `withSessionContext`
+  opens the transaction and sets it with one transaction-local `set_config(…, true)` statement,
+  equivalent to `SET LOCAL`, G-C8).
 - **`src/app/`**: Next.js App Router route groups — `(auth)` (sign-in, register, claim) and `(org)`
   (dashboard, members, rooms, rounds, settings, who-lives-here) — each with server actions
   (`actions.ts`) calling into module repositories, never the DB client directly.

@@ -2,13 +2,14 @@
 
 import { useActionState } from "react";
 import { de } from "@/ui/strings";
+import { SubmitButton } from "@/ui/submit-button";
 import { createAndOpenRoundAction, type CreateRoundFormState } from "./actions";
 
 const initialState: CreateRoundFormState = { error: null };
 const t = de.rounds.new;
 
 export function RoundForm({ rooms }: { rooms: { id: string; label: string }[] }) {
-  const [state, formAction, pending] = useActionState(createAndOpenRoundAction, initialState);
+  const [state, formAction] = useActionState(createAndOpenRoundAction, initialState);
 
   return (
     <form action={formAction} className="card space-y-4">
@@ -34,9 +35,9 @@ export function RoundForm({ rooms }: { rooms: { id: string; label: string }[] })
 
       {state.error && <p className="field-error">{state.error}</p>}
 
-      <button type="submit" disabled={pending} className="btn btn-primary">
-        {pending ? t.submitPending : t.submit}
-      </button>
+      <SubmitButton className="btn btn-primary" pendingLabel={t.submitPending}>
+        {t.submit}
+      </SubmitButton>
     </form>
   );
 }

@@ -274,6 +274,13 @@ das ist die Bedingung, unter der ADR-004 überhaupt trägt.
 -- SET LOCAL app.account_id   = '…';
 -- SET LOCAL app.profile_id   = '…';   -- leer in Sitzungen eines Haushalts-Accounts
 -- SET LOCAL app.household_id = '…';
+--
+-- Präzisierung 2026-09-25 (Menschenentscheidung): gleichwertig als EINE
+-- Anweisung mit set_config, is_local := true (src/db/session-context.ts):
+-- SELECT set_config('app.account_id',   '…', true),
+--        set_config('app.household_id', '…', true),
+--        set_config('app.profile_id',   '…', true);  -- ausgelassen in Sitzungen eines
+--                                                     -- Haushalts-Accounts
 
 CREATE FUNCTION app_account_id() RETURNS uuid LANGUAGE sql STABLE AS
   $$ SELECT nullif(current_setting('app.account_id', true), '')::uuid $$;

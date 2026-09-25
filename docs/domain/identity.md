@@ -130,7 +130,8 @@ dem Auth-Modul zu überlassen.
 
 > **`acting_profile_id` trägt die handelnde Identität — und ist seit ADR-013 innerhalb einer Sitzung
 > unveränderlich.** Der Sitzungskontext aus §5 — `account_id` plus `profile_id` — wird aus dieser
-> Zeile gefüllt und pro Request per `SET LOCAL` an Postgres übergeben (ADR-004). Das Feld wird bei
+> Zeile gefüllt und pro Request per `SET LOCAL` (oder gleichwertig `set_config(…, true)`) an
+> Postgres übergeben (ADR-004). Das Feld wird bei
 > der Anmeldung gesetzt und danach nie wieder beschrieben: `null` in der Sitzung eines
 > Haushalts-Accounts, genau ein Profil in der Sitzung eines Resident-Accounts.
 >

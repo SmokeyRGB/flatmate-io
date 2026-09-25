@@ -66,6 +66,11 @@ Fehlermodus wird von der Schicht abgefangen, die man nicht vergessen kann.
 Sitzungskontext pro Request über `SET LOCAL app.account_id / app.profile_id / app.household_id`;
 Policy-Skizzen in `04-Domaenenmodell.md` §5.5.
 
+*(Präzisierung 2026-09-25, Menschenentscheidung.)* Die Hilfsfunktion setzt diese
+drei Werte seither über eine einzige `set_config(…, true)`-Anweisung statt bis zu drei
+`SET LOCAL`-Anweisungen — gleichwertig, weil `is_local := true` genau `SET LOCAL`s
+Transaktions-Gültigkeit hat. Siehe G-C8 in `GUARDRAILS.md`.
+
 **Woher der Kontext kommt** (ergänzt in V0.2, seit `Session` modelliert ist; **präzisiert
 2026-09-11 durch ADR-013**): `app.account_id` und `app.profile_id` werden aus `Session.account_id`
 und `Session.acting_profile_id` gefüllt. `acting_profile_id = null` bedeutet: Sitzung eines

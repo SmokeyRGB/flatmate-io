@@ -5,6 +5,7 @@ import { de } from "@/ui/strings";
 import { changePasswordAction, type PasswordFormState } from "./actions";
 import { PasswordInput } from "@/ui/password-input";
 import { SuccessToast } from "@/ui/success-toast";
+import { SubmitButton } from "@/ui/submit-button";
 
 const initialState: PasswordFormState = { error: null, saved: false };
 const t = de.account.password;
@@ -12,7 +13,7 @@ const t = de.account.password;
 // design.md Decision 8: no typed value survives into action state — neither password ever has a
 // `defaultValue` and both fields are empty after every submit, success or refusal alike.
 export function PasswordForm({ passwordMinLength }: { passwordMinLength: number }) {
-  const [state, formAction, pending] = useActionState(changePasswordAction, initialState);
+  const [state, formAction] = useActionState(changePasswordAction, initialState);
 
   return (
     // noValidate: the server action is the one validator, so every refusal is our German text
@@ -40,9 +41,9 @@ export function PasswordForm({ passwordMinLength }: { passwordMinLength: number 
       )}
       {state.saved && !state.error && <p className="text-sm text-muted-foreground">{t.saved}</p>}
       <SuccessToast message={t.saved} trigger={state.saved && !state.error ? state : null} />
-      <button type="submit" disabled={pending} className="btn btn-primary w-full">
-        {pending ? t.submitPending : t.submit}
-      </button>
+      <SubmitButton className="btn btn-primary w-full" pendingLabel={t.submitPending}>
+        {t.submit}
+      </SubmitButton>
     </form>
   );
 }

@@ -11,6 +11,8 @@ import {
 } from "@/modules/identity/repository";
 import { getCurrentSession } from "@/modules/identity/session-cookie";
 import { de } from "@/ui/strings";
+import { LinkPendingHint } from "@/ui/link-pending-hint";
+import { SubmitButton } from "@/ui/submit-button";
 import {
   createResidentProfileAction,
   extendJoinCodeAction,
@@ -99,9 +101,7 @@ function renderJoinCodeCard(
         <div className="flex flex-wrap items-center gap-3">
           <form action={extendJoinCodeAction}>
             <input type="hidden" name="issuanceId" value={issuance.id} />
-            <button type="submit" className="btn-link">
-              {t.joinCode.extend}
-            </button>
+            <SubmitButton className="btn-link">{t.joinCode.extend}</SubmitButton>
           </form>
           <DeleteJoinCodeForm issuanceId={issuance.id} code={issuance.code} />
         </div>
@@ -212,9 +212,7 @@ export default async function MembersPage() {
     <div className="card space-y-2">
       <form action={createResidentProfileAction} className="flex gap-2">
         <input name="displayName" placeholder={t.addResidentPlaceholder} className="field-input flex-1" />
-        <button type="submit" className="btn btn-primary shrink-0">
-          {t.addResidentSubmit}
-        </button>
+        <SubmitButton className="btn btn-primary shrink-0">{t.addResidentSubmit}</SubmitButton>
       </form>
       <p className="field-helper">{t.addResidentHelperInviteNote}</p>
     </div>
@@ -223,6 +221,7 @@ export default async function MembersPage() {
   const backLink = (
     <Link href="/organization" className="back-link">
       <ArrowLeft className="size-4" /> {de.nav.organisation}
+      <LinkPendingHint />
     </Link>
   );
 
@@ -273,9 +272,7 @@ export default async function MembersPage() {
             <p className="field-helper">{t.joinCode.create.maxUsesHelper}</p>
           </div>
         </div>
-        <button type="submit" className="btn btn-primary">
-          {t.joinCode.create.submit}
-        </button>
+        <SubmitButton className="btn btn-primary">{t.joinCode.create.submit}</SubmitButton>
       </form>
 
       {joinCodeIssuances.length === 0 ? (
@@ -367,18 +364,14 @@ export default async function MembersPage() {
                       <form action={setMemberRoleAction}>
                         <input type="hidden" name="accountId" value={m.accountId} />
                         <input type="hidden" name="toRole" value="moderator" />
-                        <button type="submit" className="btn btn-secondary">
-                          {t.makeModerator}
-                        </button>
+                        <SubmitButton className="btn btn-secondary">{t.makeModerator}</SubmitButton>
                       </form>
                     )}
                     {isAdmin && m.role === "moderator" && (
                       <form action={setMemberRoleAction}>
                         <input type="hidden" name="accountId" value={m.accountId} />
                         <input type="hidden" name="toRole" value="member" />
-                        <button type="submit" className="btn btn-secondary">
-                          {t.makeMember}
-                        </button>
+                        <SubmitButton className="btn btn-secondary">{t.makeMember}</SubmitButton>
                       </form>
                     )}
                     {/* "Moved out" is reversible (via Reactivate) and gets the same neutral
@@ -386,9 +379,9 @@ export default async function MembersPage() {
                         irreversible action (Entfernen, the card-corner trash icon). */}
                     <form action={setMovedOutAction}>
                       <input type="hidden" name="accountId" value={m.accountId} />
-                      <button type="submit" className="btn btn-secondary">
-                        <UserMinus className="size-4" /> {t.markMovedOut}
-                      </button>
+                      <SubmitButton className="btn btn-secondary" icon={<UserMinus className="size-4" />}>
+                        {t.markMovedOut}
+                      </SubmitButton>
                     </form>
                     {/* identity/password-reset (O-16, proposal Assumption 5): household sessions
                         only — issuePasswordResetLink itself refuses a moderator, so the button is
@@ -397,9 +390,7 @@ export default async function MembersPage() {
                     {isAdmin && m.status === "active" && !m.hasEmail && (
                       <form action={issuePasswordResetLinkAction}>
                         <input type="hidden" name="residentProfileId" value={m.id} />
-                        <button type="submit" className="btn btn-secondary">
-                          {t.joinCode.issueResetLink}
-                        </button>
+                        <SubmitButton className="btn btn-secondary">{t.joinCode.issueResetLink}</SubmitButton>
                       </form>
                     )}
                   </div>
@@ -407,9 +398,9 @@ export default async function MembersPage() {
                   <div className="flex flex-wrap items-center gap-2">
                     <form action={reactivateMemberAction}>
                       <input type="hidden" name="accountId" value={m.accountId} />
-                      <button type="submit" className="btn btn-secondary">
-                        <UserPlus className="size-4" /> {de.common.reactivate}
-                      </button>
+                      <SubmitButton className="btn btn-secondary" icon={<UserPlus className="size-4" />}>
+                        {de.common.reactivate}
+                      </SubmitButton>
                     </form>
                   </div>
                 )}
@@ -445,9 +436,7 @@ export default async function MembersPage() {
               <div className="mt-3 space-y-2">
                 <form action={issueJoinCodeForProfileAction}>
                   <input type="hidden" name="residentProfileId" value={m.id} />
-                  <button type="submit" className="btn btn-secondary">
-                    {t.joinCode.issueForProfile}
-                  </button>
+                  <SubmitButton className="btn btn-secondary">{t.joinCode.issueForProfile}</SubmitButton>
                 </form>
                 {boundIssuance && (
                   <div className="space-y-1">
