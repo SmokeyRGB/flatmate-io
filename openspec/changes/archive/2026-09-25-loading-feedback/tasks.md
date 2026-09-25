@@ -204,7 +204,7 @@ report it.
       re-run after a pause is not a regression.
 - [x] 9.3 `npm run build` must succeed. Next may report Suspense/streaming problems only at build
       time.
-- [ ] 9.4 Stop and report. The browser walkthrough is Opus's and the human's:
+- [x] 9.4 Stop and report. The browser walkthrough is Opus's and the human's:
       - `next dev` and `npm run build && npm start`;
       - light, dark, 375 px, reduced motion;
       - a slow action on the members screen;
