@@ -30,28 +30,33 @@ builds the pieces once, and adds a check that makes every later change use them.
 
 - **One shared submit button** (`src/ui/submit-button.tsx`). While its form is submitting, it:
   - shows a small spinner inside the button;
-  - is disabled, which also prevents a double submit;
+  - ignores further clicks, which prevents a double submit (`aria-disabled` plus a click guard,
+    not `disabled`, so keyboard focus stays on the button);
   - sets `aria-busy`;
-  - announces the pending state to screen readers;
+  - announces the pending state to screen readers, through a status region beside the button;
   - keeps its width, so nothing jumps.
 
   Every submit button in `src/app/` uses it. A spinner inside a button is not the *„Vollbild-Spinner"*
   §6 forbids.
 - **A `loading.tsx` for every page that lacks one**, built from shared skeleton shapes
   (`src/ui/skeletons.tsx`) in the form of the page's content.
-- **The two route-group layouts stop blocking.** Today `(resident)/layout.tsx` and
-  `(org)/layout.tsx` await the session plus several display reads before rendering anything.
-  Next.js then can't show any `loading.tsx` while a navigation enters the group (its own docs:
-  *"Navigation blocks until the layout finishes rendering"*). The session check needed for the
-  redirect stays. The display reads (name, household, menu rights) move into a header rendered
-  inside a `<Suspense>` boundary, with a header skeleton.
-- **A pending hint on navigation links** (bottom bar, header links, profile menu, back-links), using
-  Next.js's `useLinkStatus`. It covers the moment between the click and the new route's skeleton.
+- **The two route-group layouts block less.** Today `(resident)/layout.tsx` and
+  `(org)/layout.tsx` await the session plus several display reads before rendering anything, and
+  Next.js can't show a `loading.tsx` while a navigation enters the group (its own docs:
+  *"Navigation blocks until the layout finishes rendering"*).
+  - The session check the redirect needs stays, so entering a group still waits for that one call
+    (Assumption 5).
+  - The display reads (name, household, menu rights) move into a header rendered inside a
+    `<Suspense>` boundary, with a header skeleton.
+- **A pending hint on every navigation link** in `src/app/` (bottom bar, header links, profile
+  menu, back-links, the dashboard's and organisation screen's links, the sign-in page's links),
+  using Next.js's `useLinkStatus`. It covers the moment between the click and the new route's
+  skeleton, and the whole wait when a link enters another area.
 - **A new lint, `scripts/lint/pending-feedback.ts`,** in `npm run verify`. It fails when:
-  - a `<button>` in `src/app/` is a submit button (explicitly or by default) instead of the shared
-    one;
-  - a `page.tsx` has no `loading.tsx` beside it, unless it is on the lint's short exemption list,
-    each entry with its stated reason.
+  - a `<button>` anywhere in `src/` is a submit button (explicitly, by default, or with a
+    non-literal `type`) instead of the shared one;
+  - a `page.tsx` has no `loading.tsx` beside it, or that `loading.tsx` renders no shared skeleton,
+    unless it is on the lint's short exemption list, each entry with its stated reason.
 - **Docs for later changes:**
   - `CLAUDE.md` names the lint in its table;
   - `openspec/config.yaml` gains a tasks rule, so an F3/F4 plan names the loading state and the
@@ -66,10 +71,15 @@ builds the pieces once, and adds a check that makes every later change use them.
     125 ms measured from the human's machine.
   - The G-C8 lint (`scripts/lint/session-context.ts`) learns `set_config`. Today it doesn't
     recognise it at all, so a session-wide `set_config(…, false)` anywhere in `src/` would pass
-    unnoticed. It allows `set_config` only in `src/db/session-context.ts` and only with
-    `is_local = true`.
-  - `docs/GUARDRAILS.md` G-C8 says *„ausschließlich per `SET LOCAL`"*. Its wording is amended to
-    name the equivalent `set_config(…, true)`, with a register entry for the human decision.
+    unnoticed. It allows `set_config` only in `src/db/session-context.ts`, only with
+    `is_local = true`, and also scans `drizzle/*.sql`. The pre-mortem found that the existing rules
+    could be bypassed too (`SET SESSION …`, `SET … TO …`), so those are closed as well.
+  - `docs/GUARDRAILS.md` G-C8 says *„ausschließlich per `SET LOCAL`"*. Its wording, and the other
+    docs that name `SET LOCAL` as the mechanism (AC-0.7, ADR-004, ADR-006, `invarianten.md`,
+    `identity.md`), are amended to name the equivalent `set_config(…, true)`, with a register entry
+    for the human decision.
+  - A new pool-leak test runs through the real mechanism, pinned to one server connection. Adding
+    it to G-D10's guarded files is the human's call.
 
 **Out of scope, on purpose:**
 - further round-trip reductions: one transaction per page, and `cache()` around
@@ -109,21 +119,38 @@ None.
    library is a tooling decision of its own. The components are checked in the browser walkthrough
    (light, dark, 375 px, reduced motion). The lint gets unit tests.
 3. **Exemptions from the loading rule are few and named.** Only `src/app/page.tsx`, which only
-   redirects. Every other page, including the `(auth)` pages, is dynamic (it reads cookies), so it
-   gets a skeleton.
+   redirects. `(auth)/join` and `(auth)/register` read no cookies and no parameters, so they are
+   static and render almost instantly. They still get a skeleton, because it is harmless there and
+   keeps the rule free of exceptions a later change could hide behind. *(Corrected in the
+   pre-mortem: the first draft claimed every page reads cookies.)*
 4. **Reduced motion:** under `prefers-reduced-motion` the spinner doesn't spin, but it stays
    visible, so the pending state is still shown.
+5. **Entering a route group still waits for the session check** (design D4). Next.js blocks
+   navigation while a layout reads runtime data, and the redirect needs the session. At those
+   moments the feedback is on what was clicked: the pending sign-in button, and the link's pending
+   hint. There is no skeleton then.
 
 ## Impact
 
-- **New:** `src/ui/submit-button.tsx`, `src/ui/link-pending-hint.tsx`, `src/ui/skeletons.tsx`,
-  `scripts/lint/pending-feedback.ts` plus its unit test, and 10 `loading.tsx` files.
-- **Changed:**
-  - every form component with a submit button in `src/app/`;
-  - the navigation components (`bottom-nav.tsx`, `avatar-menu.tsx`, the header links, back-links);
-  - `src/app/globals.css`;
-  - `src/ui/strings/de.ts`;
-  - `package.json` (`verify`);
-  - `CLAUDE.md` (lint table);
-  - `openspec/config.yaml` (one tasks rule).
-- **No** schema, migration, RLS or repository change.
+- **New:**
+  - `src/ui/submit-button.tsx`, `src/ui/link-pending-hint.tsx`, `src/ui/skeletons.tsx`;
+  - `scripts/lint/pending-feedback.ts` plus its unit test;
+  - `src/app/(resident)/resident-header.tsx` and `src/app/(org)/org-header.tsx`;
+  - 10 `loading.tsx` files;
+  - `tests/integration/raw-sql/session-context-set-config.test.ts`.
+- **Changed, UI:**
+  - every component with a submit button;
+  - every `<Link>` in `src/app/`;
+  - both route-group layouts;
+  - `src/app/globals.css`, `src/ui/strings/de.ts`.
+- **Changed, database access (D9):**
+  - `src/db/session-context.ts` (one `set_config` statement, a new exported `applySessionContext`);
+  - `scripts/lint/session-context.ts` plus `tests/unit/lint/session-context.test.ts`.
+
+  No schema, migration, RLS policy or repository change.
+- **Changed, docs and config:**
+  - `docs/GUARDRAILS.md` (G-C8), `docs/backlog/requirements/F0-requirements.md` (AC-0.7),
+    `docs/adr/0004-…` and `0006-…`, `docs/domain/invarianten.md` and `identity.md`,
+    `docs/review-log.md`;
+  - `CLAUDE.md` (lint table), `openspec/config.yaml` (one tasks rule), `package.json` (`verify`);
+  - human-gated: `test/guarded.manifest.json` (G-D10 gains the new test file).

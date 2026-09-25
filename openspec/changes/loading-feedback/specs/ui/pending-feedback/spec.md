@@ -23,9 +23,13 @@ visible. Sources: `screens/rahmenwerk.md` §6 (*„Nie Vollbild-Spinner, nie Lay
 - **THEN** its submit button shows a pending indicator and is disabled until the submission ends
 
 #### Scenario: No double submission
-- **WHEN** a person clicks a submit button a second time while the first submission is still
-  running
+- **WHEN** a person, once the page is interactive, clicks a submit button a second time while the
+  first submission is still running
 - **THEN** no second submission is sent
+
+#### Scenario: Focus stays where it was
+- **WHEN** a person submits a form from the keyboard
+- **THEN** keyboard focus stays on the submit button while it is pending
 
 #### Scenario: Nothing moves
 - **WHEN** a submit button enters or leaves its pending state
@@ -38,7 +42,9 @@ visible. Sources: `screens/rahmenwerk.md` §6 (*„Nie Vollbild-Spinner, nie Lay
 ### Requirement: Every screen has a loading state shaped like its content
 
 Every screen SHALL have a loading state that is shown as soon as a navigation to it starts, until
-its content is ready. The loading state SHALL be a skeleton in the shape of the screen's content:
+its content is ready. The one exception is entering a different area of the app (after signing in,
+or moving between the resident and the organisation areas): the session is checked first, and
+during that check the control that was used SHALL show that it is pending instead. The loading state SHALL be a skeleton in the shape of the screen's content:
 never a full-screen spinner, never a blank screen. Sources: `screens/rahmenwerk.md` §6 (Laden);
 G-N6; `09-Design-System.md` "Feedback states".
 
@@ -47,9 +53,13 @@ G-N6; `09-Design-System.md` "Feedback states".
 - **THEN** a skeleton in the shape of that screen is shown immediately, then replaced by the
   content
 
+#### Scenario: Entering another area of the app
+- **WHEN** a person signs in, or follows a link from the resident area to the organisation area
+- **THEN** the button or link they used shows a pending state until the new area appears
+
 ### Requirement: A navigation link shows that it was followed
 
-A navigation link in the resident frame and on the organisation surface SHALL show a pending hint
+Every navigation link SHALL show a pending hint
 between the click and the moment the target's loading state or content appears. The hint SHALL
 NOT move the surrounding layout. Sources: human request 2026-09-25.
 
