@@ -619,19 +619,30 @@ h3 {
     visibility: hidden;
   }
 
-  /* loading-feedback design.md D5: LinkPendingHint's fixed-size slot beside a navigation link's
-     label — always rendered at this size, so the spinner appearing/disappearing never shifts the
-     surrounding line. */
+  /* loading-feedback design.md D5, revised in the code review: the hint is an empty marker that
+     takes no space (display: none), so no link looks different at rest. While its link is pending,
+     the link itself dims and pulses gently, with a progress cursor; under reduced motion it only
+     dims. */
   .link-pending-hint {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 0.875rem;
-    height: 0.875rem;
-    flex-shrink: 0;
+    display: none;
   }
-  .link-pending-hint .spinner {
-    width: 0.875rem;
-    height: 0.875rem;
+  a:has(.link-pending-hint[data-pending]) {
+    cursor: progress;
+    animation: link-pending-pulse 900ms ease-in-out infinite;
+  }
+  @keyframes link-pending-pulse {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.45;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    a:has(.link-pending-hint[data-pending]) {
+      animation: none;
+      opacity: 0.55;
+    }
   }
 }

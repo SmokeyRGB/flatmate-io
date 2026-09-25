@@ -160,6 +160,13 @@ components, in back-links and inside the `<details>` avatar menu.
 The links that enter a route group are exactly where D4's residual wait happens. A full-card link
 places the hint at the end of its label line.
 
+**Revised in the code review:** the hint no longer renders a spinner slot. That slot made every link
+wider at rest, the same idle-width regression as the first `SubmitButton`. It now renders an empty
+marker (`display: none`), and `globals.css` styles the link itself while the marker carries
+`data-pending`: dimmed, gently pulsing, with a progress cursor, and only dimmed under reduced motion.
+It takes no space and shifts nothing. This is the kind of feedback Next's docs suggest for
+`useLinkStatus` ("a shimmer effect over the clicked link").
+
 ### D6 — The lint: `scripts/lint/pending-feedback.ts` (revised after the pre-mortem)
 
 It follows the repo's other hand-written lints (plain TypeScript over file contents, no parser,

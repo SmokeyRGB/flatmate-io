@@ -65,7 +65,7 @@ function assertUuid(value: string, label: string): void {
  * bound parameters; measurement showed they cost an extra round trip per call under
  * `prepare: false`, so the values are inlined behind the same check the `SET LOCAL` version used.
  */
-export async function applySessionContext(tx: Tx, context: SessionContext): Promise<void> {
+async function applySessionContext(tx: Tx, context: SessionContext): Promise<void> {
   assertUuid(context.accountId, "accountId");
   assertUuid(context.householdId, "householdId");
   if (context.profileId !== null) {
@@ -89,12 +89,26 @@ export async function applySessionContext(tx: Tx, context: SessionContext): Prom
   await tx.execute(sql.raw(statement));
 }
 
+// The one helper G-C8 allows: it opens the transaction itself and sets the context as its first
+// statement, so no caller can set context mid-transaction or on a transaction it opened
+// elsewhere. `applySessionContext` above is deliberately not exported (review of this change).
+// `database` exists only so the raw-SQL pool-leak test can run the real mechanism on a dedicated
+// `max: 1` client; application code always uses `withSessionContext`, which passes the shared
+// client.
+export async function withSessionContextOn<T>(
+  database: { transaction: typeof db.transaction },
+  context: SessionContext,
+  fn: (tx: Tx) => Promise<T>,
+): Promise<T> {
+  return database.transaction(async (tx) => {
+    await applySessionContext(tx as unknown as Tx, context);
+    return fn(tx as unknown as Tx);
+  });
+}
+
 export async function withSessionContext<T>(
   context: SessionContext,
   fn: (tx: Tx) => Promise<T>,
 ): Promise<T> {
-  return db.transaction(async (tx) => {
-    await applySessionContext(tx as unknown as Tx, context);
-    return fn(tx as unknown as Tx);
-  });
+  return withSessionContextOn(db, context, fn);
 }

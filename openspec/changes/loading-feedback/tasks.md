@@ -160,7 +160,7 @@ report it.
 
       Break: `true → false` in `applySessionContext`. Run THIS FILE ALONE, see it fail, restore,
       then run it again to confirm no stray setting remains. Do NOT edit `pool-reuse.test.ts`.
-- [ ] 7.6 **Human-gated, do not do it yourself:** in the report, PROPOSE adding the new file to
+- [x] 7.6 **Human-gated, do not do it yourself:** *(Confirmed by the human 2026-09-25; Opus added the entry.)* in the report, PROPOSE adding the new file to
       G-D10's `testFiles` in `test/guarded.manifest.json`, citing the break evidence. The human
       confirms, and Opus makes the edit.
 

@@ -2,7 +2,7 @@ import { sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import { afterAll, afterEach, describe, expect, it } from "vitest";
-import { applySessionContext } from "../../../src/db/session-context";
+import { withSessionContextOn } from "../../../src/db/session-context";
 import { uuid } from "../../helpers/uuid";
 
 // design.md D9: G-D10's pool-leak guarantee, exercised through the REAL mechanism
@@ -27,20 +27,19 @@ describe("[GUARDED] session context set_config pool-reuse (G-D10, sibling of poo
     await client.end();
   });
 
-  it("never leaks app.household_id set via applySessionContext past COMMIT", async () => {
+  it("never leaks app.household_id set via withSessionContextOn past COMMIT", async () => {
     const householdA = uuid();
 
     // Household A's transaction, through the real mechanism, records which physical backend it
     // ran on.
-    const pidA = await db.transaction(async (tx) => {
-      await applySessionContext(tx as unknown as Parameters<typeof applySessionContext>[0], {
-        accountId: uuid(),
-        householdId: householdA,
-        profileId: null,
-      });
-      const result = await tx.execute<{ pid: number }>(sql`SELECT pg_backend_pid() AS pid`);
-      return result[0]?.pid;
-    });
+    const pidA = await withSessionContextOn(
+      db as unknown as Parameters<typeof withSessionContextOn>[0],
+      { accountId: uuid(), householdId: householdA, profileId: null },
+      async (tx) => {
+        const result = await tx.execute<{ pid: number }>(sql`SELECT pg_backend_pid() AS pid`);
+        return result[0]?.pid;
+      },
+    );
 
     // Outside any transaction on the SAME client (pool max: 1 guarantees the same physical
     // connection — Supavisor's transaction mode may still have handed it elsewhere in principle,

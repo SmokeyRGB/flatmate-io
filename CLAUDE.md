@@ -87,7 +87,9 @@ bun run format    # prettier --write .
   schema/repository directly — `import-boundary.ts` only enforces the raw-client rule, so respect
   the module boundary by convention too.
 - **`src/db/`**: `client.ts` (the one place the raw Postgres/Drizzle client is constructed) and
-  `session-context.ts` (the one place `SET LOCAL` sets RLS session context inside a transaction).
+  `session-context.ts` (the one place the RLS session context is set: `withSessionContext`
+  opens the transaction and sets it with one transaction-local `set_config(…, true)` statement,
+  equivalent to `SET LOCAL`, G-C8).
 - **`src/app/`**: Next.js App Router route groups — `(auth)` (sign-in, register, claim) and `(org)`
   (dashboard, members, rooms, rounds, settings, who-lives-here) — each with server actions
   (`actions.ts`) calling into module repositories, never the DB client directly.

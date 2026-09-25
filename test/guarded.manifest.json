@@ -62,7 +62,7 @@
       "id": "G-D10",
       "title": "Kein Kontext-Leck über den Verbindungspool",
       "status": "implemented",
-      "testFiles": ["tests/integration/raw-sql/pool-reuse.test.ts"]
+      "testFiles": ["tests/integration/raw-sql/pool-reuse.test.ts", "tests/integration/raw-sql/session-context-set-config.test.ts"]
     },
     {
       "id": "G-D11",

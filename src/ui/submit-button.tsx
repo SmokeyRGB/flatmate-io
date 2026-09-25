@@ -44,6 +44,10 @@ export function SubmitButton({
   return (
     <>
       <button
+        // The caller's props come first, so the pending attributes below always win: a caller's
+        // own aria-disabled/aria-busy can't tell assistive technology an idle state while the
+        // form is submitting (code review of loading-feedback).
+        {...rest}
         type="submit"
         className={className}
         aria-disabled={pending || disabled ? "true" : undefined}
@@ -52,7 +56,6 @@ export function SubmitButton({
         onClick={(event) => {
           if (pending) event.preventDefault();
         }}
-        {...rest}
       >
         <span className="submit-stack">
           <span className="submit-stack-idle">

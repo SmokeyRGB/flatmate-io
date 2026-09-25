@@ -136,6 +136,51 @@ describe("session-context lint (FR-0.4, T006/T011)", () => {
 
 // D9's four deliberate breaks — each must make its own fixture fail once the "improvement" is
 // applied, proving the real check bites (task 7.4).
+// Code review of loading-feedback: the first rewrite of the SET rule required a dotted name and
+// read line by line, so undotted and multi-line statements passed. Deliberate breaks, run once:
+// requiring a dotted name again fails the first fixture; matching per line fails the second.
+describe("session-context lint — SET coverage after the code review", () => {
+  it("flags an undotted session-level SET (search_path, role)", () => {
+    fixtureDir = mkdtempSync(join(tmpdir(), "flatmate-lint-"));
+    writeFixture(
+      "src/modules/casting/repository.ts",
+      ["await tx.execute(sql`SET search_path = public`);", "await tx.execute(sql`SET role = postgres`);"].join("\n"),
+    );
+    const violations = checkSessionContextLint(fixtureDir).filter((v) => v.rule === "bare-set");
+    expect(violations.map((v) => v.line)).toEqual([1, 2]);
+  });
+
+  it("flags a SET statement split across lines", () => {
+    fixtureDir = mkdtempSync(join(tmpdir(), "flatmate-lint-"));
+    writeFixture(
+      "src/modules/casting/repository.ts",
+      ["await tx.execute(sql`SET", "    app.household_id = 'x'`);"].join("\n"),
+    );
+    expect(checkSessionContextLint(fixtureDir).some((v) => v.rule === "bare-set")).toBe(true);
+  });
+
+  it("does not flag an UPDATE's column assignment", () => {
+    fixtureDir = mkdtempSync(join(tmpdir(), "flatmate-lint-"));
+    writeFixture(
+      "src/modules/casting/repository.ts",
+      [
+        "await tx.execute(sql`UPDATE room SET status = 'open' WHERE id = ${id}`);",
+        "await tx.execute(sql`UPDATE ONLY room r SET label = ${label}`);",
+      ].join("\n"),
+    );
+    expect(checkSessionContextLint(fixtureDir)).toHaveLength(0);
+  });
+
+  it("does not flag English prose in a comment", () => {
+    fixtureDir = mkdtempSync(join(tmpdir(), "flatmate-lint-"));
+    writeFixture(
+      "src/modules/casting/repository.ts",
+      ["// the callback's own last statement set it to `true` and returns", "const x = 1;"].join("\n"),
+    );
+    expect(checkSessionContextLint(fixtureDir)).toHaveLength(0);
+  });
+});
+
 describe("session-context lint — breaks (each must fail its fixture)", () => {
   it("break: dropping the /i flag misses an upper-case SET_CONFIG", () => {
     const text = `SELECT SET_CONFIG('app.household_id', 'x', true)`;

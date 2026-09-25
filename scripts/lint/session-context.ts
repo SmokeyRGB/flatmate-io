@@ -37,40 +37,55 @@ function walk(dir: string, pattern: RegExp): string[] {
   return out;
 }
 
-// `SET`, optionally `LOCAL` or `SESSION`, a namespaced identifier (`app.household_id` — every
-// real GUC this codebase sets is namespaced this way), then `=` or `TO` — case-insensitive,
-// covering every bypass the pre-mortem found: `SET SESSION x = …`, `SET x TO …`,
-// `SET LOCAL x TO …`, on top of the original `SET LOCAL x = …` / `SET x = …`. Requiring a dot in
-// the identifier (rather than any `\w+`) keeps this from matching ordinary English prose like
-// "…the callback's own last statement set it to `true`…" (a real false positive this fix hit).
-const SET_RE = /\bSET\s+(LOCAL|SESSION)?\s*"?\w+"?\."?\w+"?\s*(?:=|\bTO\b)/gi;
+// `SET` statements, matched across the whole file content (so a statement split over lines is
+// caught too; `\s` includes newlines), case-insensitive, in two forms:
+//   - `SET [LOCAL|SESSION] <any identifier> =`: any identifier, as the original rule had it. The
+//     first rewrite required a dotted name and so let `SET search_path = …` / `SET role = …` pass
+//     (code review of this change).
+//   - `SET [LOCAL|SESSION] <identifier> TO`: only with a dotted (namespaced) identifier, or with
+//     both keywords in capitals. English prose in comments ("… set it to `true` …") must not
+//     match, and prose never capitalises both or names `app.household_id`.
+// `UPDATE <table> SET col = …` is an ordinary column assignment, not a setting, and is excluded.
+const NOT_AFTER_UPDATE = String.raw`(?<!\bUPDATE\s+(?:ONLY\s+)?[\w."]+(?:\s+(?:AS\s+)?\w+)?\s+)`;
+const SET_EQ_RE = new RegExp(
+  NOT_AFTER_UPDATE + String.raw`\bSET\s+(?:(LOCAL|SESSION)\s+)?"?[\w.]+"?\s*=`,
+  "gi",
+);
+const SET_TO_DOTTED_RE = new RegExp(
+  NOT_AFTER_UPDATE + String.raw`\bSET\s+(?:(LOCAL|SESSION)\s+)?"?\w+"?\."?\w+"?\s+TO\b`,
+  "gi",
+);
+const SET_TO_UPPER_RE = new RegExp(
+  NOT_AFTER_UPDATE + String.raw`\bSET\s+(?:(LOCAL|SESSION)\s+)?"?[\w.]+"?\s+TO\b`,
+  "g",
+);
 
 // `set_config(...)`, case-insensitive, tolerating optional quotes and whitespace around the name
 // (`"set_config"(...)`) — matches even a call whose argument list spans multiple lines (`[^)]*`
 // includes newlines), which is exactly the multi-line case D9 wants to fail closed.
 const SET_CONFIG_RE = /"?set_config"?\s*\(([^)]*)\)/gi;
 
-function checkSetStatements(lines: string[], relPath: string, violations: LintViolation[]): void {
-  lines.forEach((line, idx) => {
-    SET_RE.lastIndex = 0;
-    const match = SET_RE.exec(line);
-    if (!match) return;
-    const modifier = (match[1] ?? "").toUpperCase();
-    if (modifier === "LOCAL") {
-      if (relPath !== SESSION_CONTEXT_FILE) {
-        violations.push({
-          file: relPath,
-          line: idx + 1,
-          rule: "set-local-outside-session-context",
-          text: line.trim(),
-        });
+function checkSetStatements(content: string, relPath: string, violations: LintViolation[]): void {
+  const seen = new Set<number>();
+  for (const re of [SET_EQ_RE, SET_TO_DOTTED_RE, SET_TO_UPPER_RE]) {
+    re.lastIndex = 0;
+    let match: RegExpExecArray | null;
+    while ((match = re.exec(content)) !== null) {
+      if (seen.has(match.index)) continue;
+      seen.add(match.index);
+      const line = content.slice(0, match.index).split("\n").length;
+      const text = content.split("\n")[line - 1].trim();
+      const modifier = (match[1] ?? "").toUpperCase();
+      if (modifier === "LOCAL") {
+        if (relPath !== SESSION_CONTEXT_FILE) {
+          violations.push({ file: relPath, line, rule: "set-local-outside-session-context", text });
+        }
+        continue;
       }
-      return;
+      // No modifier, or SESSION: always a finding, like the original `SET x = …` rule.
+      violations.push({ file: relPath, line, rule: "bare-set", text });
     }
-    // No modifier, or SESSION — always a finding (bare-set), same treatment as the original
-    // `SET x = …` rule, now also catching `SET SESSION …` and `SET x TO …`.
-    violations.push({ file: relPath, line: idx + 1, rule: "bare-set", text: line.trim() });
-  });
+  }
 }
 
 function checkSetConfigCalls(
@@ -117,7 +132,7 @@ export function checkSessionContextLint(rootDir: string): LintViolation[] {
   for (const file of srcFiles) {
     const relPath = relative(rootDir, file).replace(/\\/g, "/");
     const content = readFileSync(file, "utf8");
-    checkSetStatements(content.split("\n"), relPath, violations);
+    checkSetStatements(content, relPath, violations);
     checkSetConfigCalls(content, relPath, violations, { enforceLocation: true });
   }
 
