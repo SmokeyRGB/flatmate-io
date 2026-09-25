@@ -191,14 +191,18 @@ function makeCleanup(context: SessionContext, deregister: () => void): () => Pro
     // The delete set itself lives in HOUSEHOLD_SCOPED_TABLES above (M2) — see its comment for why
     // activity_event and join_attempt are deliberately absent from it.
     await cleanupHousehold(context, id);
-    await adminClient().auth.admin.deleteUser(context.accountId);
+    await deleteTestAccount(context.accountId);
   };
 }
 
 // Cleans up a resident account created via claimResidentProfile (a separate Auth user from the
-// household's own).
+// household's own). deleteUser reports an API refusal as a returned `error`, not a rejection (PR
+// #25), so it is thrown here — otherwise a failed delete passes silently and the Auth user stays
+// behind on flatmate-io-dev. A 404 is not a failure: the user is already gone, which is the goal
+// (the code under test may have compensated it away itself).
 export async function deleteTestAccount(accountId: string): Promise<void> {
-  await adminClient().auth.admin.deleteUser(accountId);
+  const { error } = await adminClient().auth.admin.deleteUser(accountId);
+  if (error && error.status !== 404) throw error;
 }
 
 // Runs every afterEach cleanup task to completion, even if one rejects, so a failure in one
