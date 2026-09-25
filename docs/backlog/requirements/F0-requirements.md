@@ -166,6 +166,10 @@ database connection, and the session context is set only via `SET LOCAL` inside 
 helper (never bare `SET`, never outside a transaction), then the second request sees nothing set
 by the first. This is the guarded test G-D10, and it lands before the first policy is written,
 not after.
+*(Precision 2026-09-25, human decision.)* The transaction helper now sets this
+context with one `set_config(…, true)` statement rather than up to three `SET LOCAL` statements —
+`set_config` with a literal `true` third argument is equivalent to `SET LOCAL` (transaction-local,
+discarded at COMMIT/ROLLBACK); the acceptance criterion is unchanged.
 Source: `GUARDRAILS.md`, Minimal-Gate item 7 (G-C8, G-D10).
 
 **AC-0.8 — Import-boundary lint enforces the six bounded contexts**

@@ -468,12 +468,18 @@ Agent vergisst ein `WHERE household_id = …` — ist dann nicht abgedeckt.
 > ist nicht maschinell erzwingbar 🔴, aber sie ist billig zu stellen — und sie hat bereits zwei reale
 > Lecks gefunden, beide erst bei einer Querprüfung und keines durch einen Mechanismus.
 
-### G-C8 — `SET LOCAL` nur innerhalb einer Transaktion
+### G-C8 — `SET LOCAL` (bzw. gleichwertig `set_config(…, true)`) nur innerhalb einer Transaktion
 
 **Regel.** Der Sitzungskontext, aus dem RLS den aktuellen `household_id` und das aktuelle
 `resident_profile_id` liest, wird **ausschließlich per `SET LOCAL` innerhalb einer offenen
 Transaktion** gesetzt. Niemals `SET` ohne `LOCAL`, niemals außerhalb einer Transaktion, niemals in
 einem Verbindungs-Setup-Hook.
+
+*(Präzisierung 2026-09-25, Menschenentscheidung.)* `src/db/session-context.ts`
+setzt den Kontext seither über **eine** `SELECT set_config(…, true), …`-Anweisung statt bis zu drei
+`SET LOCAL`-Anweisungen. `set_config(name, value, is_local := true)` **ist** `SET LOCAL`: der Wert
+bleibt transaktionslokal und endet mit COMMIT/ROLLBACK — die Regel und ihre Begründung gelten
+unverändert, nur die Anweisungsform ist gleichwertig ersetzt.
 
 **Begründung.** Dies ist der **subtilste Fehler in der gesamten Sicherheitsarchitektur**, weil er ein
 Leck **durch die Sicherheitsmaßnahme hindurch** erzeugt. Bei Connection Pooling wird dieselbe
@@ -1280,7 +1286,7 @@ Zustände.
 | G-C5 `household_id NOT NULL` | 🟢 | Schema-Test gegen `data-inventory.yml` |
 | G-C6 Benachrichtigungen prüfen Sichtbarkeit | 🟢 | geschützter Test G-D5 |
 | G-C7 Sichtbarkeitsinvarianten zweimal getestet | 🟢 | zwei Manifest-Einträge je Invariante (Policy + rohes SQL) |
-| G-C8 `SET LOCAL` nur in Transaktion | 🟢 | einzige Hilfsfunktion, Lint, CI-Check, Pool-Test G-D10 |
+| G-C8 `SET LOCAL` (bzw. `set_config(…, true)`) nur in Transaktion | 🟢 | einzige Hilfsfunktion, Lint, CI-Check, Pool-Test G-D10 |
 | G-C9 Datenschutzseite nie ohne Freigabe erreichbar | 🟢 | `PublishedPrivacyNotice`-Typ + Policy-Test je Route |
 | G-D Geschützte Tests (Existenz, Marker, `skip`) | 🟢 | Manifest-Check + CODEOWNERS |
 | G-D Geschützte Tests (inhaltliche Abschwächung) | 🟡 | Assertion-Zahl-Trendsperre (`test/guarded.manifest.json`) — erkennt Löschen/Abschwächen-durch-Entfernen, keine Semantik |
