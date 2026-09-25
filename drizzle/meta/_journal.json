@@ -132,7 +132,7 @@
       "idx": 18,
       "version": "7",
       "when": 1790247330913,
-      "tag": "0018_milky_famine",
+      "tag": "0018_application_requires_resident_profile",
       "breakpoints": true
     },
     {
