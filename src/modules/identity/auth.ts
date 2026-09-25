@@ -74,6 +74,34 @@ function isEmailTakenError(
   return path === "update" && error.status === 500 && error.message === "Error updating user";
 }
 
+// Best-effort, no retry loop: a failure deleting the Auth user must not mask the error that made
+// the deletion necessary, or crash the request.
+async function deleteAuthUserBestEffort(accountId: string): Promise<void> {
+  try {
+    await supabaseAdmin().auth.admin.deleteUser(accountId);
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+// The compensation for a claim or join whose transaction threw after createUser. A thrown commit
+// does not prove a rollback: when the account row is there, the commit landed, and deleting the
+// Auth user would leave an active profile nobody can sign in as (and a retry refused, since the
+// profile or link is spent). So the rows are the authority: the Auth user is deleted only when
+// its account row is absent — or when that read fails too, since a database that cannot answer
+// most likely never committed, and a blocked address is the worse residual.
+async function deleteAuthUserUnlessCommitted(householdId: string, accountId: string): Promise<void> {
+  try {
+    const rows = await withSessionContext({ accountId, householdId, profileId: null }, (tx) =>
+      tx.select({ id: account.id }).from(account).where(eq(account.id, accountId)),
+    );
+    if (rows.length > 0) return;
+  } catch (err) {
+    console.error(err);
+  }
+  await deleteAuthUserBestEffort(accountId);
+}
+
 // german-ui-vocabulary (design.md Decision 4): a `code` discriminant, not `message`, is what an
 // action switches on — `message` stays exactly as it was (English, developer-facing, log-only).
 export type RegistrationErrorCode = "missing_email" | "missing_password" | "missing_name" | "signup_failed";
@@ -101,8 +129,10 @@ export class RegistrationError extends Error {
 //     retry would fail at createUser as a duplicate). The catch below runs undoRegisterHousehold,
 //     which deletes this household's rows (a no-op after a rollback; the reconciliation when a
 //     commit landed but reported failure) and then the Auth user, and rethrows the original
-//     error. If undo's own DB phase fails too, the Auth user is left in place, never rows without
-//     their Auth user; that residual is logged.
+//     error. If undo's own DB phase fails too, the Auth user is deleted anyway: a database that
+//     cannot answer most likely never committed, and the only alternative residual is an address
+//     blocked for good. Rows are left without their Auth user only when the commit landed AND
+//     the database failed again straight after; that household is unreachable, and it is logged.
 export async function registerHousehold(email: string, password: string, name: string) {
   if (!email) throw new RegistrationError("email is required", "missing_email");
   if (!password) throw new RegistrationError("password is required", "missing_password");
@@ -191,6 +221,7 @@ export async function registerHousehold(email: string, password: string, name: s
       await undoRegisterHousehold(context, householdId, accountId);
     } catch (undoErr) {
       console.error(undoErr);
+      await deleteAuthUserBestEffort(accountId);
     }
     throw err;
   }
@@ -222,15 +253,10 @@ export async function undoRegisterHousehold(
     await tx.delete(household).where(eq(household.id, householdId));
   });
 
-  // Best-effort, same reasoning as undoClaimResidentProfile: the DB rollback above is what
-  // actually gates a clean retry (registerHousehold's own createUser call is what would otherwise
-  // fail as a duplicate), so a failure deleting the Auth user must not mask the original
-  // session-setup error or crash the request.
-  try {
-    await supabaseAdmin().auth.admin.deleteUser(accountId);
-  } catch {
-    // ponytail: best-effort external cleanup, no retry loop — see comment above.
-  }
+  // Runs only once the rows are gone, so a failed DB phase above (which throws past this) never
+  // leaves a household whose Auth user was deleted — for the signIn-failure caller those rows are
+  // committed for certain.
+  await deleteAuthUserBestEffort(accountId);
 }
 
 // FR-1.5: the household account creates a resident profile for the person operating it, including
@@ -263,8 +289,8 @@ export class ClaimError extends Error {
 //
 // join-by-link design.md Decision 13: NOT reachable from any route any more — `/claim` (the only
 // caller) is deleted, and its logic is folded into joinHousehold's bound branch below (which does
-// its own equivalent work inline, inside the SAME transaction as the claim itself, rather than
-// calling this function — Decision 1's whole point is that nothing here runs across two separate
+// its own equivalent work inline, inside the SAME transaction as the link claim, rather than
+// calling this function — Decision 1's whole point is that joining never runs across two separate
 // transactions). This function stays exported purely because a broad set of
 // unrelated tests (round/quorum/permission tests that need a quick second resident, nothing to do
 // with joining or claiming) still use it as a direct, no-HTTP fixture — verified by
@@ -277,10 +303,9 @@ export class ClaimError extends Error {
 // state each failure point leaves:
 //   - the pre-check refuses (not_found/not_prepared) or createUser fails (signup_failed): nothing.
 //   - the transaction or its commit fails: the Auth user at the profile's derived address exists
-//     and would block every retry for this profile as a duplicate. The catch deletes it
-//     best-effort and rethrows; the transaction rolled itself back. A commit that landed but
-//     reported failure leaves the rows without an Auth user — the same residual joinHousehold
-//     accepts.
+//     and would block every retry for this profile as a duplicate. The catch rethrows after
+//     deleteAuthUserUnlessCommitted: deleted when no account row exists (rolled back), kept when
+//     one does (the commit landed, so the profile is claimed and signs in normally).
 export async function claimResidentProfile(
   context: SessionContext,
   residentProfileId: string,
@@ -358,11 +383,7 @@ export async function claimResidentProfile(
       return { accountId, membership: membershipRow };
     });
   } catch (err) {
-    try {
-      await supabaseAdmin().auth.admin.deleteUser(accountId);
-    } catch {
-      // ponytail: best-effort external cleanup, no retry loop — same as joinHousehold.
-    }
+    await deleteAuthUserUnlessCommitted(context.householdId, accountId);
     throw err;
   }
 }
@@ -971,15 +992,12 @@ export async function joinHousehold(
       };
     });
   } catch (err) {
-    // task 7.4: on ANY failure after the Auth user exists, delete it best-effort — matching
-    // undoClaimResidentProfile/undoRegisterHousehold's comment and reasoning exactly. No other
-    // compensating undo is needed: everything else above is inside the transaction (design.md
-    // Decision 1), which rolls itself back on any error without help from this catch.
-    try {
-      await supabaseAdmin().auth.admin.deleteUser(accountId);
-    } catch {
-      // ponytail: best-effort external cleanup, no retry loop — see comment above.
-    }
+    // task 7.4: on ANY failure after the Auth user exists, delete it — unless the transaction's
+    // commit landed despite reporting failure (deleteAuthUserUnlessCommitted), which would leave a
+    // joined resident with no way to sign in and a link use already spent. No other compensating
+    // undo is needed: everything else above is inside the transaction (design.md Decision 1),
+    // which rolls itself back on any error without help from this catch.
+    await deleteAuthUserUnlessCommitted(resolved.householdId, accountId);
     throw err;
   }
 }

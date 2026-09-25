@@ -143,4 +143,53 @@ describe("A provider user created before a failing transaction is deleted again"
     const claimed = await claimResidentProfile(hh.context, profile.id, PASSWORD);
     expect(claimed.membership.residentProfileId).toBe(profile.id);
   });
+
+  it("claimResidentProfile: a profile removed between pre-check and write is refused, and its Auth user deleted", async () => {
+    hh = await registerTestHousehold();
+    const profile = await createResidentProfile(hh.context, "Overtaken", {
+      accountId: hh.accountId,
+      profileId: null,
+    });
+    const derivedEmail = deriveResidentEmail(profile.id);
+    emails.push(derivedEmail);
+
+    // Deterministic, not timing-based: an uncommitted removal holds the profile's row lock. The
+    // claim's pre-check (a plain SELECT) still reads the committed `prepared`, createUser runs, and
+    // the conditional UPDATE then waits on the lock and re-reads `removed` once it is released.
+    let release!: () => void;
+    const released = new Promise<void>((resolve) => (release = resolve));
+    let markRemoved!: () => void;
+    const removed = new Promise<void>((resolve) => (markRemoved = resolve));
+    const holder = withSessionContext(hh.context, async (tx) => {
+      await tx.update(residentProfile).set({ status: "removed" }).where(eq(residentProfile.id, profile.id));
+      markRemoved();
+      await released;
+    });
+    await removed;
+
+    const claim = claimResidentProfile(hh.context, profile.id, PASSWORD);
+    let settled = false;
+    claim.then(
+      () => (settled = true),
+      () => (settled = true),
+    );
+    // The Auth user existing means the pre-check already passed.
+    const deadline = Date.now() + 30_000;
+    while (!settled && Date.now() < deadline && (await findAuthUserIdByEmail(derivedEmail)) === null) {
+      await new Promise((resolve) => setTimeout(resolve, 200));
+    }
+    release();
+    await holder;
+
+    await expect(claim).rejects.toBeInstanceOf(ClaimError);
+    await expect(claim).rejects.toMatchObject({ code: "not_prepared" });
+    expect(await findAuthUserIdByEmail(derivedEmail)).toBeNull();
+
+    const [profileRow, memberships] = await withSessionContext(hh.context, async (tx) => [
+      (await tx.select().from(residentProfile).where(eq(residentProfile.id, profile.id)))[0],
+      await tx.select().from(membership).where(eq(membership.residentProfileId, profile.id)),
+    ]);
+    expect(profileRow.status).toBe("removed");
+    expect(memberships).toHaveLength(0);
+  });
 });
