@@ -12,12 +12,12 @@ by that list.
 
 ## 0. Record
 
-- [ ] 0.1 Commit the planning artifacts as `docs(openspec): propose ci-local-database`. It covers only `openspec/changes/ci-local-database/**`. From now on, every tick in this file goes into a record commit of its own, or into the next record commit, never into a keeper or experiment commit. Files: `openspec/changes/ci-local-database/**`.
+- [x] 0.1 Commit the planning artifacts as `docs(openspec): propose ci-local-database`. It covers only `openspec/changes/ci-local-database/**`. From now on, every tick in this file goes into a record commit of its own, or into the next record commit, never into a keeper or experiment commit. Files: `openspec/changes/ci-local-database/**`.
 
 ## 1. Unblock the local gate (D8, human approval 2026-09-26)
 
-- [ ] 1.1 Add `".claude/**"` to `globalIgnores` in `eslint.config.mjs` and to `exclude` in `tsconfig.json`, each with a comment: `.claude/` holds tool state and worktree copies, never source; human approval 2026-09-26 under G-G3. Files: `eslint.config.mjs`, `tsconfig.json`.
-- [ ] 1.2 Show that the real tree is still fully checked:
+- [x] 1.1 Add `".claude/**"` to `globalIgnores` in `eslint.config.mjs` and to `exclude` in `tsconfig.json`, each with a comment: `.claude/` holds tool state and worktree copies, never source; human approval 2026-09-26 under G-G3. Files: `eslint.config.mjs`, `tsconfig.json`.
+- [x] 1.2 Show that the real tree is still fully checked:
   - `npx eslint . --format json` file counts outside `.claude/`, before and after 1.1, must be equal;
   - `npx tsc --noEmit` must still type-check `src/`, `tests/`, `scripts/` and `tools/`.
 
@@ -26,18 +26,18 @@ by that list.
 
 ## 2. Pre-push hook (D7)
 
-- [ ] 2.1 Create `.husky/pre-push`, containing `npm run verify` and a comment citing decision 2 (F2 plan, section 7), the `verify-hosted` backstop, and D7's known costs. Files: `.husky/pre-push`.
+- [x] 2.1 Create `.husky/pre-push`, containing `npm run verify` and a comment citing decision 2 (F2 plan, section 7), the `verify-hosted` backstop, and D7's known costs. Files: `.husky/pre-push`.
 - [ ] 2.2 **Deliberate break.** Wait about 5 min after the last hosted run first (the Auth 429, plan Working tips). On a scratch local branch that is never pushed, add a failing `expect(1).toBe(2)` to a copy of an existing unit test and commit it. Then run `git push --dry-run origin HEAD`. It must end with the hook's non-zero exit and git's `failed to push some refs` line. Report both lines, then delete the scratch branch locally. If `--dry-run` turns out not to run the hook, say so and use `git push origin HEAD:refs/heads/probe/never-lands` instead: the failing hook stops it before anything leaves the machine. Files: none kept.
 
 ## 3. Keepers commit (D11)
 
-- [ ] 3.1 In `CLAUDE.md`, add only the lines about the `.claude/**` ignore and the pre-push hook (Commands block). Nothing about where CI runs; that is 7.1. Files: `CLAUDE.md`.
-- [ ] 3.2 Commit groups 1–3 as one commit, `chore: ignore .claude/** in lint and tsc; pre-push verify`. Its message records the human's G-G3 approval of 2026-09-26. `git show --stat HEAD` must list only `eslint.config.mjs`, `tsconfig.json`, `.husky/pre-push` and `CLAUDE.md`. Files: none new.
+- [x] 3.1 In `CLAUDE.md`, add only the lines about the `.claude/**` ignore and the pre-push hook (Commands block). Nothing about where CI runs; that is 7.1. Files: `CLAUDE.md`.
+- [x] 3.2 Commit groups 1–3 as one commit, `chore: ignore .claude/** in lint and tsc; pre-push verify`. Its message records the human's G-G3 approval of 2026-09-26. `git show --stat HEAD` must list only `eslint.config.mjs`, `tsconfig.json`, `.husky/pre-push` and `CLAUDE.md`. Files: none new.
 
 ## 4. The CI stack's config (D1, D2, D3)
 
 - [x] 4.1 **Human task:** read hosted dev's pooler settings (Supabase dashboard → `flatmate-io-dev` → Database settings → Connection pooling). **Answered 2026-09-26:** shared pooler, pool size **15**, max client connections **200**. Files: none.
-- [ ] 4.2 Run `npx supabase@2.118.0 init` to generate `supabase/config.toml` and `supabase/.gitignore`. Then edit `config.toml` per D3:
+- [x] 4.2 Run `npx supabase@2.118.0 init` to generate `supabase/config.toml` and `supabase/.gitignore`. Then edit `config.toml` per D3:
   - `project_id = "flatmate-io-ci"`;
   - `[db] major_version = 17`, `[db.seed] enabled = false`;
   - `[db.pooler]`: `enabled = true`, `pool_mode = "transaction"`, `default_pool_size = 15`, `max_client_conn = 200` (both from 4.1);
@@ -45,18 +45,18 @@ by that list.
   - `[auth]`: `minimum_password_length = 6`, `enable_signup = true`.
 
   Add a header comment: CI only, local work stays on hosted dev (decision 1), and that `default_pool_size`/`max_client_conn` were copied from hosted dev on 2026-09-26 (4.1). Don't add `supabase/migrations/`, and don't add any npm script that starts the stack. Files: `supabase/config.toml`, `supabase/.gitignore`.
-- [ ] 4.3 Create the pin files, each holding one tag and one newline: `supabase/pins/postgres-version` → `17.6.1.166`, `supabase/pins/gotrue-version` → `v2.197.0`. Add `supabase/pins/README.md`, 3–5 lines covering:
+- [x] 4.3 Create the pin files, each holding one tag and one newline: `supabase/pins/postgres-version` → `17.6.1.166`, `supabase/pins/gotrue-version` → `v2.197.0`. Add `supabase/pins/README.md`, 3–5 lines covering:
   - what the files are;
   - that the workflow copies `*-version` into `supabase/.temp/`;
   - that the bootstrap script asserts the running images match them;
   - that when bumping, you re-read hosted dev's exact Postgres image (Supabase `get_project`), because the drift step only sees major.minor (D2).
 
   Files: `supabase/pins/*`.
-- [ ] 4.4 Confirm that `git status` shows nothing under `supabase/.temp/` or `supabase/.branches/`, and that `gitleaks protect --staged` passes on the staged `supabase/` files. Files: none.
+- [x] 4.4 Confirm that `git status` shows nothing under `supabase/.temp/` or `supabase/.branches/`, and that `gitleaks protect --staged` passes on the staged `supabase/` files. Files: none.
 
 ## 5. `scripts/ci/bootstrap-local-db.sh` (D4)
 
-- [ ] 5.1 Write the script in D4's order, with `set -euo pipefail`:
+- [x] 5.1 Write the script in D4's order, with `set -euo pipefail`:
   1. parse `supabase status -o json` with `node -e`, never `grep`/`cut` on the `KEY="VALUE"` env form;
   2. the host guard;
   3. roles, then the password;
@@ -68,7 +68,7 @@ by that list.
   9. export to `$GITHUB_ENV`, with `::add-mask::` for the password and the session secret.
 
   Mark it executable in git (`git update-index --chmod=+x`). Files: `scripts/ci/bootstrap-local-db.sh`.
-- [ ] 5.2 **Guard test, locally in Git Bash, with shims.** The shims live in a scratch directory first on `PATH`, never in the repo:
+- [x] 5.2 **Guard test, locally in Git Bash, with shims.** The shims live in a scratch directory first on `PATH`, never in the repo:
   - a `supabase` shim that prints real-shaped `status -o json` output, plus a `Stopped services: [...]` line on stderr as the real CLI does;
   - a `psql` shim that writes a marker file when called.
 
@@ -78,7 +78,7 @@ by that list.
   - (c) both local: the marker appears, so the guard lets a local stack through.
 
   **Deliberate break:** remove the guard, see (a) create the marker, then restore it. Report all four results.
-- [ ] 5.3 **Image-assertion test, locally, with shims.** A `docker` shim answers `docker inspect … --format '{{.Config.Image}}'`, and a `curl` shim answers `/auth/v1/health`.
+- [x] 5.3 **Image-assertion test, locally, with shims.** A `docker` shim answers `docker inspect … --format '{{.Config.Image}}'`, and a `curl` shim answers `/auth/v1/health`.
   - With `supabase_db_flatmate-io-ci` → `…/postgres:17.6.1.166` and health `v2.197.0`: the assertions pass.
   - With `…/postgres:17.6.1.171` (the CLI default): they fail and name both values.
   - With health `v2.196.0`: they fail.
@@ -88,7 +88,7 @@ by that list.
 
 ## 6. `.github/workflows/ci.yml` (D5)
 
-- [ ] 6.1 Rewrite `verify` per D5, on `runs-on: ubuntu-24.04` (pinned, for its psql 16 client). The steps:
+- [x] 6.1 Rewrite `verify` per D5, on `runs-on: ubuntu-24.04` (pinned, for its psql 16 client). The steps:
   1. checkout, setup-node 24 with the npm cache, `npm ci`, `npm run build`;
   2. `supabase/setup-cli@v3` with `version: 2.118.0`;
   3. `mkdir -p supabase/.temp && cp supabase/pins/*-version supabase/.temp/`;
@@ -98,7 +98,7 @@ by that list.
   7. `node tools/check-refs.ts`.
 
   No `secrets.*` anywhere in the job. No `VITEST_MAX_WORKERS` (measured in 8.4). `timeout-minutes: 20`. Write the stack start-up and `npm run verify` durations to `$GITHUB_STEP_SUMMARY`. Files: `.github/workflows/ci.yml`.
-- [ ] 6.2 Add `verify-hosted` per D5:
+- [x] 6.2 Add `verify-hosted` per D5:
   - `runs-on: ubuntu-24.04`, `if: github.event_name == 'push'`;
   - `concurrency: { group: hosted-dev, cancel-in-progress: false }`;
   - today's steps and env block unchanged, with today's comments moved along.
@@ -108,13 +108,13 @@ by that list.
   - `psql "$DATABASE_URL" -tAc 'show server_version'`.
 
   It fails if the GoTrue version differs from `supabase/pins/gotrue-version`, or if the server version's major.minor differs from the pin's first two components. The failure message names both values and says "bump supabase/pins on purpose". Files: `.github/workflows/ci.yml`.
-- [ ] 6.3 Leave `gitleaks` byte-for-byte unchanged, and confirm that in the diff. `continue-on-error` appears nowhere (G-G3). Files: `.github/workflows/ci.yml`.
+- [x] 6.3 Leave `gitleaks` byte-for-byte unchanged, and confirm that in the diff. `continue-on-error` appears nowhere (G-G3). Files: `.github/workflows/ci.yml`.
 
 ## 7. Docs (D9) and the experiment commit
 
-- [ ] 7.1 Update `CLAUDE.md`: the "Tests hit a real Supabase instance" paragraph (PR CI uses the runner's local stack; local runs and `verify-hosted` use dev), and the 260–350 s figure (a placeholder until 8.5). Files: `CLAUDE.md`.
-- [ ] 7.2 Update the `maxWorkers` comment in `vitest.config.ts` (comment only; the value is unchanged), and add the one-line CI note to `.env.example`. Files: `vitest.config.ts`, `.env.example`.
-- [ ] 7.3 Confirm with `git diff --stat main` that nothing under `docs/`, `src/`, `tests/`, `drizzle/` or `test/` changed, and run `node tools/check-refs.ts`. Files: none.
+- [x] 7.1 Update `CLAUDE.md`: the "Tests hit a real Supabase instance" paragraph (PR CI uses the runner's local stack; local runs and `verify-hosted` use dev), and the 260–350 s figure (a placeholder until 8.5). Files: `CLAUDE.md`.
+- [x] 7.2 Update the `maxWorkers` comment in `vitest.config.ts` (comment only; the value is unchanged), and add the one-line CI note to `.env.example`. Files: `vitest.config.ts`, `.env.example`.
+- [x] 7.3 Confirm with `git diff --stat main` that nothing under `docs/`, `src/`, `tests/`, `drizzle/` or `test/` changed, and run `node tools/check-refs.ts`. Files: none.
 - [ ] 7.4 Commit groups 4–7 as `ci: run PR verify against a local Supabase stack (experiment)`, and add its SHA to the list. `git show --stat HEAD` must list only `supabase/`, `scripts/ci/`, `.github/workflows/ci.yml`, `vitest.config.ts`, `.env.example` and `CLAUDE.md`. **Revert rehearsal:** `git revert --no-commit <every listed SHA, newest first>`, then check:
   - `git diff --cached main -- .github/workflows/ci.yml` is empty;
   - `supabase/` and `scripts/ci/` are gone;
