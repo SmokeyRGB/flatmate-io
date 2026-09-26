@@ -77,7 +77,7 @@ jobs:
       # suite reads. Reads no repository secret; every password it creates is generated for this
       # run only.
       - name: Bootstrap the local database
-        run: ./scripts/ci/bootstrap-local-db.sh
+        run: bash scripts/ci/bootstrap-local-db.sh
 
       - name: npm run verify
         run: |
