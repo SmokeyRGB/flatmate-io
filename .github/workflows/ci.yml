@@ -59,7 +59,7 @@ jobs:
         run: |
           mkdir -p supabase/.temp
           cp supabase/pins/postgres-version supabase/.temp/postgres-version
-          cp supabase/pins/gotrue-version supabase/.temp/gotrue-version
+          echo v2.196.0 > supabase/.temp/gotrue-version # probe (b): .temp disagrees with the pin file
 
       # Only the services the suite uses (design.md D1): Auth, the Kong gateway in front of it and
       # PostgREST, Postgres itself, and the transaction-mode pooler. No Storage, Realtime or Edge
