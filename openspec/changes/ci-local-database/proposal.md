@@ -78,8 +78,8 @@ schlägt fehl"*) is only as useful as the CI that runs it.
     measurement shows the cache makes the job faster.
 - **A husky `pre-push` hook, `.husky/pre-push`**, running `npm run verify`.
 - **`.claude/**` is ignored by ESLint and excluded from `tsc`** (`eslint.config.mjs`,
-  `tsconfig.json`). Today both read the Claude worktree copies under `.claude/worktrees/`, so
-  `npm run verify` fails on the human's machine with 26 errors that aren't in the real tree. A
+  `tsconfig.json`). Today ESLint reads the Claude worktree copies under `.claude/worktrees/` (tsc turned out
+  not to, see design Context), so `npm run verify` fails on the human's machine with 26 errors that aren't in the real tree. A
   pre-push hook would then block every push. Human approval: 2026-09-26.
 - **Docs**: the CI and test-timing sentences in `CLAUDE.md`, the `vitest.config.ts` worker
   comment, and a short "CI" note in `.env.example`, so none of them still claims CI talks to dev
@@ -148,5 +148,6 @@ None. No spec under `openspec/specs/` describes CI or the test environment.
   `scripts/ci/bootstrap-local-db.sh`, `.husky/pre-push`.
 - **Changed files:** `.github/workflows/ci.yml`, `eslint.config.mjs`, `tsconfig.json`, `vitest.config.ts` (comment only), `CLAUDE.md`, `.env.example`.
 - **Repository settings:** none change. The three dev secrets stay, used by `verify-hosted` only.
-- **Developer machines:** every `git push` now runs the full hosted suite, about 45 s, and hits
-  the Auth 429 when it follows a manual run closely. That cost is accepted by decision 2.
+- **Developer machines:** every `git push` now runs the full hosted suite, about 1.5–2 min.
+  That cost is accepted by decision 2. (The Auth 429 on back-to-back runs is gone: the human
+  raised dev's sign-in and token-refresh limits on 2026-09-26, see design D7.)

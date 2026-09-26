@@ -42,9 +42,11 @@ The facts below were checked on 2026-09-26. They are the constraints the decisio
   the new value in the same file.
 - **The runner image `ubuntu-24.04` ships the psql 16.15 client and Docker 28.** The workflow
   pins `ubuntu-24.04` rather than `ubuntu-latest`, so that stays true.
-- **`npm run verify` fails on the human's machine today.** `eslint .` and `tsc` (`tsconfig.json`
-  includes `**/*.ts`) also read the worktree copies under `.claude/worktrees/`: 26 files with
-  errors from two stale worktrees. Nothing in `src/` is wrong. A pre-push hook would block every
+- **`npm run verify` fails on the human's machine today.** `eslint .` also reads the worktree
+  copies under `.claude/worktrees/`: 26 files with errors from two stale worktrees. *(Corrected
+  during apply, task 1.2: `tsc --listFiles` showed that `tsc` never read them, since its glob
+  skips dot-directories. Only ESLint was affected. The `tsconfig.json` exclude stays as a
+  harmless, explicit statement of intent.)* Nothing in `src/` is wrong. A pre-push hook would block every
   push until this is fixed (D8).
 - **Baseline** (PR #26, run `36149332683`): the `npm run verify` step took 344 s, the job 6 min
   17 s.
@@ -238,10 +240,14 @@ run is reported next to it, for information. If the cache is dropped, warm and c
 
 It contains the one command `npm run verify` and a comment citing decision 2. husky's hooks run
 under Git Bash on the human's Windows machine, just as `pre-commit` does today. The only bypass is
-`git push --no-verify`, and the `verify-hosted` job exists for exactly that case. Two known costs,
-accepted by decision 2:
-- about 45 s per push;
-- an Auth 429 when a push follows a manual run within about 5 minutes (plan, Working tips);
+`git push --no-verify`, and CI's run against hosted dev is the backstop for that case (`verify-hosted`, or the PR
+`verify` job again on a no-go). Known costs, accepted by decision 2:
+- about 1.5–2 min per push (the full suite measured 82–90 s on 2026-09-26);
+- ~~an Auth 429 when a push follows a manual run within about 5 minutes~~ gone since
+  2026-09-26: the human raised dev's "sign-ups and sign-ins" **and** "token refreshes" limits to
+  1000 per 5 min. GoTrue applies the token-refresh limit to every `/token` call, password grants
+  included (Auth logs: a ~30 burst, then ~150 per 5 min). Two back-to-back full runs were green
+  afterwards;
 - deleting a remote branch and pushing a tag also run the full suite;
 - the hook tests the **working tree**, not the commit being pushed, so uncommitted edits count.
   That is husky's normal behaviour, and it's accepted.
@@ -253,7 +259,8 @@ with a comment:
 - `.claude/` holds tool state and worktree copies of the repository, never source;
 - the human approved the change on 2026-09-26 under G-G3.
 
-No file that ESLint or tsc checks today in the real tree stops being checked. The worktrees'
+No file that ESLint or tsc checks today in the real tree stops being checked (task 1.2: 243
+files before and after outside `.claude/`). The worktrees'
 own files are checked in their own worktree. This also closes item (1) on the plan's "Open with
 the human" list.
 

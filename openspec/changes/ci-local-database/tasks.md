@@ -22,7 +22,7 @@ by that list.
   - `npx tsc --noEmit` must still type-check `src/`, `tests/`, `scripts/` and `tools/`.
 
   **Deliberate break:** add a type error and a lint error to a scratch `src/__probe.ts`, see both reported with 1.1 in place, then delete the file. Report the output. Files: none kept.
-- [ ] 1.3 Run `npm run verify` on the human's machine (hosted dev), and report that it passes with both worktrees still present. Files: none.
+- [x] 1.3 Run `npm run verify` on the human's machine (hosted dev), and report that it passes with both worktrees still present. Files: none.
 
 ## 2. Pre-push hook (D7)
 
