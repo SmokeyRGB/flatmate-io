@@ -128,7 +128,7 @@ echo "-- Auth health version: $HEALTH_VERSION"
 #    connection went through the transaction-mode pooler, not directly to Postgres (decision 4).
 #    It also proves RLS will apply: app_runtime must show rolbypassrls = f.
 echo "== bootstrap-local-db: probing the pooler path =="
-POOLER_URL="postgresql://app_runtime.pooler-dev:${APP_RUNTIME_PASSWORD}@127.0.0.1:54329/postgres"
+POOLER_URL="postgresql://app_runtime.pooler-dev:${APP_RUNTIME_PASSWORD}@127.0.0.1:54322/postgres" # probe (d): direct port
 POOLER_RESULT="$(psql "$POOLER_URL" -tAc "select current_user, (select rolbypassrls from pg_roles where rolname = current_user)" | tr -d '[:space:]')"
 
 if [ "$POOLER_RESULT" != "app_runtime|f" ]; then
