@@ -30,5 +30,7 @@
     ".next/dev/types/**/*.ts",
     "**/*.mts"
   ],
-  "exclude": ["node_modules", "prototype"]
+  // .claude/ holds tool state and worktree copies of the repository, never source.
+  // Human approval 2026-09-26 under G-G3 (openspec/changes/ci-local-database).
+  "exclude": ["node_modules", "prototype", ".claude"]
 }

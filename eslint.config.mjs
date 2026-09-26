@@ -16,6 +16,9 @@ const eslintConfig = defineConfig([
     // outside the handover boundary (CLAUDE.md) — not part of this Next.js project's source.
     "prototype/**",
     "drizzle/**",
+    // .claude/ holds tool state and worktree copies of the repository, never source.
+    // Human approval 2026-09-26 under G-G3 (openspec/changes/ci-local-database).
+    ".claude/**",
   ]),
 ]);
 
