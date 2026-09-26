@@ -61,6 +61,24 @@ jobs:
           cp supabase/pins/postgres-version supabase/.temp/postgres-version
           cp supabase/pins/gotrue-version supabase/.temp/gotrue-version
 
+      # Docker image cache (design.md D6, task 8.4): an experiment inside the experiment, kept only
+      # if a warm run beats the cold one end to end. Keyed on the CLI version plus the pins, so a
+      # pin bump or a CLI bump starts cold and saves a fresh set.
+      - name: Restore the Supabase image cache
+        id: image-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: /tmp/supabase-images.tar
+          key: supabase-images-cli-2.118.0-${{ hashFiles('supabase/pins/*-version') }}
+
+      - name: Load cached images
+        if: steps.image-cache.outputs.cache-hit == 'true'
+        run: |
+          start=$(date +%s)
+          docker load -i /tmp/supabase-images.tar
+          end=$(date +%s)
+          echo "IMAGE_LOAD_SECONDS=$((end - start))" >> "$GITHUB_ENV"
+
       # Only the services the suite uses (design.md D1): Auth, the Kong gateway in front of it and
       # PostgREST, Postgres itself, and the transaction-mode pooler. No Storage, Realtime or Edge
       # Functions.
@@ -70,6 +88,20 @@ jobs:
           supabase start -x realtime,storage-api,imgproxy,postgres-meta,studio,edge-runtime,logflare,vector,mailpit
           end=$(date +%s)
           echo "STACK_STARTUP_SECONDS=$((end - start))" >> "$GITHUB_ENV"
+
+      - name: Save the Supabase images for the next run
+        if: steps.image-cache.outputs.cache-hit != 'true'
+        run: |
+          docker save -o /tmp/supabase-images.tar \
+            $(docker images --format '{{.Repository}}:{{.Tag}}' | grep '/supabase/')
+          ls -lh /tmp/supabase-images.tar
+
+      - name: Upload the image cache
+        if: steps.image-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: /tmp/supabase-images.tar
+          key: ${{ steps.image-cache.outputs.cache-primary-key }}
 
       # Builds the schema from scripts/db/bootstrap-roles.sql + drizzle/ only (G-E3), asserts the
       # running images match the committed pins, proves the pooler path (decision 4), proves
@@ -91,6 +123,7 @@ jobs:
         run: |
           {
             echo "### CI timing"
+            echo "- image cache: ${{ steps.image-cache.outputs.cache-hit == 'true' && 'hit' || 'miss' }} (load ${IMAGE_LOAD_SECONDS:-n/a}s)"
             echo "- stack start-up: ${STACK_STARTUP_SECONDS:-n/a}s"
             echo "- npm run verify: ${VERIFY_SECONDS:-n/a}s"
           } >> "$GITHUB_STEP_SUMMARY"
