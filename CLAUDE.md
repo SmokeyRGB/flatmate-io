@@ -30,10 +30,12 @@ npm run verify     # the full gate: eslint + tsc + seven guardrail lints + check
 npm run seed:demo # tsx --env-file=.env.local scripts/seed-demo-household.ts
 ```
 
-`npm run verify` is what CI/pre-push effectively require — run it, not just `npm test`, before
-treating a change as done. It type-checks (`next typegen && tsc --noEmit`; vitest alone does not
-enforce strict mode). The seven custom lints under `scripts/lint/` are hand-written checks (not
-eslint plugins), each enforcing one guardrail mechanically:
+`npm run verify` is what CI and a husky `pre-push` hook require — run it, not just `npm test`,
+before treating a change as done. It type-checks (`next typegen && tsc --noEmit`; vitest alone does
+not enforce strict mode). Both `eslint` and `tsc` ignore `.claude/**`: that directory holds tool
+state and worktree copies of the repository, never source (human approval 2026-09-26, G-G3). The
+seven custom lints under `scripts/lint/` are hand-written checks (not eslint plugins), each
+enforcing one guardrail mechanically:
 
 | Script | Guardrail | What it checks |
 |---|---|---|
@@ -50,7 +52,9 @@ a household-scoped table is missing from the delete set in `tests/helpers/identi
 `undoRegisterHousehold` misses a table `registerHousehold` writes.
 
 Husky's pre-commit hook runs `gitleaks protect --staged` (G-A1) — install gitleaks locally or the
-hook hard-fails the commit.
+hook hard-fails the commit. Husky's `pre-push` hook runs `npm run verify` against
+`flatmate-io-dev` before every push (F2 plan, section 7, decision 2) — the only bypass is
+`git push --no-verify`, and CI's `verify-hosted` job is the backstop for that case.
 
 Spec cross-reference checks (validate `docs/`, unrelated to the app):
 
@@ -97,13 +101,20 @@ bun run format    # prettier --write .
   `tests/integration/policy/` and `tests/integration/raw-sql/` — the two-sided RLS check G-C7
   demands. `test/guarded.manifest.json` tracks which G-D invariants have real test coverage;
   update it in the same commit as the test, never mark `implemented` speculatively. Tests hit a
-  real Supabase instance (no mocking DB/auth calls per F0 precedent) — specifically
-  **`flatmate-io-dev`**, never production; `tests/setup.ts` throws if `DATABASE_URL` or
-  `NEXT_PUBLIC_SUPABASE_URL` names the production ref. Expect real network latency: the suite runs
-  ~45s locally but 260–350s in CI, so `testTimeout` and `hookTimeout` are both `60000`. Teardown
-  belongs in `afterEach`, not in a `finally` inside the test — a timeout aborts before `finally`
-  runs, which used to orphan households — and `tests/setup.ts` adds a global sweep as a net
-  beneath each file's own cleanup, never as a replacement for it.
+  real Supabase instance (no mocking DB/auth calls per F0 precedent), never production;
+  `tests/setup.ts` throws if `DATABASE_URL` or `NEXT_PUBLIC_SUPABASE_URL` names the production
+  ref. Which instance depends on where the run happens
+  (openspec/changes/ci-local-database): a local run and the husky `pre-push` hook, plus CI's
+  `verify-hosted` job (push to `main` only), hit **`flatmate-io-dev`**; CI's `verify` job (every
+  pull request) hits a disposable Supabase stack built fresh inside the runner, from
+  `scripts/db/bootstrap-roles.sql` and `drizzle/` only, and reaches neither `flatmate-io-dev` nor
+  production. Expect real network latency against dev: the suite runs ~45s locally. The `verify`
+  job's own timing against the runner's local stack is not yet measured here — this sentence is
+  updated with the number once the change's task 8.5 measures it — so `testTimeout` and
+  `hookTimeout` are both `60000`. Teardown belongs in `afterEach`, not in a `finally` inside the
+  test — a timeout aborts before `finally` runs, which used to orphan households — and
+  `tests/setup.ts` adds a global sweep as a net beneath each file's own cleanup, never as a
+  replacement for it.
 - **`drizzle/`**: generated migrations from `drizzle.config.ts`, which points at the three modules'
   `schema.ts` files as the source of truth.
 - **`openspec/`**: the delivery workflow. `config.yaml` carries the project context and per-artifact

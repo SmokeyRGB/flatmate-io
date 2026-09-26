@@ -1,0 +1,14 @@
+# Binds the hosted run locally: `npm run verify` runs against flatmate-io-dev before every push
+# (F2 plan, section 7, decision 2; openspec/changes/ci-local-database, D7). The `verify-hosted`
+# job in .github/workflows/ci.yml is the backstop for a push that skipped this with --no-verify —
+# it runs the same suite against flatmate-io-dev on every push to main, just after the fact
+# instead of before.
+#
+# Known costs, accepted by decision 2:
+# - about 45s per push;
+# - an Auth 429 ("Invalid credentials" from signIn) when a push follows a manual verify run
+#   within about 5 minutes;
+# - deleting a remote branch, and pushing a tag, also run the full suite;
+# - this checks the working tree, not the commit being pushed — husky's normal behaviour, so
+#   uncommitted edits count too.
+npm run verify
