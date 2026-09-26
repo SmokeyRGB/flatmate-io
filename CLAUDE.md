@@ -54,7 +54,7 @@ a household-scoped table is missing from the delete set in `tests/helpers/identi
 Husky's pre-commit hook runs `gitleaks protect --staged` (G-A1) — install gitleaks locally or the
 hook hard-fails the commit. Husky's `pre-push` hook runs `npm run verify` against
 `flatmate-io-dev` before every push (F2 plan, section 7, decision 2) — the only bypass is
-`git push --no-verify`, and CI's `verify-hosted` job is the backstop for that case.
+`git push --no-verify`, and CI's run against `flatmate-io-dev` is the backstop for that case.
 
 Spec cross-reference checks (validate `docs/`, unrelated to the app):
 
