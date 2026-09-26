@@ -79,7 +79,11 @@ jobs:
       - name: Bootstrap the local database
         run: bash scripts/ci/bootstrap-local-db.sh
 
+      # Task 8.4: trial of 4 workers against the default (3 on a 4-vCPU runner). Kept only if
+      # faster; the comment then states both times.
       - name: npm run verify
+        env:
+          VITEST_MAX_WORKERS: "4"
         run: |
           start=$(date +%s)
           npm run verify
