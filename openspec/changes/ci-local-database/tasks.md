@@ -115,7 +115,7 @@ by that list.
 - [x] 7.1 Update `CLAUDE.md`: the "Tests hit a real Supabase instance" paragraph (PR CI uses the runner's local stack; local runs and `verify-hosted` use dev), and the 260–350 s figure (a placeholder until 8.5). Files: `CLAUDE.md`.
 - [x] 7.2 Update the `maxWorkers` comment in `vitest.config.ts` (comment only; the value is unchanged), and add the one-line CI note to `.env.example`. Files: `vitest.config.ts`, `.env.example`.
 - [x] 7.3 Confirm with `git diff --stat main` that nothing under `docs/`, `src/`, `tests/`, `drizzle/` or `test/` changed, and run `node tools/check-refs.ts`. Files: none.
-- [ ] 7.4 Commit groups 4–7 as `ci: run PR verify against a local Supabase stack (experiment)`, and add its SHA to the list. `git show --stat HEAD` must list only `supabase/`, `scripts/ci/`, `.github/workflows/ci.yml`, `vitest.config.ts`, `.env.example` and `CLAUDE.md`. **Revert rehearsal:** `git revert --no-commit <every listed SHA, newest first>`, then check:
+- [x] 7.4 Commit groups 4–7 as `ci: run PR verify against a local Supabase stack (experiment)`, and add its SHA to the list. `git show --stat HEAD` must list only `supabase/`, `scripts/ci/`, `.github/workflows/ci.yml`, `vitest.config.ts`, `.env.example` and `CLAUDE.md`. **Revert rehearsal:** `git revert --no-commit <every listed SHA, newest first>`, then check:
   - `git diff --cached main -- .github/workflows/ci.yml` is empty;
   - `supabase/` and `scripts/ci/` are gone;
   - the keeper lines in `CLAUDE.md` survive.
