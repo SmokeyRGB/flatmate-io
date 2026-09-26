@@ -58,7 +58,7 @@ jobs:
       - name: Copy version pins into supabase/.temp
         run: |
           mkdir -p supabase/.temp
-          cp supabase/pins/postgres-version supabase/.temp/postgres-version
+          echo "probe (a): postgres pin deliberately NOT copied, the CLI should fall back to its default image"
           cp supabase/pins/gotrue-version supabase/.temp/gotrue-version
 
       # Only the services the suite uses (design.md D1): Auth, the Kong gateway in front of it and
