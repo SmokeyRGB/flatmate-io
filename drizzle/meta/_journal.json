@@ -162,6 +162,13 @@
       "when": 1790324456761,
       "tag": "0022_account_password_changed_at",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1790400000000,
+      "tag": "0023_probe_broken",
+      "breakpoints": true
     }
   ]
 }
