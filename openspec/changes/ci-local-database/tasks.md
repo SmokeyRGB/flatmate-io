@@ -84,7 +84,7 @@ by that list.
   - With health `v2.196.0`: they fail.
 
   **Deliberate break:** loosen the Postgres check to a `17.6` prefix, see the `.171` case pass wrongly, then restore the exact check. Report all four results.
-- [ ] 5.4 The pooler probe runs `select current_user, (select rolbypassrls from pg_roles where rolname = current_user)` through `app_runtime.pooler-dev@127.0.0.1:54329`, and fails the script unless it returns `app_runtime` and `f`. If Supavisor refuses the login in CI (8.2), and no `config.toml` pooler setting fixes it, **stop and report to the human**. Don't switch `DATABASE_URL` to the direct port (decision 4). Files: `scripts/ci/bootstrap-local-db.sh`.
+- [x] 5.4 The pooler probe runs `select current_user, (select rolbypassrls from pg_roles where rolname = current_user)` through `app_runtime.pooler-dev@127.0.0.1:54329`, and fails the script unless it returns `app_runtime` and `f`. If Supavisor refuses the login in CI (8.2), and no `config.toml` pooler setting fixes it, **stop and report to the human**. Don't switch `DATABASE_URL` to the direct port (decision 4). Files: `scripts/ci/bootstrap-local-db.sh`.
 
 ## 6. `.github/workflows/ci.yml` (D5)
 
@@ -124,8 +124,8 @@ by that list.
 
 ## 8. Prove it in CI, then measure (human confirms before each push)
 
-- [ ] 8.1 **Ask the human before the first push** of `feat/ci-local-database`. After a yes, push and open the PR as a draft. Files: none.
-- [ ] 8.2 The draft PR's `verify` run must be green. Report:
+- [x] 8.1 **Ask the human before the first push** of `feat/ci-local-database`. After a yes, push and open the PR as a draft. Files: none.
+- [x] 8.2 The draft PR's `verify` run must be green. Report:
   - the stack start-up time, the `npm run verify` time and the job time;
   - that no step references a secret;
   - the pooler probe's `app_runtime | f` line and the PostgREST probe's `200` from the job log.

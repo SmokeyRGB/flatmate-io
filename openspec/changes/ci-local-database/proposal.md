@@ -41,6 +41,16 @@ lost fidelity.
    `.claude/**` ignore (8), the pre-push hook (2), and the `allowedDevOrigins` commit already on
    the branch.
 
+   **Amended by the human, 2026-09-26, after the first green run** (run `36235230828`, cold,
+   no image cache: job 230 s = 3 min 50 s, −39 % against the baseline; stack start-up 92 s,
+   `npm run verify` 95 s). The human's words: *"I think 3 min 50 is still better than 6 min 20.
+   Its fine if you think the tests provide the same quality as testing against the live
+   database."* The main session's assessment, given before the call: equivalent for the PR gate
+   **as long as** the pre-push hook and `verify-hosted` stay. The only real loss is a hosted-only
+   failure after a `--no-verify` push, which surfaces after the merge instead of before.
+   **Decision: go.** The ≤ 180 s bar no longer gates. The deliberate breaks (8.3) and the tuning
+   (8.4) still run, and 8.5 still records the final median.
+
 This change serves no `FR`/`AC` requirement and no `S-*` scope line. It is delivery
 infrastructure: the automated half of the guardrails (`docs/GUARDRAILS.md`, 🟢 *„CI oder Lint
 schlägt fehl"*) is only as useful as the CI that runs it.

@@ -305,7 +305,7 @@ the run id, and `gh run view <id>` shows only the latest attempt. The configurat
 one (after D6's cache choice and the worker choice in task 8.4), the runs are warm (D6), and the
 median counts. A run that failed doesn't count, and is replaced.
 
-**The bar.** A median of **≤ 180 s** is *go*. Anything above is *no-go*. The applier reports the
+**The bar** *(superseded 2026-09-26: the human called **go** at 230 s after the first green run, see proposal decision 9)*. A median of **≤ 180 s** is *go*. Anything above is *no-go*. The applier reports the
 three numbers and the median, and **the human** makes the call. The applier never merges and
 never decides for the human.
 
