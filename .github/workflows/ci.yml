@@ -193,6 +193,17 @@ jobs:
           # design, not a secret (flatmate-io-dev project jrhkhjeybtkqpkggssif).
           HOSTED_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpyaGtoamV5YnRrcXBrZ2dzc2lmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk3MjI3MTYsImV4cCI6MjEwNTI5ODcxNn0.bu3JShx9rXq2DKy9_W2XHAxsrWb8Ce4Vymx0_oBfREM" # gitleaks:allow — anon key, public by design
         run: |
+          # This raw psql call doesn't pass through tests/setup.ts's production refusal, and the
+          # step also runs after that refusal failed `npm run verify`. So it checks the URL itself,
+          # as an allowlist: only flatmate-io-dev (jrhkhjeybtkqpkggssif), never anything else.
+          case "$DATABASE_URL" in
+            *jrhkhjeybtkqpkggssif*) ;;
+            *)
+              echo "Refusing the pin-drift probe: DATABASE_URL does not name flatmate-io-dev (jrhkhjeybtkqpkggssif)." >&2
+              exit 1
+              ;;
+          esac
+
           expected_gotrue="$(cat supabase/pins/gotrue-version)"
           expected_pg_major_minor="$(cut -d. -f1,2 < supabase/pins/postgres-version)"
 
