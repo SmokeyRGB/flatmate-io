@@ -131,19 +131,33 @@ by that list.
   - the pooler probe's `app_runtime | f` line and the PostgREST probe's `200` from the job log.
 
   If a test fails only here, stop and report it (design Risks) without editing the test. Fixes to experiment files are **experiment fix-up commits**; add each SHA to the list.
-- [ ] 8.3 **Deliberate breaks in CI.** Each goes on a throwaway branch `probe/ci-local-database` off the feature branch, opened as a draft PR, then closed and deleted. **Ask the human before pushing it**; note that deleting the remote branch runs the pre-push hook once more.
+- [x] 8.3 **Deliberate breaks in CI.** Each goes on a throwaway branch `probe/ci-local-database` off the feature branch, opened as a draft PR, then closed and deleted. **Ask the human before pushing it**; note that deleting the remote branch runs the pre-push hook once more.
   - (a) `supabase/pins/gotrue-version` set to `v2.196.0`: the image assertion fails, or the CLI refuses the tag. Either way, no test runs.
   - (b) `supabase/pins/postgres-version` set to `17.6.1.171`: the image assertion fails, and no test runs.
   - (c) a copy of `drizzle/0022_account_password_changed_at.sql` with a syntax error, added as `0023` in the journal: the chain stops at that file.
   - (d) the pooler probe pointed at port `54322` (direct Postgres) with the `.pooler-dev` username: the login fails.
 
   Report each failing log line. Files: none on the feature branch.
-- [ ] 8.4 **Tuning** (D6, D5 workers), each an experiment fix-up commit:
+
+  **Done 2026-09-26, as draft PRs #28–#31 (closed, branches deleted). Deviation, found before
+  pushing:** (a) and (b) as written could never fail. Changing a pin file makes the CLI start
+  exactly that image, so the image still matches the pin. The assertion guards "the CLI ignores
+  the pin", and pin-vs-hosted drift is `verify-hosted`'s drift step. So the probes were:
+  - (a) the Postgres pin **not copied** into `.temp/`: `Postgres image
+    'public.ecr.aws/supabase/postgres:17.6.1.171' does not end in ':17.6.1.166'`;
+  - (b) `.temp/` given `v2.196.0` while the pin file says `v2.197.0`: `Auth image
+    'public.ecr.aws/supabase/gotrue:v2.196.0' does not end in ':v2.197.0'`;
+  - (c) `LINE 1: SELECT 1 FROM;` … `migration 0023_probe_broken.sql failed to apply — stopping
+    before any test runs.`;
+  - (d) `FATAL: password authentication failed for user "app_runtime.pooler-dev"` (port 54322).
+
+  Each failed in "Bootstrap the local database", before any test ran.
+- [x] 8.4 **Tuning** (D6, D5 workers), each an experiment fix-up commit:
   - the Docker image cache, `actions/cache` + `docker save`/`load`, keyed on the CLI version plus `hashFiles('supabase/pins/*-version')`. Kept only if a warm run beats 8.2's cold run end to end.
   - `VITEST_MAX_WORKERS` default against `"4"`, keeping the faster one, with both times in the comment above the step.
 
   Report every number. Files: `.github/workflows/ci.yml`.
-- [ ] 8.5 **The go/no-go measurement (D11).** On the final configuration, trigger 3 **new** runs with 3 empty commits (`git commit --allow-empty -m "ci: measure (n/3)"`; each is an experiment fix-up), **not** re-runs. Read each job's `startedAt`/`completedAt` with `gh run view <run-id> --json jobs`. Report:
+- [x] 8.5 **The go/no-go measurement (D11).** On the final configuration, trigger 3 **new** runs with 3 empty commits (`git commit --allow-empty -m "ci: measure (n/3)"`; each is an experiment fix-up), **not** re-runs. Read each job's `startedAt`/`completedAt` with `gh run view <run-id> --json jobs`. Report:
   - the three durations and their median, which is judged against **≤ 180 s**;
   - separately, one **cold** run (the first run after a cache-key change, or with the cache disabled for that run), for information;
   - the baseline, 6 min 17 s.
@@ -153,8 +167,8 @@ by that list.
   - design.md's Migration Plan step 5, as a **record** commit.
 
   Files: `CLAUDE.md`, `openspec/changes/ci-local-database/design.md`.
-- [ ] 8.6 **Stop and hand the go/no-go call to the human.** Don't mark the PR ready, merge or revert before the human's answer. Files: none.
-- [ ] 8.7 `verify-hosted` can't run before merge. Note in the PR description that its first run is the first push to `main` after the merge, and that its pin-drift step must be green there. Files: none.
+- [x] 8.6 **Stop and hand the go/no-go call to the human.** Don't mark the PR ready, merge or revert before the human's answer. Files: none.
+- [x] 8.7 `verify-hosted` can't run before merge. Note in the PR description that its first run is the first push to `main` after the merge, and that its pin-drift step must be green there. Files: none.
 
 ## 9. Close out, by outcome
 

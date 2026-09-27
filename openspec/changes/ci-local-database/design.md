@@ -381,5 +381,22 @@ instead of a revert on a branch that has not landed.
 3. After the human merges, the first push to `main` runs both jobs, and `verify-hosted` shows the
    pin-drift step green.
 4. No repository setting or secret changes. Rollback after the merge is D11's single revert.
-5. *Measured timings (cold, warm, workers 3 against 4, the 3-run median) are filled in here by
-   task 8.5, as a record commit.*
+5. **Measured timings** (the `verify` job, `startedAt` → `completedAt`; baseline 377 s, run
+   `36149332683`):
+
+   | Run | Config | Job | Stack start | `npm run verify` |
+   |---|---|---|---|---|
+   | `36235230828` | first green, no cache, 3 workers | 230 s | 92 s | 95 s |
+   | `8a3c7e4` run | cache, cold + save | 282 s | 86 s (+44 s save/upload) | 103 s |
+   | `5da9c87` run | cache, warm | 239 s | 27 s (+108 s restore/load) | 68 s |
+   | `36237009256` | no cache, 4 workers | 222 s | 83 s | 97 s |
+   | `36263512194` | final (1/3) | 247 s | 87 s | 109 s |
+   | `36263630953` | final (2/3) | 217 s | 99 s | 77 s |
+   | `36263740544` | final (3/3) | 242 s | 93 s | 104 s |
+
+   **Median of the final configuration: 242 s (4:02), −36 % against the baseline.** No cache,
+   so warm and cold are the same (D6). The image cache lost: restoring and loading the images
+   (108 s) is slower than pulling them (86–92 s). 4 workers brought nothing on a 4-vCPU runner.
+   Both were reverted. The floor is the stack start-up (~90 s) plus the suite (~80 s of vitest,
+   which is CPU-bound here: "import 33–35 %"). The human called **go** on 2026-09-26 at the
+   first run's 230 s (proposal decision 9), so the old 180 s bar doesn't apply.
