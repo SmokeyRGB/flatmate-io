@@ -11,7 +11,10 @@
 #     listed below so no window exists where that folder is unignored.
 
 # --- Local tooling ------------------------------------------------------------
-/.claude/
+# Everything under .claude/ is local state (worktrees, launch.json, settings) except rules/, which
+# holds the project rules split out of CLAUDE.md and is shared like CLAUDE.md itself.
+/.claude/*
+!/.claude/rules/
 
 # --- Coursework binaries: slides, video, and Office lock files ----------------
 # 42 MB, needed for the school submission, useless to an implementer.
