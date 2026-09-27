@@ -108,10 +108,11 @@ bun run format    # prettier --write .
   `verify-hosted` job (push to `main` only), hit **`flatmate-io-dev`**; CI's `verify` job (every
   pull request) hits a disposable Supabase stack built fresh inside the runner, from
   `scripts/db/bootstrap-roles.sql` and `drizzle/` only, and reaches neither `flatmate-io-dev` nor
-  production. Expect real network latency against dev: the suite runs ~45s locally. The `verify`
-  job's own timing against the runner's local stack is not yet measured here — this sentence is
-  updated with the number once the change's task 8.5 measures it — so `testTimeout` and
-  `hookTimeout` are both `60000`. Teardown belongs in `afterEach`, not in a `finally` inside the
+  production. Expect real network latency against dev: the suite takes ~80–90 s from the
+  human's machine. The PR `verify` job takes ~4 min end to end (median 242 s of 3 runs,
+  2026-09-27: ~90 s stack start-up, ~100 s `npm run verify`), against 6 min 17 s when it still
+  ran against dev. `verify-hosted` still talks to the EU from a US runner, so `testTimeout` and
+  `hookTimeout` stay at `60000`. Teardown belongs in `afterEach`, not in a `finally` inside the
   test — a timeout aborts before `finally` runs, which used to orphan households — and
   `tests/setup.ts` adds a global sweep as a net beneath each file's own cleanup, never as a
   replacement for it.
