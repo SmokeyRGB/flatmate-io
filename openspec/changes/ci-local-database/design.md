@@ -171,8 +171,8 @@ A bash script that runs only in the CI job. In order:
    successful login under that name proves the connection went through Supavisor (decision 4).
    It also proves RLS will apply.
 7. **Probe PostgREST.** `GET $API_URL/rest/v1/join_attempt?select=id&limit=1`, with the service
-   key, must answer `200`. `join-rate-limit.test.ts:27` ignores its cleanup delete's error, so a
-   cold schema cache would otherwise pass silently.
+   key, must answer `200`. The service-role cleanup delete in `join-rate-limit.test.ts`'s
+   `afterEach` ignores its error, so a cold schema cache would otherwise pass silently.
 8. **Export** to `$GITHUB_ENV`:
    - `DATABASE_URL=postgresql://app_runtime.pooler-dev:<pw>@127.0.0.1:54329/postgres`;
    - `NEXT_PUBLIC_SUPABASE_URL=$API_URL`;
@@ -196,10 +196,13 @@ The triggers stay as they are (push to `main`, PR to `main`).
 - **`gitleaks`** is unchanged.
 - **`verify`** runs on every PR and on every push to `main`:
   0. `runs-on: ubuntu-24.04` (see Context);
-  1. checkout, setup-node, `npm ci`, `npm run build`;
-  2. `supabase/setup-cli@v3` (`version: 2.118.0`);
-  3. copy the pins, then `supabase start -x …` (D1);
-  4. `scripts/ci/bootstrap-local-db.sh`;
+  1. checkout, `supabase/setup-cli@v3` (`version: 2.118.0`), copy the pins;
+  2. `supabase start -x …` (D1) **in the background** (review fix, 2026-09-27): it needs neither
+     `node_modules` nor the build, so it overlaps them. Its exit code goes to a file from inside an
+     `if`, so a failed start is reported at once instead of hanging under `bash -e`;
+  3. setup-node, `npm ci`, `npm run build`;
+  4. wait for the stack (prints its log, fails with its exit code), then
+     `scripts/ci/bootstrap-local-db.sh`;
   5. `npm run verify`;
   6. `node tools/check-refs.ts`.
 
@@ -212,9 +215,14 @@ The triggers stay as they are (push to `main`, PR to `main`).
   `main`):
   - today's steps, unchanged: the same secrets, `VITEST_MAX_WORKERS: "8"` and the hardcoded dev
     URL and anon key;
-  - then the pin-drift step (D2);
-  - `concurrency: { group: hosted-dev, cancel-in-progress: false }`, so two quick merges queue
-    instead of hitting the Auth 429 together.
+  - then the pin-drift step (D2), with `if: success() || failure()`, so it still runs when
+    `npm run verify` failed, which is exactly when drift may be the explanation;
+  - `timeout-minutes: 30`;
+  - **no `concurrency` group** *(review fix, 2026-09-27; the original design had
+    `group: hosted-dev`)*. GitHub keeps at most one *pending* run per group and cancels the
+    others, so a queue would drop the hosted check of an intermediate commit, possibly the
+    `--no-verify` one. The reason for the group, two runs sharing the Auth 429 budget, went away
+    when the human raised dev's Auth limits.
 
   A PR never runs it (spec: *The hosted run never gates a pull request*). It has no `needs:`, so a
   red `verify` doesn't hide what hosted dev says.
@@ -289,7 +297,9 @@ one.
 - The one shared state it touches is **the rows that test runs write into hosted dev**. Three
   writers: local runs, the pre-push hook (the same thing, from the same machine), and
   `verify-hosted`.
-  - `verify-hosted` runs are serialised against each other by the `hosted-dev` concurrency group.
+  - `verify-hosted` runs are **not** serialised against each other (D5, no concurrency group).
+    They don't need to be: each test creates its own household, and dev's Auth limits (1000 per
+    5 min) cover parallel runs.
   - A `verify-hosted` run and a local run are **not** serialised against each other. Each test
     uses its own freshly created household, and cleanup is per household, so they don't collide
     on data. They can share the Auth 429 budget only if they overlap in time. Accepted: that job
