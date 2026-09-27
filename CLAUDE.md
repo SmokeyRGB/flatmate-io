@@ -106,7 +106,7 @@ bun run format    # prettier --write .
   ref. Which instance depends on where the run happens
   (openspec/changes/ci-local-database): a local run and the husky `pre-push` hook, plus CI's
   `verify-hosted` job (push to `main` only), hit **`flatmate-io-dev`**; CI's `verify` job (every
-  pull request) hits a disposable Supabase stack built fresh inside the runner, from
+  pull request and every push to `main`) hits a disposable Supabase stack built fresh inside the runner, from
   `scripts/db/bootstrap-roles.sql` and `drizzle/` only, and reaches neither `flatmate-io-dev` nor
   production. Expect real network latency against dev: the suite takes ~80–90 s from the
   human's machine. The PR `verify` job takes ~4 min end to end (median 242 s of 3 runs,

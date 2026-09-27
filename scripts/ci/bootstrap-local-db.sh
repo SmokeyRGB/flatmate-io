@@ -13,42 +13,54 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 POSTGRES_PIN="$(cat "$REPO_ROOT/supabase/pins/postgres-version")"
 GOTRUE_PIN="$(cat "$REPO_ROOT/supabase/pins/gotrue-version")"
 
+# The CLI names its containers supabase_<service>_<project_id>. Read project_id from the one
+# place that defines it, so renaming the project can't silently break the image assertions.
+PROJECT_ID="$(sed -n 's/^project_id = "\(.*\)"/\1/p' "$REPO_ROOT/supabase/config.toml")"
+if [ -z "$PROJECT_ID" ]; then
+  echo "bootstrap-local-db: no project_id found in supabase/config.toml." >&2
+  exit 1
+fi
+
 echo "== bootstrap-local-db: reading supabase status =="
 
 # 1. Parse `supabase status -o json`. Never grep/cut the `-o env` form: it quotes every value
 #    (`KEY="VALUE"`) and supabase writes a "Stopped services: [...]" line to stderr whenever
-#    services were excluded from `supabase start -x ...`, which would otherwise corrupt a naive
-#    parse (design.md Context). The CLI is already on PATH: the workflow installs the pinned
-#    version with `supabase/setup-cli@v3` before this script runs.
-STATUS_JSON="$(supabase status -o json 2>/dev/null)"
+#    services were excluded from `supabase start -x ...` (design.md Context). stderr goes to a
+#    file, not into the JSON, and is shown if the command fails. The CLI is already on PATH: the
+#    workflow installs the pinned version with `supabase/setup-cli@v3` before this script runs.
+STATUS_ERR="$(mktemp)"
+if ! STATUS_JSON="$(supabase status -o json 2>"$STATUS_ERR")"; then
+  echo "bootstrap-local-db: 'supabase status -o json' failed:" >&2
+  cat "$STATUS_ERR" >&2
+  exit 1
+fi
 
-DB_URL="$(node -e '
+# One parse for every value the script needs, hostnames included, as KEY=value lines. Values
+# are URLs and JWTs, which contain no newline; `read`'s last variable keeps any '=' in them.
+while IFS='=' read -r key value; do
+  case "$key" in
+    DB_URL) DB_URL="$value" ;;
+    API_URL) API_URL="$value" ;;
+    ANON_KEY) ANON_KEY="$value" ;;
+    SERVICE_ROLE_KEY) SERVICE_ROLE_KEY="$value" ;;
+    DB_HOST) DB_HOST="$value" ;;
+    API_HOST) API_HOST="$value" ;;
+  esac
+done < <(node -e '
   const s = JSON.parse(process.argv[1]);
-  process.stdout.write(s.DB_URL || "");
-' "$STATUS_JSON")"
-API_URL="$(node -e '
-  const s = JSON.parse(process.argv[1]);
-  process.stdout.write(s.API_URL || "");
-' "$STATUS_JSON")"
-ANON_KEY="$(node -e '
-  const s = JSON.parse(process.argv[1]);
-  process.stdout.write(s.ANON_KEY || "");
-' "$STATUS_JSON")"
-SERVICE_ROLE_KEY="$(node -e '
-  const s = JSON.parse(process.argv[1]);
-  process.stdout.write(s.SERVICE_ROLE_KEY || "");
-' "$STATUS_JSON")"
+  const host = (u) => { try { return new URL(u).hostname; } catch { return ""; } };
+  for (const k of ["DB_URL", "API_URL", "ANON_KEY", "SERVICE_ROLE_KEY"]) console.log(`${k}=${s[k] || ""}`);
+  console.log(`DB_HOST=${host(s.DB_URL)}`);
+  console.log(`API_HOST=${host(s.API_URL)}`);
+' "$STATUS_JSON")
 
-if [ -z "$DB_URL" ] || [ -z "$API_URL" ]; then
+if [ -z "${DB_URL:-}" ] || [ -z "${API_URL:-}" ]; then
   echo "bootstrap-local-db: supabase status did not report DB_URL/API_URL — cannot continue." >&2
   exit 1
 fi
 
 # 2. Host guard (spec: "No run of the suite reaches production"). Every host this script will
 #    ever touch must be the runner's own loopback address.
-DB_HOST="$(node -e 'process.stdout.write(new URL(process.argv[1]).hostname)' "$DB_URL")"
-API_HOST="$(node -e 'process.stdout.write(new URL(process.argv[1]).hostname)' "$API_URL")"
-
 for host in "$DB_HOST" "$API_HOST"; do
   case "$host" in
     127.0.0.1|localhost) ;;
@@ -97,13 +109,13 @@ psql "$DB_URL" -v ON_ERROR_STOP=1 -f "$REPO_ROOT/scripts/db/bootstrap-roles.sql"
 #    not `select version()` — "17.6" would also match the CLI's own default ".171".
 echo "== bootstrap-local-db: asserting pinned versions =="
 
-PG_IMAGE="$(docker inspect supabase_db_flatmate-io-ci --format '{{.Config.Image}}')"
+PG_IMAGE="$(docker inspect "supabase_db_$PROJECT_ID" --format '{{.Config.Image}}')"
 if [[ "$PG_IMAGE" != *":$POSTGRES_PIN" ]]; then
   echo "bootstrap-local-db: Postgres image '$PG_IMAGE' does not end in ':$POSTGRES_PIN' (supabase/pins/postgres-version)." >&2
   exit 1
 fi
 
-AUTH_IMAGE="$(docker inspect supabase_auth_flatmate-io-ci --format '{{.Config.Image}}')"
+AUTH_IMAGE="$(docker inspect "supabase_auth_$PROJECT_ID" --format '{{.Config.Image}}')"
 if [[ "$AUTH_IMAGE" != *":$GOTRUE_PIN" ]]; then
   echo "bootstrap-local-db: Auth image '$AUTH_IMAGE' does not end in ':$GOTRUE_PIN' (supabase/pins/gotrue-version)." >&2
   exit 1
@@ -129,17 +141,25 @@ echo "-- Auth health version: $HEALTH_VERSION"
 #    It also proves RLS will apply: app_runtime must show rolbypassrls = f.
 echo "== bootstrap-local-db: probing the pooler path =="
 POOLER_URL="postgresql://app_runtime.pooler-dev:${APP_RUNTIME_PASSWORD}@127.0.0.1:54329/postgres"
-POOLER_RESULT="$(psql "$POOLER_URL" -tAc "select current_user, (select rolbypassrls from pg_roles where rolname = current_user)" | tr -d '[:space:]')"
+# The substitution sits inside `if !`, so a psql failure (the likeliest one: Supavisor refusing
+# the login) reaches the diagnostic below instead of ending the script under set -e/pipefail.
+POOLER_HINT="Supavisor may be refusing app_runtime.pooler-dev. Do not fall back to the direct port (decision 4, D4 Risks) — stop and report to the human."
+if ! POOLER_RESULT="$(psql "$POOLER_URL" -tAc "select current_user, (select rolbypassrls from pg_roles where rolname = current_user)" | tr -d '[:space:]')"; then
+  echo "bootstrap-local-db: pooler probe could not connect through 127.0.0.1:54329." >&2
+  echo "bootstrap-local-db: $POOLER_HINT" >&2
+  exit 1
+fi
 
 if [ "$POOLER_RESULT" != "app_runtime|f" ]; then
   echo "bootstrap-local-db: pooler probe returned '$POOLER_RESULT', expected 'app_runtime|f'." >&2
-  echo "bootstrap-local-db: Supavisor may be refusing app_runtime.pooler-dev. Do not fall back to the direct port (decision 4, D4 Risks) — stop and report to the human." >&2
+  echo "bootstrap-local-db: $POOLER_HINT" >&2
   exit 1
 fi
 echo "-- pooler probe: $POOLER_RESULT"
 
-# 8. Probe PostgREST. join-rate-limit.test.ts:27 ignores its cleanup delete's error, so a cold
-#    schema cache would otherwise pass every test silently while being broken.
+# 8. Probe PostgREST. The service-role cleanup delete in join-rate-limit.test.ts's afterEach
+#    ignores its error, so a cold schema cache would otherwise pass every test silently while
+#    being broken.
 echo "== bootstrap-local-db: probing PostgREST =="
 POSTGREST_STATUS="$(curl -s -o /dev/null -w '%{http_code}' \
   -H "apikey: $SERVICE_ROLE_KEY" \

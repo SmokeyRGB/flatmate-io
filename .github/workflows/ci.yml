@@ -36,17 +36,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: npm
-
-      - run: npm ci
-
-      # Runs first and needs no secrets: catches compile/type errors fast, per
-      # docs/GUARDRAILS.md's Minimal-Gate item 2 (TypeScript strict).
-      - run: npm run build
-
       - uses: supabase/setup-cli@v3
         with:
           version: 2.118.0
@@ -63,13 +52,39 @@ jobs:
 
       # Only the services the suite uses (design.md D1): Auth, the Kong gateway in front of it and
       # PostgREST, Postgres itself, and the transaction-mode pooler. No Storage, Realtime or Edge
-      # Functions.
-      - name: Start the local Supabase stack
+      # Functions. Started in the background: pulling and starting the stack (~90 s) needs neither
+      # node_modules nor the build, so it overlaps `npm ci` and `npm run build` below, and "Wait
+      # for the local Supabase stack" joins it before the bootstrap.
+      - name: Start the local Supabase stack (background)
         run: |
-          start=$(date +%s)
-          supabase start -x realtime,storage-api,imgproxy,postgres-meta,studio,edge-runtime,logflare,vector,mailpit
-          end=$(date +%s)
-          echo "STACK_STARTUP_SECONDS=$((end - start))" >> "$GITHUB_ENV"
+          echo "STACK_START_EPOCH=$(date +%s)" >> "$GITHUB_ENV"
+          # Inside `if`, bash -e doesn't abort the subshell, so a failed start still writes its
+          # exit code and the wait step fails fast instead of looping until the job timeout.
+          (
+            if supabase start -x realtime,storage-api,imgproxy,postgres-meta,studio,edge-runtime,logflare,vector,mailpit; then
+              echo 0 > /tmp/supabase-start.rc
+            else
+              echo $? > /tmp/supabase-start.rc
+            fi
+          ) > /tmp/supabase-start.log 2>&1 &
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      # Needs no secrets and no database: catches compile/type errors, per docs/GUARDRAILS.md's
+      # Minimal-Gate item 2 (TypeScript strict).
+      - run: npm run build
+
+      - name: Wait for the local Supabase stack
+        run: |
+          until [ -f /tmp/supabase-start.rc ]; do sleep 2; done
+          cat /tmp/supabase-start.log
+          echo "STACK_STARTUP_SECONDS=$(( $(date +%s) - STACK_START_EPOCH ))" >> "$GITHUB_ENV"
+          exit "$(cat /tmp/supabase-start.rc)"
 
       # Builds the schema from scripts/db/bootstrap-roles.sql + drizzle/ only (G-E3), asserts the
       # running images match the committed pins, proves the pooler path (decision 4), proves
@@ -91,7 +106,7 @@ jobs:
         run: |
           {
             echo "### CI timing"
-            echo "- stack start-up: ${STACK_STARTUP_SECONDS:-n/a}s"
+            echo "- stack ready after: ${STACK_STARTUP_SECONDS:-n/a}s (started in the background, overlapping npm ci and the build)"
             echo "- npm run verify: ${VERIFY_SECONDS:-n/a}s"
           } >> "$GITHUB_STEP_SUMMARY"
 
@@ -103,12 +118,17 @@ jobs:
   # Runs the full suite against hosted flatmate-io-dev, only on push to main, so it never blocks a
   # pull request (human decision 2026-09-26, decision 6). Catches anything a --no-verify push
   # skipped locally, and anything the local stack's pinned versions don't actually reproduce.
+  #
+  # No `concurrency` group: GitHub keeps at most one pending run per group and cancels the rest,
+  # so a queue would drop the hosted check of an intermediate commit, possibly the --no-verify
+  # one. Parallel runs are safe: each test creates its own household, and dev's Auth limits were
+  # raised to 1000 per 5 min on 2026-09-26, so two runs no longer 429 each other.
   verify-hosted:
     if: github.event_name == 'push'
     runs-on: ubuntu-24.04
-    concurrency:
-      group: hosted-dev
-      cancel-in-progress: false
+    # Against the EU from a US runner the job took 6-7 min; 30 leaves room without letting a hung
+    # network call hold a runner for GitHub's 6-hour default.
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
 
@@ -163,7 +183,10 @@ jobs:
       # Catches hosted dev drifting past the pins committed in supabase/pins/ (design.md D2). Its
       # limit: server_version only reports major.minor, so a patch-level image move at hosted dev
       # goes unseen here — whoever bumps the pins re-reads the exact image (supabase/pins/README.md).
+      # Runs even when `npm run verify` failed: drift is most likely the explanation exactly when
+      # hosted dev behaves differently (not on cancellation).
       - name: Check for pin drift against hosted dev
+        if: success() || failure()
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           # Same anon key as verify-hosted's NEXT_PUBLIC_SUPABASE_ANON_KEY above — public by
