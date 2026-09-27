@@ -172,7 +172,7 @@ by that list.
 
 ## 9. Close out, by outcome
 
-- [ ] 9.1 **On go:** run `npm run verify` locally once more and `openspec validate ci-local-database --strict`, then mark the PR ready for review. Update the plan file's Status and section 7 (`~/.claude/plans/the-pr-for-003-atomic-flask.md`) with the numbers, the PR link, and that "Open with the human" item (1) is closed by D8. Files: the plan file.
+- [x] 9.1 **On go:** run `npm run verify` locally once more and `openspec validate ci-local-database --strict`, then mark the PR ready for review. Update the plan file's Status and section 7 (`~/.claude/plans/the-pr-for-003-atomic-flask.md`) with the numbers, the PR link, and that "Open with the human" item (1) is closed by D8. Files: the plan file.
 - [ ] 9.2 **On no-go:**
   1. `git revert` every listed experiment SHA, newest first, never force-pushing.
   2. Confirm that `git diff main -- .github/workflows/ci.yml` is empty, that `supabase/` and `scripts/ci/` are gone, and that the keepers and the record commits survive.
