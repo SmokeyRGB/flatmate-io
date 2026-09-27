@@ -29,13 +29,19 @@ export default defineConfig({
     // that on its own against eu-west-1, where CI operations legitimately run 12-19s. Match
     // testTimeout so teardown has the same budget it had before the move.
     hookTimeout: 60000,
-    // The suite is network-bound: 98% of CI time is waiting on round trips from a US GitHub
-    // runner to eu-west-1, not CPU. Vitest's default (availableParallelism() - 1) gives a 4-vCPU
-    // runner 3 workers, most of them idle on I/O. CI raises it via VITEST_MAX_WORKERS
-    // (.github/workflows/ci.yml); unset, the default stands, so local runs are unchanged. The
-    // ceiling is Supabase's, not the runner's: each worker holds up to 10 pooler connections, and
-    // Auth rate-limits sign-ins per IP, which every worker shares — lower the number if CI starts
+    // `verify-hosted` (push to main, against flatmate-io-dev) is still network-bound: 98% of its
+    // time is waiting on round trips from a US GitHub runner to eu-west-1, not CPU. Vitest's
+    // default (availableParallelism() - 1) gives a 4-vCPU runner 3 workers, most of them idle on
+    // I/O, so that job raises it via VITEST_MAX_WORKERS (.github/workflows/ci.yml). The ceiling is
+    // Supabase's, not the runner's: each worker holds up to 10 pooler connections, and Auth
+    // rate-limits sign-ins per IP, which every worker shares — lower the number if that job starts
     // failing on 429s or connection limits rather than on assertions.
+    //
+    // `verify` (every pull request, against the disposable local stack started in the runner,
+    // openspec/changes/ci-local-database) leaves VITEST_MAX_WORKERS unset: with no network
+    // round-trip to pay for, more workers than cores stops being a win, so it runs on Vitest's own
+    // default. Unset anywhere, the default stands, so local runs (against flatmate-io-dev) are
+    // unchanged either way.
     maxWorkers: Number(process.env.VITEST_MAX_WORKERS) || undefined,
   },
   resolve: {

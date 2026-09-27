@@ -1,6 +1,12 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Extra hostnames `next dev` accepts, e.g. a phone on the LAN opening http://<machine-ip>:3000.
+  // Read from .env.local (loaded before this file), so no machine's address is committed.
+  allowedDevOrigins:
+    process.env.ALLOWED_DEV_ORIGINS?.split(",")
+      .map((origin) => origin.trim())
+      .filter(Boolean) ?? [],
   // join-screen design.md Decision 11 (G-A5, dev only — "this option doesn't affect production
   // builds"): next dev's own incoming-request log otherwise prints every `GET /join/<CODE>`, which
   // would put the code exactly where G-A5 forbids it. The production access log stays a deployment

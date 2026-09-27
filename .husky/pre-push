@@ -1,0 +1,14 @@
+# Binds the hosted run locally: `npm run verify` runs against flatmate-io-dev before every push
+# (F2 plan, section 7, decision 2; openspec/changes/ci-local-database, D7). CI's run against
+# flatmate-io-dev (.github/workflows/ci.yml) is the backstop for a push that skipped this with
+# --no-verify — the same suite, just after the fact instead of before.
+#
+# Known costs, accepted by decision 2:
+# - about 1.5-2 min per push (the full suite against the EU project);
+# - if many runs pile up, Auth's per-IP rate limits can still answer 429, which signIn reports as
+#   "Invalid credentials" (dev's sign-in and token-refresh limits were raised to 1000 per 5 min
+#   on 2026-09-26, so back-to-back runs are fine);
+# - deleting a remote branch, and pushing a tag, also run the full suite;
+# - this checks the working tree, not the commit being pushed — husky's normal behaviour, so
+#   uncommitted edits count too.
+npm run verify

@@ -29,6 +29,24 @@ import {
 import { createRoom, createRound, openRound } from "@/modules/casting/repository";
 import { db } from "@/db/client";
 
+// The same refusal as tests/setup.ts: this script writes real households and Auth users, and
+// activity_event is append-only, so a .env.local pointing at production must stop it before the
+// first query. The imports above only construct clients (postgres.js connects lazily), so this
+// top-level check still runs before anything reaches the database.
+const PRODUCTION_PROJECT_REF = "cjinhzzvjryojvhngjjn";
+for (const [name, value] of [
+  ["DATABASE_URL", process.env.DATABASE_URL],
+  ["NEXT_PUBLIC_SUPABASE_URL", process.env.NEXT_PUBLIC_SUPABASE_URL],
+] as const) {
+  if (value?.includes(PRODUCTION_PROJECT_REF)) {
+    throw new Error(
+      `Refusing to seed the production Supabase project.\n` +
+        `  ${name} points at ${PRODUCTION_PROJECT_REF} (flatmate-io).\n` +
+        `  Point .env.local at flatmate-io-dev instead — see .env.example.`,
+    );
+  }
+}
+
 // G-B1: synthetic-only data — @example.test is this project's fixed test-email convention
 // (tests/helpers/identity.ts's testEmail() uses the same domain).
 const DEMO_EMAIL = "demo-household@example.test";
