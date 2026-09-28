@@ -4,7 +4,7 @@
 
 # Guardrail lints
 
-The seven custom lints under `scripts/lint/` are hand-written checks (not eslint plugins), each
+The eight custom lints under `scripts/lint/` are hand-written checks (not eslint plugins), each
 enforcing one guardrail mechanically:
 
 | Script | Guardrail | What it checks |
@@ -12,11 +12,19 @@ enforcing one guardrail mechanically:
 | `import-boundary.ts` | G-C1 / FR-0.1 | only `src/db/` and each module's own `repository.ts` may import the raw Postgres/Drizzle client |
 | `session-context.ts` | G-C8 / FR-0.4 | bare `SET` is never allowed; `SET LOCAL`/`set_config(…, true)` for session context only in `src/db/session-context.ts`; also rejects `SET SESSION …`/`SET … TO` everywhere and a non-local `set_config` in `drizzle/*.sql` |
 | `rls-coverage.ts` | FR-0.2 / EC-0.1 | every table declaring `household_id` has a `pgPolicy` of its own — per table, not per schema file |
+| `data-inventory.ts` | G-F1 / G-F3 / FR-0.6 | every column any `schema.ts` declares is in `data-inventory.yml` (and vice versa — a dropped column can't stay in the file), each entry carries a valid category and, for personal data, purpose/legal_basis/retention, and no table or column name matches the Art.-9 blocklist |
 | `definer-coverage.ts` | G-C7 | every `SECURITY DEFINER` function in `drizzle/` sets `search_path` and is called by name in a `tests/integration/raw-sql/` test |
 | `migration-shape.ts` | — (re-runnability) | migrations after `0017`: an enum `ADD VALUE` alone in its file, `ADD COLUMN IF NOT EXISTS`, `DROP FUNCTION IF EXISTS` before a bare or `RETURNS TABLE` create, `search_path` on `SECURITY DEFINER` |
 | `guarded-tests.ts` | G-D | every entry in `test/guarded.manifest.json` (G-D1…G-D15) stays honest: `pending`/`implemented` must match reality |
 | `pending-feedback.ts` | `ui/pending-feedback` | no plain submit button anywhere in `src/` (only `src/ui/submit-button.tsx`'s shared one); every `page.tsx` under `src/app/` has a sibling `loading.tsx` importing `@/ui/skeletons`, short named exemptions aside |
 
-`tests/unit/lint/cleanup-inventory.test.ts` is the eighth check, run inside vitest: it fails when
+`tests/unit/lint/cleanup-inventory.test.ts` is the ninth check, run inside vitest: it fails when
 a household-scoped table is missing from the delete set in `tests/helpers/identity.ts`, or when
 `undoRegisterHousehold` misses a table `registerHousehold` writes.
+
+`tests/integration/schema/data-inventory-live.test.ts` is the other half of the data-inventory
+gate, also run inside vitest: it queries the migrated database's own catalog, so a column a
+hand-written migration adds without ever touching `schema.ts` is still caught. Strict against a
+database built from `drizzle/` alone (CI's `verify` job); a warning only against the shared hosted
+`flatmate-io-dev` database, since another branch's still-unmerged migration can legitimately put
+it ahead of this one (design.md D5, `openspec/changes/data-inventory-gate`).
