@@ -13,7 +13,7 @@ function anyContext(): SessionContext {
 }
 
 describe("withSessionContext refuses to nest", () => {
-  it("rejects a withSessionContext opened inside another's callback, before it opens a transaction", async () => {
+  it("rejects a withSessionContext opened inside another's callback without running it", async () => {
     let innerRan = false;
     const outcome = await withSessionContext(anyContext(), async () =>
       withSessionContext(anyContext(), async () => {
