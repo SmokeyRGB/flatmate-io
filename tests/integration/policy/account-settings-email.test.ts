@@ -16,8 +16,23 @@ import {
   cleanupAll,
   deleteTestAccount,
   registerTestHousehold,
+  testEmail,
   type TestHousehold,
 } from "../../helpers/identity";
+
+const EMAIL_LEA = testEmail();
+const EMAIL_SIGNIN_CHECK = testEmail();
+const EMAIL_NAMESTILLWORKS = testEmail();
+const EMAIL_OLD_ADDRESS = testEmail();
+const EMAIL_NEW_ADDRESS = testEmail();
+const EMAIL_WHATEVER = testEmail();
+const EMAIL_AUDITED = testEmail();
+const EMAIL_UNCHANGED = testEmail();
+const EMAIL_SHOULD_NOT_APPLY = testEmail();
+const EMAIL_ISOLATION_A = testEmail();
+const EMAIL_ISOLATION_B = testEmail();
+const EMAIL_OWN_EMAIL_LIVE = testEmail();
+const EMAIL_OWN_EMAIL_REVOKED = testEmail();
 
 const PASSWORD = "test-password-not-real-1234";
 
@@ -75,27 +90,27 @@ describe("changeResidentEmail (identity/account-settings, design.md Decision 2)"
     const resident = await claimResident(hh, "EmailAdder");
     const current = await residentSession(hh, resident);
 
-    await changeResidentEmail(current, "Lea@Example.Test");
+    await changeResidentEmail(current, EMAIL_LEA.toUpperCase()); // mixed case in, lower case stored
 
     const [row] = await withSessionContext(current.context, (tx) =>
       tx.select().from(account).where(eq(account.id, resident.accountId)),
     );
-    expect(row.email).toBe("lea@example.test");
+    expect(row.email).toBe(EMAIL_LEA);
     expect(row.emailVerifiedAt).toBeNull();
 
     const { data } = await adminClient().auth.admin.getUserById(resident.accountId);
-    expect(data.user?.email).toBe("lea@example.test");
+    expect(data.user?.email).toBe(EMAIL_LEA);
   });
 
   it("email sign-in then acts as the profile (acting_profile_id = profile, not null; G-D14 style)", async () => {
     hh = await registerTestHousehold();
     const resident = await claimResident(hh, "EmailSignIn");
     const current = await residentSession(hh, resident);
-    await changeResidentEmail(current, "signin-check@example.test");
+    await changeResidentEmail(current, EMAIL_SIGNIN_CHECK);
 
     const result = await signIn({
       kind: "household",
-      email: "signin-check@example.test",
+      email: EMAIL_SIGNIN_CHECK,
       password: PASSWORD,
     });
     expect(result.context.profileId).toBe(resident.profileId);
@@ -106,7 +121,7 @@ describe("changeResidentEmail (identity/account-settings, design.md Decision 2)"
     hh = await registerTestHousehold();
     const resident = await claimResident(hh, "NameStillWorks");
     const current = await residentSession(hh, resident);
-    await changeResidentEmail(current, "namestillworks@example.test");
+    await changeResidentEmail(current, EMAIL_NAMESTILLWORKS);
 
     const result = await signIn({
       kind: "resident",
@@ -121,19 +136,19 @@ describe("changeResidentEmail (identity/account-settings, design.md Decision 2)"
     hh = await registerTestHousehold();
     const resident = await claimResident(hh, "ChangeAddress");
     const current = await residentSession(hh, resident);
-    await changeResidentEmail(current, "old-address@example.test");
-    await changeResidentEmail(current, "new-address@example.test");
+    await changeResidentEmail(current, EMAIL_OLD_ADDRESS);
+    await changeResidentEmail(current, EMAIL_NEW_ADDRESS);
 
     let caught: unknown;
     try {
-      await signIn({ kind: "household", email: "old-address@example.test", password: PASSWORD });
+      await signIn({ kind: "household", email: EMAIL_OLD_ADDRESS, password: PASSWORD });
     } catch (err) {
       caught = err;
     }
     expect(caught).toBeInstanceOf(SignInError);
     expect((caught as SignInError).code).toBe("invalid_credentials");
 
-    const result = await signIn({ kind: "household", email: "new-address@example.test", password: PASSWORD });
+    const result = await signIn({ kind: "household", email: EMAIL_NEW_ADDRESS, password: PASSWORD });
     expect(result.context.accountId).toBe(resident.accountId);
   });
 
@@ -201,7 +216,7 @@ describe("changeResidentEmail (identity/account-settings, design.md Decision 2)"
     hh = await registerTestHousehold();
     const current: CurrentSession = { sessionId: "n/a", context: hh.context };
 
-    await expect(changeResidentEmail(current, "whatever@example.test")).rejects.toMatchObject({
+    await expect(changeResidentEmail(current, EMAIL_WHATEVER)).rejects.toMatchObject({
       code: "not_a_resident",
     });
 
@@ -213,7 +228,7 @@ describe("changeResidentEmail (identity/account-settings, design.md Decision 2)"
     hh = await registerTestHousehold();
     const resident = await claimResident(hh, "AuditedChange");
     const current = await residentSession(hh, resident);
-    await changeResidentEmail(current, "audited@example.test");
+    await changeResidentEmail(current, EMAIL_AUDITED);
 
     const events = await emailChangedEvents(current.context, resident.accountId);
     expect(events).toHaveLength(1);
@@ -225,8 +240,8 @@ describe("changeResidentEmail (identity/account-settings, design.md Decision 2)"
     hh = await registerTestHousehold();
     const resident = await claimResident(hh, "Unchanged");
     const current = await residentSession(hh, resident);
-    await changeResidentEmail(current, "unchanged@example.test");
-    await changeResidentEmail(current, "unchanged@example.test");
+    await changeResidentEmail(current, EMAIL_UNCHANGED);
+    await changeResidentEmail(current, EMAIL_UNCHANGED);
 
     const events = await emailChangedEvents(current.context, resident.accountId);
     expect(events).toHaveLength(1); // still just the one from the first, actual change
@@ -248,7 +263,7 @@ describe("changeResidentEmail (identity/account-settings, design.md Decision 2)"
 
     await setMovedOut(hh.context, hh.accountId, resident.accountId);
 
-    await expect(changeResidentEmail(current, "should-not-apply@example.test")).rejects.toMatchObject({
+    await expect(changeResidentEmail(current, EMAIL_SHOULD_NOT_APPLY)).rejects.toMatchObject({
       code: "not_a_resident",
     });
 
@@ -269,8 +284,8 @@ describe("changeResidentEmail (identity/account-settings, design.md Decision 2)"
     const residentA = await claimResident(hh, "IsolationA");
     const residentB = await claimResident(hh, "IsolationB");
 
-    await changeResidentEmail(await residentSession(hh, residentA), "isolation-a@example.test");
-    await changeResidentEmail(await residentSession(hh, residentB), "isolation-b@example.test");
+    await changeResidentEmail(await residentSession(hh, residentA), EMAIL_ISOLATION_A);
+    await changeResidentEmail(await residentSession(hh, residentB), EMAIL_ISOLATION_B);
 
     const [rowA] = await withSessionContext(hh.context, (tx) =>
       tx.select().from(account).where(eq(account.id, residentA.accountId)),
@@ -278,8 +293,8 @@ describe("changeResidentEmail (identity/account-settings, design.md Decision 2)"
     const [rowB] = await withSessionContext(hh.context, (tx) =>
       tx.select().from(account).where(eq(account.id, residentB.accountId)),
     );
-    expect(rowA.email).toBe("isolation-a@example.test");
-    expect(rowB.email).toBe("isolation-b@example.test");
+    expect(rowA.email).toBe(EMAIL_ISOLATION_A);
+    expect(rowB.email).toBe(EMAIL_ISOLATION_B);
   });
 
   // Copilot review round 4 (PR #23), FIX 1: the membership/account locks re-check that the
@@ -305,7 +320,7 @@ describe("changeResidentEmail (identity/account-settings, design.md Decision 2)"
       tx.update(session).set({ revokedAt: new Date() }).where(eq(session.id, signedIn.session.id)),
     );
 
-    await expect(changeResidentEmail(current, "should-not-apply@example.test")).rejects.toMatchObject({
+    await expect(changeResidentEmail(current, EMAIL_SHOULD_NOT_APPLY)).rejects.toMatchObject({
       code: "session_ended",
     });
 
@@ -325,7 +340,7 @@ describe("changeResidentEmail (identity/account-settings, design.md Decision 2)"
   // check (the `SELECT session ... FOR UPDATE` / `session_ended` throw added by FIX 1) from
   // changeResidentEmail and running this test file made the test above fail — the promise
   // resolved instead of rejecting (membership alone still passes for a revoked session), and
-  // account.email ended up set to "should-not-apply@example.test" instead of staying null. The
+  // account.email ended up set to EMAIL_SHOULD_NOT_APPLY instead of staying null. The
   // check was restored immediately afterwards; this comment records the observed failure rather
   // than leaving the break in the tree.
 });
@@ -340,9 +355,9 @@ describe("getOwnAccountEmail (identity/account-settings, Copilot review round 5,
     hh = await registerTestHousehold();
     const resident = await claimResident(hh, "OwnEmailLive");
     const current = await residentSession(hh, resident);
-    await changeResidentEmail(current, "own-email-live@example.test");
+    await changeResidentEmail(current, EMAIL_OWN_EMAIL_LIVE);
 
-    await expect(getOwnAccountEmail(current.context)).resolves.toBe("own-email-live@example.test");
+    await expect(getOwnAccountEmail(current.context)).resolves.toBe(EMAIL_OWN_EMAIL_LIVE);
   });
 
   // Uses the STALE context captured before the revocation, exactly the race
@@ -353,7 +368,7 @@ describe("getOwnAccountEmail (identity/account-settings, Copilot review round 5,
     hh = await registerTestHousehold();
     const resident = await claimResident(hh, "OwnEmailRevoked");
     const current = await residentSession(hh, resident); // captured BEFORE the revocation below
-    await changeResidentEmail(current, "own-email-revoked@example.test");
+    await changeResidentEmail(current, EMAIL_OWN_EMAIL_REVOKED);
 
     await setMovedOut(hh.context, hh.accountId, resident.accountId);
 
@@ -369,7 +384,7 @@ describe("getOwnAccountEmail (identity/account-settings, Copilot review round 5,
   // removing the membership join/predicate from getOwnAccountEmail (reverting to a plain
   // `SELECT email FROM account WHERE id = context.accountId`) and running this file made the
   // "no longer returns the address once the membership is revoked" test above fail — it resolved
-  // to "own-email-revoked@example.test" instead of `null`, since the stale profileId alone was
+  // to EMAIL_OWN_EMAIL_REVOKED instead of `null`, since the stale profileId alone was
   // enough to pass the old check. The join was restored immediately afterwards; this comment
   // records the observed failure rather than leaving the break in the tree.
 });

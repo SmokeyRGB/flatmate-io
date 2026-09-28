@@ -5,7 +5,15 @@ import { activityEvent } from "@/modules/audit/schema";
 import { joinHousehold } from "@/modules/identity/auth";
 import { issueJoinCode, listJoinCodeIssuances } from "@/modules/identity/repository";
 import { account, membership, residentProfile } from "@/modules/identity/schema";
-import { cleanupAll, deleteTestAccount, registerTestHousehold, type TestHousehold } from "../../helpers/identity";
+import {
+  cleanupAll,
+  deleteTestAccount,
+  registerTestHousehold,
+  testEmail,
+  type TestHousehold,
+} from "../../helpers/identity";
+
+const EMAIL_LEA = testEmail();
 
 let hh: TestHousehold | undefined;
 let joinerAccountId: string | undefined;
@@ -82,13 +90,13 @@ describe("joinHousehold — happy path (FR-2.18/FR-2.6/FR-2.19)", () => {
     const result = await joinHousehold(link.code, {
       displayName: "Lea",
       password: "test-password-not-real-1234",
-      email: "lea@example.test",
+      email: EMAIL_LEA,
     });
     joinerAccountId = result.context.accountId;
 
     const [accountRow] = await withSessionContext(hh.context, (tx) =>
       tx.select().from(account).where(eq(account.id, result.context.accountId)),
     );
-    expect(accountRow.email).toBe("lea@example.test");
+    expect(accountRow.email).toBe(EMAIL_LEA);
   });
 });

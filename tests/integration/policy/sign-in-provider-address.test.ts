@@ -4,7 +4,15 @@ import { withSessionContext } from "@/db/session-context";
 import { claimResidentProfile, signIn } from "@/modules/identity/auth";
 import { createResidentProfile } from "@/modules/identity/repository";
 import { account } from "@/modules/identity/schema";
-import { cleanupAll, deleteTestAccount, registerTestHousehold, type TestHousehold } from "../../helpers/identity";
+import {
+  cleanupAll,
+  deleteTestAccount,
+  registerTestHousehold,
+  testEmail,
+  type TestHousehold,
+} from "../../helpers/identity";
+
+const EMAIL_LEGACY = testEmail();
 
 const PASSWORD = "test-password-not-real-1234";
 
@@ -39,7 +47,7 @@ describe("signIn's name path asks the provider for its current address (D1)", ()
     // is left untouched, still on its derived address) — the exact divergence D1's own comment
     // names as the reason `account.email ?? derived` is unsafe.
     await withSessionContext(hh.context, (tx) =>
-      tx.update(account).set({ email: "legacy@example.test" }).where(eq(account.id, accountId)),
+      tx.update(account).set({ email: EMAIL_LEGACY }).where(eq(account.id, accountId)),
     );
 
     const result = await signIn({
