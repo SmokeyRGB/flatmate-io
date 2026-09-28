@@ -82,7 +82,8 @@ do not exist, and would misrepresent this packet as a feature when it is infrast
   with its purpose, legal basis, retention period and privacy category.
 - **FR-0.6** CI shall fail when a database column capable of holding personal data is not
   declared in `data-inventory.yml` — either with a full declaration or an explicit
-  `personal_data: false` marker; there is no silent third option.
+  `personal_data: false` marker (written `category: "⚙️"` in the file, the ⚙️ class of FR-0.8);
+  there is no silent third option.
 - **FR-0.7** The list of fields redacted at end of retention shall be **generated** from
   `data-inventory.yml`, never hand-maintained, so that a newly declared personal-data field
   extends the redaction automatically and cannot be forgotten.
@@ -223,7 +224,7 @@ Source: S-27, `05-ADRs.md` ADR-003, `GUARDRAILS.md` G-D7 and G-D8. Covers FR-0.1
   `GUARDRAILS.md` **G-D** (enforcement table row "Geschützte Tests (inhaltliche Abschwächung)").
 - **C-0.3** Row-level security is enforced structurally, not by convention: the application's
   database role is never the owner of the tables it queries. Source: `GUARDRAILS.md` **G-C2**.
-- **C-0.4** A column declared `personal_data: false` in `data-inventory.yml` satisfies the CI
+- **C-0.4** A column declared `personal_data: false` (`category: "⚙️"`) in `data-inventory.yml` satisfies the CI
   gate structurally; the gate cannot verify that the classification is actually correct — a
   named 🟡 limit, not a gap to silently close. Source: `GUARDRAILS.md` **G-F1**.
 - **C-0.5** The redaction, error-report-exclusion, subject-access-export and end-of-retention

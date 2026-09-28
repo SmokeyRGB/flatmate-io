@@ -145,9 +145,8 @@ tables:
       deleted_at: { category: "⚙️" }
       resident_profile_id: { category: "🟠", purpose: "join-by-link Decision 13 (2026-09-22): benennt die Person, für die ein gebundener Link ausgestellt wurde — anders als jede andere Spalte dieser Tabelle ein Verweis auf eine benannte Person, nicht nur auf den Haushalt", legal_basis: "Art. 6(1)(f) DSGVO", retention: "bis JoinCodeIssuance-Löschung" }
       # Added 2026-09-28 (data-inventory-gate task 2.3): missing since drizzle/0019 introduced the
-      # column — the drift ADR-010 warns about, caught by this change's own gate. The
-      # classification is a human decision (ADR-010) awaiting confirmation; this is the recommended
-      # value, not yet confirmed.
+      # column — the drift ADR-010 warns about, caught by this change's own gate. Classified ⚙️ by
+      # human decision 2026-09-28 (ADR-010: the classification is the human's call).
       purpose: { category: "⚙️", purpose: "Art des Links (join / password_reset) — resident-settings Decision 4; personenbezogen erst zusammen mit resident_profile_id, das 🟠 deklariert ist" }
 
   # --- join-by-link (FR-2.28, 2026-09-22): the join route's attempt limit ---
