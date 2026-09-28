@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from "node:async_hooks";
 import { sql } from "drizzle-orm";
 import type { PgTransaction } from "drizzle-orm/pg-core";
 import { db } from "./client";
@@ -100,10 +101,29 @@ export async function withSessionContextOn<T>(
   context: SessionContext,
   fn: (tx: Tx) => Promise<T>,
 ): Promise<T> {
-  return database.transaction(async (tx) => {
-    await applySessionContext(tx as unknown as Tx, context);
-    return fn(tx as unknown as Tx);
-  });
+  if (openTransaction.getStore()) throw new NestedSessionContextError();
+  return database.transaction(async (tx) =>
+    openTransaction.run(true, async () => {
+      await applySessionContext(tx as unknown as Tx, context);
+      return fn(tx as unknown as Tx);
+    }),
+  );
+}
+
+// Set for the duration of a withSessionContextOn callback, so a second withSessionContext opened
+// from inside it is refused instead of run. A nested call checks out a second pooled connection
+// while the first is still held; once every Supavisor server connection is held by a caller
+// doing that, all of them wait for a connection that never comes free — a pool deadlock with no
+// timeout (createResidentProfile did it until 2026-09-28, surfacing as `Test timed out in
+// 60000ms` against flatmate-io-dev). The inner transaction also cannot see the outer one's
+// uncommitted writes. Pass the `tx` you already hold to a `...Tx` helper instead.
+const openTransaction = new AsyncLocalStorage<true>();
+
+export class NestedSessionContextError extends Error {
+  constructor() {
+    super("withSessionContext called inside another withSessionContext callback; pass its tx to a ...Tx helper instead");
+    this.name = "NestedSessionContextError";
+  }
 }
 
 export async function withSessionContext<T>(
