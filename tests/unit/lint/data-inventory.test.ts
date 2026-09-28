@@ -102,8 +102,8 @@ describe("checkInventory against the real repository", () => {
     const { tables } = await loadSchemaTables(process.cwd());
     const text = readFileSync(join(process.cwd(), "data-inventory.yml"), "utf8");
     const lines = text.split("\n");
-    // Found by its key inside join_code_issuance's block, not by its wording: the classification
-    // is still awaiting the human's confirmation and may change.
+    // Found by its key inside join_code_issuance's block, not by its wording, so a later
+    // reclassification or rewording of the entry doesn't break the test.
     const tableIdx = lines.findIndex((l) => l.trimEnd() === "  join_code_issuance:");
     const offset = lines.slice(tableIdx + 1).findIndex((l) => /^\s+purpose:\s*\{/.test(l));
     const idx = tableIdx === -1 || offset === -1 ? -1 : tableIdx + 1 + offset;
