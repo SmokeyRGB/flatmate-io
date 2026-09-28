@@ -357,6 +357,14 @@ Dieser Baustein ist ein **Hilfsmittel für den Haushalt**, **keine eigene Pflich
 Flatmate.io**. Die App darf ihn deshalb weder als „Pflicht erledigt" darstellen noch das Versenden
 erzwingen; sie darf ihn anbieten und daran erinnern.
 
+> **Ergänzt 2026-09-28 (F3-Vorprüfung): der Kurzhinweis steht schon ab der Erfassung bereit.**
+> Art. 13 gilt **zum Zeitpunkt der Erhebung**. Wird der Hinweis nur beim Markieren als
+> „Eingeladen" angeboten, erhält ihn die Mehrzahl der Bewerbenden nie — alle, die nicht
+> eingeladen werden. Deshalb bietet die Detailansicht **jeder** `Application` den Kurzhinweis aus
+> §4.5 zusätzlich an: eingeklappt, zum Kopieren, **ohne Pflicht, ohne Erinnerungsaufgabe, ohne
+> Nachverfolgung**. Informieren bleibt Sache des Haushalts; die App gibt Text und Anleitung, sie
+> erzwingt nichts. Der Baustein bei „Eingeladen" (S-16) bleibt unverändert.
+
 ### 4.4 Zwei Felder, zwei Achsen — `source` und `collected_from`
 
 Der technische Erfassungspfad und der rechtliche Erhebungsort sind **verschiedene Fragen** und
@@ -402,6 +410,53 @@ sonst niemand rechnet: **dass auch die Notizen auskunftspflichtig sind**
 ([§2](#2--die-trennlinie-küchentisch-vs-system)). Genau diese Zeile ist der Grund, warum der
 Baustein nicht weiter gekürzt werden darf.
 
+#### Stufe 1, Variante Dritterhebung — wenn die Angaben von jemand anderem stammen (Art. 14)
+
+> **Neu 2026-09-28 (F3-Vorprüfung).** Bis dahin gab es nur den Art.-13-Baustein oben. Art. 14
+> verlangt zusätzlich zwei Angaben, die darin fehlen: **welche Kategorien von Daten** verarbeitet
+> werden (Abs. 1 lit. d) und **aus welcher Quelle** sie stammen (Abs. 2 lit. f). Ohne eigenen Text
+> wäre die Pflicht angezeigt, aber nicht erfüllbar.
+
+> Hey {Name}, kurze Info von der WG {Haushaltsname}: Deine Bewerbung ({Kategorien}) haben wir
+> über eine andere Person bekommen und für unsere Zimmersuche gespeichert. Spätestens 180 Tage
+> nach Ende der Suche löschen wir alles wieder. Wenn du nicht dabei sein möchtest oder wissen
+> willst, was wir über dich gespeichert haben, sag einfach Bescheid – dann löschen wir es sofort.
+> Mehr dazu: [Link]
+
+Er trägt, worauf Art. 14 nicht verzichten kann: **wer** (die WG), **dass die Daten von jemand
+anderem kamen**, **welche Daten**, **wie lange**, und **dass die Person widersprechen oder löschen
+lassen kann**. Rechtsgrundlage, vollständige Rechteliste und Beschwerderecht stehen auf der
+Stufe-2-Seite hinter `[Link]` — dasselbe Zweistufenmodell wie oben.
+
+Vier Festlegungen zum Wortlaut:
+
+1. **`{Kategorien}` wird aus den tatsächlich erfassten Feldern erzeugt**, z. B. „Name,
+   Telefonnummer, deine Nachricht" — nie eine pauschale Liste, die mehr behauptet, als
+   gespeichert ist.
+2. **Die Quelle wird allgemein benannt** („über eine andere Person"), nicht namentlich. Art. 14
+   Abs. 2 lit. f verlangt die Quelle; die empfehlende Person namentlich zu nennen, gäbe aber
+   *deren* Daten preis. Ob die allgemeine Benennung genügt, geht an die anwaltliche Prüfung
+   (**Q-15**).
+3. **Die Frist steht als Zahl im Text: 180 Tage.** Sobald `retention_days` als
+   Haushaltseinstellung existiert, tritt dessen Wert an die Stelle (v0.2).
+4. **Der Text ist ein Vorschlag, kein fester Wortlaut.** Die Moderation kann ihn vor dem Kopieren
+   ändern; die App speichert die geänderte Fassung nicht.
+
+**Neben dem Text, nicht in ihm**, nennt die App die Frist aus Art. 14 Abs. 3: „Am besten gleich
+mit deiner ersten Nachricht an {Name} schicken – spätestens bis {Datum}." `{Datum}` ist
+**ein Monat nach der Erfassung**. Die Monatsfrist ist die Obergrenze; wer die Daten nutzt, um die
+Person anzuschreiben, muss spätestens mit dieser ersten Nachricht informieren (Abs. 3 lit. b) — in
+einer WG der Normalfall. Wird die Erhebungsquelle erst nachträglich auf `third_party` korrigiert,
+zählt die Frist trotzdem ab der Erfassung, nicht ab der Korrektur; ist sie schon verstrichen, sagt
+die App das offen.
+
+**Wann Art. 14 greift und wann nicht** (Grundlage der Checkbox-Beschriftung in `03-PRD.md`
+§4.1.3): eindeutig, wenn jemand *anderes* die Angaben liefert — „meine Kollegin sucht, hier ihre
+Nummer". Leitet dagegen eine Freundin eine Bewerbung **auf Wunsch der bewerbenden Person** weiter,
+ist sie nur Botin, und die Erhebung erfolgt vertretbar bei der betroffenen Person selbst
+(Art. 13). Diese Lesart ist **unsicher** und geht an **Q-15**. Die Checkbox fragt deshalb nach der
+Herkunft der Angaben, nicht nach dem Weg der Nachricht.
+
 #### Stufe 2 — die statische Datenschutzseite je Haushalt
 
 Der Link zeigt auf eine von Flatmate.io generierte, öffentlich erreichbare Seite pro `Household`
@@ -418,6 +473,7 @@ Der Link zeigt auf eine von Flatmate.io generierte, öffentlich erreichbare Seit
 | Betroffenenrechte | Art. 15, 16, 17, 18, 20, 21 — jeweils mit einem Satz, was sie bedeuten |
 | Beschwerderecht | Hinweis auf das **Bestehen** eines Beschwerderechts „bei der für euch zuständigen Datenschutzaufsichtsbehörde", plus Link auf die Liste der deutschen Aufsichtsbehörden — **keine namentliche Benennung** (siehe [§4.6](#46-zwei-bewusste-auslegungen-in-der-datenschutzseite)) |
 | Freiwilligkeit | Die Angaben sind freiwillig; ohne sie ist eine Bewerbung praktisch nicht möglich |
+| Quelle der Daten *(neu 2026-09-28, nur bei Dritterhebung, Art. 14 Abs. 2 lit. f)* | allgemein: „von einer anderen Person, die uns auf dich aufmerksam gemacht hat" — ohne deren Namen (siehe Variante Dritterhebung oben) |
 | Keine automatisierte Entscheidung | ausdrücklich: Die Entscheidung treffen Menschen, **es wird keine KI eingesetzt** (P-5, [§9](#9--ai-act-einordnung-und-p-5)) |
 
 Sie trägt denselben Text wie die Seite des Verfügbarkeits-Token-Links, damit beide Erfassungswege
@@ -777,7 +833,7 @@ Zwei Anwendungsfälle, an denen die Abbildung schon gearbeitet hat:
 | `Application.source` | META | **technischer** Erfassungspfad: `manual_form` · `paste_parser` · `availability_link` · `portal_import`. Produktdatum, **kein** Rechtsgrundlagen-Träger | 6f | H | 180 Tage |
 | `Application.collected_from` | META | **rechtlicher Erhebungsort:** `data_subject` · `third_party`. Trägt die Entscheidung Art. 13 vs. Art. 14 ([§4](#4--art-13-vs-art-14--korrigierte-abgrenzung)). Pflichtfeld, **kein stiller Default** | 6c | H | 180 Tage |
 | `Application.message_raw` | **FREITEXT** | ursprüngliche Nachricht, Grundlage des Paste-Parsers; absatzweise verwerfbar **vor** dem Speichern ([§8.2](#82-fünf-folgen-für-das-produkt)) | 6b | H | 180 Tage — **Art.-9-Risiko, siehe [§8](#8--art-9--besondere-kategorien-im-freitext)** |
-| `Application.attributes` | STAMM/META | Ergebnis des **regelbasierten** Parsers, menschlich bestätigt | 6b | H | 180 Tage |
+| `Application.attributes` | STAMM/META | freie Zusatzangaben, von Hand im Formular eingegeben oder vom **regelbasierten** Parser vorgeschlagen und menschlich bestätigt *(korrigiert 2026-09-28: stand nur als Parser-Ergebnis da, der Parser ist aber erst v0.2)* | 6b | H | 180 Tage |
 | `Application.state` | META | Zustandsmaschine `new → screened → invited → scheduled → interviewed → offer_made → moved_in` und Seitenzustände | 6b, 6f | H | 180 Tage |
 | `Application.decision_note` | **FREITEXT / BEURTEILUNG** | Begründung der Entscheidung | 6f | H | 180 Tage — **Art.-9-Risiko** |
 | `Application.rejection_reason` | **FREITEXT / BEURTEILUNG** | Begründung der Absage — **im Vermieter-Fall potenzielles AGG-Beweismittel** ([§12.2](#122-agg--19-abs-5-greift-nicht-mehr)) | 6f | H | 180 Tage — **Art.-9-Risiko** |
@@ -1401,7 +1457,7 @@ Wahrscheinlichkeit zum Hochrisiko-System.
 | **Q-12** | Ist der **Service Worker** der PWA nach § 25 Abs. 2 Nr. 2 TDDDG einwilligungsfrei? | ja, weil für die ausdrücklich gewünschte installierbare Anwendung erforderlich ([§10.2](#102-kein-tracking)) | **Niedrig.** Notfalls Banner — was man vermeiden möchte. |
 | **Q-13** | Welche zusätzlichen Pflichten löst die **Vermieter-Stufe** aus (AGG, AI Act, eigenes Art.-30-Verzeichnis, angepasste AVV, DSFA)? | vollständige Neuprüfung vor Aktivierung ([§12](#12--vermieter-szenario)) | **Aufgeschoben.** Blockiert v1 nicht, blockiert die Monetarisierung. |
 | **Q-14** | Ist eine **Duplikaterkennung über Bewerberdaten** (Ähnlichkeit von Name, E-Mail, Telefonnummer) zulässig, um die Lücke aus [§3.4](#34-lücke-die-selbst-redaktion-schützt-nur-verknüpfte-bewerbungen) zu schließen — und wenn nein, wie wird sie **prozessual** geschlossen? | **Kein automatisches Zusammenführen.** Die App schlägt beim Setzen von `became_resident_id` ähnliche ältere Bewerbungen vor und lässt einen Menschen bestätigen | **Hoch für die betroffene Person, niedrig für das Projekt.** Bleibt die Lücke offen, kann eine eingezogene Person Beratungsinhalte über sich selbst aus einer älteren, unverknüpften Bewerbung lesen — genau die Verletzung, gegen die V-1 gebaut wurde. Die Ähnlichkeitsprüfung ist ihrerseits eine eigene Verarbeitung mit eigener Rechtsgrundlage und erzeugt falsch-positive Verknüpfungen zweier verschiedener Personen. |
-| **Q-15** | Genügt der **Copy-Paste-Datenschutzhinweis** (§4.5), den die Moderation selbst an Bewerbende weitergibt, den Anforderungen von **Art. 14** — und wer ist Absender im Rechtssinn, wenn ein Mensch den Text kopiert und über einen eigenen Kanal versendet? | der Wortlaut genügt inhaltlich; Absender ist der `Household` als Verantwortlicher | **Mittel.** Fällt die Position, braucht der Hinweis eine andere **Zustellform**, nicht einen anderen Text. Aufgeworfen durch `03-PRD.md` §8 (P-O-04): der Textkatalog ist Sammelarbeit, die Rechtsfrage dahinter nicht |
+| **Q-15** | Genügt der **Copy-Paste-Datenschutzhinweis** (§4.5), den die Moderation selbst an Bewerbende weitergibt, den Anforderungen von **Art. 14** — und wer ist Absender im Rechtssinn, wenn ein Mensch den Text kopiert und über einen eigenen Kanal versendet? **Zwei Teilfragen seit 2026-09-28** (Variante Dritterhebung in §4.5): (a) Genügt es für Art. 14 Abs. 2 lit. f, die Quelle **allgemein** zu benennen („über eine andere Person"), um die Daten der empfehlenden Person nicht preiszugeben? (b) Ist eine Bewerbung, die eine dritte Person **auf Wunsch der bewerbenden Person** weiterleitet, eine Erhebung bei der betroffenen Person (Art. 13) — die Dritte also nur Botin? | der Wortlaut genügt inhaltlich; Absender ist der `Household` als Verantwortlicher | **Mittel.** Fällt die Position, braucht der Hinweis eine andere **Zustellform**, nicht einen anderen Text. Aufgeworfen durch `03-PRD.md` §8 (P-O-04): der Textkatalog ist Sammelarbeit, die Rechtsfrage dahinter nicht |
 
 ---
 

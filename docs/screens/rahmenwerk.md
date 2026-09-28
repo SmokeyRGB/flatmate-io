@@ -351,6 +351,9 @@ bzw. den Fließtext ausgeschrieben, wo eine Regel greift; die Standardregel gilt
 | Hartes Entfernen (U-27) | „Entfernen" |
 | `join_code` | „Einladungslink" / „Beitrittscode" |
 | `join_code` ungültig machen (O16) | „Löschen" — **nicht** „Widerrufen" und **nicht** „Zurückziehen": ein bereits verwendeter Link wird gelöscht, nicht im Sinne eines Rückrufs der darüber beigetretenen Mitbewohner:innen behandelt. Wiederverwendung von „Löschen" für eine `Application` (§8.6-Eintrag unten) ist unproblematisch, da der Listen-Kontext eindeutig ist |
+| `Application` löschen (O4/O5) *(ergänzt 2026-09-28 — der Eintrag, auf den die `join_code`-Zeile oben verweist)* | „Löschen" — endgültig, mit Bestätigung, die die Person nennt; kein „Entfernen" (das ist U-27s hartes Entfernen eines Mitglieds) und kein „Archivieren" (v0.2) |
+| `Application.state`, die elf Zustände *(ergänzt 2026-09-28, F3-Vorprüfung)* | `new` „Neu" · `screened` „Gesichtet" · `invited` „Eingeladen" · `scheduled` „Termin steht" · `interviewed` „Kennengelernt" · `offer_made` „Zusage erteilt" · `moved_in` „Eingezogen" · `rejected_by_household` „Abgesagt (von uns)" · `declined_by_applicant` „Abgesagt (von der Person)" · `withdrawn` „Zurückgezogen" · `archived` „Archiviert". Alle beschreiben, wo der **Prozess** steht, keines die Person (C-10) |
+| `Application.collected_from = third_party` | Checkbox „Die Angaben stammen nicht von der Person selbst (z. B. jemand hat sie euch empfohlen)"; in Listen der Hinweis „Über jemand anderen" *(ergänzt 2026-09-28, `03-PRD.md` §4.1.3)* |
 | `Notification.type = new_application` | „Neue Bewerbung: {Name}" |
 | `Notification.type = vote_pending` | „{N} Bewerbungen warten auf deine Stimme" |
 | `Notification.type = appointment_confirmed` | „Termin bestätigt: {Datum, Uhrzeit}" |

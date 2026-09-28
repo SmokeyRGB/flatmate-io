@@ -103,7 +103,7 @@ gewählt haben.** Entsprechend die strengste Datenhaltung.
 |---|---|:--:|---|
 | `id` | `uuid` | ⚙️ | |
 | `household_id` | `uuid` | ⚙️ | redundant zur Runde, aber Anker der RLS-Policy (ADR-004) |
-| `round_id` | `uuid` | ⚙️ | |
+| `round_id` | `uuid` | ⚙️ | **Pflicht** *(2026-09-28)*: jede Bewerbung gehört zu einer Runde (F3 A-3.4), denn der Aufbewahrungsanker ist deren Abschluss. Eine rundenlose `Application` hätte kein Löschdatum (O-19) |
 | `applicant_name` | `text` | 🔴 | **Pflichtfeld**, das einzige |
 | `age` | `int?` | 🔴 | |
 | `contact_email` | `text?` | 🔴 | |
@@ -121,11 +121,12 @@ gewählt haben.** Entsprechend die strengste Datenhaltung.
 | `planned_move_in_on` | `date?` | 🔴 | |
 | `decision_note` | `text?` | ⚫ | vorläufige Beschlüsse der WG („erst Zimmer 2 anbieten") |
 | `rejection_reason` | `text?` | ⚫ | |
-| `retention_until` | `date` | ⚙️ | 180 Tage bzw. `retention_days` ab `CastingRound.closed_at` *(korrigiert 2026-09-24, maßgeblich `06-Compliance-Anhang.md` §5.3)*, siehe §7 |
+| `retention_until` | `date?` | ⚙️ | 180 Tage bzw. `retention_days` ab `CastingRound.closed_at` *(korrigiert 2026-09-24, maßgeblich `06-Compliance-Anhang.md` §5.3)*, siehe §7. **Leer, solange die Runde offen ist** — vor dem Abschluss gibt es kein Datum, von dem aus gerechnet werden könnte *(ergänzt 2026-09-28)* |
 | `subject_access_exported_at` | `timestamptz?` | 🔴 | wann eine Datenauskunft erzeugt wurde — Nachweis der Unterstützungspflicht |
 | `created_by_account_id` | `uuid` | ⚙️ | |
 | `created_by_profile_id` | `uuid` | ⚙️ | **`NOT NULL` seit O-17.** `Application` anlegen setzt `create_application` voraus, und das hat nur, wer ein `ResidentProfile` besetzt — seit S-50/U-20 gibt es keinen Pfad mehr, der hier `null` erzeugen könnte. Kommt später ein Systempfad (Import, Formulareingang), bekommt er eine **benannte** Quelle; „kein Wert" und „vom System" dürfen nicht gleich aussehen |
-| `created_at` · `deleted_at` | `timestamptz` · `timestamptz?` | ⚙️ | |
+| `created_at` | `timestamptz` | ⚙️ | |
+| ~~`deleted_at`~~ | ~~`timestamptz?`~~ | ⚙️ | **Gestrichen 2026-09-28 (F3-Vorprüfung).** Löschen heißt löschen: eine `Application` wird in einer Transaktion hart gelöscht (G-D4, G-E5), und S-33 schließt einen „Papierkorb mit unbefristeter Wiederherstellung" ausdrücklich aus. Eine ungenutzte Soft-Delete-Spalte lädt die nächste Funktion ein, „nur `deleted_at` zu setzen" — genau das Risiko R-3.5 aus `backlog/requirements/F3-requirements.md`. Verweise auf eine gelöschte Bewerbung löst der Tombstone auf (`06-Compliance-Anhang.md` §5.6, Regel 4), nicht eine stehengebliebene Zeile. Die Spalte `Room.deleted_at` ist davon nicht betroffen |
 
 > **`source` und `collected_from` sind zwei Achsen, nicht eine — und ein Feld hätte gebrochen.**
 >
@@ -145,8 +146,9 @@ gewählt haben.** Entsprechend die strengste Datenhaltung.
 > und zwar immer in dieselbe Richtung, nämlich die bequemere.
 >
 > UI-seitig ist es trotzdem ein Blick und keine Friktion: `data_subject` ist **vorausgewählt** (es ist
-> der Regelfall), daneben steht eine Checkbox **„diese Bewerbung wurde mir weitergeleitet"**. Wird sie
-> gesetzt, löst das den Art.-14-Hinweis für den Haushalt aus.
+> der Regelfall), daneben steht eine Checkbox **„Die Angaben stammen nicht von der Person selbst"**
+> *(Beschriftung korrigiert 2026-09-28, vorher „diese Bewerbung wurde mir weitergeleitet"; maßgeblich
+> `03-PRD.md` §4.1.3)*. Wird sie gesetzt, löst das den Art.-14-Hinweis für den Haushalt aus.
 >
 > Zur Erinnerung an die Rollenverteilung: **Flatmate.io ist Auftragsverarbeiter und selbst niemandem
 > informationspflichtig** (Art. 14 gilt für Auftragsverarbeiter nicht). Das Feld dient dazu, dem

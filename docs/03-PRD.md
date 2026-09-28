@@ -510,10 +510,17 @@ eine Pflicht, die betroffene Person **binnen eines Monats** zu informieren.
 | `Application.source` | `manual_form` · `paste_parser` · `availability_link` · `portal_import` | wird vom System gesetzt (technischer Pfad, speist die Metrik aus SRD §6) |
 | `Application.collected_from` | `data_subject` · `third_party` | **wird von einem Menschen gesetzt**, nicht aus `source` hergeleitet |
 
-**Interaktion:** `data_subject` ist **sichtbar vorausgewählt** — nicht implizit —, daneben
-eine einzelne Checkbox:
+**Interaktion:** `data_subject` ist **sichtbar vorausgewählt** — nicht implizit, als
+ausgeschriebene Aussage „Angaben von der bewerbenden Person" —, daneben eine einzelne Checkbox:
 
-> ☐ Diese Bewerbung wurde mir von einer dritten Person weitergeleitet.
+> ☐ Die Angaben stammen nicht von der Person selbst (z. B. jemand hat sie euch empfohlen)
+
+*(Beschriftung korrigiert 2026-09-28, vorher: „Diese Bewerbung wurde mir von einer dritten
+Person weitergeleitet". „Weitergeleitet" trifft den Art.-14-Fall nicht genau: leitet jemand eine
+Bewerbung auf Wunsch der bewerbenden Person weiter, ist das vertretbar noch eine Erhebung bei ihr
+selbst (Art. 13), und wer eine Person am Telefon beschreibt, leitet nichts weiter. Die Checkbox
+fragt deshalb nach der Herkunft der Angaben. Begründung in `06-Compliance-Anhang.md` §4.5,
+Rechtsfrage bei Q-15; Entscheidung in `review-log.md` §Offene-Punkte-Register.)*
 
 Ein Blick, keine Friktion. Wird sie gesetzt, zeigt die Anwendung einen Hinweis auf die
 Informationspflicht binnen eines Monats und stellt den entsprechenden
@@ -555,7 +562,7 @@ gespeichert und nicht protokolliert.
 - [ ] Der Erfassungspfad funktioniert vollständig ohne Beteiligung der bewerbenden Person (P-1)
 - [ ] `collected_from` ist im Erfassungsformular **sichtbar** mit `data_subject` vorbelegt; der Wert ist nicht nur implizit gesetzt
 - [ ] `collected_from` wird **nicht** aus `Application.source` hergeleitet; `paste_parser` führt nicht automatisch zu `third_party`
-- [ ] Wird die Checkbox „von einer dritten Person weitergeleitet" gesetzt, erscheint ein Hinweis auf die Informationspflicht binnen eines Monats und ein Copy-Paste-Textbaustein
+- [ ] Wird die Checkbox „Die Angaben stammen nicht von der Person selbst" gesetzt, erscheint ein Hinweis auf die Informationspflicht binnen eines Monats und ein Copy-Paste-Textbaustein *(Beschriftung korrigiert 2026-09-28, siehe oben)*
 - [ ] Die Anwendung versendet auch in diesem Fall **keine** Nachricht an die bewerbende Person
 - [ ] `collected_from` ist an der `Application` später einsehbar und korrigierbar; eine Korrektur erzeugt einen `ActivityEvent`
 - [ ] Im Paste-Parser-Schritt ist jeder erkannte Absatz der Rohnachricht einzeln verwerfbar
@@ -1220,7 +1227,7 @@ aber **nie** auf dem primären-CTA-Platz und **nie** über einer Aufgabe mit ges
 | Regel | Festlegung |
 |-------|------------|
 | Ereignisurheberschaft | Jeder `ActivityEvent` speichert **`Account` und handelndes Profil** (E-21). Anzeige: Profilname, oder ehrlich „Verwaltung" |
-| Append-only (ADR-003) | `ActivityEvent`s werden nicht geändert und nicht gelöscht, solange die Bezugsdaten existieren. Wird ein Bezugsobjekt gelöscht, wird die personenbezogene Nutzlast des Ereignisses entfernt und der Eintrag auf „gelöscht" reduziert (offener Punkt SRD O-02) |
+| Append-only (ADR-003) | `ActivityEvent`s werden nicht geändert und nicht gelöscht, solange die Bezugsdaten existieren. Wird ein Bezugsobjekt gelöscht, wird die personenbezogene Nutzlast des Ereignisses entfernt und der Eintrag auf „gelöscht" reduziert (SRD O-02, entschieden 2026-09-08 — *korrigiert 2026-09-28, stand noch als „offener Punkt"*) |
 | Zeitzonen | Speicherung in UTC, Anzeige in der lokalen Zeitzone des Betrachters |
 | Reiner Domänenkern | Score-Berechnung, Quorum, Zustandsübergänge, Termin-Kostenmodell und Zeitfenster-Parser sind pure Funktionen ohne Datenbankzugriff (E-26) — Voraussetzung dafür, dass sie als geschützte Tests prüfbar sind |
 | Löschen eines `ResidentProfile` | `Vote`s werden auf „ehemaliges Mitglied" umgestellt, nicht gelöscht — abgeschlossene Entscheidungen bleiben nachvollziehbar. Setzt eine Löschung des Profils dessen Bewerbungshistorie zurück, bleibt `became_resident_id` bestehen, um die Invariante nicht zu brechen |
@@ -1437,7 +1444,7 @@ dient genau einer Kennzahl aus `02-SRD.md` §6.
 | `round_closed` | `round_id`, Dauer | Abgeschlossene / gestartete Runden |
 | `vote_cast` | `round_stage`, Stufe, ob Änderung einer bestehenden `Vote` | **Kernmetrik Beteiligungsquote**; Medianzahl Stimmen pro Bewerbung |
 | `resident_activated` | `household_id` | Aktivierte Bewohnende pro Haushalt — trennt „Onboarding kaputt" von „Abstimmen unattraktiv" |
-| `application_created` | Erfassungsweg (`form` / `paste`) | Bewerbungen pro Runde; rechtfertigt den Paste-Parser |
+| `application_created` | Erfassungsweg `Application.source` (`manual_form` / `paste_parser`; *korrigiert 2026-09-28, stand `form` / `paste`*) | Bewerbungen pro Runde; rechtfertigt den Paste-Parser |
 | `parser_suggestion_corrected` | Art (`applicant` / `time_window`), Anzahl korrigierter Felder | Korrekturquote — entscheidet über die Dringlichkeit des KI-Parsings in v2 |
 | `refinement_shown` | ausgelöst ja/nein, Anzahl „Unbedingt", Zimmerzahl | Prüft die Schwelle `ceil(Zimmer × 1,5)` |
 | `veto_cast` | mit/ohne Begründung, anonym ja/nein | Anteil Runden mit mindestens einem `Veto` |
