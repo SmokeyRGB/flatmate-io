@@ -22,11 +22,18 @@ export interface LostResponseOptions {
 
 // A resend must never let a test pass that should fail. For reads, a PUT of the same values and a
 // DELETE (deleteTestAccount already accepts the 404 a repeat gets), a second copy leaves the same
-// state. The password grant only checks a password in this application. createUser is the one
-// that is not idempotent, but a duplicate cannot slip through: Auth addresses are unique, so if a
-// first copy ever did arrive, the second is refused with email_exists and the test fails loudly.
-// That first user then stays on flatmate-io-dev, since the test never learned its id; none of the
-// traced lost requests had reached GoTrue, so this is the rare case, not the common one.
+// state. createUser and the password grant are not idempotent, but a duplicate cannot slip through:
+// Auth addresses are unique, so if a first createUser ever did arrive, the second is refused with
+// email_exists and the test fails loudly; a sign-in that did arrive only leaves a GoTrue session
+// this application never reads.
+//
+// What a lost-but-processed request leaves behind (a user whose id the test never learned, an
+// unobserved GoTrue session) is left by the lost response itself, resend or not: without the
+// resend the test times out and cleanup cannot find that user either. The resend only changes
+// the outcome when the first copy never arrived — every one of the traced cases — and then the
+// test passes instead of timing out. Do not "reconcile" by deleting the user with that address
+// before resending: tests that provoke email_exists on purpose would lose their pre-existing user
+// and could pass wrongly (PR #37 review).
 // Any other POST fails at the deadline instead of being resent, until someone makes that case.
 function isSafeToResend(method: string, pathname: string): boolean {
   if (["GET", "HEAD", "PUT", "DELETE"].includes(method)) return true;
