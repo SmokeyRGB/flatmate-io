@@ -85,15 +85,31 @@ Prozess vs. Person, nicht bei „beschreibend vs. empfehlend".
 
 **Kernelemente**
 
-- Formular ausfüllen **oder** Nachricht einfügen mit Parser-Vorschlag zur Bestätigung (P-1, S-08)
-- Einziges Pflichtfeld: `name`
+- Formular ausfüllen **oder** Nachricht einfügen mit Parser-Vorschlag zur Bestätigung (P-1, S-08).
+  **In v0.1 nur das Formular**; der Parser-Weg ist v0.2 (S-39, `backlog/requirements/F3-requirements.md`)
+- Einziges Pflichtfeld: `applicant_name`. Optional: Alter, E-Mail, Telefon, anderer Kontakt,
+  Nachricht, weitere Angaben. Längengrenzen sichtbar, bevor sie erreicht sind (F3 C-3.14)
+- **Erhebungsquelle** *(ergänzt 2026-09-28, S-38)*: die sichtbare Aussage „Angaben von der
+  bewerbenden Person" (`collected_from = data_subject`, vorausgewählt) und daneben die Checkbox
+  „Die Angaben stammen nicht von der Person selbst (z. B. jemand hat sie euch empfohlen)"
+  (`03-PRD.md` §4.1.3)
+- **Art.-14-Hinweis, noch vor dem Speichern** *(ergänzt 2026-09-28)*: ist die Checkbox gesetzt,
+  erscheinen die Frist samt Datum und der Textbaustein *Variante Dritterhebung*
+  (`06-Compliance-Anhang.md` §4.5), vor dem Kopieren änderbar, mit Kopieren-Knopf. **Keine
+  Sende-Handlung** (S-16)
 - Anlegt: `Application` im Zustand `new`
+- **Nach dem Speichern** *(ergänzt 2026-09-28)*: bei `data_subject` zurück auf O4 mit der neuen
+  Zeile hervorgehoben; bei `third_party` auf die Detailansicht (O5) mit dem Textbaustein — Pflicht
+  und Text im selben Schritt (F3 R-3.2)
 
 **Abweichende Zustände**
 
 | Zustand | Verhalten |
 |---|---|
-| Parser erkennt nichts | Formular mit dem Rohtext im Freitextfeld, keine geratenen Felder, keine Fehlermeldung (`03-PRD.md` §4.1.3) |
+| Leer — keine offene Runde *(ergänzt 2026-09-28)* | Kein Formular. Ein Satz, dass Bewerbungen nur in einer offenen Runde erfasst werden, und der Weg zurück zur Runde (F3 AC-3.4) |
+| Fehler *(ergänzt 2026-09-28)* | Standard aus `rahmenwerk.md` §6. Wurde die Runde geschlossen, während das Formular offen war, nennt die Meldung genau diesen Grund (F3 EC-3.9). Die Eingaben bleiben im Formular stehen |
+| Keine Berechtigung *(ergänzt 2026-09-28)* | Warum (Bewerbungen erfasst die Moderation oder wer das Recht dazu hat) und wer helfen kann — die Moderation der WG (F3 AC-3.5) |
+| Parser erkennt nichts | Formular mit dem Rohtext im Freitextfeld, keine geratenen Felder, keine Fehlermeldung (`03-PRD.md` §4.1.3). **v0.2** |
 
 ---
 
@@ -106,7 +122,12 @@ Prozess vs. Person, nicht bei „beschreibend vs. empfehlend".
 
 **Kernelemente**
 
-- Bewerbungen gruppiert nach `Application.status`
+- Bewerbungen gruppiert nach `Application.state` *(korrigiert 2026-09-28, stand `status` — gemeint
+  ist dasselbe Feld)*, **mit Anzahl je Gruppe** (`03-PRD.md` §4.1.7): erst der Hauptpfad in seiner
+  Reihenfolge, dann die Seitenzustände; leere Gruppen entfallen. Je Zeile Name, Zustand (Wort aus
+  `rahmenwerk.md` §8.6) und ein Hinweis „Über jemand anderen" (`rahmenwerk.md` §8.6), wenn `collected_from = third_party`
+- Überschrift in der Oberfläche: „Bewerbungen" *(2026-09-28; „Pipeline" ist der Name dieses
+  Eintrags, nicht der Text auf dem Bildschirm)*
 - Zugriff auf O5 je Bewerbung
 - **Layout (ergänzt 2026-09-16, Prototype-User-Test):** Rundeninfo-Kopf und Bewerbungsliste
   werden als ein visuell zusammenhängender Block dargestellt, nicht als zwei getrennte Cards —
@@ -122,6 +143,7 @@ Prozess vs. Person, nicht bei „beschreibend vs. empfehlend".
 | Zustand | Verhalten |
 |---|---|
 | Leer | Noch keine Bewerbung erfasst — Primärhandlung „Bewerbung erfassen" (O3) statt einer leeren Fläche |
+| Keine Berechtigung *(ergänzt 2026-09-28)* | Der Haushalts-Account sieht die Runde (ADR-014), aber **keine** Bewerbung und **keine Zahl** daraus (G-D15). Statt der Liste steht der Satz aus `rahmenwerk.md` §8.6 („Das WG-Konto verwaltet die WG …") |
 
 ---
 
@@ -131,6 +153,18 @@ Prozess vs. Person, nicht bei „beschreibend vs. empfehlend".
 |---|---|
 | **Zweck** | Eine Bewerbung im Status weiterschieben und den dazugehörigen Nachrichtentext erzeugen |
 | **Zugang** | Aus O4 |
+
+> **Zwei Hälften, zwei Scheiben** *(ergänzt 2026-09-28)*. **Das Grundgerüst baut F3**: die
+> Detailansicht einer Bewerbung mit ihren Sachangaben; bei `third_party` Frist und Textbaustein
+> *Variante Dritterhebung* (F3 FR-3.12, AC-3.9); **für jede Bewerbung** ein eingeklappter
+> „Datenschutz-Hinweis" zum Kopieren (Art.-13-Kurzhinweis aus `06-Compliance-Anhang.md` §4.5,
+> freiwillig, ohne Erinnerung und ohne Nachverfolgung), daneben „Warum steht das hier?" mit zwei,
+> drei Sätzen zur Verantwortung der WG; Bearbeiten aller erfassten Angaben einschließlich der
+> Erhebungsquelle (F3 FR-3.21); und „Löschen" mit einer Bestätigung, die die Person nennt:
+> „{Name} löschen? Die Bewerbung und alles, was dazu gespeichert ist, wird endgültig gelöscht. Das
+> lässt sich nicht rückgängig machen." — Bestätigen in Rot, Abbrechen lässt alles unverändert.
+> Bewusst **keine** getippte Bestätigung; die bleibt dem harten Entfernen eines Mitglieds
+> vorbehalten (U-27). **Die Statushandlungen unten baut F5.**
 
 **Kernelemente**
 
