@@ -115,6 +115,12 @@ jobs:
       # `npm run verify` above already runs this; kept here as the explicit non-quiet gate.
       - run: node tools/check-refs.ts
 
+      # `npm run verify` above already runs this gate; kept here as its own named step for the
+      # same reason as check-refs above — MINIMAL-GATE gate 4 asks for an "eigener CI-Schritt",
+      # and a named step shows up on its own in the checks list (design.md D6).
+      - name: Data inventory gate (ADR-010, MINIMAL-GATE gate 4)
+        run: npx tsx scripts/lint/data-inventory.ts
+
   # Runs the full suite against hosted flatmate-io-dev, only on push to main, so it never blocks a
   # pull request (human decision 2026-09-26, decision 6). Catches anything a --no-verify push
   # skipped locally, and anything the local stack's pinned versions don't actually reproduce.
@@ -143,7 +149,7 @@ jobs:
       # docs/GUARDRAILS.md's Minimal-Gate item 2 (TypeScript strict).
       - run: npm run build
 
-      # eslint + the four custom guardrail checks + the full test suite. The integration tests
+      # eslint + the custom guardrail checks + the full test suite. The integration tests
       # talk to a real Supabase project (transaction-mode pooler) and, since F1, to Supabase
       # Auth's admin API — so this needs DATABASE_URL plus the three Supabase env vars.
       #

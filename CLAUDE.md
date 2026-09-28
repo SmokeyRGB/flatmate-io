@@ -26,7 +26,7 @@ npm run lint       # eslint
 npm test          # vitest run
 npx vitest run tests/unit/casting/room-transitions.test.ts   # single file
 npx vitest run -t "test name substring"                       # single test by name
-npm run verify     # the full gate: eslint + tsc + seven guardrail lints + check-refs, then vitest run
+npm run verify     # the full gate: eslint + tsc + eight guardrail lints + check-refs, then vitest run
 npm run seed:demo # tsx --env-file=.env.local scripts/seed-demo-household.ts
 ```
 
@@ -34,7 +34,7 @@ npm run seed:demo # tsx --env-file=.env.local scripts/seed-demo-household.ts
 before treating a change as done. It type-checks (`next typegen && tsc --noEmit`; vitest alone does
 not enforce strict mode). Both `eslint` and `tsc` ignore `.claude/**`: that directory holds tool
 state and worktree copies of the repository, never source (human approval 2026-09-26, G-G3). The
-seven hand-written guardrail lints under `scripts/lint/`, plus an eighth check that runs inside
+eight hand-written guardrail lints under `scripts/lint/`, plus a ninth check that runs inside
 vitest, are listed in `.claude/rules/guardrail-lints.md`.
 
 Husky's pre-commit hook runs `gitleaks protect --staged` (G-A1) — install gitleaks locally or the
@@ -85,8 +85,10 @@ bun run format    # prettier --write .
   (`actions.ts`) calling into module repositories, never the DB client directly.
 - **Tests** (`tests/`, Vitest, `vitest.config.ts`): `tests/unit/<module>/`, plus
   `tests/integration/policy/` and `tests/integration/raw-sql/` — the two-sided RLS check G-C7
-  demands. `test/guarded.manifest.json` tracks which G-D invariants have real test coverage;
-  update it in the same commit as the test, never mark `implemented` speculatively. Tests hit a
+  demands — and `tests/integration/schema/` (catalog checks against the migrated database, the
+  live half of the data-inventory gate). `test/guarded.manifest.json` tracks which G-D invariants
+  have real test coverage; update it in the same commit as the test, never mark `implemented`
+  speculatively. Tests hit a
   real Supabase instance (no mocking DB/auth calls per F0 precedent), never production;
   `tests/setup.ts` throws if `DATABASE_URL` or `NEXT_PUBLIC_SUPABASE_URL` names the production
   ref. Which instance depends on where the run happens

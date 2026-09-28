@@ -44,9 +44,10 @@ context: |
   entities, fields, states, enums, functions, tables, commit messages, code comments, plus
   docs/backlog/**, docs/COVERAGE.md, tools/** and everything under openspec/.
 
-  BEFORE A CHANGE IS DONE: `npm run verify` must pass. That is eslint, the six hand-written
-  guardrail lints in scripts/lint/, tools/check-refs.ts, and the full vitest suite against the
-  flatmate-io-dev Supabase project. Not `npm test` — the lints are the guardrails.
+  BEFORE A CHANGE IS DONE: `npm run verify` must pass. That is eslint, the hand-written guardrail
+  lints in scripts/lint/ (listed in .claude/rules/guardrail-lints.md), tools/check-refs.ts, and the
+  full vitest suite against the flatmate-io-dev Supabase project. Not `npm test` — the lints are
+  the guardrails.
 
   STATUS of any open question lives only in docs/review-log.md §Offene-Punkte-Register. Do not
   add a status field for an open question anywhere else.

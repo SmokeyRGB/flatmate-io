@@ -693,7 +693,8 @@ Kontext. Ohne Eintrag bricht der Build.
 Vorsatz. Compliance-Dokumentation, die man nachträglich pflegen muss, wird nicht gepflegt.
 
 **Durchsetzung.** 🟢 CI-Gate: Abgleich der Schema-Definition gegen `data-inventory.yml`. Jede
-Spalte ist entweder deklariert oder ausdrücklich als `personal_data: false` markiert. Eine dritte
+Spalte ist entweder deklariert oder ausdrücklich als `personal_data: false` markiert (in der Datei
+geschrieben als `category: "⚙️"`, die Klasse „nicht personenbezogen" aus ADR-010). Eine dritte
 Möglichkeit gibt es nicht — **es gibt keinen stillen Default**.
 
 > Dass eine als `personal_data: false` markierte Spalte tatsächlich keinen Personenbezug hat, kann

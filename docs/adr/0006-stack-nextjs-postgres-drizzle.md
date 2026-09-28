@@ -252,7 +252,9 @@ Arbeit nicht ab und kann sie nicht abnehmen.
 >    Ergebnis und die beiden verbleibenden Vorbehalte stehen in ADR-007.
 > 2. ✅ **`Account.password_hash` aus dem Modell entfernt** — `../domain/identity.md` und
 >    `../domain/personenbezogene-felder.md` (Summe 59 → 58). Das `data-inventory.yml` existiert noch
->    nicht; die Folge ist dort beim Anlegen zu berücksichtigen (CI-Gate, ADR-010).
+>    nicht; die Folge ist dort beim Anlegen zu berücksichtigen (CI-Gate, ADR-010). **Nachtrag
+>    2026-09-28:** die Datei besteht und ist als CI-Gate durchgesetzt; `password_hash` ist dort nicht
+>    deklariert, und das Gate ließe eine solche Spalte ohne Eintrag nicht zu.
 > 3. 🟡 **`06-Compliance-Anhang.md`:** Supabase ist als Unterauftragsverarbeiter für **beide** Zwecke
 >    — Datenbank und Anmeldedienst — namentlich eingetragen (§1.3). **Weiterhin offen und bewusst
 >    nicht erfunden:** Firma und Sitz, Verarbeitungsort samt EU-Nachweis, Stand der eigenen AVV, die
