@@ -9,6 +9,7 @@ import {
   cleanupAll,
   deleteTestAccount,
   registerTestHousehold,
+  testEmail,
   type TestHousehold,
 } from "../../helpers/identity";
 
@@ -29,20 +30,21 @@ describe("joinHousehold puts a supplied email at the provider (design.md Decisio
   it("a join with an email puts it at the provider, and email sign-in works", async () => {
     hh = await registerTestHousehold();
     const link = await issueJoinCode(hh.context, hh.accountId, { validDays: 7, maxUses: 1 });
+    const email = testEmail();
 
     const result = await joinHousehold(link.code, {
       displayName: "EmailJoiner",
       password: PASSWORD,
-      email: "email-joiner@example.test",
+      email,
     });
     accountIds.push(result.context.accountId);
 
     const { data } = await adminClient().auth.admin.getUserById(result.context.accountId);
-    expect(data.user?.email).toBe("email-joiner@example.test");
+    expect(data.user?.email).toBe(email);
 
     const signInResult = await signIn({
       kind: "household",
-      email: "email-joiner@example.test",
+      email,
       password: PASSWORD,
     });
     expect(signInResult.context.accountId).toBe(result.context.accountId);
@@ -126,20 +128,21 @@ describe("joinHousehold puts a supplied email at the provider (design.md Decisio
   it("a mixed-case email is stored lower-cased in both account.email and the provider", async () => {
     hh = await registerTestHousehold();
     const link = await issueJoinCode(hh.context, hh.accountId, { validDays: 7, maxUses: 1 });
+    const email = testEmail();
 
     const result = await joinHousehold(link.code, {
       displayName: "MixedCaseJoiner",
       password: PASSWORD,
-      email: "Mixed@Example.test",
+      email: email.toUpperCase(),
     });
     accountIds.push(result.context.accountId);
 
     const { data } = await adminClient().auth.admin.getUserById(result.context.accountId);
-    expect(data.user?.email).toBe("mixed@example.test");
+    expect(data.user?.email).toBe(email);
 
     const [accountRow] = await withSessionContext(hh.context, (tx) =>
       tx.select().from(account).where(eq(account.id, result.context.accountId)),
     );
-    expect(accountRow.email).toBe("mixed@example.test");
+    expect(accountRow.email).toBe(email);
   });
 });

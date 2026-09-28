@@ -23,10 +23,17 @@ describe("Join atomicity (EC-2.1, design.md Decision 2)", () => {
     hh = await registerTestHousehold();
     const link = await issueJoinCode(hh.context, hh.accountId, { validDays: 7, maxUses: 1 });
 
-    const results = await Promise.allSettled([
-      joinHousehold(link.code, { displayName: "Winner", password: "test-password-not-real-1234" }),
-      joinHousehold(link.code, { displayName: "Loser", password: "test-password-not-real-1234" }),
-    ]);
+    // Which call wins is not fixed: joinHousehold claims the link only after its Auth round trips
+    // (createUser, signInWithPassword), so the call that finishes those first wins, whichever
+    // started first. The names below are therefore read from each call's own outcome.
+    const displayNames = ["JoinerA", "JoinerB"];
+    const results = await Promise.allSettled(
+      displayNames.map((displayName) =>
+        joinHousehold(link.code, { displayName, password: "test-password-not-real-1234" }),
+      ),
+    );
+    const winnerName = displayNames[results.findIndex((r) => r.status === "fulfilled")];
+    const loserName = displayNames[results.findIndex((r) => r.status === "rejected")];
 
     const fulfilled = results.filter(
       (r): r is PromiseFulfilledResult<Awaited<ReturnType<typeof joinHousehold>>> => r.status === "fulfilled",
@@ -44,11 +51,12 @@ describe("Join atomicity (EC-2.1, design.md Decision 2)", () => {
       tx.select().from(residentProfile).where(eq(residentProfile.householdId, hh!.householdId)),
     );
     expect(profiles).toHaveLength(1);
+    expect(profiles[0].displayName).toBe(winnerName);
 
     // The loser's display name exists nowhere — no account, resident profile, or membership was
     // left behind for it (joinHousehold's own transaction rolled everything back, and the Auth
     // user created before the transaction was deleted best-effort in the catch block).
-    const loserNameStillExists = profiles.some((p) => p.displayName === "Loser");
+    const loserNameStillExists = profiles.some((p) => p.displayName === loserName);
     expect(loserNameStillExists).toBe(false);
 
     const [updatedLink] = await withSessionContext(hh.context, (tx) =>

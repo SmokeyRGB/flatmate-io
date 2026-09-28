@@ -28,8 +28,14 @@ import {
   cleanupAll,
   deleteTestAccount,
   registerTestHousehold,
+  testEmail,
   type TestHousehold,
 } from "../../helpers/identity";
+
+const EMAIL_HAS_EMAIL_ALREADY = testEmail();
+const EMAIL_CLOSES_THE_GAP = testEmail();
+const EMAIL_RACED_IN = testEmail();
+const EMAIL_RACED_BETWEEN_PHASES = testEmail();
 
 const PASSWORD = "test-password-not-real-1234";
 
@@ -120,7 +126,7 @@ describe("issuePasswordResetLink (design.md Decision 6)", () => {
     ).rejects.toThrow(ResidentProfileNotEligibleForResetError);
 
     const hasEmail = await claimResident(hh, "HasEmailNotEligible");
-    await changeResidentEmail(await residentCurrentSession(hh, hasEmail), "has-email-already@example.test");
+    await changeResidentEmail(await residentCurrentSession(hh, hasEmail), EMAIL_HAS_EMAIL_ALREADY);
     await expect(
       issuePasswordResetLink(hh.context, hh.accountId, hasEmail.profileId),
     ).rejects.toThrow(ResidentProfileNotEligibleForResetError);
@@ -310,7 +316,7 @@ describe("redeemPasswordReset (design.md Decision 5)", () => {
     const resident = await claimResident(hh, "EmailClosesGap");
     const link = await issuePasswordResetLink(hh.context, hh.accountId, resident.profileId);
 
-    await changeResidentEmail(await residentCurrentSession(hh, resident), "closes-the-gap@example.test");
+    await changeResidentEmail(await residentCurrentSession(hh, resident), EMAIL_CLOSES_THE_GAP);
 
     let caught: unknown;
     try {
@@ -394,7 +400,7 @@ describe("redeemPasswordReset (design.md Decision 5)", () => {
       await tx.select().from(account).where(eq(account.id, resident.accountId)).for("update");
       markLocked();
       await rawTxGate;
-      await tx.update(account).set({ email: "raced-in@example.test" }).where(eq(account.id, resident.accountId));
+      await tx.update(account).set({ email: EMAIL_RACED_IN }).where(eq(account.id, resident.accountId));
     });
 
     // Wait for the raw transaction to actually hold the lock before starting the redemption —
@@ -475,7 +481,7 @@ describe("redeemPasswordReset (design.md Decision 5)", () => {
               );
               await tx
                 .update(account)
-                .set({ email: "raced-between-phases@example.test" })
+                .set({ email: EMAIL_RACED_BETWEEN_PHASES })
                 .where(eq(account.id, resident.accountId));
             });
             grabbedLock = true;

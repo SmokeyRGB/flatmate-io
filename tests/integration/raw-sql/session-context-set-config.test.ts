@@ -10,9 +10,11 @@ import { uuid } from "../../helpers/uuid";
 // written `SET LOCAL` — pool-reuse.test.ts ([GUARDED], G-D10) stays byte-identical; this is its
 // sibling for the new code path.
 //
-// A dedicated `max: 1` client forces every transaction here onto the SAME physical connection —
-// exactly the shape a transaction-mode pooler (Supavisor) can hand to a DIFFERENT tenant between
-// transactions, which is the leak this guards against.
+// A dedicated `max: 1` client keeps this test on one client-side connection. Behind Supavisor's
+// transaction mode that does not pin a server backend, so the test itself waits until it observes
+// the backend its first transaction used. That backend reaching a second transaction is exactly
+// the shape a transaction-mode pooler can hand to a DIFFERENT tenant, which is the leak this
+// guards against.
 describe("[GUARDED] session context set_config pool-reuse (G-D10, sibling of pool-reuse.test.ts)", () => {
   const client = postgres(process.env.DATABASE_URL!, { prepare: false, max: 1 });
   const db = drizzle(client);
@@ -41,13 +43,25 @@ describe("[GUARDED] session context set_config pool-reuse (G-D10, sibling of poo
       },
     );
 
-    // Outside any transaction on the SAME client (pool max: 1 guarantees the same physical
-    // connection — Supavisor's transaction mode may still have handed it elsewhere in principle,
-    // so this retries until the pid actually matches, and never passes by luck).
+    // Outside any transaction on the SAME client. `max: 1` pins the client-side connection only:
+    // Supavisor's transaction mode hands each transaction whichever server backend is free, so
+    // this retries until the pid actually matches, and never passes by luck.
+    //
+    // The retry is bounded by elapsed time, not by a count. It used to stop after 20 attempts,
+    // which was enough on an idle pool (a match on the first attempt) but not while another suite
+    // shares flatmate-io-dev (CI's verify-hosted during a pre-push run): another client's
+    // transaction can hold backend A for as long as it stays open, and several tests hold one
+    // for 1-1.5 s on purpose. 20 attempts at ~30 ms each gave up after ~0.6 s and failed as
+    // inconclusive (CI verify-hosted runs 36354921063 and 36387423611, both while a second suite
+    // ran against dev). Measured with three 1.5 s transactions held against the pool: 8 of 25
+    // trials needed more than 20 attempts, and every one matched within 3 s. 15 s covers that
+    // five times over and stays well inside the 60 s test budget. The short pause after a miss
+    // keeps this loop from adding a burst of round trips to the pool it is waiting on.
+    const retryUntil = Date.now() + 15_000;
     let pidB: number | undefined;
     let leaked: string | null = null;
     let matched = false;
-    for (let attempt = 0; attempt < 20; attempt++) {
+    while (Date.now() < retryUntil) {
       // Reads the setting and clears it in ONE statement, so both run on the same server
       // connection. Supavisor's transaction mode may route a separate RESET to a different
       // backend, which would leave a leaked value behind on the shared dev database. '' is the
@@ -63,9 +77,10 @@ describe("[GUARDED] session context set_config pool-reuse (G-D10, sibling of poo
         matched = true;
         break;
       }
+      await new Promise((resolve) => setTimeout(resolve, 25));
     }
 
-    // No match after 20 attempts means the test is INCONCLUSIVE, not a pass — it must never claim
+    // No match within 15 s means the test is INCONCLUSIVE, not a pass — it must never claim
     // the guarantee holds without having actually observed the same backend.
     expect(matched).toBe(true);
     expect(leaked === null || leaked === "").toBe(true);
