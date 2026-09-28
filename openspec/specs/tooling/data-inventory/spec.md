@@ -30,6 +30,12 @@ Default."*).
   exported
 - **THEN** `npm run verify` fails, and the message names the file
 
+#### Scenario: A schema.ts that hands a table builder on
+- **WHEN** a `schema.ts` exports anything that can build a table elsewhere (a Drizzle table
+  builder under any name or re-export syntax, a `pgSchema` object, or a function other than an
+  enum), so that another file could define a table through it
+- **THEN** `npm run verify` fails, and the message names the file and the export
+
 ### Requirement: The inventory declares nothing that does not exist
 
 `npm run verify` SHALL fail when `data-inventory.yml` declares a table or a column that no
@@ -95,6 +101,11 @@ FR-3.5, AC-3.12 (schema half).
 #### Scenario: A German column name or compound
 - **WHEN** a `schema.ts` declares a column named `konfession`, `gesundheit_info` or
   `gesundheitsdaten`
+- **THEN** `npm run verify` fails
+
+#### Scenario: A German adjective form
+- **WHEN** a `schema.ts` declares a column named `politische_meinung`, `sexuelle_orientierung`,
+  `ethnische_zugehoerigkeit`, `religiöse_zugehörigkeit` or `ist_behindert`
 - **THEN** `npm run verify` fails
 
 #### Scenario: A camelCase or plural name

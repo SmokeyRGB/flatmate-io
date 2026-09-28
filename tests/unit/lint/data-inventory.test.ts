@@ -309,8 +309,19 @@ describe("matchArt9Term (D4)", () => {
   it.each<[string, string]>([
     ["health_notes", "health"],
     ["healthNotes", "health"],
-    ["religion", "religio"],
-    ["religions", "religio"],
+    ["religion", "religi"],
+    ["religions", "religi"],
+    // German forms Copilot found escaping the first stems (PR #35), plus their siblings.
+    ["politische_meinung", "politi"],
+    ["political_party", "politi"],
+    ["sexuelle_orientierung", "sexu"],
+    ["sexual_orientation", "sexu"],
+    ["ethnische_zugehoerigkeit", "ethni"],
+    ["ethnicity", "ethni"],
+    ["religiöse_zugehörigkeit", "religi"],
+    ["ist_behindert", "behinder"],
+    ["weltanschauung", "weltanschau"],
+    ["nationalität", "nationalit"],
     ["trade_union", "union"],
     ["marital_status", "marital"],
     ["konfession", "konfession"],
@@ -328,7 +339,7 @@ describe("matchArt9Term (D4)", () => {
 
   // `disabled_at`/`disable_reason`: technical deactivation flags, not disability (the stem is
   // `disabilit`, not `disab`, for exactly this reason).
-  it.each(["reunion_at", "origin_url", "household_id", "participation", "unique_key", "disabled_at", "disable_reason"])(
+  it.each(["reunion_at", "origin_url", "household_id", "participation", "unique_key", "disabled_at", "disable_reason", "polite_reminder"])(
     "%j does not match the blocklist",
     (name) => {
       expect(matchArt9Term(name)).toBeNull();
@@ -502,6 +513,37 @@ export const a = t("a", { id: uuid("id").primaryKey() });
     expect(
       violations.some((v) => v.file === "src/modules/example/schema.ts" && /pgTableCreator/.test(v.reason)),
     ).toBe(true);
+  });
+
+  // Break (Copilot, PR #35): the out-of-schema scan skips schema.ts files, so a schema.ts that
+  // hands the builder on would let a helper import it from there with an ordinary local import.
+  // Each of these is refused on the schema.ts, by the runtime value it exports.
+  it.each<[string, string]>([
+    ["a named builder re-export", 'export { pgTable } from "drizzle-orm/pg-core";\n'],
+    ["a builder bound to a new name", 'import { pgTable } from "drizzle-orm/pg-core";\nexport const makeTable = pgTable;\n'],
+    ["a pgSchema object", 'import { pgSchema } from "drizzle-orm/pg-core";\nexport const other = pgSchema("other");\n'],
+    [
+      "a wrapper function that calls pgTable",
+      'import { pgTable, uuid } from "drizzle-orm/pg-core";\nexport function makeTable(name: string) { return pgTable(name, { id: uuid("id") }); }\nexport const a = makeTable("a");\n',
+    ],
+  ])("flags a schema.ts that exports %s", async (_label, content) => {
+    fixtureDir = mkdtempSync(join(process.cwd(), "flatmate-data-inventory-fixture-"));
+    writeFixture("src/modules/example/schema.ts", content);
+    const { violations } = await loadSchemaTables(fixtureDir);
+    expect(
+      violations.some((v) => v.file === "src/modules/example/schema.ts" && /can build tables outside this file/.test(v.reason)),
+    ).toBe(true);
+  });
+
+  // Not a violation: a schema.ts exporting tables and an enum (enums are callable, and allowed).
+  it("does not flag a schema.ts exporting a table and a pgEnum", async () => {
+    fixtureDir = mkdtempSync(join(process.cwd(), "flatmate-data-inventory-fixture-"));
+    writeFixture(
+      "src/modules/example/schema.ts",
+      'import { pgEnum, pgTable, uuid } from "drizzle-orm/pg-core";\nexport const kind = pgEnum("kind", ["a", "b"]);\nexport const a = pgTable("a", { id: uuid("id").primaryKey(), k: kind("k") });\n',
+    );
+    const { violations } = await loadSchemaTables(fixtureDir);
+    expect(violations).toEqual([]);
   });
 
   // Not a violation: `pgTable(` appearing only inside a comment.

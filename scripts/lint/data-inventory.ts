@@ -19,7 +19,7 @@
 // synchron bleiben": we take "nicht umgekehrt" to rule out generating the schema FROM the file,
 // not to forbid checking the file for entries the schema no longer has.
 import { is } from "drizzle-orm";
-import { getTableConfig, PgTable } from "drizzle-orm/pg-core";
+import { getTableConfig, isPgEnum, PgSchema, PgTable } from "drizzle-orm/pg-core";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -30,34 +30,46 @@ import { parse } from "yaml";
 // ---------------------------------------------------------------------------
 
 // From G-F3's list ("nationality, religion, health, disability, ethnicity, marital_status,
-// sexual_orientation, political, union"), their English derivatives/plurals, and their German
-// equivalents. Deliberately NOT included: `origin` (would match `origin_url`), `race` (would
-// match `race_condition`-style names; `ethnic`/`herkunft` cover the category), `belief`/`faith`
-// (too broad in English; `konfession`/`glaube`/`religio` cover it). `disabilit`, not `disab`: the
-// shorter stem would refuse every technical `disabled_at`/`disable_reason` column, and this gate
-// has no exemption marker (`behinderung` covers the German side).
+// sexual_orientation, political, union" and, in UI texts, their German equivalents:
+// „Nationalität, Herkunft, Religion, Gesundheit, Behinderung, sexuelle Orientierung, politische
+// oder gewerkschaftliche Zugehörigkeit, Familienstand"). Where English and German share a root,
+// one stem short enough to prefix both serves both languages: `religi` (religion, religious,
+// religiös, religioes), `ethni` (ethnic, ethnicity, ethnisch, Ethnie), `politi` (political,
+// politics, politisch, Politik), `sexu` (sexual, sexuality, sexuell, Sexualität), `nationalit`
+// (nationality, Nationalität, nationalitaet). `weltanschau` covers Weltanschauung, the Art.-9
+// category of philosophical belief. Umlaut stems exist in both spellings (ASCII transliteration
+// and umlaut); names are NFC-normalised before matching.
+// Deliberately NOT included:
+// - `origin`: it would match `origin_url`. `herkunft` and `ethni` cover the category.
+// - `race`: it would match `race_condition`-style names.
+// - `belief`/`faith`: too broad in English. `religi`, `konfession`, `glaube` and `weltanschau`
+//   cover it.
+// - `disab`: it would refuse every technical `disabled_at`/`disable_reason` column, and this gate
+//   has no exemption marker. `disabilit` and `behinder` (Behinderung, behindert) cover the
+//   category.
+// - `polit`: it would match `polite`. `politi` does not.
 export const ART9_BLOCKLIST: readonly string[] = [
+  // shared English/German roots
   "nationalit",
-  "religio",
+  "religi",
+  "ethni",
+  "politi",
+  "sexu",
+  // English
   "health",
   "disabilit",
-  "ethnic",
   "marital",
-  "sexual",
-  "politic",
   "union",
-  "nationalitaet",
-  "nationalität",
+  // German
   "staatsangehoerig",
   "staatsangehörig",
   "herkunft",
   "konfession",
   "glaube",
+  "weltanschau",
   "gesundheit",
-  "behinderung",
+  "behinder",
   "familienstand",
-  "sexualitaet",
-  "sexualität",
   "partei",
   "gewerkschaft",
 ];
@@ -197,8 +209,23 @@ export async function loadSchemaTables(rootDir: string): Promise<LoadResult> {
 
     const moduleExports: Record<string, unknown> = await import(pathToFileURL(schemaFile).href);
     const exportedTables = new Set<PgTable>();
-    for (const value of Object.values(moduleExports)) {
-      if (is(value, PgTable)) exportedTables.add(value);
+    for (const [name, value] of Object.entries(moduleExports)) {
+      if (is(value, PgTable)) {
+        exportedTables.add(value);
+        continue;
+      }
+      // The out-of-schema scan below skips schema.ts files, so a schema.ts must not hand a way to
+      // build tables on to other files: not a builder itself (`export { pgTable }`, `export * from
+      // "drizzle-orm/pg-core"`, `export const t = pgTable`, whatever the syntax), not a pgSchema
+      // object (its `.table()` builds tables), and not a wrapper function that calls pgTable.
+      // Checked on the runtime values, so no spelling of the re-export escapes it. Enums are
+      // callable too and are the one function-valued export allowed (Copilot review, PR #35).
+      if (is(value, PgSchema) || (typeof value === "function" && !isPgEnum(value as never))) {
+        violations.push({
+          file: relPath,
+          reason: `exports '${name}', which can build tables outside this file (a table builder, a pgSchema object or a function) — a schema.ts may export only tables, enums and plain values`,
+        });
+      }
     }
 
     if (exportedTables.size !== callCount) {
