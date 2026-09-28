@@ -5,8 +5,11 @@ import {
   cleanupAll,
   deleteTestAccount,
   registerTestHousehold,
+  testEmail,
   type TestHousehold,
 } from "../../helpers/identity";
+
+const EMAIL_TAB_EMAIL = testEmail();
 
 // registerTestHousehold's own password, and the one claimResidentProfile is given below.
 const PASSWORD = "test-password-not-real-1234";
@@ -46,10 +49,10 @@ describe("signIn resident_email (identity/sign-in)", () => {
     });
     await changeResidentEmail(
       { sessionId: signedIn.session.id, context: signedIn.context },
-      "tab-email@example.test",
+      EMAIL_TAB_EMAIL,
     );
 
-    const result = await signIn({ kind: "resident_email", email: "tab-email@example.test", password: PASSWORD });
+    const result = await signIn({ kind: "resident_email", email: EMAIL_TAB_EMAIL, password: PASSWORD });
     expect(result.context.profileId).toBe(profile.id);
     expect(result.context.accountId).toBe(accountId);
     expect(result.session.actingProfileId).toBe(profile.id);

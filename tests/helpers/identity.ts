@@ -73,6 +73,10 @@ export function adminClient() {
 }
 
 // G-B1: synthetic-only test data — @example.test is this project's fixed test-email convention.
+// Use it for every address a test sends to Supabase Auth, never a fixed literal: provider
+// addresses are unique project-wide, so a fixed one collides with any other suite running against
+// flatmate-io-dev at the same time (CI's verify-hosted during a pre-push run), and with another file
+// in the same run that happens to pick the same literal.
 export function testEmail(): string {
   return `f1-test-${uuid()}@example.test`;
 }
