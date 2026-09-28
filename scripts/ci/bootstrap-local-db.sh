@@ -184,6 +184,9 @@ echo "::add-mask::$SESSION_TOKEN_HASH_SECRET"
   echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$ANON_KEY"
   echo "SUPABASE_SERVICE_ROLE_KEY=$SERVICE_ROLE_KEY"
   echo "SESSION_TOKEN_HASH_SECRET=$SESSION_TOKEN_HASH_SECRET"
+  # This database was built from drizzle/ alone, so the data-inventory live check
+  # (tests/integration/schema/data-inventory-live.test.ts) fails on a finding instead of warning.
+  echo "DATA_INVENTORY_LIVE_STRICT=1"
 } >> "$GITHUB_ENV"
 
 echo "== bootstrap-local-db: done =="
