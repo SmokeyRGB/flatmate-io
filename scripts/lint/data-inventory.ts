@@ -33,12 +33,14 @@ import { parse } from "yaml";
 // sexual_orientation, political, union"), their English derivatives/plurals, and their German
 // equivalents. Deliberately NOT included: `origin` (would match `origin_url`), `race` (would
 // match `race_condition`-style names; `ethnic`/`herkunft` cover the category), `belief`/`faith`
-// (too broad in English; `konfession`/`glaube`/`religio` cover it).
+// (too broad in English; `konfession`/`glaube`/`religio` cover it). `disabilit`, not `disab`: the
+// shorter stem would refuse every technical `disabled_at`/`disable_reason` column, and this gate
+// has no exemption marker (`behinderung` covers the German side).
 export const ART9_BLOCKLIST: readonly string[] = [
   "nationalit",
   "religio",
   "health",
-  "disab",
+  "disabilit",
   "ethnic",
   "marital",
   "sexual",
@@ -61,43 +63,25 @@ export const ART9_BLOCKLIST: readonly string[] = [
 ];
 
 // Splits a name into lowercase words at `_` and at camelCase boundaries, after NFC-normalising
-// (so a decomposed "ö" still matches an umlaut-form stem).
+// (so a decomposed "ö" still matches an umlaut-form stem). The boundary is Unicode-aware, so an
+// uppercase umlaut starts a word too (`familienÄnderung` → `familien`, `änderung`).
 function splitWords(name: string): string[] {
-  const normalised = name.normalize("NFC").replace(/([a-z0-9])([A-Z])/g, "$1_$2");
+  const normalised = name.normalize("NFC").replace(/([\p{Ll}\p{Nd}])(\p{Lu})/gu, "$1_$2");
   return normalised
     .split("_")
     .map((w) => w.toLowerCase())
     .filter((w) => w.length > 0);
 }
 
-// A stem matches when a word *starts with* it (covers plurals and German compounds), or, for a
-// multi-word stem (split at `_`), when a run of consecutive words does, the last of which may
-// only be a prefix. A stem appearing inside a word but not at its start does not match.
+// A stem matches when a word *starts with* it: that covers plurals and German compounds, and it
+// covers G-F3's multi-word terms too, since each has a single-word stem of its own
+// (`marital_status` → `marital`, `sexual_orientation` → `sexual`, `trade_union` → `union`). A stem
+// appearing inside a word but not at its start does not match (`reunion` is not `union`).
 export function matchArt9Term(name: string): string | null {
   const words = splitWords(name);
-
   for (const stem of ART9_BLOCKLIST) {
-    const stemWords = stem.split("_").filter((w) => w.length > 0);
-
-    if (stemWords.length === 1) {
-      if (words.some((w) => w.startsWith(stemWords[0]))) return stem;
-      continue;
-    }
-
-    for (let i = 0; i + stemWords.length <= words.length; i++) {
-      let allMatch = true;
-      for (let j = 0; j < stemWords.length - 1; j++) {
-        if (words[i + j] !== stemWords[j]) {
-          allMatch = false;
-          break;
-        }
-      }
-      if (allMatch && words[i + stemWords.length - 1].startsWith(stemWords[stemWords.length - 1])) {
-        return stem;
-      }
-    }
+    if (words.some((w) => w.startsWith(stem))) return stem;
   }
-
   return null;
 }
 
@@ -147,12 +131,27 @@ function stripComments(content: string): string {
 // whitespace allowed before the paren.
 const TABLE_BUILDER_CALL = /\bpgTable(?:\.withRLS)?\s*\(|\.table\s*\(/g;
 
-// Any import of a table builder (`pgTable`, `pgTableCreator`, `pgSchema`) from
-// `drizzle-orm/pg-core` or one of its subpaths, including an aliased import (`pgTable as t`) — the
-// identifier still appears literally inside the braces — plus a namespace import
-// (`import * as pg from "drizzle-orm/pg-core"`), which reaches every builder as `pg.pgTable(`.
-const TABLE_BUILDER_IMPORT =
-  /import\s*\{[^}]*\b(?:pgTable|pgTableCreator|pgSchema)\b[^}]*\}\s*from\s*["']drizzle-orm\/pg-core(?:\/[^"']*)?["']|import\s*\*\s*as\s+\w+\s+from\s*["']drizzle-orm\/pg-core(?:\/[^"']*)?["']/;
+// Every way a file outside a module's schema.ts can get hold of a table builder (`pgTable`,
+// `pgTableCreator`, `pgSchema`) from `drizzle-orm/pg-core` or one of its subpaths:
+// - a named import, aliased or not (`pgTable as t`: the identifier still appears in the braces);
+// - a named re-export (`export { pgTable } from …`), which would let a barrel hand the builder on;
+// - a namespace import or star re-export (`import * as pg`, `export * from`), which reaches every
+//   builder as `pg.pgTable(`;
+// - `require("drizzle-orm/pg-core")` or a dynamic `import("drizzle-orm/pg-core")`.
+// A named import of types or helpers only (`PgTable`, `getTableConfig`, `PgColumn`) is not flagged:
+// src/db/session-context.ts and audit/repository.ts import those today.
+const PG_CORE = String.raw`["']drizzle-orm\/pg-core(?:\/[^"']*)?["']`;
+const TABLE_BUILDER_IMPORTS: readonly RegExp[] = [
+  new RegExp(String.raw`\b(?:import|export)\s+(?:type\s+)?\{[^}]*\b(?:pgTable|pgTableCreator|pgSchema)\b[^}]*\}\s*from\s*` + PG_CORE),
+  new RegExp(String.raw`\bimport\s+\*\s*as\s+\w+\s+from\s*` + PG_CORE),
+  new RegExp(String.raw`\bexport\s+\*\s*(?:as\s+\w+\s+)?from\s*` + PG_CORE),
+  new RegExp(String.raw`\b(?:require|import)\s*\(\s*` + PG_CORE),
+];
+
+// A table creator produces tables through a function the call count below cannot follow, so a
+// schema.ts that uses one is refused outright rather than miscounted (every table here uses
+// pgTable directly today).
+const TABLE_CREATOR_USE = /\bpgTableCreator\b/;
 
 function walkTsFiles(dir: string, out: string[]): void {
   for (const entry of readdirSync(dir)) {
@@ -189,6 +188,13 @@ export async function loadSchemaTables(rootDir: string): Promise<LoadResult> {
     const code = stripComments(content);
     const callCount = (code.match(TABLE_BUILDER_CALL) ?? []).length;
 
+    if (TABLE_CREATOR_USE.test(code)) {
+      violations.push({
+        file: relPath,
+        reason: "uses pgTableCreator — the gate cannot count tables built through a creator; declare each table with pgTable",
+      });
+    }
+
     const moduleExports: Record<string, unknown> = await import(pathToFileURL(schemaFile).href);
     const exportedTables = new Set<PgTable>();
     for (const value of Object.values(moduleExports)) {
@@ -222,10 +228,10 @@ export async function loadSchemaTables(rootDir: string): Promise<LoadResult> {
       if (/^src\/modules\/[^/]+\/schema\.ts$/.test(relPath)) continue;
 
       const code = stripComments(readFileSync(file, "utf8"));
-      if (TABLE_BUILDER_IMPORT.test(code)) {
+      if (TABLE_BUILDER_IMPORTS.some((re) => re.test(code))) {
         violations.push({
           file: relPath,
-          reason: "imports a Drizzle table builder (pgTable/pgSchema) from drizzle-orm/pg-core outside a module's schema.ts",
+          reason: "imports or re-exports a Drizzle table builder (pgTable/pgTableCreator/pgSchema, or the whole of drizzle-orm/pg-core) outside a module's schema.ts",
         });
       }
     }

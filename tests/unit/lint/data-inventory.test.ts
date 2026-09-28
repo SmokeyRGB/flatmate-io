@@ -102,7 +102,11 @@ describe("checkInventory against the real repository", () => {
     const { tables } = await loadSchemaTables(process.cwd());
     const text = readFileSync(join(process.cwd(), "data-inventory.yml"), "utf8");
     const lines = text.split("\n");
-    const idx = lines.findIndex((l) => l.trim().startsWith('purpose: { category: "⚙️", purpose: "Art des Links'));
+    // Found by its key inside join_code_issuance's block, not by its wording: the classification
+    // is still awaiting the human's confirmation and may change.
+    const tableIdx = lines.findIndex((l) => l.trimEnd() === "  join_code_issuance:");
+    const offset = lines.slice(tableIdx + 1).findIndex((l) => /^\s+purpose:\s*\{/.test(l));
+    const idx = tableIdx === -1 || offset === -1 ? -1 : tableIdx + 1 + offset;
     expect(idx).toBeGreaterThan(-1); // sanity: the line we mean to delete actually exists
     const withoutPurpose = [...lines.slice(0, idx), ...lines.slice(idx + 1)].join("\n");
 
@@ -314,12 +318,17 @@ describe("matchArt9Term (D4)", () => {
     ["gesundheitsdaten", "gesundheit"],
     [decomposedStaatsangehoerigkeit, "staatsangehörig"],
     ["familienstand", "familienstand"],
-    ["disability_record", "disab"],
+    ["disability_record", "disabilit"],
+    ["disabilities", "disabilit"],
+    // ASCII-only camelCase splitting missed a boundary after a non-ASCII lowercase letter ("ß").
+    ["fußHealth", "health"],
   ])("%j matches the blocklist (stem %j)", (name, stem) => {
     expect(matchArt9Term(name)).toBe(stem);
   });
 
-  it.each(["reunion_at", "origin_url", "household_id", "participation", "unique_key"])(
+  // `disabled_at`/`disable_reason`: technical deactivation flags, not disability (the stem is
+  // `disabilit`, not `disab`, for exactly this reason).
+  it.each(["reunion_at", "origin_url", "household_id", "participation", "unique_key", "disabled_at", "disable_reason"])(
     "%j does not match the blocklist",
     (name) => {
       expect(matchArt9Term(name)).toBeNull();
@@ -452,6 +461,47 @@ const notExported = pgTable("not_exported", { id: uuid("id").primaryKey() });
     );
     const { violations } = await loadSchemaTables(fixtureDir);
     expect(violations.some((v) => v.file === "src/modules/example/schema.ts")).toBe(true);
+  });
+
+  // Break: each of these hands a builder to a file outside schema.ts without a named import.
+  it.each<[string, string]>([
+    ["src/db/builders.ts", 'export { pgTable } from "drizzle-orm/pg-core";\n'],
+    ["src/db/all.ts", 'export * from "drizzle-orm/pg-core";\n'],
+    ["scripts/req.ts", 'const pg = require("drizzle-orm/pg-core");\n'],
+    ["src/lib/dyn.ts", 'const pg = await import("drizzle-orm/pg-core");\n'],
+  ])("flags %j (re-export, star re-export, require or dynamic import)", async (file, content) => {
+    fixtureDir = mkdtempSync(join(process.cwd(), "flatmate-data-inventory-fixture-"));
+    writeFixture(file, content);
+    const { violations } = await loadSchemaTables(fixtureDir);
+    expect(violations).toHaveLength(1);
+    expect(violations[0].file).toBe(file);
+  });
+
+  // Not a violation: a named import of types/helpers only, as src/db/session-context.ts and
+  // audit/repository.ts do today.
+  it("does not flag an import of PgTable/getTableConfig only", async () => {
+    fixtureDir = mkdtempSync(join(process.cwd(), "flatmate-data-inventory-fixture-"));
+    writeFixture("src/db/types.ts", 'import { getTableConfig, PgTable } from "drizzle-orm/pg-core";\n');
+    const { violations } = await loadSchemaTables(fixtureDir);
+    expect(violations).toEqual([]);
+  });
+
+  // Break: a schema.ts building a table through pgTableCreator, which the call count can't follow.
+  it("flags a schema.ts that uses pgTableCreator", async () => {
+    fixtureDir = mkdtempSync(join(process.cwd(), "flatmate-data-inventory-fixture-"));
+    writeFixture(
+      "src/modules/example/schema.ts",
+      `
+import { pgTableCreator, uuid } from "drizzle-orm/pg-core";
+
+const t = pgTableCreator((n) => n);
+export const a = t("a", { id: uuid("id").primaryKey() });
+`,
+    );
+    const { violations } = await loadSchemaTables(fixtureDir);
+    expect(
+      violations.some((v) => v.file === "src/modules/example/schema.ts" && /pgTableCreator/.test(v.reason)),
+    ).toBe(true);
   });
 
   // Not a violation: `pgTable(` appearing only inside a comment.

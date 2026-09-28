@@ -38,7 +38,12 @@ import { describe, expect, it } from "vitest";
 import { db } from "@/db/client";
 import { loadSchemaTables, matchArt9Term, parseInventory } from "../../../scripts/lint/data-inventory";
 
+// Strict when the environment says the database was built from the repository alone:
+// scripts/ci/bootstrap-local-db.sh exports DATA_INVENTORY_LIVE_STRICT=1 for CI's `verify` job, so
+// the enforcing job doesn't depend on which hostname its DATABASE_URL happens to use. A loopback
+// host (a developer's own local stack) is strict too.
 function isLocalDatabase(): boolean {
+  if (process.env.DATA_INVENTORY_LIVE_STRICT === "1") return true;
   const url = new URL(process.env.DATABASE_URL!);
   // WHATWG URL keeps the brackets on an IPv6 hostname: `postgres://…@[::1]:5432` → "[::1]".
   return url.hostname === "localhost" || url.hostname === "127.0.0.1" || url.hostname === "[::1]";

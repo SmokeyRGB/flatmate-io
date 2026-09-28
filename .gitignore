@@ -47,3 +47,7 @@
 # name a source of truth absent from the repo was the worst defect in the tree.
 # See docs/README.md for the precedence order it sits in.
 
+
+# tests/unit/lint/data-inventory.test.ts writes its fixtures into the repo root (they import
+# drizzle-orm, which a temp dir cannot resolve); afterEach removes them, this catches a killed run.
+/flatmate-data-inventory-fixture-*/

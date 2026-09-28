@@ -47,7 +47,11 @@ generates from, so it cannot disagree with the migrations drizzle-kit writes.
 *What import-based discovery cannot see*, and how each case is closed:
 - **A table builder used outside a module's `schema.ts`.** The scan runs over `src/` and
   `scripts/` and keys on the **import**, not the call: any file outside `src/modules/*/schema.ts`
-  that imports `pgTable` or `pgSchema` from `drizzle-orm/pg-core` fails the lint and is named. This
+  that imports or re-exports `pgTable`, `pgTableCreator` or `pgSchema` from `drizzle-orm/pg-core`
+  (named, aliased, namespace or star import/re-export, `require`, dynamic `import()`) fails the lint
+  and is named. A named import of types or helpers only (`PgTable`, `getTableConfig`) is allowed:
+  `src/db/session-context.ts` and `audit/repository.ts` need them. A `schema.ts` that uses
+  `pgTableCreator` is refused outright, because the call count can't follow a creator. This
   catches `pgTable.withRLS(`, `pgSchema("x").table(`, an aliased import (`pgTable as t`), and
   `pgTable (` with a space, which a call-site regex would miss. Paths are normalised `\` to `/`
   before matching, as `rls-coverage.ts` does. Without that, every `schema.ts` on Windows reads as
@@ -127,16 +131,16 @@ is a spelling, not a deviation, and the file's header says so.
 
 **Matching.** A single-word stem matches when a word *starts with* it. That covers plurals
 (`religions`, `disabilities`, `unions`, `parteien`) and German compounds (`gesundheitsdaten`,
-`behinderungsgrad`, `gewerkschaftsmitglied`, `religionszugehoerigkeit`). A multi-word term
-(`trade_union`) matches a run of consecutive words, the last of which may be a prefix. A stem
+`behinderungsgrad`, `gewerkschaftsmitglied`, `religionszugehoerigkeit`). G-F3's multi-word terms need no special matching: each has a single-word stem (`marital_status` to
+`marital`, `sexual_orientation` to `sexual`, `trade_union` to `union`). A stem
 appearing inside a word, not at its start, does not match: `reunion` is not `union`.
 
 **Scope.** The function runs over every name the gate knows: `schema.ts` table and column names,
 inventory table and column keys, and, in the live test, catalog table and column names. A name
 created only in SQL is caught too.
 
-**The stems.** From G-F3's list: `nationalit`, `religio` (religion, religious), `health`, `disab`
-(disability, disabled), `ethnic`, `marital`, `sexual` (sexuality, sexual_orientation,
+**The stems.** From G-F3's list: `nationalit`, `religio` (religion, religious), `health`, `disabilit` (disability, disabilities; not `disab`, which would refuse every technical
+`disabled_at`/`disable_reason` column, and the gate has no exemption marker), `ethnic`, `marital`, `sexual` (sexuality, sexual_orientation,
 sexual_preference), `politic` (political, politics), `union`. German stems in ASCII transliteration
 and umlaut form: `nationalitaet`/`nationalität`, `staatsangehoerig`/`staatsangehörig`, `herkunft`,
 `konfession`, `glaube`, `gesundheit`, `behinderung`, `familienstand`, `sexualitaet`/`sexualität`,
@@ -189,7 +193,9 @@ that a strict failure on shared dev blocks every other push. From the moment F3 
 because the entries sit on change 2's unmerged branch, and a `main` hotfix in that window would need
 `--no-verify`.
 
-So the test decides by `DATABASE_URL`'s host:
+So the test decides by an explicit flag, with the host as a fallback. `scripts/ci/bootstrap-local-db.sh`
+exports `DATA_INVENTORY_LIVE_STRICT=1` for CI's `verify` job, so the enforcing job doesn't depend on
+which hostname its `DATABASE_URL` uses (code review 2026-09-28). Without the flag:
 - **`localhost`, `127.0.0.1` or `::1`** (CI's `verify` job and a local stack, both built from
   `drizzle/` alone): the findings fail the test.
 - **Any other host** (hosted dev from a local run, the pre-push hook, or CI's `verify-hosted`): the

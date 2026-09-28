@@ -33,8 +33,7 @@
   C-3.13, and the schema half of AC-3.12), what the lint cannot prove, and the reading of ADR-010's
   *„nicht umgekehrt"* (D3). Export:
   - `ART9_BLOCKLIST` and `matchArt9Term(name): string | null`, per D4: NFC-normalise, split at `_`
-    and at camelCase boundaries, lowercase, then match word-prefix stems plus word runs for
-    multi-word terms, using exactly the stems listed in D4.
+    and at camelCase boundaries, lowercase, then match word-prefix stems, using exactly the stems listed in D4.
   - `describeTable(table: PgTable)`, returning `{ table, columns[] }` via `getTableConfig`.
   - `loadSchemaTables(rootDir)`, async. It discovers `src/modules/*/schema.ts` by walking, imports
     each via `pathToFileURL`, keeps the exports where `is(v, PgTable)` holds (deduplicated by object
@@ -115,7 +114,8 @@ it.
     matches `matchArt9Term`.
   - **Non-vacuous:** the catalog's table set must be a **superset** of
     `loadSchemaTables(root)`'s table names. Don't hard-code 13.
-  - **Strict or warn by host (D5):** `DATABASE_URL` host `localhost`, `127.0.0.1` or `::1` makes
+  - **Strict or warn by host (D5):** `DATA_INVENTORY_LIVE_STRICT=1` (set by CI's bootstrap), or a `DATABASE_URL` host `localhost`,
+    `127.0.0.1` or `[::1]`, makes
     the findings fail the test. Any other host sends them to `console.warn`, prefixed `data-inventory
     live check:` and saying the branch may be behind the database's migrations, and the test passes.
   - **Comments:** state the one-directional choice, the host split and why, that views are excluded

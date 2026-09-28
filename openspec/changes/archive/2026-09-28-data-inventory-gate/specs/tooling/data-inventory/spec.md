@@ -82,8 +82,8 @@ The list covers `docs/GUARDRAILS.md` G-F3's terms (*„`nationality`, `religion`
 `disability`, `ethnicity`, `marital_status`, `sexual_orientation`, `political`, `union`"*), their
 English derivatives and plurals, and their German equivalents. A name is split into words at
 underscores and at camelCase boundaries. A term matches when a word **starts with** it (so plurals
-and German compounds such as `gesundheitsdaten` match), or, for a multi-word term, when a run of
-consecutive words does. A term appearing inside a word but not at its start does not match. The
+and German compounds such as `gesundheitsdaten` match); each multi-word term has a single-word stem
+of its own. A term appearing inside a word but not at its start does not match. The
 check runs over every name the gate knows: `schema.ts` tables and columns, inventory keys, and the
 migrated database's tables and columns. There is no exemption marker: an exemption would be a human
 decision under G-G3. The blocklist SHALL be exported for reuse by UI-level checks. Source: G-F3,

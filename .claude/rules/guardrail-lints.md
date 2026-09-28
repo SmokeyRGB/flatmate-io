@@ -27,4 +27,4 @@ gate, also run inside vitest: it queries the migrated database's own catalog, so
 hand-written migration adds without ever touching `schema.ts` is still caught. Strict against a
 database built from `drizzle/` alone (CI's `verify` job); a warning only against the shared hosted
 `flatmate-io-dev` database, since another branch's still-unmerged migration can legitimately put
-it ahead of this one (design.md D5, `openspec/changes/data-inventory-gate`).
+it ahead of this one (design.md D5, `openspec/changes/archive/2026-09-28-data-inventory-gate`).
