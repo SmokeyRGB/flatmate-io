@@ -1,6 +1,6 @@
 # Review guidance for flatmate-io
 
-Read `CLAUDE.md`, section "Implementation hazards specific to this repo", before reviewing. The
+Read `.claude/rules/implementation-hazards.md` (split out of `CLAUDE.md`) before reviewing. The
 findings that mattered most in this repo's past reviews were all of one shape: a rule enforced on
 the path the change was written for, and not on another path into the same state. For each
 changed invariant, check:

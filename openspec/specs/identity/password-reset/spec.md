@@ -73,8 +73,8 @@ password unchanged; the person needs a new link. A failure after the password is
 it set; the person is told to sign in with their new password. The old password SHALL no longer
 sign in once the new one is set. Sources: O-16 (*„beendet alle aktiven `Session`s des betroffenen
 Profils"*); O-13; FR-2.18; the redesign in answer to the second review round of PR #23 (Postgres and the identity
-provider are separate systems with no transaction spanning both — CLAUDE.md "No transaction spans Postgres and
-Supabase Auth").
+provider are separate systems with no transaction spanning both — `.claude/rules/implementation-hazards.md`, "No transaction spans Postgres
+and Supabase Auth").
 
 #### Scenario: A redeemed reset
 - **WHEN** someone redeems a valid reset link with a new password that meets the rule

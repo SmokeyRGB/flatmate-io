@@ -1,0 +1,22 @@
+<!-- Moved verbatim from CLAUDE.md on 2026-09-28 (it had grown to 384 lines; the target is ~200).
+     Loaded at session start like CLAUDE.md itself: no `paths:` frontmatter, by decision.
+     Section names match what code comments and docs cite. -->
+
+# Guardrail lints
+
+The seven custom lints under `scripts/lint/` are hand-written checks (not eslint plugins), each
+enforcing one guardrail mechanically:
+
+| Script | Guardrail | What it checks |
+|---|---|---|
+| `import-boundary.ts` | G-C1 / FR-0.1 | only `src/db/` and each module's own `repository.ts` may import the raw Postgres/Drizzle client |
+| `session-context.ts` | G-C8 / FR-0.4 | bare `SET` is never allowed; `SET LOCAL`/`set_config(…, true)` for session context only in `src/db/session-context.ts`; also rejects `SET SESSION …`/`SET … TO` everywhere and a non-local `set_config` in `drizzle/*.sql` |
+| `rls-coverage.ts` | FR-0.2 / EC-0.1 | every table declaring `household_id` has a `pgPolicy` of its own — per table, not per schema file |
+| `definer-coverage.ts` | G-C7 | every `SECURITY DEFINER` function in `drizzle/` sets `search_path` and is called by name in a `tests/integration/raw-sql/` test |
+| `migration-shape.ts` | — (re-runnability) | migrations after `0017`: an enum `ADD VALUE` alone in its file, `ADD COLUMN IF NOT EXISTS`, `DROP FUNCTION IF EXISTS` before a bare or `RETURNS TABLE` create, `search_path` on `SECURITY DEFINER` |
+| `guarded-tests.ts` | G-D | every entry in `test/guarded.manifest.json` (G-D1…G-D15) stays honest: `pending`/`implemented` must match reality |
+| `pending-feedback.ts` | `ui/pending-feedback` | no plain submit button anywhere in `src/` (only `src/ui/submit-button.tsx`'s shared one); every `page.tsx` under `src/app/` has a sibling `loading.tsx` importing `@/ui/skeletons`, short named exemptions aside |
+
+`tests/unit/lint/cleanup-inventory.test.ts` is the eighth check, run inside vitest: it fails when
+a household-scoped table is missing from the delete set in `tests/helpers/identity.ts`, or when
+`undoRegisterHousehold` misses a table `registerHousehold` writes.
