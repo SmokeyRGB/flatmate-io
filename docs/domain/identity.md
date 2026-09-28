@@ -506,6 +506,32 @@ Vergebbare Werte in `permissions` (Vorschlag, erweiterbar):
 > wird, muss **S-04**s Ausschluss von `Berechtigungsvorlagen` (`02-SRD.md` §5.3) neu aufgemacht
 > werden, statt ein weiteres Mal gedehnt zu werden.
 
+> **`create_application` und `change_application_state` sind die dritte und vierte
+> Rolle-Vorbelegung (menschliche Entscheidung, 2026-09-28, F3-Vorprüfung) — und S-04 wurde dafür,
+> wie die Abgabebedingung oben verlangt, neu aufgemacht.** Vorbelegt bei `moderator`, nicht bei
+> `household_admin` (der Haushalts-Account erreicht keine Bewerbung, S-50/U-20).
+>
+> **Begründung, in den Worten der Entscheidung:** Bewerbungen sind rundenspezifisch. Sie zu ändern
+> ist Moderationsarbeit; der Haushalts-Account sieht nur, **dass** eine Runde existiert, und eine
+> bewohnende Person erledigt nur ihren eigenen Teil (abstimmen, Termine). `03-PRD.md` §4.0.1
+> (Vorrang 3) gibt der Moderation beide Handlungen ohnehin mit ✅ — die Vorbelegung setzt die
+> Rechtematrix um, statt eine neue Regel zu erfinden.
+>
+> **Warum S-04 trotzdem nicht fällt:** Ausgeschlossen sind `Berechtigungsvorlagen`, also Bündel,
+> die jemand im Haushalt benennt, zusammenstellt oder ändert. Hier legt die Spezifikation vier
+> feste Vorbelegungen je Rolle fest, und jede davon steht bereits in der Rechtematrix; niemand im
+> Haushalt kann ein Bündel definieren. Beide Rechte bleiben außerdem **einzeln vergebbar**, ohne
+> dass das Profil Moderator wird (die Rechtematrix: Bewohnender ⬜).
+>
+> **Was ausdrücklich kein vergebbares Recht ist:** `Application` **löschen** und einen Zustand
+> **zurücknehmen** hängen an der Rolle `moderator`, nicht an einem Recht — die Rechtematrix gibt
+> beiden Bewohnenden ❌, nicht ⬜. `delete_data` bleibt unvergeben; es gehört zum Löschweg der
+> Aufbewahrung und der Betroffenenrechte (v0.2), nicht zur Handlöschung.
+>
+> **Neue Abgabebedingung:** Eine **fünfte** Rolle-Vorbelegung, oder eine, die keine höherrangige
+> Quelle (Rechtematrix) bereits vorgibt, oder ein Bündel, das Nutzende selbst zusammenstellen
+> können, ist ein Vorlagensystem. Dann wird S-04 ausdrücklich entschieden, nicht gedehnt.
+
 > **`role` und `permissions` sind 🟠, nicht ⚙️** — entschieden in der Querprüfung gegen
 > `06-Compliance-Anhang.md` (O-9 Grenzfall 1), **gegen** den ursprünglichen Vorschlag dieses
 > Dokuments. Begründung: Art. 4 Nr. 1 DSGVO ist weit, und „X ist Moderator" ist eine Information

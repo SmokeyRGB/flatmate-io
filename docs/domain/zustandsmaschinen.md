@@ -45,8 +45,8 @@ Elf Zustände: sieben auf dem Hauptpfad, vier Seitenzustände.
 
 | Von | Nach | Wer darf | Was protokolliert / bewirkt wird |
 |---|---|---|---|
-| — | `new` | jede Person mit `create_application`, oder Token-Link-Eingang | `application.created` mit `source`; setzt `retention_until = created_at + retention_days` |
-| `new` | `screened` | `change_application_state`; **oder System**, sobald das Quorum in `stage = invite` erreicht ist | `application.screened`; ab hier erscheint die Bewerbung in der Rangliste (V-4 bleibt unberührt) |
+| — | `new` | jede Person mit `create_application`, oder Token-Link-Eingang | `application.created` mit `source` und `collected_from`; **`retention_until` bleibt leer**, bis die Runde abgeschlossen wird — der Anker ist `CastingRound.closed_at`, nicht `created_at` *(korrigiert 2026-09-28; maßgeblich `06-Compliance-Anhang.md` §5.3, siehe `casting.md` §2.2)* |
+| `new` | `screened` | `change_application_state` *(„oder System, sobald das Quorum in `stage = invite` erreicht ist" gestrichen 2026-09-28: widersprach `03-PRD.md` §4.2.1 — „Kein Übergang erfolgt automatisch", und kein Zustandsübergang hängt am Quorum. Das PRD geht vor)* | `application.screened`; ab hier erscheint die Bewerbung in der Rangliste (V-4 bleibt unberührt) |
 | `screened` | `invited` | `change_application_state` | `application.invited`; erzeugt den **Copy-Paste-Text inklusive Datenschutzhinweis** als Hilfsmittel für den Haushalt (Art. 13 liegt beim Verantwortlichen, nicht bei Flatmate.io) |
 | `invited` | `scheduled` | `confirm_appointment` | `appointment.confirmed` + `application.scheduled`; setzt `Appointment.status = confirmed` |
 | `scheduled` | `interviewed` | `change_application_state` | `application.interviewed`; setzt `Appointment.status = completed`; **öffnet `stage = offer`** für Stimmen und Vetos; Notizen sind ab hier der erwartete Inhalt |

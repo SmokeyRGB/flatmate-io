@@ -40,14 +40,14 @@ Order follows `02-SRD.md` §5.4's v0.1 row exactly, group by group.
 | **S-01** | `Household` registration (email + password); the household account administers and never votes | F1 | FR-1.1, FR-1.2, FR-1.7; AC-1.1, AC-1.2, AC-1.5 | ✅ |
 | **S-02** | `ResidentProfile` creation; one fixed identity per session, separate sign-ins for administration and resident (ADR-013) | F1 | FR-1.3–FR-1.6; AC-1.3, AC-1.4, AC-1.6 | ✅ |
 | **S-03** | One join code/link for the whole household; one-step registration with only name + password required | F2 | FR-2.1, FR-2.9–FR-2.19; AC-2.1–AC-2.6, AC-2.17 | ✅ |
-| **S-04** | `Membership` with orthogonal `is_resident` / `role` plus individually grantable permissions | F1 | FR-1.8; AC-1.5, AC-1.20, AC-1.21 (create-applicant permission itself is exercised by AC-3.5 in F3) | ✅ |
+| **S-04** | `Membership` with orthogonal `is_resident` / `role` plus individually grantable permissions | F1 | FR-1.8; AC-1.5, AC-1.20, AC-1.21 (the `create_application` permission itself is exercised by AC-3.5 in F3, and `change_application_state` by FR-3.24 / AC-3.21) | ✅ |
 | **S-05** | Two lists with different rights: participant list (names only, all residents) and resident list (administration full, moderator read-only, others not at all); only two of the four original duplicate-protection mechanisms survive | F1 | **Half A:** FR-1.19, AC-1.18 · **Half B:** FR-1.25–FR-1.30, AC-1.20–AC-1.23 · dependency in **C-1.10** | ✅² |
 | **S-49** | Join code gets an expiry, a usage cap, and a share-page warning | F2 | FR-2.1–FR-2.8; AC-2.7, AC-2.8, AC-2.9, AC-2.18 | ✅ |
 | **S-50** | An account without an active `ResidentProfile` reaches household administration only | F1 | FR-1.23, FR-1.24; AC-1.16, AC-1.17 | ✅ |
 | **S-06** | `CastingRound` with multiple `Room`s, its own state machine, and a `RoundParticipation` snapshot at opening | F1 | FR-1.12–FR-1.17; AC-1.8, AC-1.9, AC-1.10, AC-1.11 | ✅ |
 | **S-07** | `Room` as its own entity with its own status | F1 | FR-1.9–FR-1.11; AC-1.7 | ✅ |
 | **S-08** (Formularhälfte) | `Application` capture through the manual form only — name required, everything else optional | F3 | FR-3.1–FR-3.7; AC-3.1–AC-3.5, AC-3.12 | ✅ |
-| **S-38** | Two-axis capture: technical intake path plus collection source (`data_subject` / `third_party`) | F3 | FR-3.8–FR-3.13; AC-3.6–AC-3.11 | ✅ |
+| **S-38** | Two-axis capture: technical intake path plus collection source (`data_subject` / `third_party`) | F3 | FR-3.8–FR-3.13, FR-3.21–FR-3.23; AC-3.6–AC-3.11, AC-3.19, AC-3.20 | ✅ |
 | **S-09** | Card-by-card screening pass over every open application of the round | F4 | FR-4.1–FR-4.7; AC-4.1–AC-4.6 | ✅ |
 | **S-10** | Round-1 vote: four-level scale (0/1/3/5), weights disclosed, revisable while the round is open | F4 | FR-4.8–FR-4.16; AC-4.7–AC-4.15 | ✅ |
 | **S-12** | Ranking: score as a 0–100 mean, sortable; detail view with the stacked four-rating distribution | F5 | FR-5.1–FR-5.5, FR-5.11–FR-5.14; AC-5.1–AC-5.6, AC-5.11–AC-5.14 | ✅ |
