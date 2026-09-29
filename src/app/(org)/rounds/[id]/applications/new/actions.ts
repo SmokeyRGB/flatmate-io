@@ -47,20 +47,16 @@ export async function captureApplicationAction(
   const values = formData.getAll("attrValue").map((v) => (typeof v === "string" ? v : ""));
   const attributes = labels.map((label, i) => ({ label, value: values[i] ?? "" }));
 
-  let createdId: string;
   try {
-    const created = await captureApplication(current.context, {
+    await captureApplication(current.context, {
       roundId,
       applicantName: text(formData, "applicantName"),
       age: text(formData, "age"),
-      contactEmail: text(formData, "contactEmail"),
-      contactPhone: text(formData, "contactPhone"),
-      contactOther: text(formData, "contactOther"),
-      messageRaw: text(formData, "messageRaw"),
+      contacts: formData.getAll("contact").map((v) => (typeof v === "string" ? v : "")),
+      messageRaw: text(formData, "message"),
       attributes,
       collectedFrom: text(formData, "collectedFrom"),
     });
-    createdId = created.id;
   } catch (err) {
     if (err instanceof PermissionDeniedError) return { status: "error", code: "permission_denied" };
     if (err instanceof ProfileRequiredError) return { status: "error", code: "profile_required" };
@@ -77,9 +73,8 @@ export async function captureApplicationAction(
   }
 
   // redirect() works by throwing, so it stays OUTSIDE the try/catch above (design D6). The round id
-  // is a uuid by now (the repository refused anything else), and collectedFrom was validated.
-  if (text(formData, "collectedFrom") === "third_party") {
-    redirect(`/rounds/${roundId}/applications/${createdId}`);
-  }
+  // is a uuid by now (the repository refused anything else). Both sources land on the round: the
+  // third-party notice was already shown in the form's last step, and the application's detail
+  // keeps it for later (FR-3.12, "afterwards").
   redirect(`/rounds/${roundId}?saved=1`);
 }

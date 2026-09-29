@@ -360,17 +360,35 @@ export const de = {
     capture: {
       heading: "Bewerbung erfassen",
       backToRound: "Zur Runde",
+      // The three steps (design D6): Nachricht, Angaben, Hinweis.
+      messageIntro: "Füge die Nachricht der Person ein, falls du sie hast. Den Rest tippst du im nächsten Schritt.",
+      next: "Weiter",
+      back: "Zurück",
       nameLabel: "Name",
       ageLabel: "Alter",
-      emailLabel: "E-Mail",
-      phoneLabel: "Telefon",
-      otherContactLabel: "Anderer Kontakt",
-      otherContactHint: "z. B. ein Portal-Name oder eine Messenger-Kennung",
+      // One contact input, sorted by a fixed rule (design D15). The line under each input says
+      // where that contact will be stored.
+      contactLabel: "Kontakt",
+      contactLabelMore: "Weiterer Kontakt",
+      contactPlaceholder: "E-Mail, Telefonnummer oder eine andere Kennung",
+      addContact: "+ weiteren Kontakt",
+      contactStoredAs: {
+        email: "Wird als E-Mail-Adresse gespeichert",
+        phone: "Wird als Telefonnummer gespeichert",
+        other: "Wird als sonstiger Kontakt gespeichert",
+      },
+      // Names the input that clashes with an earlier one of the same kind.
+      contactKindTaken: {
+        email: "Es kann nur eine E-Mail-Adresse gespeichert werden.",
+        phone: "Es kann nur eine Telefonnummer gespeichert werden.",
+        other: "Es kann nur ein sonstiger Kontakt gespeichert werden.",
+      },
       messageLabel: "Nachricht der Person",
       // Counted in Unicode code points, like the database (assumption A5).
       counter: (used: number, max: number) => `${used} von ${max} Zeichen`,
       limitNear: (max: number) => `Höchstens ${max} Zeichen`,
       attributesLegend: "Weitere Angaben",
+      openAttributes: "+ Weitere Angaben",
       attributeLabelLabel: "Bezeichnung",
       attributeValueLabel: "Angabe",
       addAttribute: "Weitere Angabe hinzufügen",
@@ -379,8 +397,8 @@ export const de = {
       collectedFromStatement: "Angaben von der bewerbenden Person",
       collectedFromCheckbox:
         "Die Angaben stammen nicht von der Person selbst (z. B. jemand hat sie euch empfohlen)",
-      submit: "Bewerbung speichern",
-      submitPending: "Wird gespeichert…",
+      save: "Speichern",
+      savePending: "Wird gespeichert…",
     },
     // The three non-form states of O3 (the fourth, loading, is loading.tsx).
     states: {
@@ -406,31 +424,21 @@ export const de = {
         "Jede weitere Angabe braucht eine Bezeichnung (bis 60 Zeichen) und eine Angabe (bis 500 Zeichen).",
       invalid_characters: "Ein Feld enthält ein Zeichen, das nicht gespeichert werden kann.",
       collected_from_required: "Bitte gib an, woher die Angaben stammen.",
+      // Shown beside the contact inputs; the input that clashes gets contactKindTaken above.
+      contact_kind_taken: "Es sind höchstens drei Kontakte möglich, je einer als E-Mail, Telefon und sonstiger Kontakt.",
       round_not_found: "Diese Runde gibt es nicht mehr.",
       round_not_open:
         "Die Runde ist nicht mehr offen, deshalb wurde nichts gespeichert. Deine Eingaben stehen noch im Formular.",
       permission_denied: "Du hast keine Berechtigung, Bewerbungen zu erfassen.",
       profile_required: "Bewerbungen können nur Bewohner:innen erfassen.",
       save_failed: "Die Bewerbung konnte nicht gespeichert werden. Deine Eingaben stehen noch im Formular.",
-      // field names for the one-line pointer under an error, keyed by ApplicationInputField
-      fields: {
-        applicantName: "Name",
-        age: "Alter",
-        contactEmail: "E-Mail",
-        contactPhone: "Telefon",
-        contactOther: "Anderer Kontakt",
-        messageRaw: "Nachricht der Person",
-        attributes: "Weitere Angaben",
-        collectedFrom: "Woher die Angaben stammen",
-      },
-      fieldPrefix: (fieldLabel: string) => `Betrifft: ${fieldLabel}`,
     },
     saved: "Bewerbung gespeichert",
     // The Art. 14 duty and text. `{Datum}` is one month after capture, on the Berlin calendar (A2).
     notice: {
-      heading: "Die Person muss informiert werden",
-      dutyLine:
-        "Ihr müsst die Person spätestens mit eurer ersten Nachricht an sie informieren, und in jedem Fall spätestens einen Monat nach der Erfassung.",
+      // Two quiet lines (design D6): this one, then deadlineLine. Together they state both
+      // deadlines of FR-3.11, the first message and the one-month date.
+      informLine: "Die Person muss erfahren, dass ihr ihre Angaben gespeichert habt.",
       // 06-Compliance-Anhang.md §4.5, verbatim apart from its placeholders.
       deadlineLine: (name: string, date: string) =>
         `Am besten gleich mit deiner ersten Nachricht an ${name} schicken – spätestens bis ${date}.`,
@@ -438,13 +446,14 @@ export const de = {
       deadlinePassed: (date: string) =>
         `Die Monatsfrist ist schon verstrichen (${date}). Informiert die Person so bald wie möglich.`,
       textLabel: "Textbaustein zum Kopieren",
-      editHint: "Du kannst den Text vor dem Kopieren ändern. Die geänderte Fassung wird nicht gespeichert.",
+      showExample: "Beispieltext anzeigen",
+      hideExample: "Beispieltext ausblenden",
+      understood: "Verstanden",
       copy: "Text kopieren",
       copied: "Text kopiert",
       regenerate: "Text neu erzeugen",
       // A1: the [Link] stays a literal placeholder; say plainly that there is nothing to link to yet.
-      linkHint:
-        "Der Platzhalter [Link] bleibt stehen: Es gibt noch keine Datenschutzseite, auf die verwiesen werden könnte.",
+      linkHint: "[Link] bleibt stehen, weil es noch keine Datenschutzseite gibt.",
       nameFallback: "{Name}",
       // Category words for {Kategorien}, in the fixed order of noticeCategories().
       categories: {

@@ -62,10 +62,10 @@ function formData(collectedFrom = "data_subject"): FormData {
   fd.set("roundId", ROUND_ID);
   fd.set("applicantName", SENTINELS.applicantName);
   fd.set("age", SENTINELS.age);
-  fd.set("contactEmail", SENTINELS.contactEmail);
-  fd.set("contactPhone", SENTINELS.contactPhone);
-  fd.set("contactOther", SENTINELS.contactOther);
-  fd.set("messageRaw", SENTINELS.messageRaw);
+  fd.append("contact", SENTINELS.contactEmail);
+  fd.append("contact", SENTINELS.contactPhone);
+  fd.append("contact", SENTINELS.contactOther);
+  fd.set("message", SENTINELS.messageRaw);
   fd.append("attrLabel", SENTINELS.attrLabel);
   fd.append("attrValue", SENTINELS.attrValue);
   fd.set("collectedFrom", collectedFrom);
@@ -145,6 +145,11 @@ describe("captureApplicationAction: only a code and at most a field ever come ba
     const [, input] = captureApplication.mock.calls[0];
     expect(input).toMatchObject({ roundId: ROUND_ID, collectedFrom: "third_party" });
     expect(input.attributes).toEqual([{ label: SENTINELS.attrLabel, value: SENTINELS.attrValue }]);
+    // One contact input, repeated: every value reaches the repository as one list, unsorted (the
+    // parser sorts, design D15); the message arrives as messageRaw.
+    expect(input.contacts).toEqual([SENTINELS.contactEmail, SENTINELS.contactPhone, SENTINELS.contactOther]);
+    expect(input.messageRaw).toBe(SENTINELS.messageRaw);
+    expect(input).not.toHaveProperty("contactEmail");
   });
 });
 
@@ -156,11 +161,23 @@ describe("captureApplicationAction: where a saved capture lands", () => {
     });
   });
 
-  it("third_party lands on the application's detail, where the duty and text are", async () => {
+  // Break: restore the third_party branch that redirected to /applications/<id>, and this fails.
+  it("third_party returns to the round too: the notice was already shown in the form's last step", async () => {
     captureApplication.mockResolvedValue({ id: CREATED_ID });
     await expect(captureApplicationAction(idle, formData("third_party"))).rejects.toMatchObject({
-      target: `/rounds/${ROUND_ID}/applications/${CREATED_ID}`,
+      target: `/rounds/${ROUND_ID}?saved=1`,
     });
+  });
+
+  it("neither redirect carries a submitted value or the new id", async () => {
+    captureApplication.mockResolvedValue({ id: CREATED_ID });
+    for (const source of ["data_subject", "third_party"]) {
+      const signal = await captureApplicationAction(idle, formData(source)).catch((err: unknown) => err);
+      expect(signal).toBeInstanceOf(RedirectSignal);
+      const target = (signal as { target: string }).target;
+      expect(target).not.toContain(CREATED_ID);
+      expectNoSentinel(target);
+    }
   });
 
   it("a redirect is not swallowed as an error: it is thrown outside the try/catch", async () => {

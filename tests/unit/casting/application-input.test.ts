@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   ApplicationInputError,
+  classifyContact,
   parseApplicationInput,
   type ApplicationInputErrorCode,
   type ApplicationInputField,
@@ -44,9 +45,7 @@ describe("parseApplicationInput", () => {
     const blanks = parseApplicationInput({
       ...base,
       age: "",
-      contactEmail: "  ",
-      contactPhone: "",
-      contactOther: "\t",
+      contacts: ["  ", "", "\t"],
       messageRaw: "\n",
       attributes: [{ label: "", value: "  " }],
     });
@@ -100,11 +99,90 @@ describe("parseApplicationInput", () => {
     expectRefusal({ ...base, messageRaw: emoji.repeat(4001) }, "too_long", "messageRaw");
   });
 
-  it("the contact limits are 254, 50 and 200", () => {
-    expect(parseApplicationInput({ ...base, contactEmail: "e".repeat(254) }).contactEmail).toHaveLength(254);
-    expectRefusal({ ...base, contactEmail: "e".repeat(255) }, "too_long", "contactEmail");
-    expectRefusal({ ...base, contactPhone: "1".repeat(51) }, "too_long", "contactPhone");
-    expectRefusal({ ...base, contactOther: "x".repeat(201) }, "too_long", "contactOther");
+  // Design D15: the column limits apply AFTER sorting, so each kind has its own.
+  // Break: check every contact against one limit (say the email's 254) and the phone case fails.
+  it("the contact limits are 254, 50 and 200, per column after sorting", () => {
+    const email = (n: number) => "e".repeat(n - 7) + "@ex.com"; // n characters, an email
+    expect(email(254)).toHaveLength(254);
+    expect(parseApplicationInput({ ...base, contacts: [email(254)] }).contactEmail).toHaveLength(254);
+    expectRefusal({ ...base, contacts: [email(255)] }, "too_long", "contact");
+    expect(parseApplicationInput({ ...base, contacts: ["1".repeat(50)] }).contactPhone).toHaveLength(50);
+    expectRefusal({ ...base, contacts: ["1".repeat(51)] }, "too_long", "contact");
+    expect(parseApplicationInput({ ...base, contacts: ["x".repeat(200)] }).contactOther).toHaveLength(200);
+    expectRefusal({ ...base, contacts: ["x".repeat(201)] }, "too_long", "contact");
+  });
+
+  // Break: drop the dot rule (accept any "@" with text after it) and "a@b" fails; drop the "exactly
+  // one @" test and "a@@b.de" fails; lower the digit minimum to 5 and "12345" fails.
+  describe("classifyContact (design D15)", () => {
+    const cases: [string, "email" | "phone" | "other"][] = [
+      ["a@b.de", "email"],
+      ["lea@example.test", "email"],
+      ["  a@b.de  ", "email"], // trimmed first
+      ["a@b", "other"], // no dot after the @
+      ["a@.de", "other"], // the dot is the first character of the part after the @
+      ["a@b.", "other"], // the dot is the last character
+      ["@b.de", "other"], // nothing before the @
+      ["a@@b.de", "other"], // two @
+      ["a @b.de", "other"], // whitespace
+      ["+49 (30) 23125-0101", "phone"],
+      ["+49 30 23125 0101", "phone"],
+      ["030/23125.0101", "phone"],
+      ["123456", "phone"],
+      ["12345", "other"], // five digits
+      ["+ ( ) - / .", "other"], // punctuation only, no digits
+      ["030 23125 0101 x", "other"], // a letter
+      ["Portal: x", "other"],
+      ["", "other"],
+    ];
+    for (const [value, kind] of cases) {
+      it(`${JSON.stringify(value)} is ${kind}`, () => {
+        expect(classifyContact(value)).toBe(kind);
+      });
+    }
+  });
+
+  it("sorts each contact into its own column, in any order", () => {
+    const parsed = parseApplicationInput({
+      ...base,
+      contacts: ["Portal: lea-sucht", "+49 30 23125 0101", "lea@example.test"],
+    });
+    expect(parsed.contactEmail).toBe("lea@example.test");
+    expect(parsed.contactPhone).toBe("+49 30 23125 0101");
+    expect(parsed.contactOther).toBe("Portal: lea-sucht");
+  });
+
+  it("trims each contact and drops blanks before counting", () => {
+    const parsed = parseApplicationInput({ ...base, contacts: ["", "  lea@example.test  ", "   ", ""] });
+    expect(parsed.contactEmail).toBe("lea@example.test");
+    expect(parsed.contactPhone).toBeNull();
+    expect(parsed.contactOther).toBeNull();
+  });
+
+  // Break: drop the clash check in readContacts and the second value silently overwrites the first.
+  it("two contacts of one kind are contact_kind_taken, field contact", () => {
+    expectRefusal({ ...base, contacts: ["a@b.de", "c@d.de"] }, "contact_kind_taken", "contact");
+    expectRefusal({ ...base, contacts: ["+49 30 23125 0101", "030 23125 0102"] }, "contact_kind_taken", "contact");
+    expectRefusal({ ...base, contacts: ["Portal: a", "Messenger: b"] }, "contact_kind_taken", "contact");
+  });
+
+  // An invariant guard, not a regression test of the cap: four contacts always clash on three
+  // columns, so dropping the cap alone would not fail this. The cap is there so that a fourth kind,
+  // if one ever exists, cannot let a fourth contact through.
+  it("four contacts are refused, three are fine", () => {
+    expectRefusal(
+      { ...base, contacts: ["a@b.de", "+49 30 23125 0101", "Portal: a", "Portal: b"] },
+      "contact_kind_taken",
+      "contact",
+    );
+    expect(
+      parseApplicationInput({ ...base, contacts: ["a@b.de", "+49 30 23125 0101", "Portal: a"] }).contactOther,
+    ).toBe("Portal: a");
+  });
+
+  it("a non-array or a non-string contact is invalid_characters, field contact", () => {
+    expectRefusal({ ...base, contacts: "a@b.de" }, "invalid_characters", "contact");
+    expectRefusal({ ...base, contacts: [42] }, "invalid_characters", "contact");
   });
 
   it("age: -1, 151 and 1.5 are invalid_age; 0, 150 and a numeric string pass", () => {
@@ -155,7 +233,7 @@ describe("parseApplicationInput", () => {
     expectRefusal({ ...base, messageRaw: "vor\u0000nach" }, "invalid_characters", "messageRaw");
     expectRefusal({ ...base, messageRaw: "vor\uD800nach" }, "invalid_characters", "messageRaw");
     expectRefusal({ ...base, applicantName: "A\u0000" }, "invalid_characters", "applicantName");
-    expectRefusal({ ...base, contactOther: "\uDC00" }, "invalid_characters", "contactOther");
+    expectRefusal({ ...base, contacts: ["\uDC00"] }, "invalid_characters", "contact");
     expectRefusal(
       { ...base, attributes: [{ label: "a\u0000", value: "b" }] },
       "invalid_characters",

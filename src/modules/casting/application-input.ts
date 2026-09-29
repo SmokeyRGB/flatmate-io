@@ -33,14 +33,13 @@ export type ApplicationInputErrorCode =
   | "too_many_attributes"
   | "invalid_attribute"
   | "invalid_characters"
+  | "contact_kind_taken"
   | "collected_from_required";
 
 export type ApplicationInputField =
   | "applicantName"
   | "age"
-  | "contactEmail"
-  | "contactPhone"
-  | "contactOther"
+  | "contact"
   | "messageRaw"
   | "attributes"
   | "collectedFrom";
@@ -59,6 +58,11 @@ export class ApplicationInputError extends Error {
 // What a caller hands in. Deliberately loose: extra keys (a `source` a browser might send, say)
 // are ignored, and the repository never reads them.
 export type RawApplicationInput = { [key: string]: unknown };
+
+// The three stored contact columns (`domain/casting.md` §2.2). The form has ONE contact input; each
+// value is sorted into one of these by classifyContact() below (design D15).
+export type ContactKind = "email" | "phone" | "other";
+export const MAX_CONTACTS = 3;
 
 export interface ApplicationAttribute {
   label: string;
@@ -169,6 +173,52 @@ function readAttributes(raw: unknown): ApplicationAttribute[] | null {
   return rows.length === 0 ? null : rows;
 }
 
+// Design D15: the fixed rule that sorts one contact input into a stored column. Pure and
+// deterministic, used by the parser (server) and by the form's hint (browser). Applied in this order:
+//  1. email: no whitespace, exactly one "@", at least one character before it, and a dot inside
+//     the part after it (not its first or last character);
+//  2. phone: only digits, spaces and "+ ( ) - / .", with at least 6 digits;
+//  3. anything else.
+export function classifyContact(value: string): ContactKind {
+  const v = value.trim();
+  const at = v.indexOf("@");
+  if (!/\s/.test(v) && at > 0 && v.indexOf("@", at + 1) === -1) {
+    const domain = v.slice(at + 1);
+    for (let i = 1; i < domain.length - 1; i++) if (domain[i] === ".") return "email";
+  }
+  if (/^[0-9 +()\-/.]+$/.test(v) && (v.match(/[0-9]/g)?.length ?? 0) >= 6) return "phone";
+  return "other";
+}
+
+const CONTACT_COLUMN_LIMIT: Record<ContactKind, number> = {
+  email: APPLICATION_LIMITS.contactEmail,
+  phone: APPLICATION_LIMITS.contactPhone,
+  other: APPLICATION_LIMITS.contactOther,
+};
+
+// Reads the contact inputs: at most MAX_CONTACTS non-blank ones, each trimmed, checked for invalid
+// characters, sorted, then length-checked against ITS column. Two of one kind cannot share a column
+// and are refused; four contacts always would, so the cap is stated on its own.
+function readContacts(raw: unknown): Record<ContactKind, string | null> {
+  const out: Record<ContactKind, string | null> = { email: null, phone: null, other: null };
+  if (raw === undefined || raw === null) return out;
+  if (!Array.isArray(raw)) throw new ApplicationInputError("invalid_characters", "contact");
+  const filled: string[] = [];
+  for (const entry of raw) {
+    if (typeof entry !== "string") throw new ApplicationInputError("invalid_characters", "contact");
+    if (hasInvalidCharacters(entry)) throw new ApplicationInputError("invalid_characters", "contact");
+    if (entry.trim() !== "") filled.push(entry.trim());
+  }
+  if (filled.length > MAX_CONTACTS) throw new ApplicationInputError("contact_kind_taken", "contact");
+  for (const value of filled) {
+    const kind = classifyContact(value);
+    if (codePoints(value) > CONTACT_COLUMN_LIMIT[kind]) throw new ApplicationInputError("too_long", "contact");
+    if (out[kind] !== null) throw new ApplicationInputError("contact_kind_taken", "contact");
+    out[kind] = value;
+  }
+  return out;
+}
+
 export function parseApplicationInput(raw: RawApplicationInput): ParsedApplication {
   // Name first: it is the one required field.
   const rawName = raw.applicantName;
@@ -190,9 +240,7 @@ export function parseApplicationInput(raw: RawApplicationInput): ParsedApplicati
   }
 
   const age = readAge(raw.age);
-  const contactEmail = readOptionalText(raw.contactEmail, "contactEmail", APPLICATION_LIMITS.contactEmail);
-  const contactPhone = readOptionalText(raw.contactPhone, "contactPhone", APPLICATION_LIMITS.contactPhone);
-  const contactOther = readOptionalText(raw.contactOther, "contactOther", APPLICATION_LIMITS.contactOther);
+  const contacts = readContacts(raw.contacts);
   // message_raw is the ORIGINAL message (the v0.2 parser's input, C-3.8), so it is stored as
   // typed, not trimmed; only an all-blank message counts as empty (code review).
   const messageRaw = readOptionalText(raw.messageRaw, "messageRaw", APPLICATION_LIMITS.messageRaw, {
@@ -212,9 +260,9 @@ export function parseApplicationInput(raw: RawApplicationInput): ParsedApplicati
   return {
     applicantName,
     age,
-    contactEmail,
-    contactPhone,
-    contactOther,
+    contactEmail: contacts.email,
+    contactPhone: contacts.phone,
+    contactOther: contacts.other,
     messageRaw,
     attributes,
     collectedFrom: collectedFrom as CollectedFrom,

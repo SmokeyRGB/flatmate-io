@@ -509,7 +509,7 @@ All in `tests/integration/policy/application-capture.test.ts` unless named other
 
 ## 11. O3 as three quiet steps (human review of the walkthrough, 2026-09-29; design D6 and D15)
 
-- [ ] 11.1 `src/modules/casting/application-input.ts`: add `classifyContact(value): "email" |
+- [x] 11.1 `src/modules/casting/application-input.ts`: add `classifyContact(value): "email" |
   "phone" | "other"` exactly per D15, and make the parser take `contacts: string[]` instead of
   `contactEmail`/`contactPhone`/`contactOther`: at most 3; blanks dropped; each trimmed, checked
   for invalid characters, classified, then length-checked against its column's limit (`too_long`,
@@ -523,14 +523,14 @@ All in `tests/integration/policy/application-capture.test.ts` unless named other
   - per-column lengths.
 
   **Break:** swap the email and phone checks' order, or drop the dot rule, and a case fails.
-- [ ] 11.2 Update every caller of the old contact fields: the seed (`scripts/seed-demo-household.ts`),
+- [x] 11.2 Update every caller of the old contact fields: the seed (`scripts/seed-demo-household.ts`),
   `tests/helpers/applications.ts` if it passes raw input, `tests/integration/policy/application-capture.test.ts`,
   `tests/unit/casting/capture-action.test.ts` and any other test passing `contactEmail`/`contactPhone`/
   `contactOther` **as raw input**. Stored-column assertions stay as they are. These are setup
   changes only in non-guarded files; the grep of 5.2 stays empty for guarded files.
-- [ ] 11.3 `src/app/(org)/rounds/[id]/applications/new/capture-form.tsx`: rebuild as D6's three steps
+- [x] 11.3 `src/app/(org)/rounds/[id]/applications/new/capture-form.tsx`: rebuild as D6's three steps
   in one client component, one `<form>` spanning them, hidden inputs for the steps not shown:
-  - step 1: the message with the counter, „Überspringen" and „Weiter";
+  - step 1: the message with the counter and „Weiter" (no „Überspringen": the message is optional, human 2026-09-29);
   - step 2: name, age, the contact list (one input, „+ weiteren Kontakt" up to 3, the sorting hint
     per input from `classifyContact`), further details collapsed until „+ Weitere Angaben", the
     statement and the checkbox, „Zurück", and „Speichern" or „Weiter" depending on the box;
@@ -539,18 +539,18 @@ All in `tests/integration/policy/application-capture.test.ts` unless named other
   A server refusal jumps to the step of the named field (`messageRaw` → 1, else 2) and shows the
   error beside that field. The rest of D6 applies: `onSubmit` + `startTransition`, controlled
   inputs, `SubmitButton` with the pending flag, no PII in action state.
-- [ ] 11.4 `src/app/(org)/rounds/[id]/applications/third-party-notice.tsx`: the quiet notice of D6:
+- [x] 11.4 `src/app/(org)/rounds/[id]/applications/third-party-notice.tsx`: the quiet notice of D6:
   `callout-info`, the two lines, a toggle „Beispieltext anzeigen"/„Beispieltext ausblenden" that
   reveals the editable text, „Text kopieren", „Text neu erzeugen" and the one-line `[Link]` hint.
   Props: an optional `onUnderstood` renders „Verstanden" as the form's submit button (step 3). On
   the detail page there is no such button. The passed-date wording stays neutral.
-- [ ] 11.5 `actions.ts`: read `message`, `applicantName`, `age`, `contact` (all), the attributes and
+- [x] 11.5 `actions.ts`: read `message`, `applicantName`, `age`, `contact` (all), the attributes and
   `collectedFrom`. **Both sources redirect to `/rounds/[id]?saved=1`** (D6). The detail route stays
   for later access. `de.ts`: the new step, contact and notice strings, and remove the strings the
   rebuild no longer uses. Every label token goes through `matchArt9Term`.
-- [ ] 11.6 `loading.tsx` of the capture route: step 1's shape (a heading, one textarea block, two
-  buttons).
-- [ ] 11.7 Tests, updated or new, each with its break:
+- [x] 11.6 `loading.tsx` of the capture route: step 1's shape (a heading, one textarea block, one
+  button).
+- [x] 11.7 Tests, updated or new, each with its break:
   - `capture-page.test.ts`: AC-3.12's enumeration now covers all three steps' inputs (render each
     step, or assert the hidden-input set plus the visible step), still ≥ 8 inputs, label tokens
     included; AC-3.6 checks the statement, the unticked box and `collectedFrom = data_subject`.
@@ -566,10 +566,10 @@ All in `tests/integration/policy/application-capture.test.ts` unless named other
     jumps to its step.
   - `capture-action.test.ts`: both sources redirect to the round with `?saved=1`, and no value is
     in the state.
-- [ ] 11.8 `npx tsc --noEmit`, `npm run lint`, the eight lint scripts, `node tools/check-refs.ts`,
+- [x] 11.8 `npx tsc --noEmit`, `npm run lint`, the eight lint scripts, `node tools/check-refs.ts`,
   then the affected test files against dev. Report their real output. Do not run the full
   `npm run verify` (the planner does).
-- [ ] 11.9 `docs/screens/O-organisation.md` O3 (German, living file), amend the Kernelemente
+- [x] 11.9 `docs/screens/O-organisation.md` O3 (German, living file), amend the Kernelemente
   in place, marked *(geändert 2026-09-29, Durchsicht)*:
   - capture runs in three steps (Nachricht → Angaben → Hinweis, the last only for a third-party
     source);

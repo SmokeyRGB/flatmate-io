@@ -405,7 +405,7 @@ copy"*. The flow, confirmed by the human against a preview:
 
 | Step | Shows | Buttons |
 |---|---|---|
-| 1 · Nachricht | the applicant's message (optional), with the code-point counter | „Überspringen", „Weiter" |
+| 1 · Nachricht | the applicant's message (optional), with the code-point counter | „Weiter" only. The message is optional, so a separate „Überspringen" would do the same (human, 2026-09-29) |
 | 2 · Angaben | Name* · Alter · **one** „Kontakt" input (with „+ weiteren Kontakt", at most 3) · „+ Weitere Angaben" (collapsed until used) · the statement „Angaben von der bewerbenden Person" and the checkbox | „Zurück" and „Speichern", or „Weiter" instead of „Speichern" when the box is ticked |
 | 3 · only when ticked | a short neutral notice, two lines | „Beispieltext anzeigen" (opens the editable text and „Text kopieren"), „Verstanden" |
 

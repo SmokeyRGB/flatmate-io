@@ -109,9 +109,7 @@ async function main() {
     {
       applicantName: "Testbewerbung Noah",
       age: 27,
-      contactEmail: "noah.test@example.test",
-      contactPhone: "+49 30 23125 0101",
-      contactOther: "Portal: noah-test",
+      contacts: ["noah.test@example.test", "+49 30 23125 0101", "Portal: noah-test"],
       messageRaw: "Hallo, ich suche ab November ein Zimmer und koche gern für alle.",
       attributes: [{ label: "Beruf", value: "Tischler" }],
       collectedFrom: "data_subject",
@@ -119,12 +117,12 @@ async function main() {
     // two third-party captures
     {
       applicantName: "Testbewerbung Lea",
-      contactPhone: "+49 30 23125 0102",
+      contacts: ["+49 30 23125 0102"],
       collectedFrom: "third_party",
     },
     {
       applicantName: "Testbewerbung Jonas",
-      contactOther: "Messenger: jonas-test",
+      contacts: ["Messenger: jonas-test"],
       messageRaw: "Über eine Kollegin empfohlen worden.",
       collectedFrom: "third_party",
     },

@@ -1,11 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { de } from "@/ui/strings";
 import { matchArt9Term } from "../../../scripts/lint/data-inventory";
 
 // Screen O3 (F3 change 2), rendered with the renderToStaticMarkup + mocks pattern of
 // new-round-page-permission-guard.test.ts. Covers the page's guard order and the four states, the
-// pre-selected collection source (AC-3.6), and AC-3.12: no input is a structured field for a
+// collection source (AC-3.6), and AC-3.12: no input is a structured field for a
 // special category, by name or by label.
 vi.mock("server-only", () => ({}));
 vi.mock("next/headers", () => ({ cookies: vi.fn() }));
@@ -55,6 +56,20 @@ vi.mock("@/app/(org)/rounds/[id]/applications/new/actions", () => ({
 }));
 
 const { default: CaptureApplicationPage } = await import("@/app/(org)/rounds/[id]/applications/new/page");
+const { CaptureForm } = await import("@/app/(org)/rounds/[id]/applications/new/capture-form");
+
+// The three steps of the form (design D6). The page renders step 1; the others are reached by
+// buttons, so the form takes an `initial` seam for these renders.
+function renderStep(step: 1 | 2 | 3, extra: { thirdParty?: boolean; extraRows?: number } = {}) {
+  return renderToStaticMarkup(
+    createElement(CaptureForm, {
+      roundId: ROUND_ID,
+      household: "Testhaushalt",
+      dateLabel: "15.10.2026",
+      initial: { step, ...extra },
+    }),
+  );
+}
 
 async function render() {
   const element = await CaptureApplicationPage({ params: Promise.resolve({ id: ROUND_ID }) });
@@ -137,9 +152,25 @@ describe("O3 capture page: the four states and the guard order", () => {
     }
   });
 
-  it("an open round for a permission holder: the form with the statement, an unticked checkbox and data_subject as the value (AC-3.6)", async () => {
+  it("an open round for a permission holder: the form starts on step 1, the message, with data_subject as the value", async () => {
     const html = await render();
     expect(html).toContain("<form");
+    expect(html).toContain(de.applications.capture.messageLabel);
+    // Steps two and three are not on screen yet.
+    expect(html).not.toContain(de.applications.capture.collectedFromStatement);
+    expect(html).not.toContain(de.applications.notice.informLine);
+
+    const controls = enumerateControls(html);
+    const hidden = controls.find((c) => c.name === "collectedFrom");
+    expect(hidden).toBeDefined();
+    expect(hidden!.type).toBe("hidden");
+    expect(attr(hidden!.attrs, "value")).toBe("data_subject");
+  });
+
+  // Break: render the checkbox with `checked`, or default `thirdParty` to true in capture-form.tsx,
+  // and this fails on the checkbox, and on the hidden value (third_party).
+  it("AC-3.6: step 2 shows the statement, an unticked checkbox, and the hidden value is data_subject", () => {
+    const html = renderStep(2);
     expect(html).toContain(de.applications.capture.collectedFromStatement);
     expect(html).toContain(de.applications.capture.collectedFromCheckbox);
 
@@ -148,23 +179,51 @@ describe("O3 capture page: the four states and the guard order", () => {
     expect(checkbox).toBeDefined();
     expect(checkbox!.attrs).not.toMatch(/\bchecked\b/);
 
-    const hidden = controls.find((c) => c.name === "collectedFrom");
-    expect(hidden).toBeDefined();
-    expect(hidden!.type).toBe("hidden");
-    expect(attr(hidden!.attrs, "value")).toBe("data_subject");
+    const hidden = controls.filter((c) => c.name === "collectedFrom");
+    expect(hidden).toHaveLength(1);
+    expect(attr(hidden[0].attrs, "value")).toBe("data_subject");
 
-    // The Art. 14 notice is not shown while the box is unticked.
-    expect(html).not.toContain(de.applications.notice.heading);
+    // Unticked: the primary control saves, and no notice step is announced.
+    expect(html).toContain(de.applications.capture.save);
+    expect(html).not.toContain(de.applications.notice.informLine);
+  });
+
+  it("ticked: step 2 goes on (Weiter) instead of saving, and the value is third_party", () => {
+    const html = renderStep(2, { thirdParty: true });
+    expect(html).not.toContain(">" + de.applications.capture.save + "<");
+    expect(html).toContain(de.applications.capture.next);
+    const hidden = enumerateControls(html).find((c) => c.name === "collectedFrom");
+    expect(attr(hidden!.attrs, "value")).toBe("third_party");
+  });
+
+  it("step 3 shows the quiet notice with Verstanden, and the details travel as hidden inputs", () => {
+    const html = renderStep(3, { thirdParty: true });
+    expect(html).toContain(de.applications.notice.informLine);
+    expect(html).toContain(de.applications.notice.understood);
+    const hidden = enumerateControls(html)
+      .filter((c) => c.type === "hidden")
+      .map((c) => c.name);
+    expect(hidden).toEqual(expect.arrayContaining(["roundId", "collectedFrom", "message", "applicantName", "age"]));
   });
 });
 
 describe("AC-3.12: no structured field for a special category (G-F3)", () => {
   it("every input, textarea and select is enumerated with its name and label, and none matches the blocklist", async () => {
-    const html = await render();
-    const controls = enumerateControls(html);
+    // Every step is rendered (step 2 with two further-details rows, step 3 with the box ticked):
+    // the union of all their inputs, hidden carriers included, is what is checked.
+    const controls = [
+      ...enumerateControls(await render()),
+      ...enumerateControls(renderStep(1)),
+      ...enumerateControls(renderStep(2, { extraRows: 2 })),
+      ...enumerateControls(renderStep(3, { thirdParty: true })),
+    ];
 
-    // Not vacuous: the enumeration must actually have found the form's inputs.
+    // Not vacuous: the enumeration must actually have found the form's inputs, on every step.
     expect(controls.length).toBeGreaterThanOrEqual(8);
+    const names = new Set(controls.map((c) => c.name));
+    for (const expected of ["message", "applicantName", "age", "contact", "attrLabel", "attrValue", "collectedFrom"]) {
+      expect(names.has(expected), `an input named ${expected}`).toBe(true);
+    }
 
     for (const control of controls) {
       if (control.name !== null) {
