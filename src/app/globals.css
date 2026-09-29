@@ -23,6 +23,8 @@
   --vote-like-foreground: #132717;
   --vote-absolutely: #00572e;
   --vote-absolutely-foreground: #f8f5ee;
+  /* .dialog: the lift that sets the dialog off the page behind it. */
+  --dialog-shadow: 0 20px 50px -12px rgba(50, 31, 20, 0.35);
 }
 
 @theme inline {
@@ -76,6 +78,9 @@
     --vote-like-foreground: #0e1f12;
     --vote-absolutely: #7cd591;
     --vote-absolutely-foreground: #10230f;
+    /* The light value is a brown shadow on a near-brown page here, invisible (new-room dialog
+       walkthrough, 2026-09-29). The backdrop's dark value sits with .dialog::backdrop. */
+    --dialog-shadow: 0 20px 50px -12px rgba(0, 0, 0, 0.7);
   }
 }
 
@@ -457,9 +462,9 @@ h3 {
     color: var(--color-muted-foreground);
   }
 
-  /* Native <dialog>-based confirmation popup (09-Design-System.md) — scoped to this one use
-     case (member removal), not a general-purpose dialog spec yet. Reuses .card's own tokens
-     rather than inventing new ones. */
+  /* Native <dialog>-based popup (09-Design-System.md): the member-removal and join-code
+     confirmations, and the new-room form (rooms/new-room-dialog.tsx). .card's surface tokens, plus
+     its own backdrop and shadow (per theme, in :root) since it floats above the page. */
   .dialog {
     /* Tailwind preflight zeroes `margin` on every element, which cancels the UA stylesheet's
        `dialog:modal { margin: auto }` centering rule — restore it or the dialog pins top-left. */
@@ -468,12 +473,21 @@ h3 {
     color: var(--color-foreground);
     border: 1px solid var(--color-border);
     border-radius: 1rem;
-    box-shadow: var(--shadow-card);
+    box-shadow: var(--dialog-shadow);
     padding: 1.25rem;
     width: min(28rem, calc(100vw - 2rem));
   }
+  /* Literal colours, not a :root variable: ::backdrop inherits custom properties only in
+     Chrome 122+/Safari 17.4+, and an unresolved var() would leave no dimming at all. */
   .dialog::backdrop {
     background: rgba(50, 31, 20, 0.35);
+  }
+  @media (prefers-color-scheme: dark) {
+    /* The brown above barely darkens the dark page, so the dialog blended into the cards behind
+       it (new-room dialog walkthrough, 2026-09-29). */
+    .dialog::backdrop {
+      background: rgba(0, 0, 0, 0.7);
+    }
   }
 
   /* join-screen design.md Decision 6: A3's Laden placeholder — the shape of the heading, chip and

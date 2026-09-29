@@ -312,8 +312,17 @@ export const de = {
   },
   rooms: {
     heading: "Zimmer",
-    addPlaceholder: "Zimmerbezeichnung",
+    // new-room-dialog.tsx: the header button opens the dialog; the dialog's own submit creates.
     addSubmit: "Neues Zimmer",
+    create: {
+      heading: "Neues Zimmer",
+      labelField: "Bezeichnung",
+      labelPlaceholder: "z. B. Zimmer 3",
+      submit: "Zimmer anlegen",
+      submitPending: "Wird angelegt…",
+      labelRequired: "Gib eine Bezeichnung für das Zimmer ein.",
+      genericFailure: "Das Zimmer konnte nicht angelegt werden. Versuche es erneut.",
+    },
     changeState: "Status ändern",
     remove: "Entfernen",
   },

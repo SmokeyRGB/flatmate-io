@@ -7,7 +7,8 @@ import { getCurrentSession } from "@/modules/identity/session-cookie";
 import { de } from "@/ui/strings";
 import { LinkPendingHint } from "@/ui/link-pending-hint";
 import { SubmitButton } from "@/ui/submit-button";
-import { createRoomAction, removeRoomAction, renameRoomAction, transitionRoomAction } from "./actions";
+import { removeRoomAction, renameRoomAction, transitionRoomAction } from "./actions";
+import { NewRoomDialog } from "./new-room-dialog";
 
 const t = de.rooms;
 
@@ -24,12 +25,10 @@ export default async function RoomsPage() {
         <ArrowLeft className="size-4" /> {de.nav.organisation}
         <LinkPendingHint />
       </Link>
-      <h1 className="font-serif text-2xl font-semibold">{t.heading}</h1>
-
-      <form action={createRoomAction} className="flex gap-2">
-        <input name="label" placeholder={t.addPlaceholder} className="field-input flex-1" />
-        <SubmitButton className="btn btn-primary shrink-0">{t.addSubmit}</SubmitButton>
-      </form>
+      <div className="flex items-center justify-between gap-4">
+        <h1 className="font-serif text-2xl font-semibold">{t.heading}</h1>
+        <NewRoomDialog />
+      </div>
 
       <ul className="space-y-3">
         {rooms.map((r) => (

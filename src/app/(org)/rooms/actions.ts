@@ -10,6 +10,7 @@ import {
   transitionRoomStatus,
 } from "@/modules/casting/repository";
 import type { RoomStatus } from "@/modules/casting/room-transitions";
+import { de } from "@/ui/strings";
 
 async function requireRoomsAccess() {
   const current = await getCurrentSession();
@@ -18,15 +19,32 @@ async function requireRoomsAccess() {
   return current;
 }
 
-export async function createRoomAction(formData: FormData): Promise<void> {
+export interface CreateRoomFormState {
+  error: string | null;
+}
+
+// Returns a state for new-room-dialog.tsx's useActionState: an empty label used to return
+// silently, which read as a dead button. The input is `required` too, but "   " passes that.
+export async function createRoomAction(
+  _prevState: CreateRoomFormState,
+  formData: FormData,
+): Promise<CreateRoomFormState> {
   const current = await requireRoomsAccess();
   const label = String(formData.get("label") ?? "").trim();
-  if (!label) return;
-  await createRoom(current.context, label, {
-    accountId: current.context.accountId,
-    profileId: current.context.profileId,
-  });
+  if (!label) return { error: de.rooms.create.labelRequired };
+  try {
+    await createRoom(current.context, label, {
+      accountId: current.context.accountId,
+      profileId: current.context.profileId,
+    });
+  } catch (err) {
+    // A throw here would swap the page for Next's error screen and lose the dialog. The class
+    // name only: a driver error can echo the inserted row, and the label is free text (G-D7).
+    console.error("createRoomAction failed:", err instanceof Error ? err.name : typeof err);
+    return { error: de.rooms.create.genericFailure };
+  }
   revalidatePath("/rooms");
+  return { error: null };
 }
 
 export async function renameRoomAction(formData: FormData): Promise<void> {
