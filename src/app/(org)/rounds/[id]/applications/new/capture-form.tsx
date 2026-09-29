@@ -7,7 +7,7 @@ import {
   MAX_CONTACTS,
   type ApplicationInputField,
 } from "@/modules/casting/application-input";
-import { noticeCategories } from "@/modules/casting/application-notice";
+import { formatDateDe, noticeCategories, oneMonthAfter } from "@/modules/casting/application-notice";
 import { de } from "@/ui/strings";
 import { SubmitButton } from "@/ui/submit-button";
 import { ThirdPartyNotice } from "../third-party-notice";
@@ -15,6 +15,7 @@ import { captureApplicationAction, type CaptureErrorCode, type CaptureFormState 
 import {
   carriedFields,
   clashingContactIndex,
+  tooLongContactIndex,
   contactFields,
   decideSubmit,
   stepBack,
@@ -125,10 +126,14 @@ export function CaptureForm({
   const nameNear = count(name) >= APPLICATION_LIMITS.applicantName * 0.9;
 
   const clashIndex = shown?.code === "contact_kind_taken" ? clashingContactIndex(contacts) : null;
+  // The server names only the field for a too-long contact; the screen names the input, by the same
+  // per-column limits the server applies (code review).
+  const tooLongIndex =
+    shown?.code === "too_long" && shown.field === "contact" ? tooLongContactIndex(contacts) : null;
   // The error beside one field. A refusal that names no field (a closed round, no permission) is
   // shown once, under the step's buttons.
   const fieldError = (field: ApplicationInputField) =>
-    shown?.field === field && !(field === "contact" && clashIndex !== null) ? (
+    shown?.field === field && !(field === "contact" && (clashIndex !== null || tooLongIndex !== null)) ? (
       <p role="alert" className="field-error">
         {e[shown.code]}
       </p>
@@ -251,7 +256,20 @@ export function CaptureForm({
                     value={value}
                     onChange={(ev) => updateContact(i, ev.target.value)}
                   />
-                  {clashIndex === i ? (
+                  {i > 0 && (
+                    <button
+                      type="button"
+                      className="btn-link mt-1 text-xs"
+                      onClick={() => setContacts((cs) => cs.filter((_, j) => j !== i))}
+                    >
+                      {t.removeContact}
+                    </button>
+                  )}
+                  {tooLongIndex === i ? (
+                    <p role="alert" className="field-error">
+                      {e.too_long}
+                    </p>
+                  ) : clashIndex === i ? (
                     <p role="alert" className="field-error">
                       {t.contactKindTaken[classifyContact(value)]}
                     </p>
@@ -396,21 +414,27 @@ export function CaptureForm({
       </form>
 
       {/* Outside the <form>: the edited text is never posted. „Verstanden" saves. */}
-      {step === 3 && (
-        <>
+      {/* Kept mounted while the box is ticked and only hidden off step 3, so an edited example text
+          survives „Zurück" and „Weiter" (code review). */}
+      {thirdParty && (
+        <div hidden={step !== 3} className="space-y-4">
           <ThirdPartyNotice
             applicantName={name}
             household={household}
             categories={categories}
-            dateLabel={dateLabel}
+            // Computed when this step is shown, not when the page was loaded: a form left open
+            // across midnight would otherwise show a date a day earlier than the one the detail
+            // page computes from created_at (code review). The server's value is the fallback for
+            // the render tests, which have no live clock to match.
+            dateLabel={typeof window === "undefined" ? dateLabel : formatDateDe(oneMonthAfter(new Date()))}
             deadlinePassed={false}
             understood={{ formId: FORM_ID, pending: isPending }}
           />
-          {generalError}
+          {step === 3 && generalError}
           <button type="button" className="btn btn-secondary" onClick={() => goTo(stepBack(3))}>
             {t.back}
           </button>
-        </>
+        </div>
       )}
     </div>
   );

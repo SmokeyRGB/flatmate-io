@@ -107,7 +107,8 @@ describe("parseApplicationInput", () => {
     expect(parseApplicationInput({ ...base, contacts: [email(254)] }).contactEmail).toHaveLength(254);
     expectRefusal({ ...base, contacts: [email(255)] }, "too_long", "contact");
     expect(parseApplicationInput({ ...base, contacts: ["1".repeat(50)] }).contactPhone).toHaveLength(50);
-    expectRefusal({ ...base, contacts: ["1".repeat(51)] }, "too_long", "contact");
+    // 51 digits no longer fit the phone column, so the rule keeps them as another contact (code review).
+    expect(parseApplicationInput({ ...base, contacts: ["1".repeat(51)] }).contactOther).toHaveLength(51);
     expect(parseApplicationInput({ ...base, contacts: ["x".repeat(200)] }).contactOther).toHaveLength(200);
     expectRefusal({ ...base, contacts: ["x".repeat(201)] }, "too_long", "contact");
   });
@@ -258,5 +259,20 @@ describe("parseApplicationInput", () => {
       const serialised = JSON.stringify({ message: err.message, own });
       for (const s of sentinels) expect(serialised).not.toContain(s);
     }
+  });
+
+  // Code review: a caller still using the first build's keys would lose the contact silently.
+  // Break: drop the RETIRED_CONTACT_KEYS loop, and this fails.
+  it("refuses the retired contactEmail/contactPhone/contactOther keys instead of dropping them", () => {
+    expect(() => parseApplicationInput({ ...base, contactEmail: "lea@example.test" })).toThrow(/retired/);
+    expect(() => parseApplicationInput({ ...base, contactPhone: "+49 30 23125 0101" })).toThrow(/retired/);
+  });
+
+  // Code review: a phone-shaped contact too long for the phone column fits the other column.
+  // Break: drop the length condition in classifyContact, and this fails.
+  it("a phone-shaped contact longer than 50 is stored as another contact", () => {
+    const long = "+49 30 23125 0101 / +49 30 23125 0102 / +49 30 23125 0103"; // 56
+    expect(classifyContact(long)).toBe("other");
+    expect(parseApplicationInput({ ...base, contacts: [long] }).contactOther).toBe(long);
   });
 });

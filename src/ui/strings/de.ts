@@ -372,6 +372,8 @@ export const de = {
       contactLabelMore: "Weiterer Kontakt",
       contactPlaceholder: "E-Mail, Telefonnummer oder eine andere Kennung",
       addContact: "+ weiteren Kontakt",
+      // Not „Entfernen": §8.6 reserves that word for removing a member (U-27).
+      removeContact: "Kontakt weglassen",
       contactStoredAs: {
         email: "Wird als E-Mail-Adresse gespeichert",
         phone: "Wird als Telefonnummer gespeichert",

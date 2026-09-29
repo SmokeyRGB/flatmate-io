@@ -177,7 +177,8 @@ function readAttributes(raw: unknown): ApplicationAttribute[] | null {
 // deterministic, used by the parser (server) and by the form's hint (browser). Applied in this order:
 //  1. email: no whitespace, exactly one "@", at least one character before it, and a dot inside
 //     the part after it (not its first or last character);
-//  2. phone: only digits, spaces and "+ ( ) - / .", with at least 6 digits;
+//  2. phone: only digits, spaces and "+ ( ) - / .", with at least 6 digits, and short enough
+//     for the phone column (50); a longer one of that shape is kept as "other" (code review);
 //  3. anything else.
 export function classifyContact(value: string): ContactKind {
   const v = value.trim();
@@ -186,7 +187,13 @@ export function classifyContact(value: string): ContactKind {
     const domain = v.slice(at + 1);
     for (let i = 1; i < domain.length - 1; i++) if (domain[i] === ".") return "email";
   }
-  if (/^[0-9 +()\-/.]+$/.test(v) && (v.match(/[0-9]/g)?.length ?? 0) >= 6) return "phone";
+  if (
+    /^[0-9 +()\-/.]+$/.test(v) &&
+    (v.match(/[0-9]/g)?.length ?? 0) >= 6 &&
+    [...v].length <= APPLICATION_LIMITS.contactPhone
+  ) {
+    return "phone";
+  }
   return "other";
 }
 
@@ -219,7 +226,17 @@ function readContacts(raw: unknown): Record<ContactKind, string | null> {
   return out;
 }
 
+// The first build took contactEmail/contactPhone/contactOther. They are refused, not ignored: a
+// caller still using them would otherwise lose the contact silently (code review). The message
+// names the keys only, never a value.
+const RETIRED_CONTACT_KEYS = ["contactEmail", "contactPhone", "contactOther"] as const;
+
 export function parseApplicationInput(raw: RawApplicationInput): ParsedApplication {
+  for (const key of RETIRED_CONTACT_KEYS) {
+    if (raw[key] !== undefined) {
+      throw new Error(`parseApplicationInput: "${key}" is retired; pass contacts: string[] (design D15)`);
+    }
+  }
   // Name first: it is the one required field.
   const rawName = raw.applicantName;
   if (rawName === undefined || rawName === null) {

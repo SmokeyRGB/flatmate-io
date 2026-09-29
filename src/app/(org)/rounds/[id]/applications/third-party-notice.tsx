@@ -83,7 +83,7 @@ export function ThirdPartyNotice({
           type="button"
           className="btn btn-secondary"
           aria-expanded={open}
-          aria-controls={panelId}
+          aria-controls={open ? panelId : undefined}
           onClick={() => setOpen((o) => !o)}
         >
           {open ? t.hideExample : t.showExample}

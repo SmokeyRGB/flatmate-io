@@ -1,6 +1,7 @@
 // Pure step logic of the capture form (design D6). No React, no I/O, so it is unit-testable without
 // a DOM. The form component owns the useState calls; every decision that could go wrong lives here.
 import {
+  APPLICATION_LIMITS,
   classifyContact,
   type ApplicationInputField,
   type ContactKind,
@@ -86,6 +87,22 @@ export function clashingContactIndex(contacts: string[]): number | null {
     const kind = classifyContact(contacts[i]);
     if (seen.has(kind)) return i;
     seen.add(kind);
+  }
+  return null;
+}
+
+// The input a `too_long` refusal on `contact` is about: the first one longer than the column its
+// kind is stored in. Same limits as the server's readContacts.
+const CONTACT_LIMIT: Record<ContactKind, number> = {
+  email: APPLICATION_LIMITS.contactEmail,
+  phone: APPLICATION_LIMITS.contactPhone,
+  other: APPLICATION_LIMITS.contactOther,
+};
+
+export function tooLongContactIndex(contacts: string[]): number | null {
+  for (let i = 0; i < contacts.length; i++) {
+    const v = contacts[i].trim();
+    if (v !== "" && [...v].length > CONTACT_LIMIT[classifyContact(v)]) return i;
   }
   return null;
 }

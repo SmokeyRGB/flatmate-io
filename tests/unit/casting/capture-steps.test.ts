@@ -6,6 +6,7 @@ import {
   decideSubmit,
   stepBack,
   stepForField,
+  tooLongContactIndex,
   type CaptureValues,
 } from "@/app/(org)/rounds/[id]/applications/new/capture-steps";
 import type { ApplicationInputField } from "@/modules/casting/application-input";
@@ -109,5 +110,18 @@ describe("contacts on the details step", () => {
     expect(clashingContactIndex(["a@b.de", "", "c@d.de"])).toBe(2);
     expect(clashingContactIndex(["a@b.de", "+49 30 23125 0101", "Portal: x"])).toBeNull();
     expect(clashingContactIndex([""])).toBeNull();
+  });
+});
+
+// Code review: the server names only the field for a too-long contact; the screen names the input.
+// Break: compare against one limit for every kind, and the email case fails.
+describe("tooLongContactIndex", () => {
+  it("names the first contact longer than its own column", () => {
+    const longEmail = "a".repeat(250) + "@b.de"; // 255 code points, email column 254
+    expect(tooLongContactIndex(["+49 30 23125 0101", longEmail])).toBe(1);
+    expect(tooLongContactIndex(["x".repeat(201)])).toBe(0);
+    expect(tooLongContactIndex(["lea@example.test", "x".repeat(200)])).toBeNull();
+    // 230 code points: too long for the other column (200), not for the email column (254).
+    expect(tooLongContactIndex(["a".repeat(225) + "@b.de"])).toBeNull();
   });
 });
