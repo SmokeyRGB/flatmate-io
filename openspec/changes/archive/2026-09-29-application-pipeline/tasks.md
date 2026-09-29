@@ -493,7 +493,7 @@
   by name, with a re-run of that file alone.
 - [x] 10.2 `grep -rn "deleted_at\|deletedAt" src/modules/casting/repository.ts`: the new reads add
   no filter (D1, change 4 drops the column). Report the lines unchanged.
-- [ ] 10.3 Report:
+- [x] 10.3 Report:
   - every file touched;
   - the diff of both guarded test files (setup only), and the stale break comment of task 2.2;
   - every break run and the failure it produced, plus the breaks that were argued rather than run;
