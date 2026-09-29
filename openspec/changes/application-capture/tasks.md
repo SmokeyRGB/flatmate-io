@@ -115,14 +115,14 @@
   - both Tx asserts: "assertion helper — the in-transaction permission primitive".
 
   `setMemberRole` keeps its existing case.
-- [ ] 2.5 Move the two tests that set `role: "moderator"` directly
+- [x] 2.5 Move the two tests that set `role: "moderator"` directly
   (`tests/integration/policy/join-code-isolation.test.ts`,
   `tests/integration/policy/resident-list-access.test.ts`) to `setMemberRole`, and give the
   `household_admin` row that `tests/unit/identity/provider-user-compensation.test.ts` inserts
   `HOUSEHOLD_PERMISSIONS`. These are setup changes only, and no `expect` line may change
   (show the grep as in 5.2). Without them, 0024's CHECKs refuse their setup. Then run the whole
   suite once and look for any other setup the CHECKs refuse; fix only setup, and list each file.
-- [ ] 2.6 New test `tests/integration/policy/moderator-permissions.test.ts`:
+- [x] 2.6 New test `tests/integration/policy/moderator-permissions.test.ts`:
   - after `setMemberRole(…, "moderator")` the stored array holds all four, and the moderator may
     open a round, manage a room and capture;
   - after `setMemberRole(…, "member")` the array holds none of the four, and each action is
@@ -145,7 +145,7 @@
   case fails.
   Remove the union from `setMemberRole`, and the first case fails (the CHECK refuses the promotion
   write).
-- [ ] 2.7 New raw-sql test `tests/integration/raw-sql/membership-role-integrity.test.ts`, as
+- [x] 2.7 New raw-sql test `tests/integration/raw-sql/membership-role-integrity.test.ts`, as
   `app_runtime` in a session of the household. Each of these fails with `23514` and its constraint
   name:
   - an `UPDATE` giving the admin membership a profile (`membership_admin_has_no_profile`);
@@ -159,7 +159,7 @@
 
   Registration still produces an admin membership with a null profile. **Break:** argue it in
   the test's comment, as D11 says, unless a disposable stack is available. Report which.
-- [ ] 2.8 `tests/integration/policy/founding-resident-permission.test.ts` and
+- [x] 2.8 `tests/integration/policy/founding-resident-permission.test.ts` and
   `join-by-link.test.ts` assert `permissions` equals `[]` for new memberships. That still holds
   (`RESIDENT_PERMISSIONS` is empty), so they stay unchanged and must stay green. Confirm in the
   report. Search the member-removal, move-out and reactivation tests for any assertion that a
@@ -174,7 +174,7 @@
   `{ context, accountId, profileId }`. It registers the new Auth account with the household's own
   cleanup, so `hh.cleanup()` deletes it. Where a household is not a `TestHousehold`, the caller
   deletes it in `afterEach` (pre-mortem 13).
-- [ ] 2b.2 Find every test that creates, opens or adds to a round with the household context
+- [x] 2b.2 Find every test that creates, opens or adds to a round with the household context
   (`grep -rln "createRound\|openRound\|createAndOpenRound\|addResidentToRound" tests`, then read
   each file's call sites). Move that setup to `createTestModerator`. For the two guarded G-D15 files
   (`tests/integration/policy/round-visibility-household-account.test.ts`,
@@ -266,7 +266,7 @@
 - [x] 4.4 Same file: `getOrganisationApplication(context, roundId, applicationId)` per D5, with the
   `null`-before-query rule for a profile-less session. Comment: `getApplication` is its sibling,
   which change 3 folds in.
-- [ ] 4.5 `tests/integration/policy/authorization-matrix.test.ts`:
+- [x] 4.5 `tests/integration/policy/authorization-matrix.test.ts`:
   - `captureApplication` gets a refusal case: a plain resident's own context → `PermissionDeniedError`,
     and no row is written;
   - `getOrganisationApplication` goes into `NOT_APPLICABLE_CASTING` as "read-only; visibility tested in
@@ -278,7 +278,7 @@
 
 - [x] 5.1 New `tests/helpers/applications.ts` per D8 (`syntheticApplication`, `insertTestRound`, the
   raw-SQL column/values fragment). The data is synthetic only (G-B1).
-- [ ] 5.2 Migrate the 7 files in D8's table to the fixture: **setup lines only.** Every raw-SQL
+- [x] 5.2 Migrate the 7 files in D8's table to the fixture: **setup lines only.** Every raw-SQL
   insert that tests a *refusal* points at **a real round of the same household**. Otherwise D12's
   BEFORE trigger answers `23503` before RLS answers `42501` (D8's order). Its assertion stays exactly
   as it is. If an existing refusal assertion is looser than "the RLS error", leave it, list it in the
@@ -294,7 +294,7 @@
 All in `tests/integration/policy/application-capture.test.ts` unless named otherwise. Teardown in
 `afterEach`.
 
-- [ ] 6.1 AC-3.1/3.3: a moderator captures with a name only. Assert **every written column**:
+- [x] 6.1 AC-3.1/3.3: a moderator captures with a name only. Assert **every written column**:
   - `state = 'new'`, `source = 'manual_form'`, `collected_from = 'data_subject'`;
   - the optionals `NULL`;
   - `round_id`, `household_id` and both `created_by_*` from the session;
@@ -302,16 +302,16 @@ All in `tests/integration/policy/application-capture.test.ts` unless named other
 
   **Break:** make the repository insert `source` from input, and this fails once the test passes
   `source: "paste_parser"` in the raw input.
-- [ ] 6.2 AC-3.7 via raw SQL: read `collected_from` with `SELECT collected_from, collected_from IS
+- [x] 6.2 AC-3.7 via raw SQL: read `collected_from` with `SELECT collected_from, collected_from IS
   NULL`, and assert `'data_subject'` / `false`. **Break:** add `.default("data_subject")` on a
   scratch branch and drop the explicit value in the repository. Report that the DB-default test
   6.9 catches it, and why this one alone would not.
-- [ ] 6.3 AC-3.11: two captures, `third_party` and `data_subject`, both `manual_form`, each stored as
+- [x] 6.3 AC-3.11: two captures, `third_party` and `data_subject`, both `manual_form`, each stored as
   chosen.
-- [ ] 6.4 AC-3.2/EC-3.10: an empty name and a whitespace name → `ApplicationInputError` with
+- [x] 6.4 AC-3.2/EC-3.10: an empty name and a whitespace name → `ApplicationInputError` with
   `name_required`, and 0 rows and 0 events. EC-3.1/3.11: two rows with the same name are both
   created.
-- [ ] 6.5 AC-3.5, repository side:
+- [x] 6.5 AC-3.5, repository side:
   - member → `PermissionDeniedError`;
   - a member granted `create_application` succeeds;
   - a household-account context → `ProfileRequiredError`, with **a spy proving `withSessionContext`
@@ -319,19 +319,19 @@ All in `tests/integration/policy/application-capture.test.ts` unless named other
   - a context whose `profileId` names another profile of the household → `PermissionDeniedError`.
 
   Every refusal leaves 0 rows and 0 events.
-- [ ] 6.6 AC-3.4: a round in `draft`, and a round `closed` via raw SQL → `ApplicationCaptureError`
+- [x] 6.6 AC-3.4: a round in `draft`, and a round `closed` via raw SQL → `ApplicationCaptureError`
   `round_not_open`. Another household's round id, and a random uuid → `round_not_found`. A
   malformed id → `round_not_found`, with no DB error.
-- [ ] 6.7 EC-3.9, deterministic: tx A (its own connection) runs `UPDATE casting_round SET status =
+- [x] 6.7 EC-3.9, deterministic: tx A (its own connection) runs `UPDATE casting_round SET status =
   'closed'` and holds it uncommitted. The capture starts and is observed to wait (it must not have
   resolved after a short fixed delay). Commit A, then assert `round_not_open`. **Break:** remove
   `.for("share")` on the round read, and the capture resolves while A is uncommitted, so the test
   fails.
-- [ ] 6.8 The concurrent revocation, the same pattern: tx A runs `UPDATE membership SET revoked_at =
+- [x] 6.8 The concurrent revocation, the same pattern: tx A runs `UPDATE membership SET revoked_at =
   now()` for the capturer, uncommitted. The capture waits; commit A → `PermissionDeniedError`.
   **Break:** move the permission check back outside the transaction (`assertHasPermission`), and
   the capture succeeds.
-- [ ] 6.9 New raw-sql `tests/integration/raw-sql/application-capture-constraints.test.ts`, as
+- [x] 6.9 New raw-sql `tests/integration/raw-sql/application-capture-constraints.test.ts`, as
   `app_runtime` in a **resident** session (so RLS passes and only the constraints decide). Each of
   these fails with its constraint name, or `23502` for NOT NULL:
   - no `collected_from`, no `source`, no `round_id` (each `23502`; the trigger's NULL guard lets
@@ -344,7 +344,7 @@ All in `tests/integration/policy/application-capture.test.ts` unless named other
 
   A valid full row succeeds. Each case asserts the SQLSTATE and the constraint name. **Break:**
   argued in the test's comment (D11), unless a disposable stack is used.
-- [ ] 6.9a Same raw-sql file, the D12 pairing, as `app_runtime` in a resident session of household A:
+- [x] 6.9a Same raw-sql file, the D12 pairing, as `app_runtime` in a resident session of household A:
   - a row whose `round_id` is a round of household B fails with SQLSTATE `23503` and constraint
     `application_round_same_household`;
   - a row whose `round_id` is a random uuid fails the same way;
@@ -354,13 +354,13 @@ All in `tests/integration/policy/application-capture.test.ts` unless named other
   Assert the SQLSTATE **and** the constraint name, not just "an error", so the refusal is proven
   to come from the trigger and not from RLS or a NOT NULL. **Break:** argued in the test's comment
   (D11), unless a disposable stack is used. Report which.
-- [ ] 6.10 Audit (FR-3.7/G-D7): after a capture, exactly one `application.created` event with
+- [x] 6.10 Audit (FR-3.7/G-D7): after a capture, exactly one `application.created` event with
   `subject_id` = the new id, `actor_account_id`/`actor_profile_id` = the session's, and payload
   keys exactly `{source, collectedFrom}`. A capture with every field filled leaves no field value
   anywhere in the event row (serialise it and search for each value). **Break:** add
   `applicantName` to the payload, and `recordActivityEvent` throws (the allowlist). Also report
   that the test itself would fail if the allowlist were widened.
-- [ ] 6.10a No value leaves in an error (D4, pre-mortem 1): fill every field with a distinct
+- [x] 6.10a No value leaves in an error (D4, pre-mortem 1): fill every field with a distinct
   sentinel string, force a DB refusal of the insert, and assert that the thrown error (`message`,
   `cause`, every own property, `JSON.stringify` of it) contains no sentinel and is an
   `ApplicationWriteError` with `sqlState` and `constraint` only. The refusal is forced through a
@@ -368,7 +368,7 @@ All in `tests/integration/policy/application-capture.test.ts` unless named other
   `captureApplicationTx` used by the repository and the test, or a CHECK the parser is bypassed
   for; say which. Also assert the action logs nothing but `{ code, sqlState, constraint }` (spy on
   `console.error`/`console.log`). **Break:** rethrow the original error, and it fails.
-- [ ] 6.11 New `tests/integration/policy/organisation-application-visibility.test.ts`:
+- [x] 6.11 New `tests/integration/policy/organisation-application-visibility.test.ts`:
   - moderator → the row;
   - member without either permission → `PermissionDeniedError`;
   - a member granted only `change_application_state` → the row;
@@ -485,16 +485,16 @@ All in `tests/integration/policy/application-capture.test.ts` unless named other
 
 ## 9. Apply to dev (after groups 1–8 are written)
 
-- [ ] 9.1 Read-only precheck on `flatmate-io-dev`: `SELECT count(*) FROM application` = 0, and
+- [x] 9.1 Read-only precheck on `flatmate-io-dev`: `SELECT count(*) FROM application` = 0, and
   `SELECT count(*) FROM membership WHERE role='household_admin' AND resident_profile_id IS NOT
   NULL` = 0. If either is non-zero, **stop** and report; don't delete anything. Also record
   `SELECT id, role, is_resident, revoked_at IS NOT NULL AS revoked, permissions FROM membership`
   before the apply (the backfills' input; ids only, no names).
-- [ ] 9.2 **Before applying, tell the human** that from now on every other branch's registrations
+- [x] 9.2 **Before applying, tell the human** that from now on every other branch's registrations
   and application inserts fail on dev until this merges (Risks). Apply `0023`, then `0024`, via Supabase MCP `apply_migration`, one file per call, with
   the file's exact content. **If the harness refuses any statement, stop, report the statement, and
   hand off to the human.** Don't rewrite the SQL to get past it.
-- [ ] 9.3 Verify the catalog, and stop if anything differs:
+- [x] 9.3 Verify the catalog, and stop if anything differs:
   - the 9 columns exist with the right types, NOT NULL exactly on `applicant_name`, `source`,
     `collected_from` and `round_id`, and **`column_default IS NULL` for all nine**;
   - both enum types have their exact values;
@@ -509,9 +509,9 @@ All in `tests/integration/policy/application-capture.test.ts` unless named other
 
 ## 10. Verify
 
-- [ ] 10.1 `npm run verify` green: paste the real tail (files/tests counts). Then the dev row counts
+- [x] 10.1 `npm run verify` green: paste the real tail (files/tests counts). Then the dev row counts
   after the suite: `application` = 0 and no leftover test households beyond the seed's.
-- [ ] 10.2 The report lists: every deliberate break and whether it was seen failing; the G-G1 diff
+- [x] 10.2 The report lists: every deliberate break and whether it was seen failing; the G-G1 diff
   evidence (5.2); the 1.8 grep; anything not done or deviating from design.md, with the reason.
   **A deviation from D4's lock order or transaction shape is not taken on its local merits. Stop
   and report it.**
