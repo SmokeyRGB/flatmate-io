@@ -60,8 +60,6 @@ export const TRANSITIONS: ReadonlyArray<readonly [ApplicationState, ApplicationS
   ["archived", "moved_in"],
 ];
 
-const TRANSITION_SET = new Set(TRANSITIONS.map(([from, to]) => `${from}->${to}`));
-
 // FR-0.11: every one of these is a backward/reopen/un-archive move and must be audited.
 const FORWARD_SET = new Set(
   [
@@ -83,10 +81,11 @@ export class InvalidTransitionError extends Error {
   }
 }
 
+// Kept for the state-machine tests (FR-0.10). Which pairs are declared is answered in ONE place,
+// TRANSITION_RULES below, whose key set equals TRANSITIONS (transition-rules.test.ts), so this is
+// ruleFor without the rule (code review: a second set of declared pairs was maintenance cost).
 export function assertTransitionAllowed(from: ApplicationState, to: ApplicationState): void {
-  if (!TRANSITION_SET.has(`${from}->${to}`)) {
-    throw new InvalidTransitionError(from, to);
-  }
+  ruleFor(from, to);
 }
 
 export function isBackwardTransition(from: ApplicationState, to: ApplicationState): boolean {

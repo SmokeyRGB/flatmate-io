@@ -136,6 +136,7 @@ const NOT_APPLICABLE_IDENTITY: Record<string, string> = {
   membershipHoldsPermission: "pure helper — no SessionContext, no DB access",
   assertHasPermissionTx: "assertion helper — the in-transaction permission primitive",
   assertHoldsAnyPermissionTx: "assertion helper — the in-transaction permission primitive",
+  assertHoldsAllPermissionsTx: "assertion helper — the in-transaction permission primitive, every permission of a list",
   getMembershipForAccount: "read-only",
   getIdentityLabel: "read-only",
   getHousehold: "read-only",

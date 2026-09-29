@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { de } from "@/ui/strings";
-import { formatDateDe, oneMonthAfter } from "@/modules/casting/application-notice";
+import { formatDateDe, isDeadlinePassed, oneMonthAfter } from "@/modules/casting/application-notice";
 import { matchArt9Term } from "../../../scripts/lint/data-inventory";
 
 // Screen O3 (F3 change 2), rendered with the renderToStaticMarkup + mocks pattern of
@@ -283,6 +283,11 @@ describe("the correction form: O3 in edit mode", () => {
           applicationId: APPLICATION_ID,
           baseline: BASELINE,
           capturedAt: overrides.capturedAt ?? "2026-09-20T10:00:00Z",
+          // The page decides this on the server (code review); the test does what the page does.
+          deadlinePassed: isDeadlinePassed(
+            oneMonthAfter(new Date(overrides.capturedAt ?? "2026-09-20T10:00:00Z")),
+            new Date(),
+          ),
           stored: { ...stored, thirdParty: overrides.thirdParty ?? false },
         },
       }),

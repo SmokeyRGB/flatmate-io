@@ -5,6 +5,7 @@ import { activityEvent } from "@/modules/audit/schema";
 import {
   assertHasPermission,
   assertHasPermissionTx,
+  assertHoldsAllPermissionsTx,
   assertHoldsAnyPermissionTx,
   PermissionDeniedError,
 } from "@/modules/identity/repository";
@@ -319,13 +320,13 @@ export class ApplicationUpdateError extends Error {
 // Order: a profile-less session is refused BEFORE any query. Then ONE transaction:
 //   a. the caller's live membership is read FOR SHARE and must hold `create_application`;
 //   b. the row is read FOR UPDATE with the round and household predicates (no row -> not_found);
-//   c. the input is parsed, after the checks, so a member without the permission learns only that.
-//      Keys the parser does not know (`source`, `state`) are ignored: it never reads them, and
-//      `roundId` only selects the row;
-//   c2. STALE CHECK: the form carries a digest of the values it was shown. If it differs from the
+//   c. STALE CHECK: the form carries a digest of the values it was shown. If it differs from the
 //      locked row, someone corrected the application in between, and the whole correction is
 //      refused with nothing written. Without it the diff would run against the locked row while
 //      the form holds page-load values, and B's save would silently revert A's correction;
+//   c2. the input is parsed, after the checks, so a member without the permission learns only
+//      that. Keys the parser does not know (`source`, `state`) are ignored: it never reads them,
+//      and `roundId` only selects the row;
 //   d. the diff over the eight fixed fields; nothing changed -> no UPDATE and no event;
 //   e. the UPDATE of the changed columns only, and one `application.updated` event that names
 //      those fields and never a value.
@@ -369,11 +370,13 @@ export async function updateApplication(
       .for("update");
     if (!current) throw new ApplicationUpdateError("not_found");
 
-    const parsed = parseApplicationInput(input);
-
+    // The stale check needs only the locked row, so it runs BEFORE parsing: a stale form is told
+    // so at once, never first sent to fix a field only to be refused as stale after (code review).
     if (typeof input.baseline !== "string" || applicationBaseline(current) !== input.baseline) {
       throw new ApplicationUpdateError("stale");
     }
+
+    const parsed = parseApplicationInput(input);
 
     const changed = changedApplicationFields(current, parsed);
     if (changed.length === 0) return { changed: [] };
@@ -447,9 +450,8 @@ async function applyTransitionTx(
   const fromState = current.state;
   const rule = ruleFor(fromState, toState);
   if (rule.kind === "pending") throw new ApplicationTransitionError("step_not_available");
-  for (const permission of rule.requires) {
-    await assertHasPermissionTx(tx, context, permission);
-  }
+  // EVERY entry, in one read of the membership row the caller already share-locked.
+  await assertHoldsAllPermissionsTx(tx, context, rule.requires);
 
   const [updated] = await tx
     .update(application)

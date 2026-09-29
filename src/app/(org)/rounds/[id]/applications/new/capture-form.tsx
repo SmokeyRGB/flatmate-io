@@ -9,7 +9,6 @@ import {
 } from "@/modules/casting/application-input";
 import {
   formatDateDe,
-  isDeadlinePassed,
   noticeCategories,
   oneMonthAfter,
 } from "@/modules/casting/application-notice";
@@ -59,6 +58,9 @@ export type FormMode =
       baseline: string;
       stored: CaptureValues & { thirdParty: boolean };
       capturedAt: string;
+      // Whether the one-month date has passed, decided by the page on the server: computing it
+      // with `new Date()` during render could differ between the server and the hydration.
+      deadlinePassed: boolean;
     };
 
 // What the form shows under a field: a refusal's code and the field it named. Never a value.
@@ -69,7 +71,7 @@ interface ShownError {
 
 // Screen O3, in three quiet steps on one route (design D6): the message, the details, and the
 // notice only for a third-party source. In `edit` mode it is the correction form of O5 (design D5):
-// the same three steps, pre-filled, opening on the details; the notice step appears only when the
+// the same three steps, pre-filled, opening on the message; the notice step appears only when the
 // source is switched to a third party during this correction. Every value lives in CLIENT STATE (controlled inputs) until
 // the final click; nothing is kept in the URL, in storage or on the server, and a reload starts
 // over. The steps that are not on screen travel as hidden inputs (capture-steps.ts), so one <form>
@@ -484,7 +486,7 @@ export function CaptureForm({
                   ? dateLabel
                   : formatDateDe(oneMonthAfter(new Date()))
             }
-            deadlinePassed={edit ? isDeadlinePassed(oneMonthAfter(new Date(edit.capturedAt)), new Date()) : false}
+            deadlinePassed={edit ? edit.deadlinePassed : false}
             understood={{ formId: FORM_ID, pending: isPending }}
           />
           {step === 3 && generalError}

@@ -53,35 +53,33 @@ export default async function RoundDetailPage({
     }
   }
 
-  const [participants, procedureChanged] = await Promise.all([
-    getRoundParticipants(current.context, id),
-    hasProcedureChangedNotice(current.context, id),
-  ]);
-
   // O4 (F3 change 3, design D2): three viewer cases. The household account gets the §8.6 sentence
   // and no read at all; a resident without either application permission gets no section (the
   // read refuses); a holder gets the list. The repository decides who may read, not this page.
-  let section: ApplicationsView | null;
-  if (current.context.profileId === null) {
-    section = { view: "household_account" };
-  } else {
+  const context = current.context;
+  async function readSection(): Promise<ApplicationsView | null> {
+    if (context.profileId === null) return { view: "household_account" };
     try {
-      const rows = await listOrganisationApplications(current.context, id);
-      section = { view: "list", rows: rows ?? [] };
+      const rows = await listOrganisationApplications(context, id);
+      return { view: "list", rows: rows ?? [] };
     } catch (err) {
-      if (err instanceof PermissionDeniedError) {
-        section = null;
-      } else if (err instanceof TypeError || err instanceof ReferenceError) {
-        // A programming error (say, a repository function missing from a test's module mock) is
-        // never shown as a load error.
-        throw err;
-      } else {
-        // Never the error object: a Drizzle message carries bound values (change 2, D4).
-        console.error({ code: "unexpected", name: err instanceof Error ? err.name : typeof err });
-        section = { view: "load_error" };
-      }
+      if (err instanceof PermissionDeniedError) return null;
+      // A programming error (say, a repository function missing from a test's module mock) is
+      // never shown as a load error.
+      if (err instanceof TypeError || err instanceof ReferenceError) throw err;
+      // Never the error object: a Drizzle message carries bound values (change 2, D4).
+      console.error({ code: "unexpected", name: err instanceof Error ? err.name : typeof err });
+      return { view: "load_error" };
     }
   }
+
+  // Three independent reads, run together (code review): each is its own transaction, never one
+  // nested in another (NestedSessionContextError).
+  const [participants, procedureChanged, section] = await Promise.all([
+    getRoundParticipants(context, id),
+    hasProcedureChangedNotice(context, id),
+    readSection(),
+  ]);
 
   return (
     <div className="mx-auto max-w-2xl space-y-6 p-6">

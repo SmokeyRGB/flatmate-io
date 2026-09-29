@@ -9,6 +9,7 @@ import {
 } from "@/modules/casting/application-notice";
 import { getOrganisationApplication } from "@/modules/casting/repository";
 import { assertHasPermission, getHousehold, PermissionDeniedError } from "@/modules/identity/repository";
+import type { SessionContext } from "@/db/session-context";
 import { getCurrentSession } from "@/modules/identity/session-cookie";
 import { de } from "@/ui/strings";
 import { LinkPendingHint } from "@/ui/link-pending-hint";
@@ -16,6 +17,17 @@ import { SavedToast } from "../../saved-toast";
 import { ApplicantNotice, ThirdPartyNotice } from "../notice";
 
 const t = de.applications.detail;
+
+// A refusal is an answer here (false), never an error; anything else is rethrown.
+async function holdsCreateApplication(context: SessionContext): Promise<boolean> {
+  try {
+    await assertHasPermission(context, context.accountId, "create_application");
+    return true;
+  } catch (err) {
+    if (err instanceof PermissionDeniedError) return false;
+    throw err;
+  }
+}
 
 // The organisation's detail of one application (design D5): O5's first cut, which change 3
 // extends. Facts are shown as TEXT only: React escapes them and there is no
@@ -68,18 +80,16 @@ export default async function ApplicationDetailPage({
     ? (application.attributes as { label: string; value: string }[])
     : [];
   const thirdParty = application.collectedFrom === "third_party";
-  const householdRow = thirdParty ? await getHousehold(current.context) : null;
   const deadline = oneMonthAfter(application.createdAt);
 
-  // The way to the correction form: only a resident profile holding create_application (the same
-  // try/catch as the round page). The edit page and the repository refuse again on their own.
-  let canEdit = false;
-  try {
-    await assertHasPermission(current.context, current.context.accountId, "create_application");
-    canEdit = true;
-  } catch (err) {
-    if (!(err instanceof PermissionDeniedError)) throw err;
-  }
+  // The way to the correction form: only a resident profile holding create_application. The edit
+  // page and the repository refuse again on their own. Run together with the household read, which
+  // is independent of it (code review).
+  const context = current.context;
+  const [householdRow, canEdit] = await Promise.all([
+    thirdParty ? getHousehold(context) : Promise.resolve(null),
+    holdsCreateApplication(context),
+  ]);
 
   const fact = (label: string, value: string | number | null) => (
     <div>

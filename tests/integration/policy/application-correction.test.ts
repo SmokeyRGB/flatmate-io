@@ -247,6 +247,23 @@ describe("updateApplication: a stale form is refused (pre-mortem M5)", () => {
     expect(await eventsOf(s, row.id, "application.updated")).toHaveLength(1);
   });
 
+  // Code review: the stale check runs BEFORE parsing, so a stale form is told so at once instead of
+  // first being sent to fix a field. Break: move the baseline check below parseApplicationInput,
+  // and this gets `name_required` instead of `stale`.
+  it("(i2) a stale form that also holds an invalid field is refused as stale, not on the field", async () => {
+    const s = await setupPipeline(households);
+    const row = await capture(s);
+    const baselineOfB = applicationBaseline(row);
+    await updateApplication(s.moderator.context, formInput(s, row, { applicantName: "Testbewerbung von A" }));
+
+    const err = await errorOf(
+      updateApplication(s.moderator.context, formInput(s, row, { applicantName: "   " }, baselineOfB)),
+    );
+    expect(err).toBeInstanceOf(ApplicationUpdateError);
+    expect((err as ApplicationUpdateError).code).toBe("stale");
+    expect((await readApplication(s, row.id)).applicantName).toBe("Testbewerbung von A");
+  });
+
   // The deterministic pattern of revoked-membership-sign-in.test.ts: a real transaction holds the
   // row lock uncommitted, so the outcome does not depend on the pooler serialising anything.
   it("(j) a correction waits for a concurrent writer of the row, then is refused as stale, writing nothing", async () => {

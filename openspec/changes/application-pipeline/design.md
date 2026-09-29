@@ -197,11 +197,13 @@ whether a date exists. A switch would put every one of those differences behind 
      `FOR SHARE` (FR-3.21 names this permission).
    - b. `SELECT … FROM application WHERE id = $a AND round_id = $r AND household_id =
      context.householdId FOR UPDATE`. No row → `not_found`.
-   - c. `parseApplicationInput(input)`. It runs after the checks, as in capture, so a member
+   - c. **Stale check (pre-mortem M5).** `applicationBaseline(current) !== input.baseline` →
+     `ApplicationUpdateError("stale")`, with nothing written. The baseline is described below. It
+     needs only the locked row, so it runs **before** parsing: a stale form is told so at once,
+     not first sent to fix a field *(moved 2026-09-29, code review)*.
+   - c2. `parseApplicationInput(input)`. It runs after the checks, as in capture, so a member
      without the permission learns only that. Keys it does not know (`source`, `state`, `roundId`
      as a field) are ignored: the parser never reads them, and `roundId` only selects the row.
-   - c2. **Stale check (pre-mortem M5).** `applicationBaseline(current) !== input.baseline` →
-     `ApplicationUpdateError("stale")`, with nothing written. The baseline is described below.
    - d. `changedApplicationFields(current, parsed)`: a fixed list, compared column by column.
      `attributes` is compared as the canonical JSON of the `{label, value}` array in order. `null`
      and a blank both mean empty, because the parser already maps a blank to `null`.
@@ -274,7 +276,7 @@ In edit mode:
   thirdParty)`:** `decideSubmit`, the step-2 primary button's label, and the notice's mount. Today
   `deadlinePassed` is hard-coded `false` in capture mode, which is right there, since the capture
   instant is now. In edit mode it is computed from `capturedAt` (pre-mortem L).
-- The hidden `baseline` input rides along (D4 c2), and a `stale` refusal shows its sentence without
+- The hidden `baseline` input rides along (D4 c), and a `stale` refusal shows its sentence without
   changing step.
 - The form **starts on step 1, the message, exactly like capture** *(changed 2026-09-29, human walkthrough: opening on „Angaben" hid the message behind „Zurück", and the free text looked missing)*.
 - The heading is „Bewerbung bearbeiten", and the primary control is „Änderungen speichern".
@@ -516,7 +518,7 @@ The matrix requires every export to be classified (`authorization-matrix.test.ts
 
 How each pair is serialised:
 - **update against update:** the second waits on `FOR UPDATE`, then checks its baseline against
-  the first's result (D4 c2). A form loaded before the first save is refused as `stale`. Only
+  the first's result (D4 c). A form loaded before the first save is refused as `stale`. Only
   then does it diff. There is no lost update, including across two open forms, which the row lock
   alone would not give (pre-mortem M5).
 - **update against transition:** the same row lock. Neither writes the other's columns, and the
