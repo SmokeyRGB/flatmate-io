@@ -5,7 +5,7 @@ import {
   getRoundForSession,
   getRoundParticipants,
 } from "@/modules/casting/repository";
-import { registerTestHousehold, type TestHousehold } from "../../helpers/identity";
+import { createTestModerator, registerTestHousehold, type TestHousehold } from "../../helpers/identity";
 
 let hh: TestHousehold | undefined;
 
@@ -21,7 +21,13 @@ describe("[GUARDED] G-D15: a household-account session sees round identity/lifec
     hh = await registerTestHousehold();
     const actor = { accountId: hh.accountId, profileId: null };
     const roomA = await createRoom(hh.context, "Room A", actor);
-    const round = await createRound(hh.context, "Test round", [roomA.id], actor);
+    // Setup only (design D13): the household account no longer creates rounds (S-50/U-20), so a
+    // moderator does. The assertions below still read the round as the household account.
+    const moderator = await createTestModerator(hh);
+    const round = await createRound(moderator.context, "Test round", [roomA.id], {
+      accountId: moderator.accountId,
+      profileId: moderator.profileId,
+    });
 
     // hh.context.profileId is already null (a household-account session).
     const seen = await getRoundForSession(hh.context, round.id);
@@ -51,7 +57,13 @@ describe("[GUARDED] G-D15: a household-account session sees round identity/lifec
     hh = await registerTestHousehold();
     const actor = { accountId: hh.accountId, profileId: null };
     const roomA = await createRoom(hh.context, "Room A", actor);
-    const round = await createRound(hh.context, "Test round", [roomA.id], actor);
+    // Setup only (design D13): the household account no longer creates rounds (S-50/U-20), so a
+    // moderator does. The assertions below still read the round as the household account.
+    const moderator = await createTestModerator(hh);
+    const round = await createRound(moderator.context, "Test round", [roomA.id], {
+      accountId: moderator.accountId,
+      profileId: moderator.profileId,
+    });
 
     const participants = await getRoundParticipants(hh.context, round.id);
 

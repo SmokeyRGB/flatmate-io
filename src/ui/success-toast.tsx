@@ -1,6 +1,7 @@
 "use client";
 
 import { CircleCheck, X } from "lucide-react";
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { de } from "@/ui/strings";
 
@@ -15,7 +16,16 @@ const AUTO_DISMISS_MS = 5000;
 // yields a new state object, so the same message shows again on a second save. Whether it is open
 // is derived from `trigger` rather than set inside an effect. Only the timer and the close button
 // write state, and they record which trigger was dismissed.
-export function SuccessToast({ message, trigger }: { message: string; trigger: object | null }) {
+// `link` is optional: a quiet way onward (the saved application's detail). No other caller passes it.
+export function SuccessToast({
+  message,
+  trigger,
+  link,
+}: {
+  message: string;
+  trigger: object | null;
+  link?: { href: string; label: string };
+}) {
   const [dismissed, setDismissed] = useState<object | null>(null);
   const open = trigger !== null && trigger !== dismissed;
 
@@ -32,6 +42,11 @@ export function SuccessToast({ message, trigger }: { message: string; trigger: o
         <div className="toast">
           <CircleCheck className="size-5 shrink-0 text-primary" aria-hidden />
           <p className="flex-1">{message}</p>
+          {link && (
+            <Link href={link.href} className="underline">
+              {link.label}
+            </Link>
+          )}
           <button
             type="button"
             className="toast-close"

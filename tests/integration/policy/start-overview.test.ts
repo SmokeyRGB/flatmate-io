@@ -7,7 +7,8 @@ import { createRoom, createRound, getStartOverview, openRound, transitionApplica
 import { application, roundParticipation } from "@/modules/casting/schema";
 import type { ApplicationState } from "@/modules/casting/transitions";
 import { eq } from "drizzle-orm";
-import { cleanupAll, deleteTestAccount, registerTestHousehold, type TestHousehold } from "../../helpers/identity";
+import { syntheticApplication } from "../../helpers/applications";
+import { cleanupAll, createTestModerator, deleteTestAccount, registerTestHousehold, type TestHousehold } from "../../helpers/identity";
 
 let hh: TestHousehold | undefined;
 const accountIds: string[] = [];
@@ -45,19 +46,38 @@ async function insertApplication(
   const [row] = await withSessionContext(writer, (tx) =>
     tx
       .insert(application)
-      .values({
-        householdId: household.householdId,
-        roundId: fields.roundId,
-        state: fields.state,
-        becameResidentId: fields.becameResidentId ?? null,
-        createdByAccountId: writer.accountId,
-        createdByProfileId: writer.profileId as string,
-        deletedAt: fields.deletedAt ?? null,
-      })
+      .values(
+        syntheticApplication(
+          {
+            householdId: household.householdId,
+            roundId: fields.roundId,
+            createdByAccountId: writer.accountId,
+            createdByProfileId: writer.profileId as string,
+          },
+          {
+            state: fields.state,
+            becameResidentId: fields.becameResidentId ?? null,
+            deletedAt: fields.deletedAt ?? null, // kept until change 4 drops the column
+          },
+        ),
+      )
       .returning(),
   );
   return row;
 }
+
+// Design D13 (application-capture): the household account no longer creates or opens rounds
+// (S-50/U-20), so the first resident of each test is a moderator and does it. Same person as
+// before, so every participant count below is unchanged.
+async function claimModerator(household: TestHousehold, name: string) {
+  const moderator = await createTestModerator(household, name);
+  return { profileId: moderator.profileId, accountId: moderator.accountId, context: moderator.context };
+}
+
+const actorOf = (m: { accountId: string; profileId: string }) => ({
+  accountId: m.accountId,
+  profileId: m.profileId,
+});
 
 async function setCanVote(household: TestHousehold, roundId: string, residentProfileId: string, canVote: boolean) {
   await withSessionContext(household.context, (tx) =>
@@ -80,10 +100,10 @@ async function setRemoved(household: TestHousehold, residentProfileId: string) {
 describe("getStartOverview (start-screen design.md Decision 4)", () => {
   it("(b) counts new+screened as T-5, excludes invited/rejected", async () => {
     hh = await registerTestHousehold();
-    const founder = await claim(hh, "Founder");
+    const founder = await claimModerator(hh, "Founder");
     const room = await createRoom(hh.context, "Room A", { accountId: hh.accountId, profileId: null });
-    const round = await createRound(hh.context, "Round", [room.id], { accountId: hh.accountId, profileId: null });
-    await openRound(hh.context, round.id, { accountId: hh.accountId, profileId: null });
+    const round = await createRound(founder.context, "Round", [room.id], actorOf(founder));
+    await openRound(founder.context, round.id, actorOf(founder));
 
     await insertApplication(hh, founder.context, { roundId: round.id, state: "new" });
     await insertApplication(hh, founder.context, { roundId: round.id, state: "new" });
@@ -99,10 +119,10 @@ describe("getStartOverview (start-screen design.md Decision 4)", () => {
 
   it("(c) can_vote = false: no T-5 count, but standing is still returned", async () => {
     hh = await registerTestHousehold();
-    const founder = await claim(hh, "Founder");
+    const founder = await claimModerator(hh, "Founder");
     const room = await createRoom(hh.context, "Room A", { accountId: hh.accountId, profileId: null });
-    const round = await createRound(hh.context, "Round", [room.id], { accountId: hh.accountId, profileId: null });
-    await openRound(hh.context, round.id, { accountId: hh.accountId, profileId: null });
+    const round = await createRound(founder.context, "Round", [room.id], actorOf(founder));
+    await openRound(founder.context, round.id, actorOf(founder));
     await setCanVote(hh, round.id, founder.profileId, false);
 
     await insertApplication(hh, founder.context, { roundId: round.id, state: "new" });
@@ -117,11 +137,11 @@ describe("getStartOverview (start-screen design.md Decision 4)", () => {
 
   it("(d) removed_at set: the viewer is not offered the round's T-5", async () => {
     hh = await registerTestHousehold();
-    const founder = await claim(hh, "Founder");
+    const founder = await claimModerator(hh, "Founder");
     const second = await claim(hh, "Second");
     const room = await createRoom(hh.context, "Room A", { accountId: hh.accountId, profileId: null });
-    const round = await createRound(hh.context, "Round", [room.id], { accountId: hh.accountId, profileId: null });
-    await openRound(hh.context, round.id, { accountId: hh.accountId, profileId: null });
+    const round = await createRound(founder.context, "Round", [room.id], actorOf(founder));
+    await openRound(founder.context, round.id, actorOf(founder));
     await setRemoved(hh, second.profileId);
 
     const overview = await getStartOverview(second.context);
@@ -133,10 +153,10 @@ describe("getStartOverview (start-screen design.md Decision 4)", () => {
 
   it("(e) a resident who joined the open round after it opened is offered its T-5", async () => {
     hh = await registerTestHousehold();
-    await claim(hh, "Founder"); // eligible resident, needed for openRound's EC-1.4 precondition
+    const founder = await claimModerator(hh, "Founder"); // eligible resident, needed for openRound's EC-1.4 precondition
     const room = await createRoom(hh.context, "Room A", { accountId: hh.accountId, profileId: null });
-    const round = await createRound(hh.context, "Round", [room.id], { accountId: hh.accountId, profileId: null });
-    await openRound(hh.context, round.id, { accountId: hh.accountId, profileId: null });
+    const round = await createRound(founder.context, "Round", [room.id], actorOf(founder));
+    await openRound(founder.context, round.id, actorOf(founder));
 
     // Joins AFTER the round is already open — the auto-join trigger (drizzle/0010), same path as
     // join-open-round.test.ts, fires on this claim's own membership insert.
@@ -149,11 +169,11 @@ describe("getStartOverview (start-screen design.md Decision 4)", () => {
 
   it("(f) V-1: a moved-in application naming the viewer is excluded from their own counts, present in another's", async () => {
     hh = await registerTestHousehold();
-    const founder = await claim(hh, "Founder");
+    const founder = await claimModerator(hh, "Founder");
     const newFlatmate = await claim(hh, "NewFlatmate");
     const room = await createRoom(hh.context, "Room A", { accountId: hh.accountId, profileId: null });
-    const round = await createRound(hh.context, "Round", [room.id], { accountId: hh.accountId, profileId: null });
-    await openRound(hh.context, round.id, { accountId: hh.accountId, profileId: null });
+    const round = await createRound(founder.context, "Round", [room.id], actorOf(founder));
+    await openRound(founder.context, round.id, actorOf(founder));
 
     await insertApplication(hh, founder.context, {
       roundId: round.id,
@@ -170,10 +190,10 @@ describe("getStartOverview (start-screen design.md Decision 4)", () => {
 
   it("(f2) a moved_in application with became_resident_id NULL is counted (the NULL trap)", async () => {
     hh = await registerTestHousehold();
-    const founder = await claim(hh, "Founder");
+    const founder = await claimModerator(hh, "Founder");
     const room = await createRoom(hh.context, "Room A", { accountId: hh.accountId, profileId: null });
-    const round = await createRound(hh.context, "Round", [room.id], { accountId: hh.accountId, profileId: null });
-    await openRound(hh.context, round.id, { accountId: hh.accountId, profileId: null });
+    const round = await createRound(founder.context, "Round", [room.id], actorOf(founder));
+    await openRound(founder.context, round.id, actorOf(founder));
 
     await insertApplication(hh, founder.context, { roundId: round.id, state: "moved_in", becameResidentId: null });
 
@@ -188,11 +208,11 @@ describe("getStartOverview (start-screen design.md Decision 4)", () => {
   // outright: an Application with became_resident_id == the active profile creates no vote task.
   it("(f5) the viewer's own application walked back to screened creates no vote task for them", async () => {
     hh = await registerTestHousehold();
-    const founder = await claim(hh, "Founder");
+    const founder = await claimModerator(hh, "Founder");
     const other = await claim(hh, "Other");
     const room = await createRoom(hh.context, "Room A", { accountId: hh.accountId, profileId: null });
-    const round = await createRound(hh.context, "Round", [room.id], { accountId: hh.accountId, profileId: null });
-    await openRound(hh.context, round.id, { accountId: hh.accountId, profileId: null });
+    const round = await createRound(founder.context, "Round", [room.id], actorOf(founder));
+    await openRound(founder.context, round.id, actorOf(founder));
 
     const own = await insertApplication(hh, other.context, {
       roundId: round.id,
@@ -213,11 +233,11 @@ describe("getStartOverview (start-screen design.md Decision 4)", () => {
 
   it("(f3) a removed participation while a round is open: anyOpenRound true, no state counts", async () => {
     hh = await registerTestHousehold();
-    await claim(hh, "Founder"); // eligible resident, needed for openRound's EC-1.4 precondition
+    const founder = await claimModerator(hh, "Founder"); // eligible resident, needed for openRound's EC-1.4 precondition
     const second = await claim(hh, "Second");
     const room = await createRoom(hh.context, "Room A", { accountId: hh.accountId, profileId: null });
-    const round = await createRound(hh.context, "Round", [room.id], { accountId: hh.accountId, profileId: null });
-    await openRound(hh.context, round.id, { accountId: hh.accountId, profileId: null });
+    const round = await createRound(founder.context, "Round", [room.id], actorOf(founder));
+    await openRound(founder.context, round.id, actorOf(founder));
     await setRemoved(hh, second.profileId);
 
     const overview = await getStartOverview(second.context);
@@ -228,10 +248,10 @@ describe("getStartOverview (start-screen design.md Decision 4)", () => {
 
   it("(g) a deleted application is absent from every count", async () => {
     hh = await registerTestHousehold();
-    const founder = await claim(hh, "Founder");
+    const founder = await claimModerator(hh, "Founder");
     const room = await createRoom(hh.context, "Room A", { accountId: hh.accountId, profileId: null });
-    const round = await createRound(hh.context, "Round", [room.id], { accountId: hh.accountId, profileId: null });
-    await openRound(hh.context, round.id, { accountId: hh.accountId, profileId: null });
+    const round = await createRound(founder.context, "Round", [room.id], actorOf(founder));
+    await openRound(founder.context, round.id, actorOf(founder));
 
     await insertApplication(hh, founder.context, { roundId: round.id, state: "new" });
     await insertApplication(hh, founder.context, { roundId: round.id, state: "new", deletedAt: new Date() });
@@ -243,10 +263,10 @@ describe("getStartOverview (start-screen design.md Decision 4)", () => {
 
   it("(h) a phase_deadline_at set on the round is returned", async () => {
     hh = await registerTestHousehold();
-    const founder = await claim(hh, "Founder");
+    const founder = await claimModerator(hh, "Founder");
     const room = await createRoom(hh.context, "Room A", { accountId: hh.accountId, profileId: null });
-    const round = await createRound(hh.context, "Round", [room.id], { accountId: hh.accountId, profileId: null });
-    await openRound(hh.context, round.id, { accountId: hh.accountId, profileId: null });
+    const round = await createRound(founder.context, "Round", [room.id], actorOf(founder));
+    await openRound(founder.context, round.id, actorOf(founder));
 
     const deadline = new Date("2026-11-01T00:00:00Z");
     await withSessionContext(hh.context, (tx) =>
@@ -265,14 +285,14 @@ describe("getStartOverview (start-screen design.md Decision 4)", () => {
   // false. The standing must come from the most recent open round the viewer takes part in.
   it("(f4) viewer only in an older open round: standing is that round's, not null", async () => {
     hh = await registerTestHousehold();
-    const founder = await claim(hh, "Founder");
+    const founder = await claimModerator(hh, "Founder");
     const actor = { accountId: hh.accountId, profileId: null };
     const roomA = await createRoom(hh.context, "Room A", actor);
     const roomB = await createRoom(hh.context, "Room B", actor);
-    const older = await createRound(hh.context, "Older", [roomA.id], actor);
-    await openRound(hh.context, older.id, actor);
-    const newer = await createRound(hh.context, "Newer", [roomB.id], actor);
-    await openRound(hh.context, newer.id, actor);
+    const older = await createRound(founder.context, "Older", [roomA.id], actorOf(founder));
+    await openRound(founder.context, older.id, actorOf(founder));
+    const newer = await createRound(founder.context, "Newer", [roomB.id], actorOf(founder));
+    await openRound(founder.context, newer.id, actorOf(founder));
     await withSessionContext(hh.context, (tx) =>
       tx
         .update(roundParticipation)

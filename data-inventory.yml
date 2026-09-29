@@ -33,6 +33,15 @@ tables:
       retention_until: { category: "⚙️" }
       created_at: { category: "⚙️" }
       deleted_at: { category: "⚙️" }
+      applicant_name: { category: "🔴", purpose: "Identifikation im Screening (Compliance §6.2)", legal_basis: "Art. 6(1)(b) DSGVO", retention: "180 Tage nach Rundenabschluss (Compliance §5.3)" }
+      age: { category: "🔴", purpose: "Passung zur WG-Struktur (Compliance §6.2)", legal_basis: "Art. 6(1)(b) und (f) DSGVO", retention: "180 Tage nach Rundenabschluss (Compliance §5.3)" }
+      contact_email: { category: "🔴", purpose: "Einladung, Terminabsprache, Absage; Identitätsnachweis bei Betroffenenanfragen (Compliance §6.2)", legal_basis: "Art. 6(1)(b) DSGVO", retention: "180 Tage nach Rundenabschluss (Compliance §5.3)" }
+      contact_phone: { category: "🔴", purpose: "Einladung, Terminabsprache, Absage (Kanalneutralität P-1, Compliance §6.2)", legal_basis: "Art. 6(1)(b) DSGVO", retention: "180 Tage nach Rundenabschluss (Compliance §5.3)" }
+      contact_other: { category: "🔴", purpose: "Portal-Handle oder Messenger-Kennung, der Kanal der Bewerbung (P-1, Compliance §6.2)", legal_basis: "Art. 6(1)(b) DSGVO", retention: "180 Tage nach Rundenabschluss (Compliance §5.3)" }
+      message_raw: { category: "🔴", purpose: "ursprüngliche Nachricht der Bewerbung; Freitext mit Art.-9-Risiko (C-3.4, Compliance §6.2 und §8)", legal_basis: "Art. 6(1)(b) DSGVO", retention: "180 Tage nach Rundenabschluss (Compliance §5.3)" }
+      attributes: { category: "🔴", purpose: "freie Zusatzangaben, von Hand erfasst (Compliance §6.2)", legal_basis: "Art. 6(1)(b) DSGVO", retention: "180 Tage nach Rundenabschluss (Compliance §5.3)" }
+      source: { category: "⚙️", purpose: "technischer Erfassungspfad, kein Rechtsgrundlagen-Träger (Compliance §6.2)" }
+      collected_from: { category: "⚙️", purpose: "rechtlicher Erhebungsort, trägt die Entscheidung Art. 13 vs. Art. 14 (Compliance §4.4, §6.2)" }
 
   room:
     context: casting

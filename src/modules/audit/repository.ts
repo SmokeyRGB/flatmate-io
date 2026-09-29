@@ -12,6 +12,10 @@ type Tx = PgTransaction<any, any, any>;
 // ships, not invented here ahead of time.
 const PAYLOAD_ALLOWLIST: Readonly<Record<string, readonly string[]>> = {
   "application.state_changed": ["fromState", "toState"],
+  // F3 (application-capture, D7): enum values only (G-D7) — the intake path and the collection
+  // source. Never the name, a contact, the message or an attribute. Deliberately NOT in
+  // REDACTABLE_KEYS: whether deletion redacts them is change 4's decision.
+  "application.created": ["source", "collectedFrom"],
   // F1 event types (identity/casting modules) — registered here, the one write path, per FR-1.20.
   "resident_profile.created": [],
   "resident_profile.status_changed": ["fromStatus", "toStatus"],

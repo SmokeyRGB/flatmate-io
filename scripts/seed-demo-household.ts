@@ -26,7 +26,13 @@ import {
   listJoinCodeIssuances,
   setMemberRole,
 } from "@/modules/identity/repository";
-import { createRoom, createRound, openRound } from "@/modules/casting/repository";
+import {
+  captureApplication,
+  createRoom,
+  createRound,
+  openRound,
+  transitionApplication,
+} from "@/modules/casting/repository";
 import { db } from "@/db/client";
 
 // The same refusal as tests/setup.ts: this script writes real households and Auth users, and
@@ -56,9 +62,11 @@ async function main() {
   const { household, context } = await registerHousehold(DEMO_EMAIL, PASSWORD, "Demo-WG");
   const adminActor = { accountId: context.accountId, profileId: null };
 
-  // Appointed moderator explicitly — close_round is a role default (household_admin/moderator,
-  // docs/domain/identity.md §2.1), not inferred from being first claimed, so this is what actually
-  // grants it. A realistic "person who set the WG up and lives there too" for demo purposes.
+  // Appointed moderator explicitly — setMemberRole stores the moderator's permission set on the
+  // membership (docs/domain/identity.md §2.1, design D3); nothing is inferred from being first
+  // claimed. A realistic "person who set the WG up and lives there too" for demo purposes. The
+  // household account itself runs no rounds (03-PRD.md §4.0.1, S-50/U-20), so Alex creates and
+  // opens the round below and captures the demo applications.
   const moderatorProfile = await createResidentProfile(context, "Alex", adminActor);
   const { accountId: moderatorAccountId } = await claimResidentProfile(
     context,
@@ -80,8 +88,70 @@ async function main() {
   const roomA = await createRoom(context, "Zimmer 1", adminActor);
   const roomB = await createRoom(context, "Zimmer 2", adminActor);
 
-  const round = await createRound(context, "Herbstrunde 2026", [roomA.id, roomB.id], adminActor);
-  await openRound(context, round.id, adminActor);
+  // The rooms stay with the household account (manage_rooms); the round is Alex's (close_round).
+  const alexContext = {
+    accountId: moderatorAccountId,
+    householdId: household.id,
+    profileId: moderatorProfile.id,
+  };
+  const alexActor = { accountId: moderatorAccountId, profileId: moderatorProfile.id };
+  const round = await createRound(alexContext, "Herbstrunde 2026", [roomA.id, roomB.id], alexActor);
+  await openRound(alexContext, round.id, alexActor);
+
+  // Six synthetic applications (G-B1: invented names, @example.test, the fictional 030 23125 range)
+  // so O4 (change 3) and F4 can be walked by hand. Captured as Alex through the same repository
+  // function the form uses; two are then moved new -> screened.
+  const applicationIds: string[] = [];
+  const captures = [
+    // a name only
+    { applicantName: "Testbewerbung Mia", collectedFrom: "data_subject" },
+    // a full one
+    {
+      applicantName: "Testbewerbung Noah",
+      age: 27,
+      contacts: ["noah.test@example.test", "+49 30 23125 0101", "Portal: noah-test"],
+      messageRaw: "Hallo, ich suche ab November ein Zimmer und koche gern für alle.",
+      attributes: [{ label: "Beruf", value: "Tischler" }],
+      collectedFrom: "data_subject",
+    },
+    // two third-party captures
+    {
+      applicantName: "Testbewerbung Lea",
+      contacts: ["+49 30 23125 0102"],
+      collectedFrom: "third_party",
+    },
+    {
+      applicantName: "Testbewerbung Jonas",
+      contacts: ["Messenger: jonas-test"],
+      messageRaw: "Über eine Kollegin empfohlen worden.",
+      collectedFrom: "third_party",
+    },
+    // one with attributes
+    {
+      applicantName: "Testbewerbung Yara",
+      age: 31,
+      attributes: [
+        { label: "Beruf", value: "Hebamme" },
+        { label: "Einzug", value: "ab sofort" },
+        { label: "Haustiere", value: "keine" },
+      ],
+      collectedFrom: "data_subject",
+    },
+    // one with a long message
+    {
+      applicantName: "Testbewerbung Ben",
+      messageRaw: "Ich stelle mich kurz vor. ".repeat(60),
+      collectedFrom: "data_subject",
+    },
+  ];
+  for (const capture of captures) {
+    const created = await captureApplication(alexContext, { roundId: round.id, ...capture });
+    applicationIds.push(created.id);
+  }
+  // transitionApplication is still unguarded until change 3; scripts/ is not src/app, so the
+  // authorization matrix's KNOWN_OPEN entry stays valid.
+  await transitionApplication(alexContext, applicationIds[0], "screened", alexActor);
+  await transitionApplication(alexContext, applicationIds[1], "screened", alexActor);
 
   // join-by-link: registerHousehold already mints a founding link, but it is single-use by default
   // (FR-2.4: max_uses 1) — enough to walk the join path exactly once and then only the used-up
@@ -110,7 +180,9 @@ async function main() {
   console.log(`  Name:      Alex   (moderator)`);
   console.log(`  Name:      Sam    (plain resident)`);
   console.log(`  Password:  ${PASSWORD}\n`);
-  console.log(`Round "${round.title}" is open with both residents as participants.\n`);
+  console.log(`Round "${round.title}" is open with both residents as participants.`);
+  // Counts only: nothing personal is printed (the applicants are synthetic, but the habit counts).
+  console.log(`${applicationIds.length} synthetic applications captured (2 of them screened).\n`);
 
   console.log("Join by link (open in a clean browser profile — signed out):");
   console.log(`  Reusable link (5 uses):  ${BASE_URL}/join/${reusableLink.code}`);

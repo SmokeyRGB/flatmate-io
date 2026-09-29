@@ -14,7 +14,9 @@ import {
   household,
   householdSettings,
   joinCodeIssuance,
+  MODERATOR_PERMISSIONS,
   membership,
+  RESIDENT_PERMISSIONS,
   residentProfile,
   session,
 } from "./schema";
@@ -158,6 +160,18 @@ async function transitionResidentProfileStatusTx(
   return updated;
 }
 
+// A direct status change of a claimed profile is refused: it would leave the membership and the
+// profile disagreeing. No value in the message.
+export class ClaimedProfileTransitionError extends Error {
+  readonly code = "claimed_profile_transition";
+  constructor() {
+    super(
+      "A claimed resident profile changes status only through setMovedOut, removeMember or reactivateMember, which also revoke or restore its membership",
+    );
+    this.name = "ClaimedProfileTransitionError";
+  }
+}
+
 export async function transitionResidentProfileStatus(
   context: SessionContext,
   residentProfileId: string,
@@ -171,9 +185,28 @@ export async function transitionResidentProfileStatus(
   // of which gate on assertIsAdministrationOrModerator before touching anything.
   if (!actor.accountId) throw new ResidentListActionDeniedError();
   await assertIsAdministrationOrModerator(context, actor.accountId);
-  return withSessionContext(context, (tx) =>
-    transitionResidentProfileStatusTx(tx, residentProfileId, toStatus, actor),
-  );
+  return withSessionContext(context, async (tx) => {
+    // A claimed profile (one that has a membership row) moves out, is removed or comes back only
+    // through the paths that also revoke or restore its membership. A status change alone would
+    // leave a live membership acting for a moved-out person, or a revoked one for an active
+    // person (V-3). A prepared profile has no membership yet, so it still moves here.
+    if (toStatus === "moved_out" || toStatus === "removed" || toStatus === "active") {
+      const [claimed] = await tx
+        .select({ id: membership.id })
+        .from(membership)
+        .where(eq(membership.residentProfileId, residentProfileId));
+      if (claimed) {
+        const [current] = await tx
+          .select({ status: residentProfile.status })
+          .from(residentProfile)
+          .where(eq(residentProfile.id, residentProfileId));
+        if (toStatus !== "active" || (current && current.status !== "active")) {
+          throw new ClaimedProfileTransitionError();
+        }
+      }
+    }
+    return transitionResidentProfileStatusTx(tx, residentProfileId, toStatus, actor);
+  });
 }
 
 // The ONE deliberate RLS-bootstrap exception (drizzle/0005_identity_login_bootstrap_function.sql,
@@ -367,16 +400,24 @@ export class PermissionDeniedError extends Error {
   }
 }
 
-// docs/domain/identity.md §2.1: manage_rooms and close_round are "vorbelegt bei household_admin
-// und moderator" — the two permissions with a documented role-based default (close_round joined
-// manage_rooms here by human decision, 2026-09-22, replacing the old first-resident inference in
-// auth.ts's claimResidentProfile). Every other permission is individually grantable only (C-1.3:
-// orthogonal, no role hierarchy/presets) — household_admin implicitly has every permission
-// regardless (it's the account that registered, C-1.4, not a security boundary), but a moderator
-// otherwise needs a permission explicitly in the array. A third role-assigned default would make
-// this a template system (S-04 excludes `Berechtigungsvorlagen`) — see the abandonment condition
-// in domain/identity.md §2.1's close_round note before adding one.
-const MODERATOR_DEFAULT_PERMISSIONS = new Set(["manage_rooms", "close_round"]);
+// Roles are names for fixed sets of STORED permissions (design D3; human decisions 2026-09-28 and
+// 2026-09-29: "The terms 'household' or 'moderator' should simply map to permissions; they
+// shouldn't be a separate workaround for permissions / Backdoor for ignoring permissions."). The
+// sets are HOUSEHOLD_/RESIDENT_/MODERATOR_PERMISSIONS in ./schema. Registration, joining and
+// appointment store them; demotion, move-out and removal take them out again, in the same write
+// (see setMemberRole, revokeMembershipForProfileTx, reactivateMember). drizzle/0024's CHECKs make
+// a membership that disagrees with its roles a refused write. So this is the ONE rights
+// mechanism: no role is read here, for the administering membership either. An individual grant
+// (the matrix's ⬜) is an extra stored value beyond the role sets.
+//
+// The one place the rule lives: assertHasPermission and the transaction-scoped asserts below both
+// call it. A live membership holds a permission iff it is stored on it.
+export function membershipHoldsPermission(
+  row: { permissions: readonly string[]; revokedAt: Date | null },
+  permission: string,
+): boolean {
+  return row.revokedAt === null && row.permissions.includes(permission);
+}
 
 export async function assertHasPermission(
   context: SessionContext,
@@ -388,12 +429,52 @@ export async function assertHasPermission(
   // (context.accountId), never an id supplied independently of it.
   if (accountId !== context.accountId) throw new PermissionDeniedError(permission);
   const membershipRow = await getMembershipForAccount(context, accountId);
-  if (!membershipRow) throw new PermissionDeniedError(permission);
-  if (membershipRow.role === "household_admin") return;
-  if (membershipRow.role === "moderator" && MODERATOR_DEFAULT_PERMISSIONS.has(permission)) return;
-  if (!membershipRow.permissions.includes(permission)) {
+  if (!membershipRow || !membershipHoldsPermission(membershipRow, permission)) {
     throw new PermissionDeniedError(permission);
   }
+}
+
+// D4 a: the in-transaction permission primitive. It reads the caller's LIVE membership FOR SHARE
+// inside the transaction that also does the write, so a revocation or role change committed
+// first is seen, and one in flight is waited for (FOR SHARE conflicts with every membership
+// writer's row lock). assertHasPermission above reads in its own transaction and returns, which
+// leaves a window before the caller's write; the older mutators keep that shape (see design
+// Risks). Refuses when there is no live row, when the row's resident profile is not the one the
+// session claims (a stale claim), or when the permission is not stored.
+export async function assertHoldsAnyPermissionTx(
+  tx: Tx,
+  context: SessionContext,
+  permissions: readonly string[],
+  // A writer needs the row lock to serialize against revocation (D4 a). So does a read that
+  // returns personal data (getOrganisationApplication). `lock: false` is only for a read that
+  // returns nothing an ended membership could not see.
+  options: { lock: boolean } = { lock: true },
+): Promise<void> {
+  const denied = () => new PermissionDeniedError(permissions.join(" | "));
+  const query = tx
+    .select()
+    .from(membership)
+    .where(and(eq(membership.accountId, context.accountId), isNull(membership.revokedAt)));
+  const [row] = options.lock ? await query.for("share") : await query;
+  if (!row) throw denied();
+  if (row.residentProfileId !== context.profileId) throw denied();
+  if (!permissions.some((p) => membershipHoldsPermission(row, p))) throw denied();
+}
+
+export async function assertHasPermissionTx(
+  tx: Tx,
+  context: SessionContext,
+  permission: string,
+): Promise<void> {
+  await assertHoldsAnyPermissionTx(tx, context, [permission]);
+}
+
+// Literal SQL text[] for a role set, computed inside an UPDATE so the union/difference happens on
+// the locked row, never from an earlier unlocked read (design D3, pre-mortem 11). Values are
+// single-quote-escaped and never bound parameters.
+function permissionSet(values: readonly string[]) {
+  if (values.length === 0) return sql.raw(`'{}'::text[]`);
+  return sql.raw(`ARRAY[${values.map((v) => `'${v.replace(/'/g, "''")}'`).join(", ")}]::text[]`);
 }
 
 // A revoked Membership (removeMember) grants nothing — every permission/role check in this file
@@ -492,10 +573,14 @@ export async function getNavigationAccess(
   // proposal Assumption 3: "may act on organisation tasks" = household_admin/moderator, or any
   // individually granted permission — the avatar menu's "Organisation" item uses the same test
   // listOrganisationTasks' own count-vs-permission filter relies on (design.md Decision 4).
+  // Since application-capture the stored permissions hold the ROLE SETS too (design D3), so "any
+  // permission" no longer means "an individual grant": once the resident set is non-empty (F4's
+  // `vote`), every resident would qualify. Only a permission beyond the resident set counts.
+  // Change 5 replaces this whole rule with the organisation guard (moderator only).
   const organisation =
     membershipRow.role === "household_admin" ||
     membershipRow.role === "moderator" ||
-    membershipRow.permissions.length > 0;
+    membershipRow.permissions.some((p) => !(RESIDENT_PERMISSIONS as readonly string[]).includes(p));
 
   // proposal Assumption 1: "may see the members list" = the rule O1 applies today (O16's own
   // access rule, U-30) — household_admin or moderator, not every permission holder.
@@ -682,9 +767,11 @@ async function revokeMembershipForProfileTx(
     .where(eq(membership.residentProfileId, residentProfileId));
   if (!target) return; // profile was never claimed (still `prepared`) — nothing to revoke
 
+  // Losing the resident status and the moderator role is part of the revocation (design D3):
+  // role -> member and every stored permission cleared, in this one UPDATE on the one row.
   await tx
     .update(membership)
-    .set({ revokedAt: new Date() })
+    .set({ revokedAt: new Date(), role: "member", permissions: [] })
     .where(and(eq(membership.id, target.id), isNull(membership.revokedAt)));
 
   // V-3: a pre-existing session must stop working immediately, not just at its next
@@ -810,7 +897,12 @@ export async function reactivateMember(
       await transitionResidentProfileStatusTx(tx, target.residentProfileId, "active", actor);
     }
 
-    await tx.update(membership).set({ revokedAt: null }).where(eq(membership.id, target.id));
+    // A reactivated member holds the resident set as a member (design D3). A former moderator is
+    // appointed again, visibly, rather than silently regaining the role.
+    await tx
+      .update(membership)
+      .set({ revokedAt: null, role: "member", permissions: [...RESIDENT_PERMISSIONS] })
+      .where(eq(membership.id, target.id));
 
     await recordActivityEvent(tx, {
       householdId: context.householdId,
@@ -1306,7 +1398,17 @@ export async function setMemberRole(
     const fromRole = target.role;
     if (fromRole === toRole) return;
 
-    await tx.update(membership).set({ role: toRole }).where(eq(membership.id, target.id));
+    // Appointment stores the moderator set, demotion removes it (design D3). Computed in SQL on
+    // the locked row. A permission in both the moderator and the resident set survives demotion:
+    // the difference is taken first, then the resident set is unioned back for a resident.
+    const permissions =
+      toRole === "moderator"
+        ? sql`ARRAY(SELECT DISTINCT p FROM unnest(${membership.permissions} || ${permissionSet(MODERATOR_PERMISSIONS)}) AS p ORDER BY p)`
+        : sql`ARRAY(SELECT p FROM (SELECT p FROM unnest(${membership.permissions}) AS p EXCEPT SELECT p FROM unnest(${permissionSet(MODERATOR_PERMISSIONS)}) AS p) AS kept UNION SELECT p FROM unnest(CASE WHEN ${membership.isResident} THEN ${permissionSet(RESIDENT_PERMISSIONS)} ELSE '{}'::text[] END) AS p ORDER BY p)`;
+    await tx
+      .update(membership)
+      .set({ role: toRole, permissions })
+      .where(eq(membership.id, target.id));
 
     await recordActivityEvent(tx, {
       householdId: context.householdId,

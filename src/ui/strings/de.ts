@@ -173,6 +173,10 @@ export const de = {
       openFirstRoundBody: "Noch läuft nichts — eröffne eine Runde, sobald du Zimmer zum Besetzen hast.",
       openNewRound: "Neue Runde eröffnen",
       openAnotherRound: "Weitere Runde eröffnen",
+      // D13 (application-capture): the household account and any session without close_round is
+      // not offered the way to open a round; runs of the round are the moderation's (S-50/U-20).
+      noRoundYetHeading: "Noch keine Runde",
+      noRoundYetBody: "Casting-Runden eröffnet die Moderation der WG.",
       otherRoundsHeading: "Weitere Runden",
       roomsLink: "Zimmer",
       membersLink: "Mitglieder",
@@ -327,6 +331,8 @@ export const de = {
     detail: {
       procedureChangedNotice: "Eine Abstimmungsregel wurde geändert, während diese Runde offen war.",
       participantsHeading: "Teilnehmende",
+      // F3 change 2: shown only to a session holding create_application, for an open round.
+      captureApplication: "Bewerbung erfassen",
     },
     errors: {
       // casting/repository.ts's RoundOpenPreconditionError — not enumerated in tasks.md's error
@@ -341,6 +347,150 @@ export const de = {
       // resolves to the same "not allowed" outcome for the user, see the implementation report),
       // mapped by class to one generic text rather than the raw `Missing permission: …` message.
       permissionDenied: "Du hast keine Berechtigung für diese Aktion.",
+    },
+  },
+  // F3 change 2 (application-capture): screen O3 (capture), the application detail shell (O5's
+  // first cut) and the Art. 14 notice. Labels follow 03-PRD.md §4.1.3 and rahmenwerk.md §8.6
+  // verbatim where they have an entry; the notice text is 06-Compliance-Anhang.md §4.5 "Variante
+  // Dritterhebung", reproduced verbatim except for its placeholders. NO label may contain an
+  // Art.-9 stem (scripts/lint/data-inventory.ts ART9_BLOCKLIST; `herkunft` is one, so the
+  // collection-source label is never „Herkunft der Angaben"); tests/unit/casting/capture-page.test.ts
+  // checks every rendered label token by token.
+  applications: {
+    capture: {
+      heading: "Bewerbung erfassen",
+      backToRound: "Zur Runde",
+      // The three steps (design D6): Nachricht, Angaben, Hinweis.
+      messageIntro: "Füge die Nachricht der Person ein, falls du sie hast. Den Rest tippst du im nächsten Schritt.",
+      next: "Weiter",
+      back: "Zurück",
+      nameLabel: "Name",
+      ageLabel: "Alter",
+      // One contact input, sorted by a fixed rule (design D15). The line under each input says
+      // where that contact will be stored.
+      contactLabel: "Kontakt",
+      contactLabelMore: "Weiterer Kontakt",
+      contactPlaceholder: "E-Mail, Telefonnummer oder eine andere Kennung",
+      addContact: "+ weiteren Kontakt",
+      // Not „Entfernen": §8.6 reserves that word for removing a member (U-27).
+      removeContact: "Kontakt weglassen",
+      contactStoredAs: {
+        email: "Wird als E-Mail-Adresse gespeichert",
+        phone: "Wird als Telefonnummer gespeichert",
+        other: "Wird als sonstiger Kontakt gespeichert",
+      },
+      // Names the input that clashes with an earlier one of the same kind.
+      contactKindTaken: {
+        email: "Es kann nur eine E-Mail-Adresse gespeichert werden.",
+        phone: "Es kann nur eine Telefonnummer gespeichert werden.",
+        other: "Es kann nur ein sonstiger Kontakt gespeichert werden.",
+      },
+      messageLabel: "Nachricht der Person",
+      // Counted in Unicode code points, like the database (assumption A5).
+      counter: (used: number, max: number) => `${used} von ${max} Zeichen`,
+      limitNear: (max: number) => `Höchstens ${max} Zeichen`,
+      attributesLegend: "Weitere Angaben",
+      openAttributes: "+ Weitere Angaben",
+      attributeLabelLabel: "Bezeichnung",
+      attributeValueLabel: "Angabe",
+      addAttribute: "Weitere Angabe hinzufügen",
+      removeAttribute: "Entfernen",
+      // rahmenwerk.md §8.6 / 03-PRD.md §4.1.3, verbatim.
+      collectedFromStatement: "Angaben von der bewerbenden Person",
+      collectedFromCheckbox:
+        "Die Angaben stammen nicht von der Person selbst (z. B. jemand hat sie euch empfohlen)",
+      save: "Speichern",
+      savePending: "Wird gespeichert…",
+    },
+    // The three non-form states of O3 (the fourth, loading, is loading.tsx).
+    states: {
+      noOpenRound:
+        "Bewerbungen werden nur in einer offenen Runde erfasst. Diese Runde ist gerade nicht offen.",
+      // O3 „Keine Berechtigung": why, and who can help.
+      permissionDenied:
+        "Bewerbungen erfasst die Moderation der WG oder wer das Recht dazu hat. Wende dich an die Moderation, wenn eine Bewerbung erfasst werden soll.",
+      // rahmenwerk.md §8.6, verbatim.
+      householdAccount:
+        "Das WG-Konto verwaltet die WG — Bewerbungen und Abstimmung bleiben bei den Bewohner:innen.",
+      detailPermissionDenied:
+        "Diese Seite ist für die Moderation der WG. Wende dich an sie, wenn du etwas zu einer Bewerbung wissen möchtest.",
+    },
+    // Only a code and at most a field name ever reach the form, never a typed value (D4). One
+    // text per code; the field is named by the field-level text below where it helps.
+    errors: {
+      name_required: "Bitte gib einen Namen an.",
+      too_long: "Eine Angabe ist zu lang.",
+      invalid_age: "Das Alter muss eine ganze Zahl von 0 bis 150 sein.",
+      too_many_attributes: "Es sind höchstens 10 weitere Angaben möglich.",
+      invalid_attribute:
+        "Jede weitere Angabe braucht eine Bezeichnung (bis 60 Zeichen) und eine Angabe (bis 500 Zeichen).",
+      invalid_characters: "Ein Feld enthält ein Zeichen, das nicht gespeichert werden kann.",
+      collected_from_required: "Bitte gib an, woher die Angaben stammen.",
+      // Shown beside the contact inputs; the input that clashes gets contactKindTaken above.
+      contact_kind_taken: "Es sind höchstens drei Kontakte möglich, je einer als E-Mail, Telefon und sonstiger Kontakt.",
+      round_not_found: "Diese Runde gibt es nicht mehr.",
+      round_not_open:
+        "Die Runde ist nicht mehr offen, deshalb wurde nichts gespeichert. Deine Eingaben stehen noch im Formular.",
+      permission_denied: "Du hast keine Berechtigung, Bewerbungen zu erfassen.",
+      profile_required: "Bewerbungen können nur Bewohner:innen erfassen.",
+      save_failed: "Die Bewerbung konnte nicht gespeichert werden. Deine Eingaben stehen noch im Formular.",
+    },
+    saved: "Bewerbung gespeichert",
+    viewSaved: "Bewerbung ansehen",
+    // The Art. 14 duty and text. `{Datum}` is one month after capture, on the Berlin calendar (A2).
+    notice: {
+      // Two quiet lines (design D6): this one, then deadlineLine. Together they state both
+      // deadlines of FR-3.11, the first message and the one-month date.
+      informLine: "Die Person muss erfahren, dass ihr ihre Angaben gespeichert habt.",
+      // 06-Compliance-Anhang.md §4.5, verbatim apart from its placeholders.
+      deadlineLine: (name: string, date: string) =>
+        `Am besten gleich mit deiner ersten Nachricht an ${name} schicken – spätestens bis ${date}.`,
+      deadlineNameFallback: "die Person",
+      deadlinePassed: (date: string) =>
+        `Die Monatsfrist ist schon verstrichen (${date}). Informiert die Person so bald wie möglich.`,
+      textLabel: "Textbaustein zum Kopieren",
+      showExample: "Beispieltext anzeigen",
+      hideExample: "Beispieltext ausblenden",
+      understood: "Verstanden",
+      copy: "Text kopieren",
+      copied: "Text kopiert",
+      regenerate: "Text neu erzeugen",
+      // A1: the [Link] stays a literal placeholder; say plainly that there is nothing to link to yet.
+      linkHint: "[Link] bleibt stehen, weil es noch keine Datenschutzseite gibt.",
+      nameFallback: "{Name}",
+      // Category words for {Kategorien}, in the fixed order of noticeCategories().
+      categories: {
+        name: "Name",
+        age: "Alter",
+        email: "E-Mail-Adresse",
+        phone: "Telefonnummer",
+        other: "weiterer Kontakt",
+        message: "deine Nachricht",
+        attributes: "weitere Angaben",
+      },
+      // 06-Compliance-Anhang.md §4.5 „Stufe 1, Variante Dritterhebung", verbatim except {Name},
+      // {Haushaltsname} and {Kategorien}.
+      thirdPartyText: (v: { name: string; household: string; categories: string }) =>
+        `Hey ${v.name}, kurze Info von der WG ${v.household}: Deine Bewerbung (${v.categories}) haben wir ` +
+        `über eine andere Person bekommen und für unsere Zimmersuche gespeichert. Spätestens 180 Tage ` +
+        `nach Ende der Suche löschen wir alles wieder. Wenn du nicht dabei sein möchtest oder wissen ` +
+        `willst, was wir über dich gespeichert haben, sag einfach Bescheid – dann löschen wir es sofort. ` +
+        `Mehr dazu: [Link]`,
+    },
+    detail: {
+      heading: "Bewerbung",
+      backToRound: "Zur Runde",
+      capturedNotice: "Diese Bewerbung wurde erfasst.",
+      viaSomeoneElse: "Über jemand anderen",
+      fromApplicant: "Von der bewerbenden Person",
+      ageLabel: "Alter",
+      emailLabel: "E-Mail",
+      phoneLabel: "Telefon",
+      otherContactLabel: "Anderer Kontakt",
+      messageLabel: "Nachricht der Person",
+      attributesLabel: "Weitere Angaben",
+      sourceLabel: "Wie die Angaben zu uns kamen",
+      empty: "—",
     },
   },
   settings: {

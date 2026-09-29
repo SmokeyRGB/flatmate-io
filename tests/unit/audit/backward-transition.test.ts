@@ -2,9 +2,10 @@ import { eq } from "drizzle-orm";
 import { afterEach, describe, expect, it } from "vitest";
 import { withSessionContext } from "@/db/session-context";
 import { activityEvent } from "@/modules/audit/schema";
-import { application } from "@/modules/casting/schema";
+import { application, castingRound } from "@/modules/casting/schema";
 import { transitionApplication } from "@/modules/casting/repository";
 import { isBackwardTransition } from "@/modules/casting/transitions";
+import { insertTestRound, syntheticApplication } from "../../helpers/applications";
 import { uuid } from "../../helpers/uuid";
 
 // FR-0.11: a permitted backward transition produces exactly one ActivityEvent naming the acting
@@ -26,6 +27,10 @@ describe("Backward transition produces exactly one ActivityEvent (FR-0.11, G-D3)
       await withSessionContext({ accountId: uuid(), householdId, profileId: uuid() }, (tx) =>
         tx.delete(application).where(eq(application.householdId, householdId)),
       );
+      // The seeded round (drizzle/0023: an application needs a real round) is removed as well.
+      await withSessionContext({ accountId: uuid(), householdId, profileId: uuid() }, (tx) =>
+        tx.delete(castingRound).where(eq(castingRound.householdId, householdId)),
+      );
     }
     seededHouseholds.length = 0;
   });
@@ -38,17 +43,18 @@ describe("Backward transition produces exactly one ActivityEvent (FR-0.11, G-D3)
     const profileId = uuid();
     const actor = { accountId: uuid(), profileId };
 
-    const [seed] = await withSessionContext({ accountId: uuid(), householdId, profileId: profileId }, (tx) =>
-      tx
+    const [seed] = await withSessionContext({ accountId: uuid(), householdId, profileId: profileId }, async (tx) => {
+      const roundId = await insertTestRound(tx, householdId);
+      return tx
         .insert(application)
-        .values({
-          householdId,
-          state: "screened",
-          createdByAccountId: uuid(),
-          createdByProfileId: profileId,
-        })
-        .returning(),
-    );
+        .values(
+          syntheticApplication(
+            { householdId, roundId, createdByAccountId: uuid(), createdByProfileId: profileId },
+            { state: "screened" },
+          ),
+        )
+        .returning();
+    });
 
     await transitionApplication(
       { accountId: uuid(), householdId, profileId: profileId },

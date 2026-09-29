@@ -82,8 +82,8 @@ describe("close_round is a role default (identity/permissions capability), not a
       PermissionDeniedError,
     );
 
-    // Appointed moderator: close_round now passes via MODERATOR_DEFAULT_PERMISSIONS — the
-    // permissions array itself is still empty, nothing was granted to it individually.
+    // Appointed moderator: setMemberRole stores the moderator's set (MODERATOR_PERMISSIONS) on the
+    // membership, and close_round passes because it is stored there (design D3: no role is read).
     await setMemberRole(hh.context, hh.accountId, accountId, "moderator");
     await expect(assertHasPermission(residentContext, accountId, "close_round")).resolves.toBeUndefined();
   });

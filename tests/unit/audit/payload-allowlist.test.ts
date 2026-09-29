@@ -2,13 +2,14 @@ import { eq } from "drizzle-orm";
 import { afterEach, describe, expect, it } from "vitest";
 import { withSessionContext } from "@/db/session-context";
 import { activityEvent } from "@/modules/audit/schema";
-import { application } from "@/modules/casting/schema";
+import { application, castingRound } from "@/modules/casting/schema";
 import {
   assertPayloadAllowed,
   PayloadValidationError,
   recordActivityEvent,
   redactExpiredActivityEvents,
 } from "@/modules/audit/repository";
+import { insertTestRound, syntheticApplication } from "../../helpers/applications";
 import { uuid } from "../../helpers/uuid";
 
 // FR-0.14/EC-0.5/G-D7: payload validated against a positive list of allowed keys per event_type.
@@ -73,6 +74,10 @@ describe("ActivityEvent retention redaction (FR-0.13, EC-0.6, G-D8)", () => {
       await withSessionContext({ accountId: uuid(), householdId, profileId: uuid() }, (tx) =>
         tx.delete(application).where(eq(application.householdId, householdId)),
       );
+      // The seeded round (drizzle/0023: an application needs a real round) is removed as well.
+      await withSessionContext({ accountId: uuid(), householdId, profileId: uuid() }, (tx) =>
+        tx.delete(castingRound).where(eq(castingRound.householdId, householdId)),
+      );
     }
     seededHouseholds.length = 0;
   });
@@ -85,17 +90,18 @@ describe("ActivityEvent retention redaction (FR-0.13, EC-0.6, G-D8)", () => {
 
     const [expiredApplication] = await withSessionContext(
       { accountId: uuid(), householdId, profileId: profileId },
-      (tx) =>
-        tx
+      async (tx) => {
+        const roundId = await insertTestRound(tx, householdId);
+        return tx
           .insert(application)
-          .values({
-            householdId,
-            state: "archived",
-            createdByAccountId: uuid(),
-            createdByProfileId: profileId,
-            retentionUntil: pastDate,
-          })
-          .returning(),
+          .values(
+            syntheticApplication(
+              { householdId, roundId, createdByAccountId: uuid(), createdByProfileId: profileId },
+              { state: "archived", retentionUntil: pastDate },
+            ),
+          )
+          .returning();
+      },
     );
 
     const event = await withSessionContext({ accountId: uuid(), householdId, profileId: profileId }, (tx) =>
@@ -140,17 +146,18 @@ describe("ActivityEvent retention redaction (FR-0.13, EC-0.6, G-D8)", () => {
 
     const [activeApplication] = await withSessionContext(
       { accountId: uuid(), householdId, profileId: profileId },
-      (tx) =>
-        tx
+      async (tx) => {
+        const roundId = await insertTestRound(tx, householdId);
+        return tx
           .insert(application)
-          .values({
-            householdId,
-            state: "new",
-            createdByAccountId: uuid(),
-            createdByProfileId: profileId,
-            retentionUntil: futureDate,
-          })
-          .returning(),
+          .values(
+            syntheticApplication(
+              { householdId, roundId, createdByAccountId: uuid(), createdByProfileId: profileId },
+              { state: "new", retentionUntil: futureDate },
+            ),
+          )
+          .returning();
+      },
     );
 
     await withSessionContext({ accountId: uuid(), householdId, profileId: profileId }, (tx) =>

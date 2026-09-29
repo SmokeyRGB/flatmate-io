@@ -1,14 +1,12 @@
-import { eq } from "drizzle-orm";
 import { afterEach, describe, expect, it } from "vitest";
-import { withSessionContext } from "@/db/session-context";
 import { claimResidentProfile } from "@/modules/identity/auth";
 import {
   createResidentProfile,
   getResidentList,
   PermissionDeniedError,
+  setMemberRole,
   setMovedOut,
 } from "@/modules/identity/repository";
-import { membership } from "@/modules/identity/schema";
 import {
   cleanupAll,
   deleteTestAccount,
@@ -38,9 +36,9 @@ describe("Resident list access by role", () => {
       "test-password-not-real-1234",
     );
     accountIds.push(modAccountId);
-    await withSessionContext(hh.context, (tx) =>
-      tx.update(membership).set({ role: "moderator" }).where(eq(membership.accountId, modAccountId)),
-    );
+    // Appointed through setMemberRole so the moderator's permission set is stored with the role
+    // (drizzle/0024 refuses a moderator without it); setup only, no assertion changes.
+    await setMemberRole(hh.context, hh.accountId, modAccountId, "moderator");
 
     const memberProfile = await createResidentProfile(hh.context, "PlainMember", actor);
     const { accountId: memberAccountId } = await claimResidentProfile(

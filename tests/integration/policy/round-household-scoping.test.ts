@@ -6,6 +6,7 @@ import { createRoom, createRound, openRound } from "@/modules/casting/repository
 import { castingRound, roundParticipation } from "@/modules/casting/schema";
 import {
   cleanupAll,
+  createTestModerator,
   deleteTestAccount,
   registerTestHousehold,
   type TestHousehold,
@@ -41,11 +42,18 @@ describe("casting_round/round_participation household isolation — policy layer
     accountIds.push(residentAccountId);
 
     const roomA = await createRoom(a.context, "Room A", actorA);
-    const roundA = await createRound(a.context, "Round A", [roomA.id], actorA);
+    // Setup only (design D13): rounds are created and opened by a moderator of each household.
+    const modA = await createTestModerator(a);
+    const roundA = await createRound(modA.context, "Round A", [roomA.id], {
+      accountId: modA.accountId,
+      profileId: modA.profileId,
+    });
 
     const roomB = await createRoom(b.context, "Room B", actorB);
-    const roundB = await createRound(b.context, "Round B", [roomB.id], actorB);
-    await openRound(b.context, roundB.id, actorB);
+    const modB = await createTestModerator(b);
+    const actorModB = { accountId: modB.accountId, profileId: modB.profileId };
+    const roundB = await createRound(modB.context, "Round B", [roomB.id], actorModB);
+    await openRound(modB.context, roundB.id, actorModB);
 
     const [roundsSeenByA, participationsSeenByA] = await withSessionContext(a.context, async (tx) => [
       await tx.select().from(castingRound),

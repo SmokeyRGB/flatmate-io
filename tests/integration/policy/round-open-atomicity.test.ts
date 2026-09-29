@@ -12,6 +12,7 @@ import {
 import { castingRound, roundParticipation } from "@/modules/casting/schema";
 import {
   cleanupAll,
+  createTestModerator,
   deleteTestAccount,
   registerTestHousehold,
   type TestHousehold,
@@ -42,14 +43,18 @@ describe("Round opening: atomic snapshot + frozen rules (AC-1.8, AC-1.9, AC-1.10
     const actor = { accountId: hh.accountId, profileId: null };
     const RESIDENT_COUNT = 4; // smaller than spec.md's illustrative "7" to keep this test fast;
     // the property under test (exactly N rows, marked snapshot_at_open) doesn't depend on N.
-    for (let i = 0; i < RESIDENT_COUNT; i++) {
+    // Design D13: a moderator (also a resident) creates and opens the round, so it is one of the
+    // RESIDENT_COUNT residents rather than an extra one — the expected count is unchanged.
+    for (let i = 0; i < RESIDENT_COUNT - 1; i++) {
       const r = await claim(hh, `Resident${i}`);
       accountIds.push(r.accountId);
     }
+    const moderator = await createTestModerator(hh, "Resident3");
+    const modActor = { accountId: moderator.accountId, profileId: moderator.profileId };
     const roomA = await createRoom(hh.context, "Room A", actor);
-    const round = await createRound(hh.context, "Round", [roomA.id], actor);
+    const round = await createRound(moderator.context, "Round", [roomA.id], modActor);
 
-    const opened = await openRound(hh.context, round.id, actor);
+    const opened = await openRound(moderator.context, round.id, modActor);
     expect(opened.status).toBe("open");
     expect(opened.settingsSnapshot).toMatchObject({
       favoriteBudgetFactor: "1.5",
@@ -69,11 +74,12 @@ describe("Round opening: atomic snapshot + frozen rules (AC-1.8, AC-1.9, AC-1.10
   it("keeps the frozen quorum_share even after the household's live setting changes (AC-1.9)", async () => {
     hh = await registerTestHousehold();
     const actor = { accountId: hh.accountId, profileId: null };
-    const resident = await claim(hh, "Resident1");
-    accountIds.push(resident.accountId);
+    // Design D13: the round is created and opened by a moderator, who is the one eligible resident.
+    const moderator = await createTestModerator(hh, "Resident1");
+    const modActor = { accountId: moderator.accountId, profileId: moderator.profileId };
     const roomA = await createRoom(hh.context, "Room A", actor);
-    const round = await createRound(hh.context, "Round", [roomA.id], actor);
-    const opened = await openRound(hh.context, round.id, actor);
+    const round = await createRound(moderator.context, "Round", [roomA.id], modActor);
+    const opened = await openRound(moderator.context, round.id, modActor);
     expect((opened.settingsSnapshot as { quorumShare: string }).quorumShare).toBe("0.5");
 
     const { householdSettings } = await import("@/modules/identity/schema");
@@ -96,13 +102,14 @@ describe("Round opening: atomic snapshot + frozen rules (AC-1.8, AC-1.9, AC-1.10
   it("leaves zero partial state when opening fails (AC-1.10)", async () => {
     hh = await registerTestHousehold();
     const actor = { accountId: hh.accountId, profileId: null };
-    const resident = await claim(hh, "Resident1");
-    accountIds.push(resident.accountId);
+    // Design D13: the round is created and opened by a moderator, who is the one eligible resident.
+    const moderator = await createTestModerator(hh, "Resident1");
+    const modActor = { accountId: moderator.accountId, profileId: moderator.profileId };
     const roomA = await createRoom(hh.context, "Room A", actor);
-    const round = await createRound(hh.context, "Round", [roomA.id], actor);
-    await openRound(hh.context, round.id, actor); // first open succeeds
+    const round = await createRound(moderator.context, "Round", [roomA.id], modActor);
+    await openRound(moderator.context, round.id, modActor); // first open succeeds
 
-    await expect(openRound(hh.context, round.id, actor)).rejects.toThrow(RoundOpenPreconditionError);
+    await expect(openRound(moderator.context, round.id, modActor)).rejects.toThrow(RoundOpenPreconditionError);
 
     // The second (failed) attempt must not have added a second snapshot batch.
     const participants = await withSessionContext(hh.context, (tx) =>
@@ -117,14 +124,15 @@ describe("Round opening: atomic snapshot + frozen rules (AC-1.8, AC-1.9, AC-1.10
   it("lets exactly one of two concurrent opens succeed (EC-1.9)", async () => {
     hh = await registerTestHousehold();
     const actor = { accountId: hh.accountId, profileId: null };
-    const resident = await claim(hh, "Resident1");
-    accountIds.push(resident.accountId);
+    // Design D13: the round is created and opened by a moderator, who is the one eligible resident.
+    const moderator = await createTestModerator(hh, "Resident1");
+    const modActor = { accountId: moderator.accountId, profileId: moderator.profileId };
     const roomA = await createRoom(hh.context, "Room A", actor);
-    const round = await createRound(hh.context, "Round", [roomA.id], actor);
+    const round = await createRound(moderator.context, "Round", [roomA.id], modActor);
 
     const results = await Promise.allSettled([
-      openRound(hh.context, round.id, actor),
-      openRound(hh.context, round.id, actor),
+      openRound(moderator.context, round.id, modActor),
+      openRound(moderator.context, round.id, modActor),
     ]);
 
     const fulfilled = results.filter((r) => r.status === "fulfilled");
