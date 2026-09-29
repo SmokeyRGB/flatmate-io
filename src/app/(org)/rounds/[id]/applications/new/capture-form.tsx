@@ -32,7 +32,13 @@ import {
 } from "./capture-steps";
 
 const t = de.applications.capture;
-const e = de.applications.errors;
+// The refusal texts by mode: the correction form names correcting where the capture text names
+// capturing (Copilot, PR #41); every other code reads the same in both.
+const CAPTURE_ERRORS = de.applications.errors;
+const EDIT_ERRORS = { ...de.applications.errors, ...de.applications.edit.errors };
+export function errorTextsFor(kind: FormMode["kind"]) {
+  return kind === "edit" ? EDIT_ERRORS : CAPTURE_ERRORS;
+}
 const FORM_ID = "capture-application-form";
 const initialState: CaptureFormState = { status: "idle" };
 
@@ -101,6 +107,7 @@ export function CaptureForm({
   initial?: { step?: CaptureStep; thirdParty?: boolean; extraRows?: number };
 }) {
   const edit = mode.kind === "edit" ? mode : null;
+  const e = errorTextsFor(mode.kind);
   const stepMode: StepMode = edit ? { kind: "edit", wasThirdParty: edit.stored.thirdParty } : { kind: "capture" };
   const [state, formAction] = useActionState(edit ? updateApplicationAction : captureApplicationAction, initialState);
   const [isPending, startTransition] = useTransition();
@@ -219,7 +226,7 @@ export function CaptureForm({
 
         {step === 1 && (
           <>
-            <p className="text-sm text-muted-foreground">{t.messageIntro}</p>
+            <p className="text-sm text-muted-foreground">{edit ? de.applications.edit.messageIntro : t.messageIntro}</p>
             <div>
               <label htmlFor="message" className="field-label">
                 {t.messageLabel}

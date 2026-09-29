@@ -461,10 +461,18 @@ export const de = {
       // A correction saved without any change writes nothing (FR-3.22), so it says so.
       unchanged: "Keine Änderungen",
       editLink: "Bearbeiten",
+      // Step 1 of the correction: the message is already there (capture's intro asks to paste it).
+      messageIntro: "Hier steht die Nachricht der Person, so wie sie gespeichert ist. Die übrigen Angaben kommen im nächsten Schritt.",
       // Shown to a member without create_application; the action refuses anyway.
       permissionDenied: "Bewerbungen bearbeitet die Moderation der WG.",
-      // Refused as stale: someone corrected the application after the form was loaded (D4 c2).
+      // Refused as stale: someone corrected the application after the form was loaded (D4 c).
       stale: "Die Bewerbung wurde inzwischen geändert. Lade die Seite neu, um die aktuelle Fassung zu sehen.",
+      // The refusals whose capture wording names capturing („erfassen"): in the correction form
+      // they name correcting instead (Copilot, PR #41). Every other code reads the same in both.
+      errors: {
+        permission_denied: "Du hast keine Berechtigung, Bewerbungen zu bearbeiten.",
+        profile_required: "Bewerbungen können nur Bewohner:innen bearbeiten.",
+      },
     },
     // Only a code and at most a field name ever reach the form, never a typed value (D4). One
     // text per code; the field is named by the field-level text below where it helps.

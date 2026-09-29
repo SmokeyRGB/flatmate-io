@@ -22,6 +22,7 @@ import {
   type CorrectableField,
 } from "./application-changes";
 import { application, castingRound, room, roundParticipation } from "./schema";
+import { LOCKED_SETTINGS_FIELDS, type LockedSettingsField } from "./settings-fields";
 import { ruleFor, type ApplicationState } from "./transitions";
 import { assertF1RoomTransitionAllowed, type RoomStatus } from "./room-transitions";
 
@@ -962,14 +963,6 @@ export async function getRoundParticipants(context: SessionContext, roundId: str
       ),
   );
 }
-
-const LOCKED_SETTINGS_FIELDS = [
-  "scaleWeights",
-  "favoriteBudgetFactor",
-  "hideResultsUntilVoted",
-  "quorumShare",
-] as const;
-type LockedSettingsField = (typeof LOCKED_SETTINGS_FIELDS)[number];
 
 export class ProcedureLockedError extends Error {
   constructor(public readonly openRoundId: string, field: string) {

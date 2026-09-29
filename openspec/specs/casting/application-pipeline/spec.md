@@ -159,8 +159,16 @@ write exactly one audit entry. The entry names the changed fields from a fixed l
 (`applicantName`, `age`, `contactEmail`, `contactPhone`, `contactOther`, `messageRaw`,
 `attributes`, `collectedFrom`) and contains neither the old nor the new value of any field. It
 names the acting account and profile. A correction SHALL never alter or remove a vote already
-cast. Sources: FR-3.21, FR-3.22, AC-3.19, `03-PRD.md` §4.1.3 (a correction of `collected_from`
-creates an `ActivityEvent`), G-D7, `06-Compliance-Anhang.md` §7.2.
+cast. The audit write boundary itself SHALL refuse an entry whose field list holds anything but
+those fixed names, whichever function writes it. Every other audit key likewise accepts only its
+fixed shape (an enum value, a count, an id), so no key carries free text *(added 2026-09-29,
+Copilot on PR #41)*. Sources: FR-3.21, FR-3.22, AC-3.19, `03-PRD.md` §4.1.3 (a correction of
+`collected_from` creates an `ActivityEvent`), G-D7, `06-Compliance-Anhang.md` §7.2.
+
+#### Scenario: The audit boundary refuses a value in the field list
+- **WHEN** any function records a correction entry whose field list holds typed text, or a real
+  field name next to typed text
+- **THEN** the write is refused, and the refusal names the key, not the value
 
 #### Scenario: Correcting the message and the source
 - **WHEN** a moderator corrects an application's message text and switches its collection source

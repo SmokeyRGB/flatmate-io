@@ -5,6 +5,7 @@ import { activityEvent } from "@/modules/audit/schema";
 import { application, castingRound } from "@/modules/casting/schema";
 import {
   assertPayloadAllowed,
+  payloadKeysWithoutValueRule,
   PayloadValidationError,
   recordActivityEvent,
   redactExpiredActivityEvents,
@@ -50,6 +51,60 @@ describe("ActivityEvent payload allowlist (FR-0.14, EC-0.5, G-D7)", () => {
       PayloadValidationError,
     );
   });
+});
+
+// G-D7 for VALUES (Copilot, PR #41): a key on the allowlist still refused free text as its value,
+// at the write boundary, for every caller of recordActivityEvent. Breaks: drop the value check in
+// assertPayloadAllowed and the free-text cases pass through; remove one rule and the coverage case
+// names it.
+describe("ActivityEvent payload values (G-D7)", () => {
+  const SENTINEL = "Lea Testbewerbung, 0151 23125 0100";
+
+  it("every allowlisted key has a value rule, so a new key must declare its shape", () => {
+    expect(payloadKeysWithoutValueRule()).toEqual([]);
+  });
+
+  it("accepts the fixed shapes the writers produce", () => {
+    expect(() => assertPayloadAllowed("application.updated", { fields: ["messageRaw", "collectedFrom"] })).not.toThrow();
+    expect(() => assertPayloadAllowed("application.created", { source: "manual_form", collectedFrom: "third_party" })).not.toThrow();
+    expect(() => assertPayloadAllowed("casting_round.opened", { participantCount: 0 })).not.toThrow();
+    expect(() =>
+      assertPayloadAllowed("household_settings.changed", { field: "quorumShare,scaleWeights" }),
+    ).not.toThrow();
+    expect(() =>
+      assertPayloadAllowed("household_settings.changed_while_round_open", {
+        field: "quorumShare",
+        roundId: "5f3c2a10-8f6e-4d2b-9a41-2c7e3b9d1f00",
+      }),
+    ).not.toThrow();
+    expect(() => assertPayloadAllowed("membership.role_changed", { fromRole: "member", toRole: "moderator" })).not.toThrow();
+  });
+
+  const refused: [string, string, Record<string, unknown>][] = [
+    ["free text in the correction's field list", "application.updated", { fields: [SENTINEL] }],
+    ["a real field name next to free text", "application.updated", { fields: ["messageRaw", SENTINEL] }],
+    ["an empty field list", "application.updated", { fields: [] }],
+    ["a repeated field name", "application.updated", { fields: ["age", "age"] }],
+    ["the field list as a string", "application.updated", { fields: "messageRaw" }],
+    ["free text as a state", "application.state_changed", { fromState: "new", toState: SENTINEL }],
+    ["free text as the collection source", "application.created", { source: "manual_form", collectedFrom: SENTINEL }],
+    ["free text as a settings field", "household_settings.changed", { field: `quorumShare,${SENTINEL}` }],
+    ["a round id that is not an id", "household_settings.changed_while_round_open", { field: "quorumShare", roundId: SENTINEL }],
+    ["a count that is text", "casting_round.opened", { participantCount: SENTINEL }],
+    ["a role that is free text", "membership.role_changed", { fromRole: "member", toRole: SENTINEL }],
+  ];
+  for (const [label, eventType, payload] of refused) {
+    it(`refuses ${label}, and the error never carries the value`, () => {
+      let caught: unknown;
+      try {
+        assertPayloadAllowed(eventType, payload);
+      } catch (err) {
+        caught = err;
+      }
+      expect(caught).toBeInstanceOf(PayloadValidationError);
+      expect((caught as Error).message).not.toContain(SENTINEL);
+    });
+  }
 });
 
 // FR-0.13/G-D8: end-of-retention redaction nulls only the 🔴/⚫-classified payload keys for an

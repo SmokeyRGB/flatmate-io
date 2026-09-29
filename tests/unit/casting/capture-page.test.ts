@@ -324,6 +324,21 @@ describe("the correction form: O3 in edit mode", () => {
     expect(html).not.toContain(">" + de.applications.capture.save + "<");
   });
 
+  // Copilot, PR #41: a correction's refusals and its first step speak of correcting, not of
+  // capturing. Break: use the capture texts in edit mode, and this fails.
+  it("speaks of correcting: its refusals and its intro never say „erfassen“", async () => {
+    const { errorTextsFor } = await import("@/app/(org)/rounds/[id]/applications/new/capture-form");
+    const editTexts = errorTextsFor("edit");
+    expect(editTexts.permission_denied).toBe(de.applications.edit.errors.permission_denied);
+    expect(editTexts.profile_required).toBe(de.applications.edit.errors.profile_required);
+    for (const text of Object.values(editTexts)) expect(text).not.toMatch(/erfass/i);
+    expect(errorTextsFor("capture").permission_denied).toBe(de.applications.errors.permission_denied);
+
+    const html = renderEdit();
+    expect(html).toContain(de.applications.edit.messageIntro);
+    expect(html).not.toContain(de.applications.capture.messageIntro);
+  });
+
   it("carries the baseline and the application id as hidden inputs", () => {
     const controls = enumerateControls(renderEdit());
     const baseline = controls.find((c) => c.name === "baseline");

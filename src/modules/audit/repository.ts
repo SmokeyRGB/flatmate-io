@@ -1,7 +1,17 @@
 import { and, eq, sql } from "drizzle-orm";
 import type { PgTransaction } from "drizzle-orm/pg-core";
 import { activityEvent } from "./schema";
-import { application } from "@/modules/casting/schema";
+import {
+  application,
+  applicationCollectedFromEnum,
+  applicationSourceEnum,
+  applicationStateEnum,
+  roomStatusEnum,
+  roundParticipationSourceEnum,
+} from "@/modules/casting/schema";
+import { CORRECTABLE_FIELDS } from "@/modules/casting/application-changes";
+import { LOCKED_SETTINGS_FIELDS } from "@/modules/casting/settings-fields";
+import { membershipRoleEnum, residentProfileStatusEnum } from "@/modules/identity/schema";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Tx = PgTransaction<any, any, any>;
@@ -65,6 +75,58 @@ const PAYLOAD_ALLOWLIST: Readonly<Record<string, readonly string[]>> = {
   "account.password_reset_by_admin": [],
 };
 
+// G-D7 at the write boundary, for VALUES (Copilot, PR #41): the allowlist above only names the keys,
+// so a key alone would still accept free text as its value (`{ fields: ["typed text"] }`). Every
+// allowlisted key has a rule here that accepts only its fixed shape: an enum value, a list of fixed
+// names, a count, an id. A key with no rule is refused, so a later key must declare its shape in
+// the same change (tests/unit/audit/payload-allowlist.test.ts checks that every key has one).
+// Rules never echo the value they refuse.
+type ValueRule = (value: unknown) => boolean;
+
+const oneOf = (values: readonly string[]): ValueRule => (v) => typeof v === "string" && values.includes(v);
+// A non-empty list of distinct names from a fixed set.
+const listOf = (values: readonly string[]): ValueRule => (v) =>
+  Array.isArray(v) &&
+  v.length > 0 &&
+  new Set(v).size === v.length &&
+  v.every((x) => typeof x === "string" && values.includes(x));
+// The settings events store their field names comma-joined (casting/repository.ts).
+const commaListOf = (values: readonly string[]): ValueRule => (v) =>
+  typeof v === "string" && listOf(values)(v.split(","));
+const count: ValueRule = (v) => typeof v === "number" && Number.isInteger(v) && v >= 0;
+const uuidValue: ValueRule = (v) =>
+  typeof v === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
+
+const applicationStates = applicationStateEnum.enumValues;
+const residentStatuses = residentProfileStatusEnum.enumValues;
+const roomStatuses = roomStatusEnum.enumValues;
+const roles = membershipRoleEnum.enumValues;
+
+const PAYLOAD_VALUE_RULES: Readonly<Record<string, Readonly<Record<string, ValueRule>>>> = {
+  "application.state_changed": { fromState: oneOf(applicationStates), toState: oneOf(applicationStates) },
+  "application.created": {
+    source: oneOf(applicationSourceEnum.enumValues),
+    collectedFrom: oneOf(applicationCollectedFromEnum.enumValues),
+  },
+  "application.updated": { fields: listOf(CORRECTABLE_FIELDS) },
+  "resident_profile.status_changed": { fromStatus: oneOf(residentStatuses), toStatus: oneOf(residentStatuses) },
+  "room.status_changed": { fromStatus: oneOf(roomStatuses), toStatus: oneOf(roomStatuses) },
+  "casting_round.opened": { participantCount: count },
+  "casting_round.participant_added": { source: oneOf(roundParticipationSourceEnum.enumValues) },
+  "household_settings.changed": { field: commaListOf(LOCKED_SETTINGS_FIELDS) },
+  "household_settings.changed_while_round_open": { field: oneOf(LOCKED_SETTINGS_FIELDS), roundId: uuidValue },
+  "membership.role_changed": { fromRole: oneOf(roles), toRole: oneOf(roles) },
+};
+
+// Exported for the test that every allowlisted key has a rule.
+export function payloadKeysWithoutValueRule(): string[] {
+  const missing: string[] = [];
+  for (const [eventType, keys] of Object.entries(PAYLOAD_ALLOWLIST)) {
+    for (const key of keys) if (!PAYLOAD_VALUE_RULES[eventType]?.[key]) missing.push(`${eventType}.${key}`);
+  }
+  return missing;
+}
+
 export class PayloadValidationError extends Error {}
 
 export function assertPayloadAllowed(
@@ -75,9 +137,14 @@ export function assertPayloadAllowed(
   if (!allowedKeys) {
     throw new PayloadValidationError(`No payload allowlist registered for event_type "${eventType}"`);
   }
-  for (const key of Object.keys(payload)) {
+  for (const [key, value] of Object.entries(payload)) {
     if (!allowedKeys.includes(key)) {
       throw new PayloadValidationError(`Key "${key}" is not allowed for event_type "${eventType}"`);
+    }
+    // The message names the key and the event type, never the refused value (G-D7).
+    const rule = PAYLOAD_VALUE_RULES[eventType]?.[key];
+    if (!rule || !rule(value)) {
+      throw new PayloadValidationError(`Value of "${key}" is not allowed for event_type "${eventType}"`);
     }
   }
 }
