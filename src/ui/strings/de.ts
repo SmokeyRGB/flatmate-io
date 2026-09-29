@@ -436,6 +436,7 @@ export const de = {
       save_failed: "Die Bewerbung konnte nicht gespeichert werden. Deine Eingaben stehen noch im Formular.",
     },
     saved: "Bewerbung gespeichert",
+    viewSaved: "Bewerbung ansehen",
     // The Art. 14 duty and text. `{Datum}` is one month after capture, on the Berlin calendar (A2).
     notice: {
       // Two quiet lines (design D6): this one, then deadlineLine. Together they state both

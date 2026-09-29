@@ -64,6 +64,7 @@ async function render(searchParams: { saved?: string } = {}) {
   return renderToStaticMarkup(element);
 }
 
+const SAVED_ID = "55555555-5555-5555-5555-555555555555";
 const CAPTURE_HREF = `href="/rounds/${ROUND_ID}/applications/new"`;
 
 describe("round page: the way to the capture form", () => {
@@ -105,10 +106,27 @@ describe("round page: the way to the capture form", () => {
     expect(html).not.toContain(CAPTURE_HREF);
   });
 
-  it("?saved=1 shows the success notice, and its absence does not", async () => {
+  it("?saved=<uuid> shows the success notice with a link to that application, and its absence does not", async () => {
     state.holdsCreateApplication = true;
     state.profileId = "44444444-4444-4444-4444-444444444444";
-    expect(await render({ saved: "1" })).toContain(de.applications.saved);
-    expect(await render()).not.toContain(de.applications.saved);
+    const html = await render({ saved: SAVED_ID });
+    expect(html).toContain(de.applications.saved);
+    expect(html).toContain(`href="/rounds/${ROUND_ID}/applications/${SAVED_ID}"`);
+    expect(html).toContain(de.applications.viewSaved);
+    const plain = await render();
+    expect(plain).not.toContain(de.applications.saved);
+    expect(plain).not.toContain(de.applications.viewSaved);
+  });
+
+  // Break: drop the isUuid check in the page, and the garbage case shows a link to a made-up path.
+  it("a saved value that is not a uuid shows no notice and no link", async () => {
+    state.holdsCreateApplication = true;
+    state.profileId = "44444444-4444-4444-4444-444444444444";
+    for (const garbage of ["1", "../../evil", "not-a-uuid", ""]) {
+      const html = await render({ saved: garbage });
+      expect(html).not.toContain(de.applications.saved);
+      expect(html).not.toContain(de.applications.viewSaved);
+      expect(html).not.toContain("/applications/" + garbage + "\"");
+    }
   });
 });

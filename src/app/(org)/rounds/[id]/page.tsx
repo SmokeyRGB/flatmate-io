@@ -10,6 +10,7 @@ import {
   assertHasPermission,
   PermissionDeniedError,
 } from "@/modules/identity/repository";
+import { isUuid } from "@/db/session-context";
 import { getCurrentSession } from "@/modules/identity/session-cookie";
 import { de } from "@/ui/strings";
 import { LinkPendingHint } from "@/ui/link-pending-hint";
@@ -26,7 +27,10 @@ export default async function RoundDetailPage({
   searchParams?: Promise<{ saved?: string }>;
 }) {
   const { id } = await params;
-  const saved = (await searchParams)?.saved === "1";
+  // ?saved=<application id> after a capture. Anything that is not a uuid is ignored (no toast, no
+  // link): the value comes from the URL, so it is never trusted as a path segment.
+  const savedParam = (await searchParams)?.saved;
+  const savedId = typeof savedParam === "string" && isUuid(savedParam) ? savedParam : null;
   const current = await getCurrentSession();
   if (!current) redirect("/sign-in");
 
@@ -64,7 +68,12 @@ export default async function RoundDetailPage({
         <span className="badge mt-1">{de.status.round[round.status as keyof typeof de.status.round]}</span>
       </div>
 
-      {saved && <SavedToast message={de.applications.saved} />}
+      {savedId && (
+        <SavedToast
+          message={de.applications.saved}
+          link={{ href: `/rounds/${id}/applications/${savedId}`, label: de.applications.viewSaved }}
+        />
+      )}
 
       {canCapture && (
         <Link href={`/rounds/${id}/applications/new`} className="btn btn-primary">

@@ -160,6 +160,18 @@ async function transitionResidentProfileStatusTx(
   return updated;
 }
 
+// A direct status change of a claimed profile is refused: it would leave the membership and the
+// profile disagreeing. No value in the message.
+export class ClaimedProfileTransitionError extends Error {
+  readonly code = "claimed_profile_transition";
+  constructor() {
+    super(
+      "A claimed resident profile changes status only through setMovedOut, removeMember or reactivateMember, which also revoke or restore its membership",
+    );
+    this.name = "ClaimedProfileTransitionError";
+  }
+}
+
 export async function transitionResidentProfileStatus(
   context: SessionContext,
   residentProfileId: string,
@@ -173,9 +185,28 @@ export async function transitionResidentProfileStatus(
   // of which gate on assertIsAdministrationOrModerator before touching anything.
   if (!actor.accountId) throw new ResidentListActionDeniedError();
   await assertIsAdministrationOrModerator(context, actor.accountId);
-  return withSessionContext(context, (tx) =>
-    transitionResidentProfileStatusTx(tx, residentProfileId, toStatus, actor),
-  );
+  return withSessionContext(context, async (tx) => {
+    // A claimed profile (one that has a membership row) moves out, is removed or comes back only
+    // through the paths that also revoke or restore its membership. A status change alone would
+    // leave a live membership acting for a moved-out person, or a revoked one for an active
+    // person (V-3). A prepared profile has no membership yet, so it still moves here.
+    if (toStatus === "moved_out" || toStatus === "removed" || toStatus === "active") {
+      const [claimed] = await tx
+        .select({ id: membership.id })
+        .from(membership)
+        .where(eq(membership.residentProfileId, residentProfileId));
+      if (claimed) {
+        const [current] = await tx
+          .select({ status: residentProfile.status })
+          .from(residentProfile)
+          .where(eq(residentProfile.id, residentProfileId));
+        if (toStatus !== "active" || (current && current.status !== "active")) {
+          throw new ClaimedProfileTransitionError();
+        }
+      }
+    }
+    return transitionResidentProfileStatusTx(tx, residentProfileId, toStatus, actor);
+  });
 }
 
 // The ONE deliberate RLS-bootstrap exception (drizzle/0005_identity_login_bootstrap_function.sql,
@@ -414,8 +445,9 @@ export async function assertHoldsAnyPermissionTx(
   tx: Tx,
   context: SessionContext,
   permissions: readonly string[],
-  // A writer needs the row lock to serialize against revocation (D4 a). A pure read does not, and
-  // taking it on every page view would block membership writers for nothing (code review).
+  // A writer needs the row lock to serialize against revocation (D4 a). So does a read that
+  // returns personal data (getOrganisationApplication). `lock: false` is only for a read that
+  // returns nothing an ended membership could not see.
   options: { lock: boolean } = { lock: true },
 ): Promise<void> {
   const denied = () => new PermissionDeniedError(permissions.join(" | "));

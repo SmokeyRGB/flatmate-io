@@ -154,10 +154,10 @@ describe("captureApplicationAction: only a code and at most a field ever come ba
 });
 
 describe("captureApplicationAction: where a saved capture lands", () => {
-  it("data_subject returns to the round with the success notice", async () => {
+  it("data_subject returns to the round with the success notice and the saved id", async () => {
     captureApplication.mockResolvedValue({ id: CREATED_ID });
     await expect(captureApplicationAction(idle, formData("data_subject"))).rejects.toMatchObject({
-      target: `/rounds/${ROUND_ID}?saved=1`,
+      target: `/rounds/${ROUND_ID}?saved=${CREATED_ID}`,
     });
   });
 
@@ -165,17 +165,17 @@ describe("captureApplicationAction: where a saved capture lands", () => {
   it("third_party returns to the round too: the notice was already shown in the form's last step", async () => {
     captureApplication.mockResolvedValue({ id: CREATED_ID });
     await expect(captureApplicationAction(idle, formData("third_party"))).rejects.toMatchObject({
-      target: `/rounds/${ROUND_ID}?saved=1`,
+      target: `/rounds/${ROUND_ID}?saved=${CREATED_ID}`,
     });
   });
 
-  it("neither redirect carries a submitted value or the new id", async () => {
+  it("neither redirect carries a submitted value: the only addition is the new id, for the link to the detail", async () => {
     captureApplication.mockResolvedValue({ id: CREATED_ID });
     for (const source of ["data_subject", "third_party"]) {
       const signal = await captureApplicationAction(idle, formData(source)).catch((err: unknown) => err);
       expect(signal).toBeInstanceOf(RedirectSignal);
       const target = (signal as { target: string }).target;
-      expect(target).not.toContain(CREATED_ID);
+      expect(target).toBe(`/rounds/${ROUND_ID}?saved=${CREATED_ID}`);
       expectNoSentinel(target);
     }
   });

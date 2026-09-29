@@ -65,7 +65,9 @@ export const application = pgTable(
     // NOT NULL since drizzle/0023 (A-3.4, C-3.11). The pairing with `household_id` (the round must
     // be a round of the SAME household) is enforced by the trigger
     // `application_round_same_household` in drizzle/0023, hand-written because drizzle-kit does
-    // not generate triggers (design D12). There are no foreign keys.
+    // not generate triggers (design D12); drizzle/0025 locks the round row through the check, and
+    // drizzle/0026 refuses to delete or re-home a round that applications belong to. There are no
+    // foreign keys.
     roundId: uuid("round_id").notNull(),
     state: applicationStateEnum("state").notNull(),
     stateChangedAt: timestamp("state_changed_at", { withTimezone: true }).notNull().defaultNow(),
@@ -92,7 +94,7 @@ export const application = pgTable(
     collectedFrom: applicationCollectedFromEnum("collected_from").notNull(),
   },
   (t) => [
-    // C-3.14 limits as CHECKs (drizzle/0023). Every value is written as literal SQL, never
+    // C-3.14 limits as CHECKs (drizzle/0023, and 0025 for the attributes). Every value is written as literal SQL, never
     // interpolated as `${value}`: drizzle-kit keeps only the SQL text of a check() and drops its
     // bound parameters, which would leave `$1` in the migration (design D1).
     check(
@@ -118,14 +120,12 @@ export const application = pgTable(
       sql`message_raw IS NULL OR char_length(message_raw) <= 4000`,
     ),
     check("application_age_range", sql`age IS NULL OR age BETWEEN 0 AND 150`),
-    // Only the list shape and its length (1-10) are enforced here. The per-element limits (label
-    // 1-60, value 1-500, the object shape) are enforced in the repository ONLY: a CHECK cannot
-    // contain a subquery. CASE, not AND: jsonb_array_length on a non-array raises 22023 instead of
-    // a check violation, and AND has no evaluation-order guarantee.
-    check(
-      "application_attributes_shape",
-      sql`attributes IS NULL OR CASE WHEN jsonb_typeof(attributes) = 'array' THEN jsonb_array_length(attributes) BETWEEN 1 AND 10 ELSE false END`,
-    ),
+    // drizzle/0025: the list shape (1-10 entries) AND the per-element limits (an object with exactly
+    // the string keys label 1-60 and value 1-500, after btrim) are now enforced by the database,
+    // through the IMMUTABLE function application_attributes_valid (a CHECK cannot hold a
+    // subquery, a function can iterate). The repository parser mirrors it so a normal refusal
+    // never reaches the database. The limits are the C-3.14 values of APPLICATION_LIMITS.
+    check("application_attributes_shape", sql.raw("application_attributes_valid(attributes)")),
     // Every RLS policy filters by household_id — an unindexed scan here would be the single
     // biggest hot path in the app (Supabase's own RLS-performance guidance).
     index("application_household_id_idx").on(t.householdId),

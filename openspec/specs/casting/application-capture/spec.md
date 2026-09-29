@@ -68,6 +68,17 @@ casting round"*), AC-3.4, AC-3.5 (*"by any route"*), EC-3.9, S-50.
   none at all
 - **THEN** the database refuses the write
 
+#### Scenario: A round that applications belong to cannot be deleted or re-homed
+- **WHEN** a round that has applications is deleted, or its id or household is changed, by any
+  writer, including direct SQL and a session without a resident profile
+- **THEN** the database refuses the write, and a round without applications is still deleted
+
+#### Scenario: An insert racing a round delete waits and is refused
+- **WHEN** an application is inserted for a round while another transaction that deleted that round
+  has not ended
+- **THEN** the insert waits for that transaction, and once the round is gone the database refuses
+  it
+
 ### Requirement: The name is the one required field
 
 A capture SHALL require the applicant's name and SHALL accept every other field empty: age, email,
@@ -135,7 +146,8 @@ The fields SHALL be limited as C-3.14 sets:
 
 Characters are counted as Unicode code points. The form SHALL show the message text's count
 against its limit while typing. A value over a limit SHALL be refused and name its field. The
-database SHALL enforce every limit except the per-attribute ones, which the server enforces.
+database SHALL enforce every limit, the per-attribute ones included: each attribute is an object
+with exactly a text label and a text value, within the limits above.
 Sources: C-3.14, EC-3.4.
 
 #### Scenario: A long message is counted before the limit
@@ -149,6 +161,11 @@ Sources: C-3.14, EC-3.4.
 #### Scenario: The database enforces the limits
 - **WHEN** a row whose name, a contact, the message or the age exceeds its limit, or whose attribute
   list is not a list of 1–10 entries, is inserted by direct SQL
+- **THEN** the database refuses it
+
+#### Scenario: The database enforces each attribute
+- **WHEN** an attribute list holding a null element, an empty object, a label over 60 or a value
+  over 500 characters, an extra key or a value that is not text is inserted by direct SQL
 - **THEN** the database refuses it
 
 #### Scenario: Emoji count once
@@ -295,7 +312,8 @@ Sources: FR-3.7, G-D7.
 ### Requirement: After saving, the moderator returns to the round, and the application keeps its notice
 
 After every capture the moderator SHALL return to the round with a short success notice, whatever
-the collection source. The duty and the text were already shown in the notice step. For a
+the collection source. The notice SHALL link to the saved application's detail; the link is shown
+only when the saved application's id in the address is a well-formed UUID. The duty and the text were already shown in the notice step. For a
 third-party application, the application's detail SHALL show the same quiet notice afterwards,
 with the one-month date counted from the capture and the example text behind „Beispieltext
 anzeigen". If the date has passed, the notice SHALL say so plainly. Sources: FR-3.12
@@ -306,6 +324,11 @@ step, now the notice step).
 - **WHEN** a capture is saved, from either source
 - **THEN** the round's page is shown with a success notice, and reloading it does not show the
   notice again
+
+#### Scenario: The notice links to the saved application
+- **WHEN** the round's page is shown after a capture
+- **THEN** the notice offers „Bewerbung ansehen", a link to that application's detail, and an
+  address whose saved id is not a UUID shows neither notice nor link
 
 #### Scenario: The detail keeps the notice
 - **WHEN** a third-party application's detail is opened
@@ -328,6 +351,13 @@ household account SHALL see neither the detail nor that the application exists. 
 unknown id SHALL show "not found", never an error. Sources: G-D15, ADR-014, F3 plan decision Q-11
 (the organisation surface is permission-gated, stricter than V-2).
 
+The permission SHALL hold through the read itself: the membership stays locked from the check to
+the end of the read, so a revocation that commits in between makes the read wait and then refuse,
+and never lets it return personal data at no authorized instant. No other read SHALL return an
+application's personal columns: the profile-only read of an application returns its lifecycle
+columns (id, household, round, state, state change time, resident it became, creation time,
+retention date) and nothing else.
+
 #### Scenario: A moderator opens the organisation detail
 - **WHEN** a moderator opens the organisation detail of an application in their household
 - **THEN** its details are shown
@@ -344,6 +374,15 @@ unknown id SHALL show "not found", never an error. Sources: G-D15, ADR-014, F3 p
 #### Scenario: A malformed id
 - **WHEN** the organisation detail is requested with an id that is not a UUID
 - **THEN** "not found" is shown
+
+#### Scenario: A revocation in flight is waited for
+- **WHEN** the reader's membership is being revoked in a transaction that has not ended
+- **THEN** the read waits, and once the revocation commits it is refused
+
+#### Scenario: The profile-only read carries no personal column
+- **WHEN** an application is read by the profile-only read
+- **THEN** its result has no applicant name, contact, message, attributes, age, source or
+  collection source
 
 ### Requirement: The capture screen has its four states, and a refusal never echoes what was typed
 

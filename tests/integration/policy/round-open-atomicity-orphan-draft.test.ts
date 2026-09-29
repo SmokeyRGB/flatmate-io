@@ -2,7 +2,6 @@ import { eq } from "drizzle-orm";
 import { afterEach, describe, expect, it } from "vitest";
 import { withSessionContext } from "@/db/session-context";
 import { activityEvent } from "@/modules/audit/schema";
-import { transitionResidentProfileStatus } from "@/modules/identity/repository";
 import {
   createAndOpenRound,
   createRoom,
@@ -11,6 +10,7 @@ import {
 import { castingRound } from "@/modules/casting/schema";
 import {
   cleanupAll,
+  createNonResidentModerator,
   createTestModerator,
   deleteTestAccount,
   registerTestHousehold,
@@ -63,12 +63,10 @@ describe("createAndOpenRound: no orphan draft on a failed open (rounds-new-orpha
     hh = await registerTestHousehold();
     const adminActor = { accountId: hh.accountId, profileId: null };
     const roomA = await createRoom(hh.context, "Room A", adminActor);
-    // Design D13: a moderator must attempt the round, and it is itself an active resident, which
-    // would make EC-1.3 unreachable. Its profile is therefore moved out with the profile-only
-    // transition (which, unlike setMovedOut, leaves the membership live): it can still act, but is
-    // no longer an eligible resident to snapshot -> EC-1.3 fails.
-    const moderator = await createTestModerator(hh);
-    await transitionResidentProfileStatus(hh.context, moderator.profileId, "moved_out", adminActor);
+    // Design D13: a moderator must attempt the round, and a resident moderator is itself an active
+    // resident, which would make EC-1.3 unreachable. A non-resident moderator can act but is no
+    // eligible resident to snapshot -> EC-1.3 fails.
+    const moderator = await createNonResidentModerator(hh);
     const actor = { accountId: moderator.accountId, profileId: moderator.profileId };
 
     // A room exists but no ACTIVE resident is left -> EC-1.3 fails.

@@ -9,6 +9,7 @@ import {
   createAndOpenRound,
   createRoom,
   createRound,
+  getApplication,
   getOrganisationApplication,
 } from "@/modules/casting/repository";
 import {
@@ -124,4 +125,86 @@ describe("getOrganisationApplication (design D5)", () => {
   // Deliberate break: remove the permission check (assertHoldsAnyPermissionTx) from
   // getOrganisationApplication, and the plain-member case returns the row instead of throwing.
   // Argued, not run: it needs an edit to the repository and the migrations on dev.
+});
+
+// Copilot, PR #39: the permission check and the read share one transaction, and the membership row
+// stays share-locked through the read. A revocation that is still in flight therefore makes the
+// read WAIT, and once it commits the read is refused. Without the lock the read returns the row
+// immediately: a page view then returns personal data at no authorized instant.
+describe("getOrganisationApplication holds the membership lock through the read (Copilot, PR #39)", () => {
+  it("waits behind an uncommitted revocation and then refuses with PermissionDeniedError", async () => {
+    const s = await setup();
+
+    let releaseRevocation: () => void = () => {};
+    const gate = new Promise<void>((resolve) => {
+      releaseRevocation = resolve;
+    });
+    let markRevoked: () => void = () => {};
+    const revoked = new Promise<void>((resolve) => {
+      markRevoked = resolve;
+    });
+
+    // Stand-in for a concurrent removal: revokes the reader's membership (a revoked row keeps no
+    // permission and is never a moderator, membership_revoked_holds_nothing) and holds the
+    // transaction open until this test releases it.
+    const revocation = withSessionContext(s.hh.context, async (tx) => {
+      await tx
+        .update(membership)
+        .set({ revokedAt: new Date(), role: "member", permissions: [] })
+        .where(eq(membership.accountId, s.moderator.accountId));
+      markRevoked();
+      await gate;
+    });
+    await revoked;
+
+    const outcome = getOrganisationApplication(s.moderator.context, s.roundId, s.applicationId).then(
+      (row) => ({ ok: true as const, row }),
+      (err) => ({ ok: false as const, err }),
+    );
+    const early = await Promise.race([
+      outcome,
+      new Promise<"waiting">((resolve) => setTimeout(() => resolve("waiting"), 1500)),
+    ]);
+    // With lock: false the read returns the still-committed row at once, and this fails.
+    expect(early, "the read should still be waiting on the revocation's row lock").toBe("waiting");
+
+    releaseRevocation();
+    await revocation;
+
+    const settled = await outcome;
+    expect(settled.ok).toBe(false);
+    if (!settled.ok) expect(settled.err).toBeInstanceOf(PermissionDeniedError);
+  });
+
+  // Deliberate break: pass { lock: false } to assertHoldsAnyPermissionTx in
+  // getOrganisationApplication. The read then returns the row while the revocation is still
+  // uncommitted, so `early` is the result object, not "waiting", and the first expect fails.
+});
+
+// Copilot, PR #39: getApplication is the profile-only read, so it returns lifecycle columns and
+// never a personal one. Personal data leaves the module only through getOrganisationApplication.
+describe("getApplication returns no personal column (Copilot, PR #39)", () => {
+  it("has none of the applicant keys", async () => {
+    const s = await setup();
+    const row = await getApplication(s.moderator.context, s.applicationId);
+    expect(row).not.toBeNull();
+    expect(row!.id).toBe(s.applicationId);
+    const keys = Object.keys(row!);
+    for (const personal of [
+      "applicantName",
+      "contactEmail",
+      "contactPhone",
+      "contactOther",
+      "messageRaw",
+      "attributes",
+      "age",
+      "collectedFrom",
+      "source",
+    ]) {
+      expect(keys, personal).not.toContain(personal);
+    }
+  });
+
+  // Deliberate break: revert getApplication to select() with no column list. The row then carries
+  // applicantName and the other personal keys, and the loop fails on the first one.
 });

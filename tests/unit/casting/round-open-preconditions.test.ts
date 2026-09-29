@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { transitionResidentProfileStatus } from "@/modules/identity/repository";
 import { createRoom, createRound, openRound, RoundOpenPreconditionError, transitionRoomStatus } from "@/modules/casting/repository";
 import {
   cleanupAll,
+  createNonResidentModerator,
   createTestModerator,
   deleteTestAccount,
   registerTestHousehold,
@@ -47,14 +47,12 @@ describe("Round-open preconditions (EC-1.1, EC-1.2, EC-1.3, EC-1.4)", () => {
     hh = await registerTestHousehold();
     const actor = { accountId: hh.accountId, profileId: null };
     const roomA = await createRoom(hh.context, "Room A", actor);
-    // Design D13: a moderator must open the round, and it is itself an active resident, which
-    // would make EC-1.3 unreachable. Its profile is moved out with the profile-only transition
-    // (which leaves the membership live, unlike setMovedOut): it can still act, but is no longer
-    // an eligible resident to snapshot.
-    const mod = await createTestModerator(hh);
+    // Design D13: a moderator must open the round, and a resident moderator is itself an active
+    // resident, which would make EC-1.3 unreachable. A non-resident moderator can act but is no
+    // eligible resident to snapshot.
+    const mod = await createNonResidentModerator(hh);
     const modActor = { accountId: mod.accountId, profileId: mod.profileId };
     const round = await createRound(mod.context, "Round", [roomA.id], modActor);
-    await transitionResidentProfileStatus(hh.context, mod.profileId, "moved_out", actor);
     await expect(openRound(mod.context, round.id, modActor)).rejects.toThrow(RoundOpenPreconditionError);
   });
 

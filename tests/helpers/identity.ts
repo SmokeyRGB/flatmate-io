@@ -3,6 +3,7 @@ import { sql } from "drizzle-orm";
 import { withSessionContext, type SessionContext } from "@/db/session-context";
 import { claimResidentProfile, registerHousehold } from "@/modules/identity/auth";
 import { createResidentProfile, setMemberRole } from "@/modules/identity/repository";
+import { MODERATOR_PERMISSIONS, membership } from "@/modules/identity/schema";
 import { uuid } from "./uuid";
 
 // The household-scoped delete set (M2, P6: "no foreign keys means a hand-kept deletion
@@ -252,5 +253,33 @@ export async function createTestModerator(
     context: { accountId, householdId: hh.householdId, profileId: profile.id },
     accountId,
     profileId: profile.id,
+  };
+}
+
+// A moderator that is NOT a resident: a membership row with a random account id, role moderator,
+// is_resident false, no resident profile and the moderator permission set. It can act (round
+// creation, opening) but is never an eligible resident to snapshot, which is what tests of the
+// "no eligible residents" precondition need. Before this helper they moved a claimed moderator's
+// profile out with a direct status change, which left the membership live, a state the identity
+// module now refuses (ClaimedProfileTransitionError). No Auth user is needed (nothing signs in
+// as it), and hh.cleanup() removes the row through household_id.
+export async function createNonResidentModerator(
+  hh: TestHousehold,
+): Promise<{ context: SessionContext; accountId: string; profileId: null }> {
+  const accountId = uuid();
+  await withSessionContext(hh.context, (tx) =>
+    tx.insert(membership).values({
+      householdId: hh.householdId,
+      accountId,
+      residentProfileId: null,
+      isResident: false,
+      role: "moderator",
+      permissions: [...MODERATOR_PERMISSIONS],
+    }),
+  );
+  return {
+    context: { accountId, householdId: hh.householdId, profileId: null },
+    accountId,
+    profileId: null,
   };
 }

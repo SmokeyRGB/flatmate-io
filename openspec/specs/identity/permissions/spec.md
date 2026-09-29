@@ -126,6 +126,12 @@ it in the same write that takes the role away:
 - **Reactivation** of a moved-out member restores the resident set, as a member. A former
   moderator must be appointed again.
 
+A claimed profile's move-out, removal or reactivation SHALL happen only through the paths that
+also revoke or restore its membership (`setMovedOut`, `removeMember`, `reactivateMember`). A
+direct status change of a claimed profile (one that has a membership) is refused, because it would
+leave a live membership acting for a person who moved out. A prepared profile has no membership
+yet and keeps its direct status change.
+
 The matrix's ⬜ column (an individual grant to a resident) stays possible in the model. No screen or
 function grants one, so in practice every permission comes with a role. Sources: `03-PRD.md`
 §4.0.1; FR-1.8, FR-1.26 (removal tiers); the human decision of 2026-09-29.
@@ -154,6 +160,10 @@ function grants one, so in practice every permission comes with a role. Sources:
 - **WHEN** a moved-out former moderator is reactivated
 - **THEN** it holds the resident set as a member, and none of the moderator's permissions until it
   is appointed again
+
+#### Scenario: A direct status change of a claimed profile is refused
+- **WHEN** the profile-only status change is asked to move a claimed moderator's profile out
+- **THEN** it is refused, the profile stays active and the membership is unchanged
 
 #### Scenario: A member cannot run a round or capture
 - **WHEN** a resident membership that is not a moderator tries to create, open or close a round, or

@@ -245,3 +245,87 @@ describe("[G-C7 raw SQL] application.round_id must name a round of the same hous
   // round is never looked at. The SQLSTATE assertion is what proves the refusal comes from the
   // trigger (23503, its own constraint name) and not from RLS (42501) or a NOT NULL (23502).
 });
+
+describe("[G-C7 raw SQL] application.attributes per-element limits (drizzle/0025)", () => {
+  const shape = { code: "23514", constraint: "application_attributes_shape" } as const;
+  const bad: Array<[string, unknown]> = [
+    ["a null element", [null]],
+    ["an empty object", [{}]],
+    ["a 61-character label", [{ label: "l".repeat(61), value: "v" }]],
+    ["a whitespace-only label", [{ label: "   ", value: "v" }]],
+    ["a 501-character value", [{ label: "l", value: "v".repeat(501) }]],
+    ["an extra key", [{ label: "l", value: "v", extra: "x" }]],
+    ["a missing value key", [{ label: "l", other: "v" }]],
+    ["a number as value", [{ label: "l", value: 5 }]],
+    ["a string as element", ["Beruf: Tischler"]],
+  ];
+
+  for (const [name, attributes] of bad) {
+    it(`${name} is refused by application_attributes_shape`, async () => {
+      const f = await fixture();
+      await expectRefusal(f, insertStatement(f, { attributes: sql`${JSON.stringify(attributes)}::jsonb` }), shape);
+    });
+  }
+
+  it("a valid list at the limits passes: 10 entries, a 60-character label, a 500-character value", async () => {
+    const f = await fixture();
+    const list = Array.from({ length: 10 }, (_, i) => ({
+      label: i === 0 ? "l".repeat(60) : `l${i}`,
+      value: i === 0 ? "v".repeat(500) : `v${i}`,
+    }));
+    const rows = await withSessionContext(f.resident, (tx) =>
+      tx.execute<{ id: string }>(insertStatement(f, { attributes: sql`${JSON.stringify(list)}::jsonb` })),
+    );
+    expect(rows).toHaveLength(1);
+  });
+
+  // Deliberate break (ARGUED, not executed: DATABASE_URL is app_runtime and cannot alter the
+  // constraint): with the 0023 CHECK back (list length only), every case in `bad` is accepted, so
+  // expectRefusal's toBeInstanceOf(Error) fails because no error was thrown.
+});
+
+describe("[G-C7 raw SQL] an application insert waits for a concurrent round delete (drizzle/0025)", () => {
+  it("blocks behind an uncommitted delete of its round, then is refused by the pairing trigger", async () => {
+    const f = await fixture();
+
+    let release: () => void = () => {};
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let markDeleted: () => void = () => {};
+    const deleted = new Promise<void>((resolve) => {
+      markDeleted = resolve;
+    });
+
+    // The round has no application yet, so it may go. The transaction stays open (uncommitted).
+    const deletion = withSessionContext(f.resident, async (tx) => {
+      await tx.execute(sql`DELETE FROM casting_round WHERE id = ${f.roundId}::uuid`);
+      markDeleted();
+      await gate;
+    });
+    await deleted;
+
+    const insert = withSessionContext(f.resident, (tx) => tx.execute(insertStatement(f, {}))).then(
+      () => ({ ok: true as const }),
+      (err: unknown) => ({ ok: false as const, err }),
+    );
+    const early = await Promise.race([insert, new Promise<"waiting">((r) => setTimeout(() => r("waiting"), 1500))]);
+    // With the plain EXISTS of 0023 the insert reads the still-committed round and returns at once.
+    expect(early, "the insert should wait on the round's row lock").toBe("waiting");
+
+    release();
+    await deletion;
+
+    const settled = await insert;
+    expect(settled.ok).toBe(false);
+    if (!settled.ok) {
+      const pg = pgErrorOf(settled.err);
+      expect(pg.code).toBe("23503");
+      expect(pg.constraint_name).toBe("application_round_same_household");
+    }
+  });
+
+  // Deliberate break: 0025's PERFORM ... FOR SHARE back to 0023's plain EXISTS. The insert then
+  // does not wait, so `early` is the result object and the first expect fails. Argued, not run
+  // (it needs a migration change on the shared dev database).
+});

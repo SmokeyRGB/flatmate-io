@@ -47,8 +47,9 @@ export async function captureApplicationAction(
   const values = formData.getAll("attrValue").map((v) => (typeof v === "string" ? v : ""));
   const attributes = labels.map((label, i) => ({ label, value: values[i] ?? "" }));
 
+  let createdId: string;
   try {
-    await captureApplication(current.context, {
+    const created = await captureApplication(current.context, {
       roundId,
       applicantName: text(formData, "applicantName"),
       age: text(formData, "age"),
@@ -57,6 +58,7 @@ export async function captureApplicationAction(
       attributes,
       collectedFrom: text(formData, "collectedFrom"),
     });
+    createdId = created.id;
   } catch (err) {
     if (err instanceof PermissionDeniedError) return { status: "error", code: "permission_denied" };
     if (err instanceof ProfileRequiredError) return { status: "error", code: "profile_required" };
@@ -75,6 +77,7 @@ export async function captureApplicationAction(
   // redirect() works by throwing, so it stays OUTSIDE the try/catch above (design D6). The round id
   // is a uuid by now (the repository refused anything else). Both sources land on the round: the
   // third-party notice was already shown in the form's last step, and the application's detail
-  // keeps it for later (FR-3.12, "afterwards").
-  redirect(`/rounds/${roundId}?saved=1`);
+  // keeps it for later (FR-3.12, "afterwards"). The new id (a uuid the database made, never a typed
+  // value) rides along so the toast can link to the detail (Copilot, PR #39).
+  redirect(`/rounds/${roundId}?saved=${createdId}`);
 }

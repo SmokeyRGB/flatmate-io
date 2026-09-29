@@ -44,12 +44,28 @@ export class ProfileRequiredError extends Error {
 
 // FR-0.1: the only sanctioned entry point for reading/writing Application — every call opens its
 // transaction through the session-context helper (FR-0.3), never queries the raw client directly.
+//
+// Returns the LIFECYCLE columns only, never a personal one (applicant name, contact, message,
+// attributes, age, source, collected_from). Personal data leaves the module only through
+// `getOrganisationApplication`, which checks the caller's permission (Copilot, PR #39).
 export async function getApplication(context: SessionContext, id: string) {
   // G-D15/ADR-014: a household-account session sees no Application row. Checked here, before
   // opening a transaction, rather than left to the RESTRICTIVE policy alone (Decision 4).
   if (context.profileId === null) return null;
   return withSessionContext(context, async (tx) => {
-    const [row] = await tx.select().from(application).where(eq(application.id, id));
+    const [row] = await tx
+      .select({
+        id: application.id,
+        householdId: application.householdId,
+        roundId: application.roundId,
+        state: application.state,
+        stateChangedAt: application.stateChangedAt,
+        becameResidentId: application.becameResidentId,
+        createdAt: application.createdAt,
+        retentionUntil: application.retentionUntil,
+      })
+      .from(application)
+      .where(eq(application.id, id));
     return row ?? null;
   });
 }
@@ -210,7 +226,8 @@ export async function captureApplication(
 // Returns null for a profile-less session (no query runs), a malformed id, an unknown id, a round
 // mismatch or another household. Throws PermissionDeniedError when the live membership holds
 // neither create_application nor change_application_state. Sibling: `getApplication` above keeps
-// its profile-only check; change 3 folds it into this rule.
+// its profile-only check but returns lifecycle columns only, so no other read returns an
+// application's personal columns.
 export async function getOrganisationApplication(
   context: SessionContext,
   roundId: string,
@@ -219,10 +236,10 @@ export async function getOrganisationApplication(
   if (context.profileId === null) return null;
   if (!isUuid(roundId) || !isUuid(applicationId)) return null;
   return withSessionContext(context, async (tx) => {
-    // A read: the rule of the writers, without their row lock.
-    await assertHoldsAnyPermissionTx(tx, context, ["create_application", "change_application_state"], {
-      lock: false,
-    });
+    // The share lock is held through the read, like the writers. Without it, a revocation that
+    // commits between the check and the read would let the read return personal data at no
+    // authorized instant (Copilot, PR #39).
+    await assertHoldsAnyPermissionTx(tx, context, ["create_application", "change_application_state"]);
     const [row] = await tx
       .select()
       .from(application)
