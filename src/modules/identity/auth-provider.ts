@@ -30,6 +30,12 @@ import { createClient, isAuthError, isAuthRetryableFetchError, type AuthError } 
 // per call, so a test can set the variable before the call it exercises") — not lazily inside the
 // fetch wrapper, so a misconfigured value throws when the client is created, not on the first
 // request.
+//
+// Deliberately a fresh client per call, never a shared one, although one password change now
+// builds up to ten: signInWithPassword keeps the signed-in user's session in the client's memory
+// even with persistSession: false, and supabase-js then sends that user's token on every
+// postgrest/storage/functions request through the same client. A client shared across requests
+// would carry the last sign-in's identity into the next caller's request.
 export function supabaseAdmin() {
   const deadlineMs = readDeadlineMs();
   return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
@@ -55,7 +61,7 @@ function readDeadlineMs(): number {
 
 // D1: the deadline lives in the client's `global.fetch`. The GLOBAL fetch itself is resolved
 // lazily — at call time, never captured at module load. That keeps tests/setup.ts's own test-only
-// wrapper (fix/test-timeouts-hosted-dev, if merged) and this change's fault injector
+// wrapper (tests/helpers/lost-response-fetch.ts, PR #37) and this change's fault injector
 // (tests/helpers/provider-fault.ts) underneath this deadline: both replace `globalThis.fetch`, and
 // this function reads whatever is there right now, every time it runs.
 //
@@ -111,14 +117,12 @@ export function classifyProviderError(error: unknown): "ok" | "refused" | "unkno
 export function classifyPasswordCheck(error: unknown): "ok" | "wrong_password" | "unknown" {
   if (!error) return "ok";
   if (classifyProviderError(error) === "unknown") return "unknown";
+  // Exactly the code, nothing broader (D3). A 400 without a code is not assumed to be about the
+  // password: flatmate-io-dev's GoTrue always sends `invalid_credentials` for this refusal, so a
+  // code-less 400 is some other refusal, and reading it as "wrong password" would reintroduce the
+  // misreport this rule exists to remove (and make a D7/D8 probe answer "not applied").
   const authError = error as AuthError;
-  // Some GoTrue versions omit `code` on this exact refusal (older/self-hosted) but always answer it
-  // as a clean 400 — the status is the fallback, `code` the precise signal when present. Any other
-  // refusal (a 429 `over_request_rate_limit`, an `AuthUnknownError` from a non-JSON 4xx) says
-  // nothing about the password and stays `unknown`.
-  if (authError.status === 400 && (authError.code === undefined || authError.code === "invalid_credentials")) {
-    return "wrong_password";
-  }
+  if (authError.status === 400 && authError.code === "invalid_credentials") return "wrong_password";
   return "unknown";
 }
 
@@ -134,9 +138,11 @@ export async function getUserByIdWithResend(
   return supabaseAdmin().auth.admin.getUserById(accountId);
 }
 
-// D4: signInWithPassword as a password check — sent a second time only when the FIRST answer was
-// itself `unknown` per classifyPasswordCheck's rule (never a plain wrong-password refusal, which
-// is definite and must not be masked by a second attempt). Used by every password-check site
+// D4: signInWithPassword as a password check — sent a second time only when the first answer never
+// came (classifyProviderError: `unknown`, a transport failure or a retryable 5xx). A definite
+// refusal is never resent: a wrong password must not be masked by a second attempt, and a 429 rate
+// limit would only be hit again at once, when the budget is already spent (the caller still reads
+// that 429 as `unknown` through classifyPasswordCheck). Used by every password-check site
 // (D3's "every password check follows one rule"): signIn's real grant, changeResidentPassword's
 // current-password check, D11's throwaway check, confirmPasswordSet's probe, and phase 3's sign-in.
 export async function signInWithPasswordWithResend(
@@ -144,7 +150,7 @@ export async function signInWithPasswordWithResend(
   password: string,
 ): ReturnType<AdminClient["auth"]["signInWithPassword"]> {
   const first = await supabaseAdmin().auth.signInWithPassword({ email, password });
-  if (classifyPasswordCheck(first.error) !== "unknown") return first;
+  if (classifyProviderError(first.error) !== "unknown") return first;
   return supabaseAdmin().auth.signInWithPassword({ email, password });
 }
 

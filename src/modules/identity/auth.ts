@@ -974,10 +974,11 @@ export async function joinHousehold(
   }
 
   try {
-    const { data: signInData, error: signInError } = await supabaseAdmin().auth.signInWithPassword({
-      email: authEmail,
-      password,
-    });
+    // identity/provider-calls: a password check is sent a second time when its first answer never
+    // came (D4). Every failure here still ends as signup_failed, with the new Auth user removed by
+    // the catch below (deleteAuthUserUnlessCommitted), so the resend only changes the outcome of a
+    // single lost grant: a completed join instead of a failed one.
+    const { data: signInData, error: signInError } = await signInWithPasswordWithResend(authEmail, password);
     if (signInError || !signInData.user || !signInData.session) {
       throw new JoinError("Sign-in immediately after join's own createUser failed", "signup_failed");
     }
@@ -1214,7 +1215,15 @@ async function resolveEmailWriteOutcome(accountId: string, requestedEmail: strin
     throw new AccountSettingsError("Email address is already in use", "email_taken");
   }
   if (classifyProviderError(resend.error) === "refused") {
-    throw resend.error;
+    // A definite refusal of the resend, other than email_taken (a rate limit, say): the address was
+    // just read back as NOT applied and this copy was declined, so nothing changed. Reported as
+    // such, not rethrown raw: changeEmailAction maps only AccountSettingsError, and a raw AuthError
+    // would reach the error page with the provider's own message (ui/vocabulary).
+    console.error(resend.error);
+    throw new AccountSettingsError(
+      "The email change is not possible right now — nothing was changed",
+      "provider_unavailable",
+    );
   }
 
   const second = await readBackEmailOutcome(accountId, requestedEmail);
@@ -1713,12 +1722,13 @@ export async function changeResidentPassword(
       // auth-provider-deadline design.md D7 "Steps 10 and 11": neither the address lookup nor the
       // current-password check may read an unanswered (or otherwise-refused) provider as "wrong
       // current password" — only a clean, definite refusal does. Both go through the D4 wrappers
-      // and D3's password-check classification; `classifyPasswordCheck` already treats anything
-      // that isn't a clean `invalid_credentials` refusal as `unknown` (a 404 on the lookup
-      // included), which is exactly this rule.
+      // and their own classification: the lookup through classifyProviderError (an unanswered
+      // lookup is `provider_unavailable`; a definite refusal such as a 404 stays the definite
+      // refusal it always was, never "try again shortly" on every retry), the password check
+      // through classifyPasswordCheck (D3: only `invalid_credentials` is a wrong password).
       const { data: userData, error: userError } = await getUserByIdWithResend(context.accountId);
       if (userError || !userData.user?.email) {
-        if (classifyPasswordCheck(userError) === "unknown") {
+        if (classifyProviderError(userError) === "unknown") {
           throw new AccountSettingsError(
             "The current password could not be checked right now",
             "provider_unavailable",

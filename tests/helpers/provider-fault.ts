@@ -6,13 +6,15 @@
 // and must never be dropped, so this must be installed once the household/link a test exercises
 // already exists.
 //
-// Interaction with tests/helpers/lost-response-fetch.ts (fix/test-timeouts-hosted-dev): that branch
-// has not merged as of this change (no such file exists in this tree). If it lands later, its own
-// resend wrapper would sit BELOW this injector at globalThis.fetch — `forward-then-drop` passes no
-// signal, so that wrapper could wait out its own deadline and resend a PUT or a createUser by
-// itself, defeating the fault this test is trying to hold in place. The fix, when that file exists,
-// is for `forward-then-drop` to bypass it: forward to that wrapper's own exported underlying fetch
-// rather than to the wrapped `globalThis.fetch`. Until it exists there is nothing to bypass.
+// Interaction with tests/helpers/lost-response-fetch.ts (PR #37, installed by tests/setup.ts): its
+// resend wrapper sits BELOW this injector, and it stays there on purpose (design.md D12 planned a
+// bypass; dropped once the merged wrapper could be read). `drop-before` never calls through, so
+// the wrapper never sees that request. `forward-then-drop` passes no signal down, so the wrapper
+// applies its own 8s deadline to the forward. It resends only a forward that was itself lost,
+// which is what keeps the forward from failing: the fault needs the request applied, and a
+// second copy of a PUT sets the same values. A resent createUser applies only if the first copy
+// never arrived; if it did arrive, email_exists fails the test loudly. Either way the fault still
+// holds: the application's own deadline ends its wait, and the answer never reaches it.
 export interface SeenRequest {
   method: string;
   url: string;

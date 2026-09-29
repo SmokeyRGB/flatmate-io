@@ -37,7 +37,7 @@
 | 15 | 1908 | `redeemPasswordReset` phase 3 · `signInWithPassword` | **yes** | membership | as 14 |
 
 - **The test-only wrapper** (`tests/helpers/lost-response-fetch.ts`, on
-  `fix/test-timeouts-hosted-dev`, not yet on `main`) applies a 15 s deadline and three attempts to
+  `fix/test-timeouts-hosted-dev` at the time of writing; merged as PR #37 with 8 s, see D12) applies a 15 s deadline and three attempts to
   the *global* fetch. This change neither depends on it nor removes it.
 
 ## Goals / Non-Goals
@@ -123,7 +123,7 @@ known names.
 
 | call | resend on `unknown`? | why |
 |---|---|---|
-| `getUserById`, `signInWithPassword` | yes, once (two attempts total) | reads and a password check change nothing. A second grant only creates a provider session that is discarded, as every refusal path already does |
+| `getUserById`, `signInWithPassword` | yes, once (two attempts total), and only when the first answer never came (`classifyProviderError` → `unknown`). A definite refusal, a 429 included, is not resent: it would be hit again at once | reads and a password check change nothing. A second grant only creates a provider session that is discarded, as every refusal path already does |
 | `updateUserById` | only after a read-back shows it did not apply (D6–D8), at most once, under the same lock | a blind second PUT would be answered against a state we do not know |
 | `createUser` | never | not idempotent. D5 compensates instead |
 | `deleteUser` | yes, once | a repeat gets a 404, which counts as done |
@@ -301,8 +301,10 @@ be set; try it; if it fails, ask the administration for a new link".
   `undoRegisterHousehold`, as every other failure there already does, and shows the
   **registration's** failure text, not the sign-in's (pre-mortem finding 14). The household was
   undone, so "try signing in again" would send the person to an account that no longer exists.
-- Step 7 (join's sign-in): unchanged. It is `signup_failed`, and the existing
-  `deleteAuthUserUnlessCommitted` is correct.
+- Step 7 (join's sign-in): every failure stays `signup_failed`, and the existing
+  `deleteAuthUserUnlessCommitted` is correct. It goes through the D4 resend wrapper like every other
+  password check (local review, 2026-09-29): as a raw call, one lost grant failed a join the spec's
+  "sent a second time" rule would have completed.
 
 ### D10 — New codes and texts
 
@@ -393,10 +395,17 @@ teardown. Install the injector **after** the fixtures (`registerTestHousehold` i
 `POST /admin/users` and `/token`), so fixture requests neither count as occurrences nor get
 dropped.
 
-If `fix/test-timeouts-hosted-dev` merges first, its resend wrapper sits below the injector.
-`forward-then-drop` passes no signal, so that wrapper could wait up to 45 s and resend a PUT or a
-`createUser` by itself. While a provider-fault rule is active, the injector bypasses it by
-forwarding to the wrapper's own underlying fetch (exported for this), not the wrapped global.
+~~If `fix/test-timeouts-hosted-dev` merges first, the injector bypasses its resend wrapper.~~
+**Superseded 2026-09-29, after PR #37 merged** (8 s × 3 attempts):
+- The wrapper stays below the injector. `drop-before` never reaches it. For `forward-then-drop`,
+  its resend only rescues a forward that was itself lost, which is what that mode needs anyway (the
+  request applied); a second copy of a PUT sets the same values, and a duplicate `createUser`
+  fails loudly with `email_exists`.
+- The application's deadline sits *above* the wrapper and passes its signal down. At 5 s it would
+  abort every lost request before the wrapper's 8 s deadline, silently disabling PR #37's resend
+  for all application calls in the suite. So `tests/setup.ts` sets `AUTH_PROVIDER_DEADLINE_MS=30000`
+  on every file, which is longer than the wrapper's 24 s. The fault-injection files set 3000 at
+  module load, after setup.
 
 Both use the real flatmate-io-dev GoTrue and Postgres. Only the transport loss is simulated (human
 decision in explore, 2026-09-28: this is fault injection, not mocking the provider). The tests set

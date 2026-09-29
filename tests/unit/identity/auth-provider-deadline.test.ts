@@ -4,6 +4,7 @@ import {
   classifyPasswordCheck,
   classifyProviderError,
   getUserByIdWithResend,
+  signInWithPasswordWithResend,
   supabaseAdmin,
 } from "@/modules/identity/auth-provider";
 
@@ -140,6 +141,39 @@ describe("auth-provider deadline", () => {
     });
 
     expect(classifyPasswordCheck(error)).toBe("unknown");
+  }, 5000);
+
+  it("on /token, a 400 without a code is not taken for a wrong password (D3: the code, nothing broader)", async () => {
+    await pointAdminAt((_req, res) => respondJson(res, 400, { msg: "Bad request" }));
+
+    const { error } = await supabaseAdmin().auth.signInWithPassword({
+      email: "probe@example.test",
+      password: "whatever-not-real",
+    });
+
+    expect(classifyPasswordCheck(error)).toBe("unknown");
+  }, 5000);
+
+  it("a 429 on /token is not resent: a definite refusal, only an unanswered check gets a second copy", async () => {
+    const testServer = await pointAdminAt((_req, res) =>
+      respondJson(res, 429, { error_code: "over_request_rate_limit", msg: "Rate limit exceeded" }),
+    );
+
+    const { error } = await signInWithPasswordWithResend("probe@example.test", "whatever-not-real");
+
+    expect(classifyPasswordCheck(error)).toBe("unknown");
+    expect(testServer.counts.get("POST /auth/v1/token")).toBe(1);
+  }, 5000);
+
+  it("a withheld /token answer IS resent once", async () => {
+    const testServer = await pointAdminAt(() => {
+      // never respond
+    });
+
+    const { error } = await signInWithPasswordWithResend("probe@example.test", "whatever-not-real");
+
+    expect(classifyPasswordCheck(error)).toBe("unknown");
+    expect(testServer.counts.get("POST /auth/v1/token")).toBe(2);
   }, 5000);
 
   it("a normal answer is returned unchanged", async () => {

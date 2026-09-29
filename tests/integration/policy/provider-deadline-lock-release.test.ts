@@ -61,8 +61,8 @@ describe("a lost provider request releases its locks within the deadline, not 30
     expect(injector.seen.filter((s) => s.method === "PUT").length).toBeGreaterThan(0);
 
     // The SAME account changeResidentEmail is holding the locks for — signIn's own
-    // `membership FOR SHARE` (before its session INSERT) is what races changeResidentEmail's
-    // `membership FOR UPDATE`.
+    // `membership FOR UPDATE` (then `account FOR SHARE`, before its session INSERT) waits on
+    // changeResidentEmail's `membership FOR UPDATE`.
     const signInStartedAt = Date.now();
     const signInResult = await signIn({
       kind: "resident",
@@ -74,6 +74,10 @@ describe("a lost provider request releases its locks within the deadline, not 30
 
     expect(signInResult.context.accountId).toBe(residentAccountId);
     expect(signInElapsedMs).toBeLessThan(6 * DEADLINE_MS + 10000);
+    // And it really waited on the held lock: changeResidentEmail cannot let go before its first,
+    // dropped PUT has hit the deadline, so a signIn that returns sooner than that was never
+    // blocked, and this test would no longer be testing lock release at all.
+    expect(signInElapsedMs).toBeGreaterThanOrEqual(DEADLINE_MS - 1000);
 
     const emailChangeErr = await emailChangePromise;
     expect(emailChangeErr).toBeInstanceOf(AccountSettingsError);

@@ -318,7 +318,9 @@ it fail, then restores the code. The fault-injection tests run against flatmate-
 - [x] 9.2 If `fix/test-timeouts-hosted-dev` has merged into `main` by now, correct the "the
   application's own provider calls have no deadline in production" sentence in
   `tests/helpers/lost-response-fetch.ts` to point at `auth-provider.ts`. Otherwise record the
-  follow-up in the report.
+  follow-up in the report. *Done 2026-09-29 after PR #37 merged, together with its consequence
+  (design.md D12, superseded paragraph): `tests/setup.ts` sets `AUTH_PROVIDER_DEADLINE_MS=30000`,
+  so the application's deadline does not pre-empt the wrapper's resend.*
 - [x] 9.3 Run `grep -n "supabaseAdmin()" src/` and check each hit against design.md's table. Every
   call must go through a D4 wrapper, or through `classifyProviderError` at its site. Report the
   list.

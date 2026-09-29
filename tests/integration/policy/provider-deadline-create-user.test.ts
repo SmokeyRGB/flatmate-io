@@ -118,6 +118,24 @@ describe("a lost createUser answer leaves no account behind (design.md D5)", () 
     expect(retry.context.profileId).toBe(prepared.id);
   });
 
+  it("joinHousehold: a lost sign-in grant after createUser is sent once more, and the join completes", async () => {
+    hh = await registerTestHousehold();
+    const link = await issueJoinCode(hh.context, hh.accountId, { validDays: 7, maxUses: 1 });
+
+    injector = injectProviderFault([
+      { method: "POST", path: /\/auth\/v1\/token$/, occurrence: 1, mode: "drop-before" },
+    ]);
+
+    const joined = await joinHousehold(link.code, { displayName: "LostGrantJoiner", password: PASSWORD });
+    accountIds.push(joined.context.accountId);
+
+    const tokenRequests = injector.seen.filter(
+      (s) => s.method === "POST" && /\/auth\/v1\/token$/.test(new URL(s.url).pathname),
+    );
+    expect(tokenRequests).toHaveLength(2);
+    expect(joined.session.accountId).toBe(joined.context.accountId);
+  });
+
   it("registerHousehold: signup_failed, no orphan, retry with the same address succeeds", async () => {
     const email = testEmail();
 

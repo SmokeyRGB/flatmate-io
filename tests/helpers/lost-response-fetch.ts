@@ -10,8 +10,10 @@
 // So each Supabase request gets its own deadline, and a request whose answer did not come is sent
 // again. Only the transport changes, and only then: a response that does arrive, error or not, is
 // returned exactly as before, and each resend is printed, so how often it happens stays visible.
-// Test-only (tests/setup.ts installs it): the application's own provider calls have no deadline
-// in production, which is a separate question from the suite's reliability.
+// Test-only (tests/setup.ts installs it). The application's own provider calls have a deadline
+// of their own in production (src/modules/identity/auth-provider.ts, auth-provider-deadline).
+// It sits above this wrapper, and tests/setup.ts sets it longer than all attempts here, so this
+// wrapper still resends first.
 
 export interface LostResponseOptions {
   origin: string;
