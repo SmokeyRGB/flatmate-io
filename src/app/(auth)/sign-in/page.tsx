@@ -19,6 +19,11 @@ export default async function SignInPage({
           {de.auth.signIn.passwordResetNote}
         </div>
       )}
+      {note === "password_reset_unknown" && (
+        <div role="note" className="callout callout-info">
+          {de.auth.signIn.passwordResetUnknownNote}
+        </div>
+      )}
       <SignInForm />
     </>
   );

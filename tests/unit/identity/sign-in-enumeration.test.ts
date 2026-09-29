@@ -7,6 +7,7 @@ import {
   registerTestHousehold,
   type TestHousehold,
 } from "../../helpers/identity";
+import { injectProviderFault } from "../../helpers/provider-fault";
 
 let hh: TestHousehold | undefined;
 const accountIds: string[] = [];
@@ -51,5 +52,47 @@ describe("signIn resident-mode: no-such-resident vs wrong-password enumeration",
     expect(wrongPasswordError).toBeInstanceOf(SignInError);
     expect(unknownNameError.code).toBe("invalid_credentials");
     expect(wrongPasswordError.code).toBe("invalid_credentials");
+  });
+
+  // auth-provider-deadline design.md D11 (tasks.md 5.3's call-parity assertion, extended into this
+  // file per that task): not just the SAME code, but the SAME NUMBER AND KIND of provider requests
+  // — otherwise the provider's own traffic (visible to anyone who can watch it, or its timing)
+  // would still leak whether the name exists, message notwithstanding.
+  it("sends the identity provider the same requests for an unknown name and a known name with a wrong password", async () => {
+    hh = await registerTestHousehold();
+    const actor = { accountId: hh.accountId, profileId: null };
+    const profile = await createResidentProfile(hh.context, "Parity-Target", actor);
+    const { accountId } = await claimResidentProfile(hh.context, profile.id, "test-password-not-real-1234");
+    accountIds.push(accountId);
+
+    function pathTemplate(url: string): string {
+      return new URL(url).pathname.replace(
+        /\/admin\/users\/[0-9a-f-]{36}/,
+        "/admin/users/:id",
+      );
+    }
+
+    const injectorA = injectProviderFault([{ method: "GET", path: /.*/, mode: "record" }, { method: "POST", path: /.*/, mode: "record" }]);
+    await signIn({
+      kind: "resident",
+      householdId: hh.householdId,
+      displayName: "Nobody-With-This-Name-Either",
+      password: "irrelevant-password",
+    }).catch(() => {});
+    const requestsA = injectorA.seen.map((s) => `${s.method} ${pathTemplate(s.url)}`);
+    injectorA.restore();
+
+    const injectorB = injectProviderFault([{ method: "GET", path: /.*/, mode: "record" }, { method: "POST", path: /.*/, mode: "record" }]);
+    await signIn({
+      kind: "resident",
+      householdId: hh.householdId,
+      displayName: "Parity-Target",
+      password: "definitely-the-wrong-password",
+    }).catch(() => {});
+    const requestsB = injectorB.seen.map((s) => `${s.method} ${pathTemplate(s.url)}`);
+    injectorB.restore();
+
+    expect(requestsA).toEqual(["GET /auth/v1/admin/users/:id", "POST /auth/v1/token"]);
+    expect(requestsB).toEqual(requestsA);
   });
 });

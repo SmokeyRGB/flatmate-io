@@ -1,8 +1,16 @@
 import { createHmac, randomUUID } from "node:crypto";
-import { createClient } from "@supabase/supabase-js";
 import { and, eq, isNull, lt, ne, notInArray, sql } from "drizzle-orm";
 import { isUuid, withSessionContext, type SessionContext } from "@/db/session-context";
 import { recordActivityEvent } from "@/modules/audit/repository";
+import {
+  classifyPasswordCheck,
+  classifyProviderError,
+  confirmPasswordSet,
+  deleteUserWithResend,
+  getUserByIdWithResend,
+  signInWithPasswordWithResend,
+  supabaseAdmin,
+} from "./auth-provider";
 import type { CurrentSession } from "./session-cookie";
 import {
   claimJoinCodeTx,
@@ -28,16 +36,6 @@ import { NAME_RELEASING_STATUSES } from "./transitions";
 // signature so insertSessionTx (task group 6) can be composed under a caller's already-open
 // transaction (joinHousehold, task group 7) as well as signIn's own.
 type Tx = Parameters<Parameters<typeof withSessionContext>[1]>[0];
-
-// Admin-only client (research.md §2) — uses the service-role key, never the anon key. Server-only:
-// this module must never be imported from a client component (the service-role key would end up
-// in the browser bundle otherwise). Created lazily so a missing env var doesn't crash unrelated
-// module imports (e.g. this file being imported transitively by a route that never calls it).
-function supabaseAdmin() {
-  return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
-}
 
 // research.md §2: a non-deliverable, internally-unique email for a resident account without a
 // real one. Derived from the profile's own uuid, NEVER from display_name — display_name is only
@@ -74,14 +72,17 @@ function isEmailTakenError(
   return path === "update" && error.status === 500 && error.message === "Error updating user";
 }
 
-// Best-effort, no retry loop: a failure deleting the Auth user must not mask the error that made
-// the deletion necessary, or crash the request. The client reports an API refusal as a returned
-// `error`, not a rejection (Copilot, PR #25) — only a transport failure rejects — so both are
-// checked; either way the address stays taken, and the log is the only trace of it.
+// Best-effort, no retry loop beyond the D4 wrapper's own one resend: a failure deleting the Auth
+// user must not mask the error that made the deletion necessary, or crash the request. Routed
+// through deleteUserWithResend (auth-provider.ts, D4) — a 404 on the resend counts as done. If the
+// outcome still comes back unknown, that residual is logged; either way the caller (D5: createUser
+// callers, deleteAuthUserUnlessCommitted) has already decided this is the right thing to attempt.
 async function deleteAuthUserBestEffort(accountId: string): Promise<void> {
   try {
-    const { error } = await supabaseAdmin().auth.admin.deleteUser(accountId);
-    if (error) console.error(error);
+    const outcome = await deleteUserWithResend(accountId);
+    if (outcome === "unknown") {
+      console.error(new Error(`deleteAuthUserBestEffort: delete for account ${accountId} could not be confirmed`));
+    }
   } catch (err) {
     console.error(err);
   }
@@ -125,9 +126,21 @@ export class RegistrationError extends Error {
 // new household's id BEFORE the first insert — every new row's household_id must equal
 // current_setting('app.household_id') to satisfy each table's RLS WITH CHECK.
 //
-// No transaction spans Postgres and Supabase Auth (CLAUDE.md). The state each failure point
+// No transaction spans Postgres and Supabase Auth (CLAUDE.md). auth-provider-deadline design.md D5:
+// `accountId` is generated HERE, before createUser, and passed as its own `id` (assumption A1,
+// probed and confirmed against flatmate-io-dev: GoTrue honours a caller-supplied id) — this is what
+// makes an `unknown` outcome safe to compensate: nothing in Postgres points at this id yet, so
+// deleting it is correct whether or not the creation actually landed. The state each failure point
 // leaves:
-//   - createUser fails: nothing exists — signup_failed.
+//   - createUser is refused (email taken, a weak password, ...): nothing exists — signup_failed.
+//   - createUser's answer is unknown (identity/provider-calls): the Auth user MAY exist at
+//     `accountId`. deleteAuthUserBestEffort(accountId) is called before throwing signup_failed —
+//     nothing in Postgres references it yet, so deleting it (or finding it was never created: a 404
+//     on the resend counts as done, D4) leaves the address free either way. If the delete's own
+//     outcome stays unknown, that residual is logged, not repaired (D5's accepted residual).
+//   - createUser succeeds but GoTrue did not honour the requested id (an old/self-hosted GoTrue
+//     version, say): `data.user.id` — the user ACTUALLY created — is deleted (never `accountId`,
+//     which would 404 and orphan the real one), and this throws signup_failed.
 //   - the transaction fails, or its commit does: the Auth user exists and blocks the address (a
 //     retry would fail at createUser as a duplicate). The catch below runs undoRegisterHousehold,
 //     which deletes this household's rows (a no-op after a rollback; the reconciliation when a
@@ -142,7 +155,10 @@ export async function registerHousehold(email: string, password: string, name: s
   const trimmedName = name.trim();
   if (!trimmedName) throw new RegistrationError("household name is required", "missing_name");
 
+  const accountId = randomUUID(); // D5: generated up front so an unknown createUser outcome can be
+  // safely compensated — nothing references this id yet either way.
   const { data, error } = await supabaseAdmin().auth.admin.createUser({
+    id: accountId,
     email,
     password,
     // identity.md: "Verifikation ist nachgelagert und blockiert die erste Abstimmung nicht" —
@@ -153,12 +169,25 @@ export async function registerHousehold(email: string, password: string, name: s
     // outright on any project with "Confirm email" enabled (Supabase's own default).
     email_confirm: true,
   });
-  if (error || !data.user) {
-    throw new RegistrationError(error?.message ?? "Supabase Auth did not return a user", "signup_failed");
+  if (error) {
+    if (classifyProviderError(error) === "unknown") {
+      await deleteAuthUserBestEffort(accountId);
+    }
+    throw new RegistrationError(error.message ?? "Supabase Auth did not return a user", "signup_failed");
+  }
+  if (!data.user) {
+    throw new RegistrationError("Supabase Auth did not return a user", "signup_failed");
+  }
+  if (data.user.id !== accountId) {
+    // D5 pre-mortem finding 5: delete the user ACTUALLY created, never `accountId` (which would
+    // 404 here and orphan the real one).
+    await deleteAuthUserBestEffort(data.user.id);
+    throw new RegistrationError("Supabase Auth did not honour the requested id", "signup_failed");
   }
 
   const householdId = randomUUID();
-  const accountId = data.user.id; // Account.id == the Supabase Auth user id (1:1, standard pattern)
+  // Account.id == the Supabase Auth user id (1:1, standard pattern) — now `accountId` itself,
+  // generated above, rather than read back from `data.user.id` (D5).
   const context: SessionContext = { accountId, householdId, profileId: null };
 
   try {
@@ -302,9 +331,14 @@ export class ClaimError extends Error {
 // function then rather than leaving it "just in case".
 //
 // No transaction spans Postgres and Supabase Auth (CLAUDE.md), so this has joinHousehold's shape:
-// check, then createUser, then one transaction, with a catch that deletes the new Auth user. The
-// state each failure point leaves:
-//   - the pre-check refuses (not_found/not_prepared) or createUser fails (signup_failed): nothing.
+// check, then createUser, then one transaction, with a catch that deletes the new Auth user. D5:
+// `accountId` is generated before createUser and passed as its own id — the state each failure
+// point leaves:
+//   - the pre-check refuses (not_found/not_prepared), or createUser is refused: nothing.
+//   - createUser's answer is unknown: deleteAuthUserBestEffort(accountId) runs before throwing
+//     signup_failed — nothing yet references this id, so the address is free either way (D5).
+//   - createUser succeeds but does not honour the requested id: the user ACTUALLY created
+//     (`data.user.id`, never `accountId`) is deleted, and this throws signup_failed.
 //   - the transaction or its commit fails: the Auth user at the profile's derived address exists
 //     and would block every retry for this profile as a duplicate. The catch rethrows after
 //     deleteAuthUserUnlessCommitted: deleted when no account row exists (rolled back), kept when
@@ -326,17 +360,29 @@ export async function claimResidentProfile(
   });
 
   const derivedEmail = deriveResidentEmail(residentProfileId);
+  // D5: generated up front, exactly as registerHousehold/joinHousehold — nothing references this id
+  // yet, so an unknown createUser outcome can be safely compensated by deleting it.
+  const accountId = randomUUID();
   const { data, error } = await supabaseAdmin().auth.admin.createUser({
+    id: accountId,
     email: derivedEmail,
     password,
     email_confirm: true, // identity.md: "gilt beim Anbieter als bestätigt" — a technical
     // precondition for the sign-in path, not a claim about a real mailbox.
   });
-  if (error || !data.user) {
-    throw new ClaimError(error?.message ?? "Supabase Auth did not return a user", "signup_failed");
+  if (error) {
+    if (classifyProviderError(error) === "unknown") {
+      await deleteAuthUserBestEffort(accountId);
+    }
+    throw new ClaimError(error.message ?? "Supabase Auth did not return a user", "signup_failed");
   }
-
-  const accountId = data.user.id;
+  if (!data.user) {
+    throw new ClaimError("Supabase Auth did not return a user", "signup_failed");
+  }
+  if (data.user.id !== accountId) {
+    await deleteAuthUserBestEffort(data.user.id); // the user actually created (D5)
+    throw new ClaimError("Supabase Auth did not honour the requested id", "signup_failed");
+  }
 
   try {
     return await withSessionContext(context, async (tx) => {
@@ -420,12 +466,19 @@ export function joinAttemptSourceHash(ip: string | null): string {
 // 5 / proposal.md Assumption 6 merges "No such resident in this household" and "Invalid
 // credentials" into `invalid_credentials` — telling the two apart would let an unauthenticated
 // visitor learn whether a display name exists in the household.
+//
+// auth-provider-deadline design.md D9/D11: `provider_unavailable` is thrown whenever the identity
+// provider's answer is unknown (identity/provider-calls) — never as, and never distinguishable
+// from, `invalid_credentials`. It is NOT a sixth converging throw site for the enumeration concern
+// above: D11 makes every name path send the identity provider the same requests regardless of
+// whether the name resolves, so an unreachable provider says the same thing for both.
 export type SignInErrorCode =
   | "missing_fields"
   | "invalid_household"
   | "invalid_credentials"
   | "no_household"
-  | "no_membership";
+  | "no_membership"
+  | "provider_unavailable";
 
 export class SignInError extends Error {
   constructor(message: string, readonly code: SignInErrorCode) {
@@ -552,21 +605,37 @@ export async function signIn(
           ),
         ),
     );
-    // design.md Decision 5 / proposal.md Assumption 6: converges with the "Invalid credentials"
-    // throw below on the single code `invalid_credentials` — this is the change's one
-    // user-visible behaviour change (tasks.md 2.2). A profile with no membership yet (still
-    // `prepared`, never claimed) has no account to resolve either, and fails the same way.
-    if (!resolvedAccount) throw new SignInError("No such resident in this household", "invalid_credentials");
 
-    // Every failure past this point stays invalid_credentials too — a missing Auth user is exactly
-    // as uninformative to the caller as a wrong password would be.
-    const { data: userData, error: userError } = await supabaseAdmin().auth.admin.getUserById(
-      resolvedAccount.accountId,
-    );
-    if (userError || !userData.user?.email) {
-      throw new SignInError("Invalid credentials", "invalid_credentials");
+    // auth-provider-deadline design.md D11 (pre-mortem finding 9): the name path, from here on,
+    // only decides WHICH account id to look up and which fallback email to fall back to — it then
+    // falls through the SAME shared code every name sign-in takes (this lookup, then
+    // readDatabaseClock, then signInWithPasswordWithResend below). An unknown name is never
+    // refused early any more: doing so used to answer one or two provider round trips sooner than
+    // a known one, leaking existence through timing before this change even added
+    // `provider_unavailable`'s own leak risk. Every case below reaches the identical request
+    // sequence: GET /admin/users/:id -> readDatabaseClock -> POST /token.
+    //   - the name resolves: look up its own account id;
+    //   - the name does not resolve: look up a random, unclaimed id instead — GoTrue answers a
+    //     lookup for it exactly like a real account whose Auth user is missing (both 404, both
+    //     `refused` per classifyProviderError), so this and the branch below cannot be told apart
+    //     by the caller.
+    const lookupAccountId = resolvedAccount?.accountId ?? randomUUID();
+    const { data: userData, error: userError } = await getUserByIdWithResend(lookupAccountId);
+    if (userError && classifyProviderError(userError) === "unknown") {
+      // Whether or not the name resolved, an unanswered lookup means the same thing: signing in
+      // isn't possible right now. Reported at exactly this point for both, so neither the answer
+      // nor its timing tells a visitor whether the name exists (identity/sign-in).
+      throw new SignInError(
+        "The identity provider did not answer the address lookup",
+        "provider_unavailable",
+      );
     }
-    email = userData.user.email;
+    // The lookup was refused (typically a 404 — the resolved account's Auth user is missing, or
+    // the throwaway id was never claimed by anyone) or came back with no email for some other
+    // reason: fall through with a fresh, unclaimed `.invalid` address. GoTrue answers a password
+    // grant against it like any other unknown address (`invalid_credentials`), with no session
+    // created and nothing stored — it costs one provider request, never more.
+    email = userData?.user?.email ?? `resident-${randomUUID()}@accounts.flatmate.invalid`;
   }
 
   // Copilot review round 5 (PR #23), FIX 1: read the DATABASE clock ONCE, here, BEFORE
@@ -579,11 +648,17 @@ export async function signIn(
   // BEFORE this attempt even began can pass.
   const credentialsCheckedAt = await readDatabaseClock();
 
-  const { data, error } = await supabaseAdmin().auth.signInWithPassword({
-    email,
-    password: input.password,
-  });
-  if (error || !data.user || !data.session) {
+  // auth-provider-deadline design.md D3/D9: every password check follows the SAME rule, here and
+  // for D11's throwaway checks alike — only a clean `invalid_credentials` refusal means "wrong
+  // password". Anything else the provider does not definitely answer with that (no answer, a rate
+  // limit, ...) is `provider_unavailable`: the person is never told their password is wrong when
+  // the truth is "unknown" (identity/provider-calls, identity/sign-in).
+  const { data, error } = await signInWithPasswordWithResend(email, input.password);
+  const passwordOutcome = classifyPasswordCheck(error);
+  if (passwordOutcome === "unknown") {
+    throw new SignInError("The identity provider did not answer the password check", "provider_unavailable");
+  }
+  if (passwordOutcome === "wrong_password" || !data.user || !data.session) {
     throw new SignInError("Invalid credentials", "invalid_credentials");
   }
 
@@ -709,7 +784,12 @@ export type JoinErrorCode =
   // (recreated exactly as in commit a95bbb9, before the Copilot PR #23 fix folded the sign-in into
   // one all-or-nothing transaction) rather than reporting the reset as failed, which would be a
   // lie: the reset already succeeded.
-  | "reset_done_sign_in_failed";
+  | "reset_done_sign_in_failed"
+  // auth-provider-deadline design.md D8: phase 2's write, and every check of it, went unanswered —
+  // genuinely unknown, neither "set" nor "not set". Distinct from reset_incomplete (which promises
+  // the password was NOT set) and reset_done_sign_in_failed (which promises it WAS) — this promises
+  // neither.
+  | "reset_outcome_unknown";
 
 export class JoinError extends Error {
   constructor(message: string, readonly code: JoinErrorCode) {
@@ -863,26 +943,42 @@ export async function joinHousehold(
   // given. `account.email` keeps storing the supplied address either way (unchanged below).
   const authEmail = email ?? derivedEmail;
 
+  // D5: generated up front, exactly as registerHousehold/claimResidentProfile — nothing references
+  // this id yet, so an unknown createUser outcome can be safely compensated by deleting it.
+  const accountId = randomUUID();
   const { data, error } = await supabaseAdmin().auth.admin.createUser({
+    id: accountId,
     email: authEmail,
     password,
     email_confirm: true, // identity.md: a technical precondition for the sign-in path, not a
     // claim about a real mailbox — same reasoning as registerHousehold/claimResidentProfile.
   });
-  if (error || !data.user) {
+  if (error) {
     if (isEmailTakenError(error, "create")) {
       throw new JoinError("Email address is already in use", "email_taken");
     }
-    throw new JoinError(error?.message ?? "Supabase Auth did not return a user", "signup_failed");
+    if (classifyProviderError(error) === "unknown") {
+      // D5: nothing in Postgres references accountId yet (the link is not yet claimed) — deleting
+      // it is correct whether or not the creation actually landed. This is what keeps a lost
+      // createUser answer from blocking the address, bound-link or supplied, for good.
+      await deleteAuthUserBestEffort(accountId);
+    }
+    throw new JoinError(error.message ?? "Supabase Auth did not return a user", "signup_failed");
+  }
+  if (!data.user) {
+    throw new JoinError("Supabase Auth did not return a user", "signup_failed");
+  }
+  if (data.user.id !== accountId) {
+    await deleteAuthUserBestEffort(data.user.id); // the user actually created (D5)
+    throw new JoinError("Supabase Auth did not honour the requested id", "signup_failed");
   }
 
-  const accountId = data.user.id;
-
   try {
-    const { data: signInData, error: signInError } = await supabaseAdmin().auth.signInWithPassword({
-      email: authEmail,
-      password,
-    });
+    // identity/provider-calls: a password check is sent a second time when its first answer never
+    // came (D4). Every failure here still ends as signup_failed, with the new Auth user removed by
+    // the catch below (deleteAuthUserUnlessCommitted), so the resend only changes the outcome of a
+    // single lost grant: a completed join instead of a failed one.
+    const { data: signInData, error: signInError } = await signInWithPasswordWithResend(authEmail, password);
     if (signInError || !signInData.user || !signInData.session) {
       throw new JoinError("Sign-in immediately after join's own createUser failed", "signup_failed");
     }
@@ -1038,7 +1134,18 @@ export type AccountSettingsErrorCode =
   // reruns the DB side under the same locks; this code is thrown only when THAT compensation also
   // fails — both the original commit and the repair attempt are logged (console.error) and the
   // caller is told the change may have applied only partly.
-  | "change_incomplete";
+  | "change_incomplete"
+  // auth-provider-deadline design.md D6/D7: the identity provider's answer never arrived (identity
+  // `provider-calls`), resolved (or not) under the same lock — never a refusal, and nothing written.
+  | "provider_unavailable"
+  // D7: an unknown provider write's SAFE DIRECTION (pre-mortem findings 3/4) — the change did NOT
+  // take effect (confirmed, or resent once and still not confirmed), but every OTHER session has
+  // already ended and the credentials-generation stamp already moved, because the write that
+  // failed to confirm may still apply later, after this lock is released.
+  | "password_unchanged_sessions_ended"
+  // D7/D8: neither the write nor any check of it could be confirmed at all — same safe direction,
+  // but genuinely unknown rather than confirmed unchanged.
+  | "password_uncertain_sessions_ended";
 
 export class AccountSettingsError extends Error {
   constructor(message: string, readonly code: AccountSettingsErrorCode) {
@@ -1062,6 +1169,72 @@ export function normalizeEmail(raw: string): string {
 
 export function isWellFormedEmail(normalized: string): boolean {
   return EMAIL_SHAPE.test(normalized);
+}
+
+// auth-provider-deadline design.md D6: after an unanswered updateUserById(email), read the
+// provider back. "Applied" is defined in exactly one way: the provider's NORMALIZED address equals
+// the REQUESTED one — never a comparison with any "previous" address, which for a resident who
+// joined without an email has no single value (the derived `.invalid` one while account.email is
+// null) — pre-mortem finding 1. A read that itself fails to answer (refused or unknown) is
+// indeterminate here; the caller (resolveEmailWriteOutcome) treats it as `unknown`.
+async function readBackEmailOutcome(
+  accountId: string,
+  requestedEmail: string,
+): Promise<"applied" | "not_applied" | "unknown"> {
+  const { data, error } = await getUserByIdWithResend(accountId);
+  if (error) return "unknown";
+  const providerEmail = data.user?.email ? normalizeEmail(data.user.email) : null;
+  return providerEmail === requestedEmail ? "applied" : "not_applied";
+}
+
+// D6's full sequence for an unanswered updateUserById(email), run under changeResidentEmail's own
+// locks: read-back, then at most one resend (only once the read-back shows the write did NOT take
+// effect — a blind second PUT would otherwise be answered against a state we do not know, D4),
+// then one more read-back. Returns "applied" (the caller commits as normal — account.email/the
+// audit event, already written before the provider call, stand) or "unknown" (the caller must
+// throw so the transaction rolls back; the outer repair alone decides what to write, and only if
+// it can confirm the provider holds the requested address). A definite refusal (email_taken, or
+// a second read-back showing the address did NOT apply) throws directly — this rolls the whole
+// transaction back, exactly as a same-request refusal always has.
+async function resolveEmailWriteOutcome(accountId: string, requestedEmail: string): Promise<"applied" | "unknown"> {
+  const first = await readBackEmailOutcome(accountId, requestedEmail);
+  if (first === "applied") return "applied";
+  if (first === "unknown") return "unknown";
+
+  const resend = await supabaseAdmin().auth.admin.updateUserById(accountId, {
+    email: requestedEmail,
+    email_confirm: true,
+  });
+  if (!resend.error) return "applied";
+
+  // resident-settings design.md D2 / this change's D3 exception: the update path's email-taken
+  // signature is itself a 500 `AuthRetryableFetchError` with no machine-readable code — classified
+  // `unknown` by classifyProviderError — so isEmailTakenError MUST run first, before that
+  // classification, or a genuine duplicate on the resend would be misread as a lost request.
+  if (isEmailTakenError(resend.error, "update")) {
+    throw new AccountSettingsError("Email address is already in use", "email_taken");
+  }
+  if (classifyProviderError(resend.error) === "refused") {
+    // A definite refusal of the resend, other than email_taken (a rate limit, say): the address was
+    // just read back as NOT applied and this copy was declined, so nothing changed. Reported as
+    // such, not rethrown raw: changeEmailAction maps only AccountSettingsError, and a raw AuthError
+    // would reach the error page with the provider's own message (ui/vocabulary).
+    console.error(resend.error);
+    throw new AccountSettingsError(
+      "The email change is not possible right now — nothing was changed",
+      "provider_unavailable",
+    );
+  }
+
+  const second = await readBackEmailOutcome(accountId, requestedEmail);
+  if (second === "applied") return "applied";
+  if (second === "not_applied") {
+    throw new AccountSettingsError(
+      "The email change is not possible right now — nothing was changed",
+      "provider_unavailable",
+    );
+  }
+  return "unknown";
 }
 
 // design.md Decision 2, REORDERED (Copilot review round 3, PR #23): the previous shape called the
@@ -1112,15 +1285,29 @@ export function isWellFormedEmail(normalized: string): boolean {
 //      precondition for the provider's sign-in path (identity.md provider rule 2), never a claim
 //      about delivery, which stays account.email_verified_at's alone. On email_exists, throw
 //      email_taken — this now rolls the DB write (step 7/8) back WITH it, since it is thrown
-//      before the transaction's own commit. Any other provider error rethrows the same way.
+//      before the transaction's own commit. Any other definite refusal rethrows the same way.
+//  10. auth-provider-deadline design.md D6: an UNANSWERED step 9 (classifyProviderError ->
+//      `unknown`; auth-js returns it, it never throws) is not a refusal — the provider may hold
+//      the new address. Still under the step 3–5 locks, resolveEmailWriteOutcome reads the
+//      provider back ("applied" means exactly: its normalized address equals the requested one),
+//      resends at most once only when it did not apply, and reads back again. Applied -> commit
+//      as normal. Definitely not applied -> `provider_unavailable`, rolled back, nothing written.
+//      Still unknown -> the transaction is made to roll back with providerOutcome = "unknown".
 //
-// The only window this discipline cannot close is a failed COMMIT after step 9's provider call
-// already returned success: Postgres then rolls back everything (email/audit gone) while Supabase
-// already carries the new address. Handled by a best-effort RECONCILIATION, outside the
-// transaction: a local `providerUpdated` flag is set true immediately after step 9 succeeds; the
-// `withSessionContext(...)` call is wrapped in try/catch; if it throws AND `providerUpdated` is
-// true (meaning the throw can only be the commit itself failing, since every earlier throw path
-// leaves the flag false), a second, best-effort transaction re-applies the DB side under the same
+// `providerOutcome` ("none" | "applied" | "unknown") tells the catch what it is looking at. "none":
+// every throw before step 9 succeeded or was resolved, and every definite refusal — rethrown as-is.
+// "unknown": step 10 could not decide — the repair below runs, but may write only if the provider
+// holds the REQUESTED address; otherwise it writes nothing and throws `provider_unavailable`. It
+// must never copy the provider's address into account.email on this branch: for a resident who
+// joined without an email that address is the derived `.invalid` one, and writing it would make
+// every later reset link refuse (redeemPasswordReset requires `account.email === null`). A lost
+// read in the repair, or its own failure -> `change_incomplete`.
+//
+// "applied", the remaining window: a failed COMMIT after step 9 (or step 10) confirmed the write.
+// Postgres then rolls back everything (email/audit gone) while Supabase already carries the new
+// address. Handled by a best-effort RECONCILIATION, outside the transaction: if
+// `withSessionContext(...)` throws with providerOutcome "applied" (the throw can only be the
+// commit itself failing), a second, best-effort transaction re-applies the DB side under the same
 // locks (membership -> account). Copilot review round 4 (PR #23): this compensation used to
 // re-write THIS REQUEST'S OWN address unconditionally — but a LATER change (a second
 // changeResidentEmail call) could have committed for real in the gap between this request's
@@ -1177,11 +1364,17 @@ export async function changeResidentEmail(current: CurrentSession, rawEmail: str
     );
   }
 
-  // Flips to true only once the provider call (the LAST statement of the transaction below) has
-  // actually succeeded — so the catch block below can tell "the provider never changed" (this
-  // stays false: every throw before that point, including email_taken, leaves it false) apart from
-  // "the provider changed but the commit that should have followed it failed" (this is true).
-  let providerUpdated = false;
+  // auth-provider-deadline design.md D6: replaces the boolean `providerUpdated` with a three-valued
+  // outcome. "none" (unchanged default): every throw before the provider write ever ran, or a
+  // definite refusal (email_taken, any other refusal, or resolveEmailWriteOutcome's own
+  // `provider_unavailable`) — nothing to reconcile, rethrow as-is. "applied": the write succeeded,
+  // either directly or after resolveEmailWriteOutcome confirmed it — the transaction commits as
+  // normal; only a failed COMMIT after this reaches the catch below (today's pre-existing repair,
+  // unchanged). "unknown": resolveEmailWriteOutcome could not confirm either way even after its own
+  // resend — the transaction is made to roll back (nothing here is trustworthy), and the catch
+  // below runs the D6 repair variant, which writes only if it can itself confirm the provider holds
+  // the REQUESTED address.
+  let providerOutcome: "none" | "applied" | "unknown" = "none";
 
   try {
     await withSessionContext(context, async (tx) => {
@@ -1237,36 +1430,65 @@ export async function changeResidentEmail(current: CurrentSession, rawEmail: str
         email,
         email_confirm: true,
       });
-      if (error) {
-        if (isEmailTakenError(error, "update")) {
-          throw new AccountSettingsError("Email address is already in use", "email_taken");
-        }
+      if (!error) {
+        providerOutcome = "applied";
+        return; // commit as normal — account.email/the audit event, written above, stand
+      }
+
+      // resident-settings design.md D2 / this change's D3 exception: isEmailTakenError runs BEFORE
+      // classifyProviderError — the update path's duplicate refusal is itself a 500
+      // `AuthRetryableFetchError` with no code, which classifyProviderError alone would call
+      // `unknown`.
+      if (isEmailTakenError(error, "update")) {
+        throw new AccountSettingsError("Email address is already in use", "email_taken");
+      }
+      if (classifyProviderError(error) === "refused") {
         throw error;
       }
-      providerUpdated = true;
+
+      // unknown (identity/provider-calls): resolve under the SAME locks, per D6, before this
+      // transaction ever commits or rolls back.
+      const resolved = await resolveEmailWriteOutcome(context.accountId, email);
+      if (resolved === "applied") {
+        providerOutcome = "applied";
+        return; // commit as normal
+      }
+      providerOutcome = "unknown";
+      throw new Error("changeResidentEmail: provider outcome could not be confirmed");
     });
   } catch (err) {
-    if (!providerUpdated) throw err;
+    if (providerOutcome === "none") throw err;
 
-    // The provider call succeeded but the transaction's own commit failed — best-effort
-    // reconciliation, re-applying the DB side under the same locks. Copilot review round 4 (PR
-    // #23), FIX 2 — see the big comment above: RECONCILE TO THE PROVIDER rather than blindly
-    // rewriting this request's own address, which could otherwise clobber a later, already-
-    // committed change. `getUserById` is the read this reconciles against; a failure of that read
-    // falls through to the outer catch below (`change_incomplete`), same as any other failure of
-    // this compensating transaction.
+    // Either the provider write succeeded but the transaction's own COMMIT failed (providerOutcome
+    // "applied" — Copilot review round 4, PR #23, FIX 2, unchanged), or the write's own answer never
+    // arrived and resolveEmailWriteOutcome could not confirm it either way (providerOutcome
+    // "unknown" — D6). Both reconcile the DB side under the same locks by reading the provider
+    // back, but D6 restricts WHAT "unknown" may write: never the provider's own current address
+    // unconditionally (only "applied" does that) — for a resident who joined without an email, the
+    // provider's address absent a confirmed write is the derived `.invalid` one, and writing that
+    // into account.email would make every later reset link refuse (this file's redeemPasswordReset
+    // requires `account.email === null`) — pre-mortem finding 1.
     try {
       await withSessionContext(context, async (tx) => {
         await tx.select().from(membership).where(eq(membership.accountId, context.accountId)).for("update");
         const [row] = await tx.select().from(account).where(eq(account.id, context.accountId)).for("update");
 
-        const { data: userData, error: userError } = await supabaseAdmin().auth.admin.getUserById(
-          context.accountId,
-        );
+        const { data: userData, error: userError } = await getUserByIdWithResend(context.accountId);
         if (userError || !userData.user?.email) {
           throw userError ?? new Error("getUserById returned no email during changeResidentEmail's compensation");
         }
         const providerEmail = normalizeEmail(userData.user.email);
+
+        if (providerOutcome === "unknown" && providerEmail !== email) {
+          // D6: the provider does NOT hold the requested address — write nothing, and report this
+          // as the same "not possible right now" outcome a definite non-application would have
+          // been, never a partial-completion code (`change_incomplete` promises nothing about
+          // sessions or the account.email value; `provider_unavailable` promises nothing changed).
+          throw new AccountSettingsError(
+            "The email change is not possible right now — nothing was changed",
+            "provider_unavailable",
+          );
+        }
 
         if (!row || row.email === providerEmail) return; // already reconciled — no write, no audit
 
@@ -1287,6 +1509,9 @@ export async function changeResidentEmail(current: CurrentSession, rawEmail: str
       });
       return; // compensation succeeded — the account row now agrees with the provider
     } catch (compensationErr) {
+      if (compensationErr instanceof AccountSettingsError && compensationErr.code === "provider_unavailable") {
+        throw compensationErr; // D6's own definite outcome, not a partial-completion residual
+      }
       console.error(err);
       console.error(compensationErr);
       throw new AccountSettingsError(
@@ -1295,6 +1520,30 @@ export async function changeResidentEmail(current: CurrentSession, rawEmail: str
       );
     }
   }
+}
+
+// auth-provider-deadline design.md D7: changeResidentPassword's (and redeemPasswordReset phase 2's)
+// resolution of an UNANSWERED updateUserById(password), run under the caller's locks. A password
+// cannot be read back, so the only evidence is whether the new one now authenticates
+// (confirmPasswordSet, auth-provider.ts). Only a definite "not_applied" probe leads to the one
+// resend; a probe that is itself `unknown` returns `unknown` at once, since nothing is known to
+// decide a resend on. After the resend (answered or not) a second probe decides.
+async function resolvePasswordWriteOutcome(
+  email: string,
+  newPassword: string,
+  accountId: string,
+): Promise<"applied" | "not_applied" | "unknown"> {
+  const firstProbe = await confirmPasswordSet(email, newPassword);
+  if (firstProbe === "applied") return "applied";
+  if (firstProbe === "unknown") return "unknown";
+
+  const resend = await supabaseAdmin().auth.admin.updateUserById(accountId, { password: newPassword });
+  if (!resend.error) return "applied";
+
+  // D7: "refused | unknown -> probe" — the SECOND probe runs regardless of how the resend itself
+  // failed; there is no password-specific refusal (like email_taken) to short-circuit on here.
+  const secondProbe = await confirmPasswordSet(email, newPassword);
+  return secondProbe; // "applied" | "not_applied" | "unknown" — all three map directly
 }
 
 // design.md Decision 7: resident-only, as changeResidentEmail above.
@@ -1325,44 +1574,52 @@ export async function changeResidentEmail(current: CurrentSession, rawEmail: str
 //      serialize on the same row instead of racing;
 //   4. WHILE HOLDING THAT LOCK: look up the provider's current address (getUserById, D1's lookup)
 //      and verify the current password (signInWithPassword; the session it returns is discarded,
-//      as signIn already does on refusal) — a failure is wrong_current_password. Neither of these
-//      two provider calls changes any state, so putting them before the DB writes below is not the
+//      as signIn already does on refusal). Only a clean `invalid_credentials` refusal is
+//      wrong_current_password; an unanswered or otherwise-refused check (a rate limit, say) is
+//      `provider_unavailable`, nothing written (auth-provider-deadline D3/D7, classifyPasswordCheck).
+//      Neither call changes any state, so putting them before the DB writes below is not the
 //      hazard round 3 fixes — see the next paragraph;
 //   5. Copilot review round 3 (PR #23), CLAUDE.md "No transaction spans Postgres and Supabase
-//      Auth": revoke every OTHER session of the account (current.sessionId is kept) and record
-//      account.password_changed — moved BEFORE the provider password write, so the MUTATING
-//      provider call (step 6) is the LAST statement of the transaction, exactly
-//      changeResidentEmail's own reorder and redeemPasswordReset's phase 2 discipline;
-//   6. LAST: updateUserById(password). A failure here now rolls the session-revoke and the audit
-//      insert back WITH it — no half-known state where sessions ended for a password that never
-//      actually changed.
+//      Auth": revoke every OTHER session of the account (current.sessionId is kept) and stamp
+//      password_changed_at — BEFORE the provider password write;
+//   6. updateUserById(password). A clean refusal rolls the revoke and the stamp back WITH it — no
+//      session ends for a password that was plainly never changed. On success,
+//      account.password_changed is recorded (auth-provider-deadline D7 moved the audit insert
+//      AFTER the provider call, so it is written only for a confirmed change; if it or the commit
+//      then fails, the repair below re-records it);
+//   7. auth-provider-deadline design.md D7: an UNANSWERED step 6 is not a refusal — the password
+//      may be set. Still under the locks, resolvePasswordWriteOutcome probes with the new password
+//      (a password cannot be read), resends at most once when the probe shows it did not apply,
+//      and probes again. Applied -> record the event, commit: success. Otherwise, the SAFE
+//      DIRECTION (S): commit this transaction as it stands (other sessions revoked, stamp set),
+//      WITHOUT the event, and throw `password_unchanged_sessions_ended` (probe: not applied) or
+//      `password_uncertain_sessions_ended` (cannot tell) only after that commit. Even "not applied"
+//      ends the sessions: every path into (S) has had a write whose answer never came, and the
+//      deadline cuts slow requests as well as lost ones, so that write may still apply at GoTrue
+//      after this lock is released — too late to revoke then.
 // Validation that touches no row (missing fields, the new password's length rule) stays OUTSIDE
 // the lock, exactly as before.
 //
-// The only window this cannot close is a failed COMMIT after step 6's provider call already
-// returned success: Postgres rolls back (the revoke and the audit entry are gone) while Supabase
-// already has the new password — the OTHER sessions would then still be live for a password that
-// did change. Handled the same way as changeResidentEmail: a local `providerUpdated` flag flips
-// true right after the provider call succeeds; the `withSessionContext(...)` call is wrapped in
-// try/catch; if it throws AND `providerUpdated` is true, a best-effort compensating transaction
-// re-applies the DB side under the same locks (membership -> account, then session) — revoking the
-// other sessions and recording the event again, nothing else. Copilot review round 4 (PR #23),
-// FIX 2 — the "revoke every other session" repair used to unconditionally re-run against
-// `isNull(session.revokedAt)`, which would also revoke a session legitimately created WITH THE NEW
-// PASSWORD in the gap between this call's own provider write and its failed commit (someone
-// signing in successfully right after the reset, before the repair runs). Closed by capturing
-// `const startedAt = new Date()` at the very top of this function, before the main transaction
-// even opens, and filtering the repair's revoke on `createdAt < startedAt` (in addition to
-// excluding `current.sessionId`, unchanged) — a session created at or after the moment this call
-// began cannot be one this call's own password write is responsible for un-knowing about, so the
-// repair leaves it alone. Each path this leaves:
+// The remaining window is a failed COMMIT of the main transaction after step 6/7 either confirmed
+// the change or chose (S): Postgres rolls back (revoke, stamp, event gone) while Supabase may
+// already have the new password — the OTHER sessions would then still be live. The flag
+// `needsCommitFailureRepair` (set only on those two paths) sends the catch into a best-effort
+// compensating transaction under the same locks (membership -> account): revoke the other sessions
+// again, re-stamp, and re-record the event for a confirmed change only, never for (S). Copilot
+// review round 4 (PR #23), FIX 2 — the revoke is filtered on `createdAt < startedAt`, so a session
+// created WITH THE NEW PASSWORD in the gap between this call's provider write and its failed commit
+// (someone signing in successfully right after the change, before the repair runs) survives.
+// `startedAt` comes from readDatabaseClock() before the main transaction opens (auth-provider-
+// deadline D7 "Clocks": `createdAt` is a DB timestamp, so the bound must be one too). Each path
+// this leaves:
 //   - the repair's own transaction fails too: both errors are logged (console.error) and this
-//     throws `AccountSettingsError("change_incomplete")` — Supabase already has the new password,
+//     throws `AccountSettingsError("change_incomplete")` — Supabase may have the new password,
 //     but Postgres has neither the revoke nor the audit entry, and the caller is told so;
-//   - the repair succeeds: this returns normally — the change did take effect, late, and every
-//     session that existed before this call started (other than the caller's own) is now revoked,
-//     while a session created during the gap survives, exactly as an ordinary successful call
-//     would have left it.
+//   - the repair succeeds after a confirmed change: this returns normally — the change did take
+//     effect, late, and every session that existed before this call started (other than the
+//     caller's own) is now revoked;
+//   - the repair succeeds after an (S) outcome: `change_incomplete` — the transaction that was
+//     meant to carry the specific (S) message never committed, so that promise is not made.
 //
 // This cannot be exercised by a real test without mocking Supabase or forcing a commit failure,
 // which CLAUDE.md forbids here (no DB/auth mocking) — see the test file's own note. FIX 2's own
@@ -1407,15 +1664,27 @@ export async function changeResidentPassword(
     );
   }
 
-  // Copilot review round 4 (PR #23), FIX 2: captured BEFORE the main transaction even opens, so
-  // the compensating transaction's own session-revoke (below) can distinguish a session that
-  // existed when this call started from one created legitimately, with the new password, in the
-  // gap between this call's provider write and a later failed commit. See the big comment above.
-  const startedAt = new Date();
+  // Copilot review round 4 (PR #23), FIX 2, corrected by auth-provider-deadline design.md D7
+  // "Clocks": this now comes from the DATABASE clock, not a JS `Date` — the repair's
+  // `createdAt < startedAt` compares a DB timestamp with a JS clock read, against the hazards
+  // file's rule ("compare in SQL or with the DB-returned values, never mixing JS clock and DB
+  // clock"). Read BEFORE the main transaction even opens, so the compensating transaction's own
+  // session-revoke (below) can distinguish a session that existed when this call started from one
+  // created legitimately, with the new password, in the gap between this call's provider write and
+  // a later failed commit.
+  const startedAt = await readDatabaseClock();
 
-  // See the big comment above: flips true only once the provider password write (the LAST
-  // statement of the transaction below) has actually succeeded.
-  let providerUpdated = false;
+  // Distinguishes "nothing to reconcile — rethrow as-is" (a validation refusal, wrong_current_
+  // password, session_ended, provider_unavailable, or a clean first-write refusal — every one of
+  // these rolls the transaction back) from "the commit-failure repair applies" — which now covers
+  // BOTH a confirmed successful write whose own commit then failed (as before) AND an (S) safe-
+  // direction outcome whose commit then failed (D7) — both leave the SAME thing to repair
+  // (revoke + stamp), just reported differently once the repair itself is resolved (see the catch
+  // below).
+  let needsCommitFailureRepair = false;
+  // Set only on an (S) outcome (D7) whose transaction commits successfully on the FIRST attempt —
+  // the function throws this code AFTER that commit, never instead of it.
+  let safeDirectionCode: "password_unchanged_sessions_ended" | "password_uncertain_sessions_ended" | null = null;
 
   try {
     await withSessionContext(context, async (tx) => {
@@ -1450,16 +1719,30 @@ export async function changeResidentPassword(
         throw new AccountSettingsError("Your session has ended — please sign in again", "session_ended");
       }
 
-      const { data: userData, error: userError } = await supabaseAdmin().auth.admin.getUserById(context.accountId);
+      // auth-provider-deadline design.md D7 "Steps 10 and 11": neither the address lookup nor the
+      // current-password check may read an unanswered (or otherwise-refused) provider as "wrong
+      // current password" — only a clean, definite refusal does. Both go through the D4 wrappers
+      // and their own classification: the lookup through classifyProviderError (an unanswered
+      // lookup is `provider_unavailable`; a definite refusal such as a 404 stays the definite
+      // refusal it always was, never "try again shortly" on every retry), the password check
+      // through classifyPasswordCheck (D3: only `invalid_credentials` is a wrong password).
+      const { data: userData, error: userError } = await getUserByIdWithResend(context.accountId);
       if (userError || !userData.user?.email) {
+        if (classifyProviderError(userError) === "unknown") {
+          throw new AccountSettingsError(
+            "The current password could not be checked right now",
+            "provider_unavailable",
+          );
+        }
         throw new AccountSettingsError("Current password is incorrect", "wrong_current_password");
       }
 
-      const { error: signInError } = await supabaseAdmin().auth.signInWithPassword({
-        email: userData.user.email,
-        password: currentPassword,
-      });
-      if (signInError) {
+      const { error: signInError } = await signInWithPasswordWithResend(userData.user.email, currentPassword);
+      const currentCheck = classifyPasswordCheck(signInError);
+      if (currentCheck === "unknown") {
+        throw new AccountSettingsError("The current password could not be checked right now", "provider_unavailable");
+      }
+      if (currentCheck === "wrong_password") {
         throw new AccountSettingsError("Current password is incorrect", "wrong_current_password");
       }
 
@@ -1471,8 +1754,8 @@ export async function changeResidentPassword(
       // Copilot review round 5 (PR #23), FIX 1: stamp the credentials generation in the DATABASE
       // clock, never a JS Date (CLAUDE.md: "compare in SQL or with the DB-returned values, never
       // mixing JS clock and DB clock"), inside this same transaction, holding the same account row
-      // lock — alongside the session revoke and the audit entry, before the provider call. This is
-      // what signIn's own credentials-generation check (auth.ts's signIn) compares against.
+      // lock — alongside the session revoke, before the provider call. This is what signIn's own
+      // credentials-generation check (auth.ts's signIn) compares against.
       //
       // `clock_timestamp()`, deliberately NOT plain `now()`: Postgres's `now()` returns the
       // TRANSACTION's start timestamp (fixed for the whole transaction), not the instant this
@@ -1489,33 +1772,72 @@ export async function changeResidentPassword(
         .set({ passwordChangedAt: sql`clock_timestamp()` })
         .where(eq(account.id, context.accountId));
 
-      await recordActivityEvent(tx, {
-        householdId: context.householdId,
-        eventType: "account.password_changed",
-        subjectType: "account",
-        subjectId: context.accountId,
-        actorAccountId: context.accountId,
-        actorProfileId: context.profileId,
-        payload: {},
-      });
-
-      // LAST statement before commit — see the big comment above.
+      // auth-provider-deadline design.md D7: the audit insert MOVES to after the provider outcome
+      // is resolved (below), so it is written only when the change is confirmed. Moving it after
+      // the provider call is safe: if a later step fails after an applied write, the commit fails
+      // and the existing `applied` repair re-records it.
       const { error: updateError } = await supabaseAdmin().auth.admin.updateUserById(context.accountId, {
         password: newPassword,
       });
-      if (updateError) throw updateError;
-      providerUpdated = true;
+      if (!updateError) {
+        await recordActivityEvent(tx, {
+          householdId: context.householdId,
+          eventType: "account.password_changed",
+          subjectType: "account",
+          subjectId: context.accountId,
+          actorAccountId: context.accountId,
+          actorProfileId: context.profileId,
+          payload: {},
+        });
+        needsCommitFailureRepair = true; // a real success — repair applies if the COMMIT then fails
+        return; // commit as normal: success
+      }
+
+      if (classifyProviderError(updateError) === "refused") {
+        // A clean first-write refusal, with no unknown in between: rolls back without ending
+        // anything (D7 "Why even 'not applied' goes the safe direction" — this is the ONE case
+        // that is genuinely safe to roll back, since no write has gone unanswered at all yet).
+        throw updateError;
+      }
+
+      // unknown (identity/provider-calls): resolve via the probe sequence, under the SAME locks,
+      // before this transaction ever commits or rolls back.
+      const resolved = await resolvePasswordWriteOutcome(userData.user.email, newPassword, context.accountId);
+      if (resolved === "applied") {
+        await recordActivityEvent(tx, {
+          householdId: context.householdId,
+          eventType: "account.password_changed",
+          subjectType: "account",
+          subjectId: context.accountId,
+          actorAccountId: context.accountId,
+          actorProfileId: context.profileId,
+          payload: {},
+        });
+        needsCommitFailureRepair = true;
+        return; // commit as normal: success
+      }
+
+      // (S) — the safe direction (D7 pre-mortem findings 3/4): every path here has had at least
+      // one write whose answer never came, so the deadline may have cut a request that still
+      // applies LATER, after this lock is released. The session revoke and the stamp, above,
+      // already stand; COMMIT them now, WITHOUT the audit event (nothing here is confirmed), and
+      // report the outcome once this transaction has actually committed. This is not re-applied by
+      // a separate repair transaction afterwards — doing so would leave the other sessions live in
+      // the gap between the two, or for good if that repair failed.
+      needsCommitFailureRepair = true;
+      safeDirectionCode = resolved === "not_applied" ? "password_unchanged_sessions_ended" : "password_uncertain_sessions_ended";
+      return; // commit as-is — the marker above is read once this succeeds
     });
   } catch (err) {
-    if (!providerUpdated) throw err;
+    if (!needsCommitFailureRepair) throw err;
 
-    // The provider call succeeded but the transaction's own commit failed — best-effort
-    // reconciliation, re-applying the DB side under the same locks. Copilot review round 4 (PR
-    // #23), FIX 2 — the revoke below is filtered on `createdAt < startedAt` (captured before the
-    // main transaction opened), so a session created WITH THE NEW PASSWORD in the gap between this
-    // call's own provider write and its failed commit survives this repair rather than being
-    // un-known along with everything that existed before this call started. See the big comment
-    // above.
+    // Either the provider write (or its probe sequence) was confirmed and the transaction's own
+    // COMMIT failed (the pre-existing repair, unchanged in shape), or an (S) outcome's own commit
+    // failed (D7) — both leave the same thing to repair: revoke every other session created before
+    // `startedAt`, and re-stamp the generation. Copilot review round 4 (PR #23), FIX 2: the revoke
+    // is filtered on `createdAt < startedAt`, so a session created WITH THE NEW PASSWORD in the gap
+    // between this call's own provider write and its failed commit survives this repair rather than
+    // being un-known along with everything that existed before this call started.
     try {
       await withSessionContext(context, async (tx) => {
         await tx.select().from(membership).where(eq(membership.accountId, context.accountId)).for("update");
@@ -1543,18 +1865,36 @@ export async function changeResidentPassword(
           .set({ passwordChangedAt: sql`clock_timestamp()` })
           .where(eq(account.id, context.accountId));
 
-        await recordActivityEvent(tx, {
-          householdId: context.householdId,
-          eventType: "account.password_changed",
-          subjectType: "account",
-          subjectId: context.accountId,
-          actorAccountId: context.accountId,
-          actorProfileId: context.profileId,
-          payload: {},
-        });
+        // D7: the audit event is re-recorded here ONLY for a confirmed-applied write whose commit
+        // failed (the pre-existing repair's own behaviour) — never for an (S) outcome, which never
+        // records one in the first place.
+        if (!safeDirectionCode) {
+          await recordActivityEvent(tx, {
+            householdId: context.householdId,
+            eventType: "account.password_changed",
+            subjectType: "account",
+            subjectId: context.accountId,
+            actorAccountId: context.accountId,
+            actorProfileId: context.profileId,
+            payload: {},
+          });
+        }
       });
-      return; // compensation succeeded — the change did take effect, late
+      if (safeDirectionCode) {
+        // D7: an (S) outcome whose own commit failed is reported as change_incomplete even though
+        // the repair above succeeded — the transaction that was meant to report the specific safe-
+        // direction code never itself committed, so that specific promise cannot be made; the
+        // repair only re-establishes the safe state (sessions ended, stamp moved), not the message.
+        throw new AccountSettingsError(
+          "The password change may have applied only partly — please try again",
+          "change_incomplete",
+        );
+      }
+      return; // the confirmed-applied repair succeeded — the change did take effect, late
     } catch (compensationErr) {
+      if (compensationErr instanceof AccountSettingsError && compensationErr.code === "change_incomplete") {
+        throw compensationErr; // the (S)-outcome-commit-failure case above, already the right code
+      }
       console.error(err);
       console.error(compensationErr);
       throw new AccountSettingsError(
@@ -1562,6 +1902,18 @@ export async function changeResidentPassword(
         "change_incomplete",
       );
     }
+  }
+
+  // The main transaction committed on its FIRST attempt (no exception at all) — report the (S)
+  // outcome now, after the commit that already stands. A real success (safeDirectionCode null)
+  // simply returns.
+  if (safeDirectionCode) {
+    throw new AccountSettingsError(
+      safeDirectionCode === "password_unchanged_sessions_ended"
+        ? "Your password was not changed — your other sessions were ended as a precaution"
+        : "Whether your new password was set could not be determined — your other sessions were ended as a precaution",
+      safeDirectionCode,
+    );
   }
 }
 
@@ -1609,13 +1961,23 @@ export async function changeResidentPassword(
 //      comment states this explicitly now);
 //   c. auth.admin.updateUserById(password) — a local `providerUpdated` flag is set to `true`
 //      immediately after this call returns successfully (Copilot review round 4, PR #23, FIX 3).
-//      STATE LEFT if the provider call itself fails (`updateError`): logged (console.error), then
+//      STATE LEFT if the provider call itself is cleanly REFUSED (`updateError`, classified
+//      `refused`): logged (console.error), then
 //      thrown as `reset_incomplete` BEFORE `providerUpdated` is ever set — phase 1 already
 //      committed (link spent, every session dead), the password never changed. This is the SAFE
 //      direction: nobody's session survives, and no password sits half-known. OUTCOME: the action
 //      tells the person to ask the administration for a new link; issuePasswordResetLink's own
 //      eligibility check is unaffected (the account still has no email), so a fresh link can be
 //      issued immediately;
+//   c.2 auth-provider-deadline design.md D8: an UNANSWERED write (`unknown`) may have set the
+//      password. Only now is the address read (getUserById — never before the write, so a lost
+//      read cannot spend a link on the happy path), then resolvePasswordWriteOutcome probes, resends
+//      at most once, probes again, under these same locks. Applied -> `providerUpdated`, re-stamp,
+//      commit, phase 3 as normal. Definitely not applied -> `reset_incomplete`, as for a refusal.
+//      Still unknown, or the address read itself lost -> commit this phase WITHOUT the re-stamp
+//      (phase 1's stamp covers the window) and hand `passwordOutcome = "unknown"` to phase 3,
+//      whose own sign-in decides. Phase 1 already ended every session, so a write that applies
+//      late cannot leave one live;
 //   d. COMMIT (releases the locks). STATE LEFT if the commit itself fails, AFTER step (c) already
 //      returned success (`providerUpdated` is `true` when this transaction throws): Supabase has
 //      the new password, but this phase's own re-check locks leave nothing else behind in Postgres
@@ -1643,11 +2005,15 @@ export async function changeResidentPassword(
 // or profile rechecks below) passes through UNCHANGED — phases 1 and 2 already committed, the link
 // is spent, and refusing here changes nothing about that. ANY OTHER error — the provider calls
 // below, `insertSessionTx`, the session UPDATE, a lock-acquisition error, or this transaction's own
-// COMMIT failing — is logged (console.error) and rethrown as `JoinError("reset_done_sign_in_failed")`,
-// because by the time execution reaches this phase the password IS already set (phase 2 committed,
-// or its own commit failure was already treated as success above) and nothing here can make that
-// untrue again; the only question left is whether THIS device gets signed in automatically, never
-// whether the reset happened:
+// COMMIT failing — is logged (console.error) and mapped by `passwordOutcome` (auth-provider-deadline
+// design.md D8). "set" (phase 2 confirmed the write, or its own commit failure was already treated
+// as success above): rethrown as `JoinError("reset_done_sign_in_failed")` — the password IS set and
+// nothing here can make that untrue again; the only question left is whether THIS device gets
+// signed in automatically, never whether the reset happened. "unknown": this phase's sign-in is the
+// last word — it succeeding means the password was set (normal success); a clean
+// `invalid_credentials` means it was not (`reset_incomplete`); anything else is
+// `reset_outcome_unknown` ("may be set — try it, else ask for a new link"). The steps below
+// describe the "set" case:
 //   a. SELECT membership ... FOR UPDATE, re-check it is STILL live, resident, with the profile
 //      still active — a removal that won this same lock between phase 1 and here (a real window,
 //      now that they are separate transactions) refuses here as invalid_link, and nothing is
@@ -1817,6 +2183,11 @@ export async function redeemPasswordReset(
   // failing) from "the provider write succeeded and only the COMMIT that should have followed it
   // failed" — see the big comment above for the full state/outcome analysis of each branch.
   let providerUpdated = false;
+  // auth-provider-deadline design.md D8: "set" (the default) covers both a direct success and a
+  // write later confirmed applied via the probe sequence below. "unknown" means neither this write
+  // nor any check of it could be confirmed — phase 3 below reads this to decide how to map ITS OWN
+  // failures (D8's own mapping table).
+  let passwordOutcome: "set" | "unknown" = "set";
   try {
     await withSessionContext(bootstrapContext, async (tx) => {
       // Consistent lock order, same as phase 1 and everywhere else in this file: membership FIRST.
@@ -1844,22 +2215,54 @@ export async function redeemPasswordReset(
       }
 
       const { error: updateError } = await supabaseAdmin().auth.admin.updateUserById(accountId, { password });
-      if (updateError) {
+      if (!updateError) {
+        providerUpdated = true;
+        // Copilot review round 5 (PR #23), FIX 1: re-stamp the generation here too, AFTER the
+        // successful provider write, before this transaction's own commit — phase 1's stamp
+        // already covers the window between phase 1 and phase 2 (see that phase's own comment),
+        // but this phase writes the ACTUAL new password, so the generation must also reflect the
+        // instant THAT write took effect, not only phase 1's earlier one. `clock_timestamp()`, not
+        // `now()` — see changeResidentPassword's own comment for why.
+        await tx.update(account).set({ passwordChangedAt: sql`clock_timestamp()` }).where(eq(account.id, accountId));
+        return;
+      }
+
+      if (classifyProviderError(updateError) === "refused") {
         console.error(updateError);
         throw new JoinError(
           "Password reset committed but the provider write failed",
           "reset_incomplete",
         );
       }
-      providerUpdated = true;
 
-      // Copilot review round 5 (PR #23), FIX 1: re-stamp the generation here too, AFTER the
-      // successful provider write, before this transaction's own commit — phase 1's stamp already
-      // covers the window between phase 1 and phase 2 (see that phase's own comment), but this
-      // phase writes the ACTUAL new password, so the generation must also reflect the instant
-      // THAT write took effect, not only phase 1's earlier one. `clock_timestamp()`, not `now()` —
-      // see changeResidentPassword's own comment for why.
-      await tx.update(account).set({ passwordChangedAt: sql`clock_timestamp()` }).where(eq(account.id, accountId));
+      // auth-provider-deadline design.md D8: the address is read ONLY NOW, after the write itself
+      // came back unknown (pre-mortem finding 10) — reading it before every write would turn a lost
+      // READ on the happy path into `reset_incomplete`, spending a link that would have worked
+      // today.
+      const { data: userData, error: userError } = await getUserByIdWithResend(accountId);
+      if (userError || !userData.user?.email) {
+        // A lost address read is itself an unknown outcome: commit phase 2 WITHOUT the post-write
+        // stamp, and let phase 3's own sign-in decide (D8's "U" branch).
+        passwordOutcome = "unknown";
+        return;
+      }
+
+      // The SAME probe-then-resend-then-probe sequence changeResidentPassword's own D7 uses
+      // (resolvePasswordWriteOutcome) — a password cannot be read, only checked.
+      const resolved = await resolvePasswordWriteOutcome(userData.user.email, password, accountId);
+      if (resolved === "applied") {
+        providerUpdated = true;
+        await tx.update(account).set({ passwordChangedAt: sql`clock_timestamp()` }).where(eq(account.id, accountId));
+        return;
+      }
+      if (resolved === "not_applied") {
+        throw new JoinError(
+          "Password reset committed but the provider write failed",
+          "reset_incomplete",
+        );
+      }
+      // resolved === "unknown" -> D8's "U" branch.
+      passwordOutcome = "unknown";
     });
   } catch (err) {
     if (!providerUpdated) throw err;
@@ -1875,12 +2278,20 @@ export async function redeemPasswordReset(
   // comment above for why this is a separate acquisition from phase 1's, and how that is what
   // makes two concurrent resets converge on exactly one live session.
   //
-  // Copilot review round 4 (PR #23), FIX 3: the whole phase is wrapped so that only an
-  // `invalid_link` `JoinError` passes through unchanged — any other failure (a provider call here,
-  // `insertSessionTx`, the session UPDATE, or this transaction's own commit) is logged and
-  // rethrown as `reset_done_sign_in_failed`, never left to fall through to a generic error
-  // boundary, because by this point the password IS already set (see the big comment above).
+  // Copilot review round 4 (PR #23), FIX 3, extended by auth-provider-deadline design.md D8: the
+  // whole phase is wrapped so that only an `invalid_link` `JoinError` passes through unchanged —
+  // any other failure (a provider call here, `insertSessionTx`, the session UPDATE, or this
+  // transaction's own commit) is logged and mapped per `passwordOutcome`:
+  //   - "set" (as today): any failure -> `reset_done_sign_in_failed`, because by this point the
+  //     password IS already set;
+  //   - "unknown": the sign-in here is the LAST word (D8). It succeeding means the password was
+  //     set after all -> falls through to a normal success below. A clean `wrong_password` refusal
+  //     -> `reset_incomplete` (definitely not set). Anything else (another unanswered check, or a
+  //     lost address read) -> `reset_outcome_unknown`: neither outcome can be promised.
   let sessionRow: Awaited<ReturnType<typeof insertSessionTx>>;
+  // Read inside the transaction below (via classifyPasswordCheck) and inspected in the catch —
+  // "unknown" is the safe default for a lost address read, which is itself an unanswered check.
+  let phase3CheckOutcome: "ok" | "wrong_password" | "unknown" = "unknown";
   try {
     sessionRow = await withSessionContext(bootstrapContext, async (tx) => {
       const [membershipRow] = await tx
@@ -1900,16 +2311,17 @@ export async function redeemPasswordReset(
         throw new JoinError("Join code is not valid", "invalid_link");
       }
 
-      const { data: userData, error: userError } = await supabaseAdmin().auth.admin.getUserById(accountId);
+      const { data: userData, error: userError } = await getUserByIdWithResend(accountId);
       if (userError || !userData.user?.email) {
         throw userError ?? new Error("getUserById returned no email after password reset");
       }
 
-      const { data: signInData, error: signInError } = await supabaseAdmin().auth.signInWithPassword({
-        email: userData.user.email,
+      const { data: signInData, error: signInError } = await signInWithPasswordWithResend(
+        userData.user.email,
         password,
-      });
-      if (signInError || !signInData.session) {
+      );
+      phase3CheckOutcome = classifyPasswordCheck(signInError);
+      if (phase3CheckOutcome !== "ok" || !signInData.session) {
         throw signInError ?? new Error("signInWithPassword returned no session after password reset");
       }
 
@@ -1932,7 +2344,18 @@ export async function redeemPasswordReset(
   } catch (err) {
     if (err instanceof JoinError && err.code === "invalid_link") throw err;
     console.error(err);
-    throw new JoinError("Password is set; signing in with it failed", "reset_done_sign_in_failed");
+    if (passwordOutcome === "set") {
+      throw new JoinError("Password is set; signing in with it failed", "reset_done_sign_in_failed");
+    }
+    // passwordOutcome === "unknown" (D8): phase 3's own sign-in is the last word. Cast explicitly:
+    // TS's control-flow analysis over-narrows a `let` reassigned inside a nested closure once read
+    // back in this catch (even a re-annotated `const` binding narrows to the initializer's own CFA
+    // type, not the declared one).
+    const checkOutcome = phase3CheckOutcome as "ok" | "wrong_password" | "unknown";
+    if (checkOutcome === "wrong_password") {
+      throw new JoinError("Password reset committed but the provider write failed", "reset_incomplete");
+    }
+    throw new JoinError("Whether the new password was set could not be determined", "reset_outcome_unknown");
   }
 
   // design.md Decision 8 (pre-mortem fix, 2026-09-24): a visitor already signed in (the household

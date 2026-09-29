@@ -155,11 +155,13 @@ export async function joinHouseholdAction(
           // a failed one created nothing (t.errors.genericFailure states that now, task 2.2).
           console.error(err);
           return { error: t.errors.genericFailure, fieldError: null, refusal: null };
-        // reset_incomplete/reset_done_sign_in_failed belong to redeemPasswordReset's own
-        // refusals (Copilot review round 2, PR #23) — joinHousehold never throws either, covered
-        // here only so this switch stays exhaustive.
+        // reset_incomplete/reset_done_sign_in_failed/reset_outcome_unknown belong to
+        // redeemPasswordReset's own refusals (Copilot review round 2, PR #23; reset_outcome_unknown
+        // added by auth-provider-deadline design.md D8) — joinHousehold never throws any of them,
+        // covered here only so this switch stays exhaustive.
         case "reset_incomplete":
         case "reset_done_sign_in_failed":
+        case "reset_outcome_unknown":
           return { error: t.errors.genericFailure, fieldError: null, refusal: null };
         default: {
           const _exhaustive: never = errCode;
@@ -292,6 +294,13 @@ export async function redeemPasswordResetAction(
           // is now phase 3's re-acquired membership lock, not a post-commit step).
           console.error(err);
           redirect("/sign-in?note=password_reset");
+        case "reset_outcome_unknown":
+          // auth-provider-deadline design.md D8: neither phase 2's write nor any check of it (nor
+          // phase 3's own sign-in, the last word) could be confirmed either way. Redirects rather
+          // than reporting a failure, exactly like reset_done_sign_in_failed above — the person is
+          // told plainly that the new password MAY already work.
+          console.error(err);
+          redirect("/sign-in?note=password_reset_unknown");
         // The remaining JoinErrorCode members belong to joinHousehold's own refusals
         // (name collisions, an already-signed-in visitor, a duplicate email) and redeemPasswordReset
         // never throws them — covered here only so this switch stays exhaustive.
