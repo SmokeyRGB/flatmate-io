@@ -51,11 +51,17 @@ export async function changeEmailAction(
         // changeResidentEmail) also failed — a distinct, honest message, not genericFailure.
         case "change_incomplete":
           return { error: t.email.errors.changeIncomplete, saved: false };
+        // auth-provider-deadline design.md D6: the identity provider's answer never arrived and
+        // could not be resolved — nothing was changed.
+        case "provider_unavailable":
+          return { error: t.email.errors.providerUnavailable, saved: false };
         // The password-only codes never reach this action (changeResidentEmail never throws
         // them) — covered here only so the switch stays exhaustive over the shared error type.
         case "missing_fields":
         case "password_too_short":
         case "wrong_current_password":
+        case "password_unchanged_sessions_ended":
+        case "password_uncertain_sessions_ended":
           return { error: t.email.errors.genericFailure, saved: false };
         default: {
           const _exhaustive: never = code;
@@ -110,6 +116,16 @@ export async function changePasswordAction(
         // compensating transaction in changeResidentPassword's own big comment also failed.
         case "change_incomplete":
           return { error: t.password.errors.changeIncomplete, saved: false };
+        // auth-provider-deadline design.md D7: an unanswered current-password check, or a check
+        // refused for any reason other than the password itself, is never "wrong current password".
+        case "provider_unavailable":
+          return { error: t.password.errors.providerUnavailable, saved: false };
+        // D7's safe direction: every OTHER session already ended as a precaution, because an
+        // unanswered write may still apply later, after this lock releases.
+        case "password_unchanged_sessions_ended":
+          return { error: t.password.errors.unchangedSessionsEnded, saved: false };
+        case "password_uncertain_sessions_ended":
+          return { error: t.password.errors.uncertainSessionsEnded, saved: false };
         // The email-only codes never reach this action — covered so the switch stays exhaustive.
         case "missing_email":
         case "invalid_email":

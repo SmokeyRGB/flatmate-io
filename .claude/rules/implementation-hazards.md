@@ -69,6 +69,11 @@ Three more rules at that boundary, from PR #23's fourth round:
   authenticating and refuses when `account.password_changed_at` is later (`drizzle/0022`).
 - A stamp written inside a long transaction uses `clock_timestamp()`, not `now()`. `now()` is
   fixed at transaction start, so it predates the provider calls made in between.
+- An unanswered provider call is an *unknown* outcome, not a refusal — auth-js returns it as
+  `AuthRetryableFetchError`, and it is never distinguishable from a definite decline by an `if
+  (error)` check alone. The request may or may not have taken effect. A mutating call resolves this
+  by reading the provider back under the same lock the call itself was made under; it is never
+  resent blind (`src/modules/identity/auth-provider.ts`, auth-provider-deadline proposal.md).
 
 **Every writer of the same state, pairwise.** When two functions write the same thing (a password,
 a provider address, the set of live sessions), each pair has to be serialized against each other,
