@@ -73,6 +73,22 @@ describe("parseApplicationInput", () => {
     expectRefusal({ ...base, applicantName: "  " }, "name_required", "applicantName");
   });
 
+  // Code review: invisible format characters pass trim() and \S but render empty.
+  // Break: drop the VISIBLE test in parseApplicationInput, and this fails.
+  it("a name of only zero-width characters is name_required", () => {
+    expectRefusal({ ...base, applicantName: "​" }, "name_required", "applicantName");
+    expectRefusal({ ...base, applicantName: "⁠﻿​" }, "name_required", "applicantName");
+    expect(parseApplicationInput({ ...base, applicantName: "Mia​" }).applicantName).toBe("Mia​");
+  });
+
+  // Code review: message_raw is the original message, the v0.2 parser's input (C-3.8).
+  // Break: trim it in readOptionalText again, and this fails.
+  it("keeps message_raw as typed, not trimmed; an all-blank message is still null", () => {
+    const typed = "  - Punkt eins\n  - Punkt zwei\n";
+    expect(parseApplicationInput({ ...base, messageRaw: typed }).messageRaw).toBe(typed);
+    expect(parseApplicationInput({ ...base, messageRaw: " \n\t " }).messageRaw).toBeNull();
+  });
+
   it("the name limit is 200 code points: 200 passes, 201 is too_long", () => {
     expect(parseApplicationInput({ ...base, applicantName: "a".repeat(200) }).applicantName).toHaveLength(200);
     expectRefusal({ ...base, applicantName: "a".repeat(201) }, "too_long", "applicantName");

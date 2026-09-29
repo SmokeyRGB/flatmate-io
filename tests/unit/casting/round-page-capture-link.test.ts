@@ -8,7 +8,13 @@ import { de } from "@/ui/strings";
 // only what is SHOWN.
 vi.mock("server-only", () => ({}));
 vi.mock("next/headers", () => ({ cookies: vi.fn() }));
-vi.mock("next/navigation", () => ({ redirect: vi.fn(), notFound: vi.fn() }));
+vi.mock("next/navigation", () => ({
+  redirect: vi.fn(),
+  notFound: vi.fn(),
+  // SavedToast strips ?saved=1 from the URL after showing it (code review).
+  useRouter: () => ({ replace: vi.fn() }),
+  usePathname: () => "/rounds/x",
+}));
 
 const ROUND_ID = "33333333-3333-3333-3333-333333333333";
 

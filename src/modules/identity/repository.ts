@@ -414,13 +414,16 @@ export async function assertHoldsAnyPermissionTx(
   tx: Tx,
   context: SessionContext,
   permissions: readonly string[],
+  // A writer needs the row lock to serialize against revocation (D4 a). A pure read does not, and
+  // taking it on every page view would block membership writers for nothing (code review).
+  options: { lock: boolean } = { lock: true },
 ): Promise<void> {
   const denied = () => new PermissionDeniedError(permissions.join(" | "));
-  const [row] = await tx
+  const query = tx
     .select()
     .from(membership)
-    .where(and(eq(membership.accountId, context.accountId), isNull(membership.revokedAt)))
-    .for("share");
+    .where(and(eq(membership.accountId, context.accountId), isNull(membership.revokedAt)));
+  const [row] = options.lock ? await query.for("share") : await query;
   if (!row) throw denied();
   if (row.residentProfileId !== context.profileId) throw denied();
   if (!permissions.some((p) => membershipHoldsPermission(row, p))) throw denied();
@@ -538,10 +541,14 @@ export async function getNavigationAccess(
   // proposal Assumption 3: "may act on organisation tasks" = household_admin/moderator, or any
   // individually granted permission — the avatar menu's "Organisation" item uses the same test
   // listOrganisationTasks' own count-vs-permission filter relies on (design.md Decision 4).
+  // Since application-capture the stored permissions hold the ROLE SETS too (design D3), so "any
+  // permission" no longer means "an individual grant": once the resident set is non-empty (F4's
+  // `vote`), every resident would qualify. Only a permission beyond the resident set counts.
+  // Change 5 replaces this whole rule with the organisation guard (moderator only).
   const organisation =
     membershipRow.role === "household_admin" ||
     membershipRow.role === "moderator" ||
-    membershipRow.permissions.length > 0;
+    membershipRow.permissions.some((p) => !(RESIDENT_PERMISSIONS as readonly string[]).includes(p));
 
   // proposal Assumption 1: "may see the members list" = the rule O1 applies today (O16's own
   // access rule, U-30) — household_admin or moderator, not every permission holder.

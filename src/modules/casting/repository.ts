@@ -1,6 +1,6 @@
 import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import { isUuid, withSessionContext, type SessionContext } from "@/db/session-context";
-import { recordActivityEvent } from "@/modules/audit/repository";
+import { PayloadValidationError, recordActivityEvent } from "@/modules/audit/repository";
 import { activityEvent } from "@/modules/audit/schema";
 import {
   assertHasPermission,
@@ -146,6 +146,9 @@ export async function insertCapturedApplicationTx(
     });
     return { id: row.id };
   } catch (err) {
+    // A payload-allowlist violation is a code bug, not a database refusal, and its message names
+    // keys only, never values: it is rethrown as itself so the cause stays visible (code review).
+    if (err instanceof PayloadValidationError) throw err;
     throw toApplicationWriteError(err);
   }
 }
@@ -216,7 +219,10 @@ export async function getOrganisationApplication(
   if (context.profileId === null) return null;
   if (!isUuid(roundId) || !isUuid(applicationId)) return null;
   return withSessionContext(context, async (tx) => {
-    await assertHoldsAnyPermissionTx(tx, context, ["create_application", "change_application_state"]);
+    // A read: the rule of the writers, without their row lock.
+    await assertHoldsAnyPermissionTx(tx, context, ["create_application", "change_application_state"], {
+      lock: false,
+    });
     const [row] = await tx
       .select()
       .from(application)

@@ -72,8 +72,10 @@ export function CaptureForm({
   const messageNear = messageUsed >= APPLICATION_LIMITS.messageRaw * 0.9;
   const near = (value: string, max: number) => count(value) >= max * 0.9;
 
-  const errorCode = state.status === "error" ? state.code : blankName ? "name_required" : null;
-  const errorField = state.status === "error" ? state.field : blankName ? "applicantName" : undefined;
+  // The client's own check is newer than any server answer: it runs on this submit, the server's
+  // state belongs to the previous one (code review).
+  const errorCode = blankName ? "name_required" : state.status === "error" ? state.code : null;
+  const errorField = blankName ? "applicantName" : state.status === "error" ? state.field : undefined;
 
   const categories = noticeCategories({
     applicantName: name,

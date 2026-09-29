@@ -46,6 +46,10 @@ export default async function CaptureApplicationPage({ params }: { params: Promi
     );
   }
 
+  // The household name is read alongside the permission check, not after it (code review): the two
+  // are independent, and each is its own pooled round trip on hosted dev.
+  const householdPromise = getHousehold(current.context);
+  householdPromise.catch(() => {}); // awaited below; a refusal path must not leave it unhandled
   try {
     await assertHasPermission(current.context, current.context.accountId, "create_application");
   } catch (err) {
@@ -71,7 +75,7 @@ export default async function CaptureApplicationPage({ params }: { params: Promi
     );
   }
 
-  const householdRow = await getHousehold(current.context);
+  const householdRow = await householdPromise;
 
   return (
     <div className="mx-auto max-w-md space-y-6 p-6">

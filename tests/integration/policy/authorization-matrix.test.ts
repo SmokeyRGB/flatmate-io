@@ -195,8 +195,24 @@ function residentContext(
 
 describe("authorization matrix (M6): every exported casting/identity mutator decides its authorization", () => {
   describe("set coverage — every export is classified exactly once", () => {
-    it("insertCapturedApplicationTx (a no-authorization test seam) has no route caller", () => {
+    it("insertCapturedApplicationTx (a no-authorization test seam) has no caller outside its own module", () => {
       expect(srcAppReferencesName("insertCapturedApplicationTx")).toBe(false);
+      // Code review: a route is not the only way around captureApplication's checks. Any other
+      // module or script calling the seam would bypass them too, so all of src/ and scripts/ is
+      // searched, except the one file that defines and uses it.
+      const own = join(ROOT, "src", "modules", "casting", "repository.ts");
+      const files: string[] = [];
+      const walk = (dir: string) => {
+        for (const entry of readdirSync(dir)) {
+          const full = join(dir, entry);
+          if (statSync(full).isDirectory()) walk(full);
+          else if (/\.(ts|tsx)$/.test(entry) && full !== own) files.push(full);
+        }
+      };
+      walk(join(ROOT, "src"));
+      walk(join(ROOT, "scripts"));
+      const callers = files.filter((f) => /\binsertCapturedApplicationTx\b/.test(readFileSync(f, "utf8")));
+      expect(callers).toEqual([]);
     });
 
     it("casting/repository.ts: NOT_APPLICABLE + KNOWN_OPEN + cases below == every exported function", () => {

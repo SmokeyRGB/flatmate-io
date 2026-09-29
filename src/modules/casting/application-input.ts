@@ -90,20 +90,25 @@ function codePoints(s: string): number {
 // A name needs one character that is not whitespace, matching drizzle/0023's `~ '[^[:space:]]'`.
 // JavaScript's `\s` is at least as wide as POSIX `[:space:]`, so this is at least as strict.
 const NON_WHITESPACE = /\S/;
+// A name made only of invisible format characters (zero-width space U+200B, word joiner U+2060,
+// BOM U+FEFF, ...) passes `trim()` and `\S` but renders empty; it counts as blank (code review).
+// The database CHECK is weaker here; the parser is the stricter of the two, as with whitespace.
+const VISIBLE = /[^\s\p{Cf}]/u;
 
 // Reads an optional text field: undefined/null/blank -> null, else the trimmed string.
 function readOptionalText(
   raw: unknown,
   field: ApplicationInputField,
   max: number,
+  options: { trim: boolean } = { trim: true },
 ): string | null {
   if (raw === undefined || raw === null) return null;
   if (typeof raw !== "string") throw new ApplicationInputError("invalid_characters", field);
   if (hasInvalidCharacters(raw)) throw new ApplicationInputError("invalid_characters", field);
-  const trimmed = raw.trim();
-  if (trimmed === "") return null;
-  if (codePoints(trimmed) > max) throw new ApplicationInputError("too_long", field);
-  return trimmed;
+  if (raw.trim() === "") return null;
+  const value = options.trim ? raw.trim() : raw;
+  if (codePoints(value) > max) throw new ApplicationInputError("too_long", field);
+  return value;
 }
 
 function readAge(raw: unknown): number | null {
@@ -177,7 +182,7 @@ export function parseApplicationInput(raw: RawApplicationInput): ParsedApplicati
     throw new ApplicationInputError("invalid_characters", "applicantName");
   }
   const applicantName = rawName.trim();
-  if (applicantName === "" || !NON_WHITESPACE.test(applicantName)) {
+  if (applicantName === "" || !NON_WHITESPACE.test(applicantName) || !VISIBLE.test(applicantName)) {
     throw new ApplicationInputError("name_required", "applicantName");
   }
   if (codePoints(applicantName) > APPLICATION_LIMITS.applicantName) {
@@ -188,7 +193,11 @@ export function parseApplicationInput(raw: RawApplicationInput): ParsedApplicati
   const contactEmail = readOptionalText(raw.contactEmail, "contactEmail", APPLICATION_LIMITS.contactEmail);
   const contactPhone = readOptionalText(raw.contactPhone, "contactPhone", APPLICATION_LIMITS.contactPhone);
   const contactOther = readOptionalText(raw.contactOther, "contactOther", APPLICATION_LIMITS.contactOther);
-  const messageRaw = readOptionalText(raw.messageRaw, "messageRaw", APPLICATION_LIMITS.messageRaw);
+  // message_raw is the ORIGINAL message (the v0.2 parser's input, C-3.8), so it is stored as
+  // typed, not trimmed; only an all-blank message counts as empty (code review).
+  const messageRaw = readOptionalText(raw.messageRaw, "messageRaw", APPLICATION_LIMITS.messageRaw, {
+    trim: false,
+  });
   const attributes = readAttributes(raw.attributes);
 
   // No fallback (C-3.2): a missing or unknown collection source is refused, never defaulted.
