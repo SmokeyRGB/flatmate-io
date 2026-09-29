@@ -467,8 +467,9 @@ the parser (server) and by the form's hint (browser), and applied in this order:
 
 1. **email**: no whitespace, exactly one `@`, at least one character before it, and a dot inside
    the part after it. Goes to `contact_email` (≤ 254).
-2. **phone**: only digits, spaces and `+ ( ) - / .`, with at least 6 digits. Goes to
-   `contact_phone` (≤ 50).
+2. **phone**: only digits, spaces and `+ ( ) - / .`, with at least 6 digits, and no longer than the
+   phone column (50). Goes to `contact_phone`. A longer one of that shape is kept as other (code
+   review).
 3. **anything else** goes to `contact_other` (≤ 200): a portal handle, a messenger id.
 
 This is P-3 explainable: a fixed rule that the screen names for each input, with no guessing model

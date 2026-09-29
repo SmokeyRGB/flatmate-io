@@ -98,7 +98,7 @@ Prozess vs. Person, nicht bei „beschreibend vs. empfehlend".
   Kontakt" bis zu drei. Jeder Kontakt wird nach einer festen Regel einer der drei gespeicherten
   Angaben zugeordnet, und der Bildschirm sagt unter jeder Eingabe, wie sie gespeichert wird:
   eine Adresse mit genau einem „@" und einem Punkt dahinter als E-Mail-Adresse; Ziffern mit den
-  üblichen Satzzeichen, mindestens sechs Ziffern, als Telefonnummer; alles andere als sonstiger
+  üblichen Satzzeichen, mindestens sechs Ziffern und höchstens 50 Zeichen, als Telefonnummer; alles andere als sonstiger
   Kontakt. Zwei Eingaben derselben Art werden abgelehnt, und der Bildschirm nennt die Eingabe, die
   kollidiert
 - **Erhebungsquelle** *(ergänzt 2026-09-28, S-38)*: die sichtbare Aussage „Angaben von der

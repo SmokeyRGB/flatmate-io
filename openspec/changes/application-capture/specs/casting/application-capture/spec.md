@@ -243,8 +243,8 @@ FR-3.2, FR-3.3, AC-3.1–3.3; the human review of 2026-09-29.
 
 The details step SHALL offer one „Kontakt" input, with a way to add up to two more. Each contact
 SHALL be stored as an email, a phone number or another contact by a fixed, deterministic rule: an
-address shape with one `@` is an email; digits with the usual phone punctuation and at least six
-digits are a phone number; anything else is another contact. The screen SHALL name, beside each
+address shape with one `@` is an email; digits with the usual phone punctuation, at least six
+digits and at most 50 characters are a phone number; anything else is another contact. The screen SHALL name, beside each
 input, how it will be stored. Two contacts of the same kind SHALL be refused, naming the contact
 field. The stored columns and their limits are unchanged. Sources: `domain/casting.md` §2.2,
 Compliance §6.2, C-3.14, P-3; the human review of 2026-09-29.
