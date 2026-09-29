@@ -49,10 +49,12 @@ async function activeResidentNoEmail(household: TestHousehold, name: string) {
   return { profileId: profile.id, accountId };
 }
 
-let codeCounter = 0;
+// join_code_issuance.code is unique project-wide, not per household, so a per-file counter
+// (`RESET1-TESTX`, …) produced the same codes in every run: two suites against flatmate-io-dev at
+// once (a pre-push run during CI's verify-hosted) collided on the unique index, and a leftover row
+// from an aborted run would collide with the next one. A random part keeps each code unique.
 function freshCode(): string {
-  codeCounter += 1;
-  return `RESET${codeCounter}-TESTX`;
+  return `RESET-${randomUUID().replace(/-/g, "").slice(0, 12).toUpperCase()}`;
 }
 
 type PgError = { code?: string; message?: string };

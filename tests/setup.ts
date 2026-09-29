@@ -1,5 +1,6 @@
 import { config } from "dotenv";
 import { afterEach } from "vitest";
+import { withLostResponseDeadline } from "./helpers/lost-response-fetch";
 
 // `quiet: true` suppresses dotenv's own stdout "tip" advertisements (confirmed in its source,
 // node_modules/dotenv/lib/main.js) — not a security concern, just noise in test output.
@@ -28,6 +29,19 @@ for (const [name, value] of [
         `  Point .env.local at flatmate-io-dev instead — see .env.example.`,
     );
   }
+}
+
+// A Supabase request whose response never comes gets a deadline and, where that is safe, a
+// second copy, instead of hanging until the 60s test timeout (tests/helpers/lost-response-fetch.ts
+// has the measurements). 8s is six times the slowest request GoTrue logged, and three attempts
+// (24s) leave most of a test's 60s budget for the test itself, even one already slow under load. Installed before any test module creates a Supabase client, which
+// captures the global fetch when it is created.
+if (process.env.NEXT_PUBLIC_SUPABASE_URL) {
+  globalThis.fetch = withLostResponseDeadline(globalThis.fetch, {
+    origin: new URL(process.env.NEXT_PUBLIC_SUPABASE_URL).origin,
+    deadlineMs: 8000,
+    attempts: 3,
+  });
 }
 
 // A net beneath each file's own afterEach, not a replacement for it. If this ever ran before a

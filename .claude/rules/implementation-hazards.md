@@ -77,6 +77,16 @@ the password and both take the `account` row lock (PR #23). A new session is cre
 same transaction, under the same `membership` lock, that decides the membership still stands, as
 `signIn` does. Inserting it after that transaction commits reopens the race with removal.
 
+**One pooled connection per call chain.** A `withSessionContext` opened inside another's callback
+holds one Supavisor connection while it waits for a second. Once every server connection (16 for
+`app_runtime` on dev) is held that way, the pool deadlocks, with no timeout to break it:
+`createResidentProfile` did this until 2026-09-28, and it surfaced as dozens of `Test timed out in
+60000ms` whenever two suites overlapped. `withSessionContextOn` now refuses the nested call
+(`NestedSessionContextError`), so pass the `tx` you hold to a `...Tx` helper instead.
+`flatmate-io-dev` is shared: CI's `verify-hosted` and other sessions' pre-push runs overlap yours.
+Anything unique project-wide, such as an Auth address or a join code, must be random per run,
+never a counter or a literal.
+
 Anything keyed on request data — a header, a cookie, a route param — ask who can set it.
 `x-forwarded-for` is caller-supplied unless `JOIN_ATTEMPT_TRUSTED_IP_HEADER` names a proxy that
 overwrites it.
