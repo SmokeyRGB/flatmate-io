@@ -52,8 +52,10 @@ export function ThirdPartyNotice({
     }
   }
 
+  // .callout is a one-line flex row (icon + text); this notice is a stacked block, so it is turned
+  // into a column (walkthrough finding: the paragraphs sat side by side and scrolled sideways).
   return (
-    <section className="callout callout-caution space-y-3" aria-labelledby="third-party-notice-heading">
+    <section className="callout callout-caution flex-col items-stretch gap-3" aria-labelledby="third-party-notice-heading">
       <h2 id="third-party-notice-heading" className="text-base font-medium">
         {t.heading}
       </h2>
