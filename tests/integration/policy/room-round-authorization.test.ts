@@ -4,6 +4,7 @@ import { createResidentProfile, PermissionDeniedError } from "@/modules/identity
 import { addResidentToRound, createRoom, createRound, openRound, removeRoom, renameRoom, transitionRoomStatus } from "@/modules/casting/repository";
 import {
   cleanupAll,
+  createTestModerator,
   deleteTestAccount,
   registerTestHousehold,
   type TestHousehold,
@@ -55,10 +56,15 @@ describe("Room and round mutations require their documented permission", () => {
     hh = await registerTestHousehold();
     const adminActor = { accountId: hh.accountId, profileId: null };
     const room = await createRoom(hh.context, "Room A", adminActor);
-    const round = await createRound(hh.context, "Round", [room.id], adminActor);
-    // close_round is a role default (household_admin/moderator, docs/domain/identity.md §2.1) —
-    // no claimed resident membership gets it, first or otherwise. Two residents are claimed here
-    // only to keep this test's shape close to the room-mutation test above it.
+    // close_round is part of the moderator's stored set only (docs/domain/identity.md §2.1; the
+    // household account has none, 03-PRD.md §4.0.1) — no claimed resident membership gets it, first
+    // or otherwise. The round is therefore created by a moderator (design D13). Two plain residents
+    // are claimed here only to keep this test's shape close to the room-mutation test above it.
+    const moderator = await createTestModerator(hh);
+    const round = await createRound(moderator.context, "Round", [room.id], {
+      accountId: moderator.accountId,
+      profileId: moderator.profileId,
+    });
     const first = await claim(hh, "Resident1");
     accountIds.push(first.accountId);
     const resident = await claim(hh, "Resident2");

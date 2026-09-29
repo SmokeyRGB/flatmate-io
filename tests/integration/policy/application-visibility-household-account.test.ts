@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { withSessionContext } from "@/db/session-context";
 import { application } from "@/modules/casting/schema";
 import { getApplication, ProfileRequiredError, transitionApplication } from "@/modules/casting/repository";
+import { insertTestRound, syntheticApplication } from "../../helpers/applications";
 import { registerTestHousehold, type TestHousehold } from "../../helpers/identity";
 import { uuid } from "../../helpers/uuid";
 
@@ -23,17 +24,21 @@ describe("[GUARDED] G-D15: no Application is visible or writable without a resid
     const residentProfileId = uuid();
     const residentContext = { ...hh.context, profileId: residentProfileId };
 
-    const [seed] = await withSessionContext(residentContext, (tx) =>
-      tx
+    // Setup only (drizzle/0023): the row needs a name, both axes and a real round of its household.
+    const [seed] = await withSessionContext(residentContext, async (tx) => {
+      const roundId = await insertTestRound(tx, hh!.householdId);
+      return tx
         .insert(application)
-        .values({
-          householdId: hh!.householdId,
-          state: "new",
-          createdByAccountId: hh!.accountId,
-          createdByProfileId: residentProfileId,
-        })
-        .returning(),
-    );
+        .values(
+          syntheticApplication({
+            householdId: hh!.householdId,
+            roundId,
+            createdByAccountId: hh!.accountId,
+            createdByProfileId: residentProfileId,
+          }),
+        )
+        .returning();
+    });
 
     // hh.context.profileId is already null (a household-account session).
     const seenByHousehold = await getApplication(hh.context, seed.id);
@@ -71,14 +76,17 @@ describe("[GUARDED] G-D15: no Application is visible or writable without a resid
     const residentContext = { ...hh.context, profileId: residentProfileId };
     const householdId = hh.householdId;
 
-    await withSessionContext(residentContext, (tx) =>
-      tx.insert(application).values({
-        householdId,
-        state: "new",
-        createdByAccountId: hh!.accountId,
-        createdByProfileId: residentProfileId,
-      }),
-    );
+    await withSessionContext(residentContext, async (tx) => {
+      const roundId = await insertTestRound(tx, householdId);
+      await tx.insert(application).values(
+        syntheticApplication({
+          householdId,
+          roundId,
+          createdByAccountId: hh!.accountId,
+          createdByProfileId: residentProfileId,
+        }),
+      );
+    });
 
     await hh.cleanup();
     hh = undefined;

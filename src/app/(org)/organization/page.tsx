@@ -2,7 +2,11 @@ import { ArrowLeft, ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { listRoundsForSession } from "@/modules/casting/repository";
-import { getNavigationAccess } from "@/modules/identity/repository";
+import {
+  assertHasPermission,
+  getNavigationAccess,
+  PermissionDeniedError,
+} from "@/modules/identity/repository";
 import { getCurrentSession } from "@/modules/identity/session-cookie";
 import { de } from "@/ui/strings";
 import { LinkPendingHint } from "@/ui/link-pending-hint";
@@ -31,6 +35,17 @@ export default async function OrganizationPage() {
   const canSeeMembersList =
     current.context.profileId === null || (await getNavigationAccess(current.context)).membersList;
 
+  // Design D13 (application-capture): the household account runs no rounds (03-PRD.md §4.0.1,
+  // S-50/U-20), and neither does anyone without close_round. The way to open one is offered only to
+  // a session that holds it, checked the way rounds/new's own page does.
+  let canOpenRound = false;
+  try {
+    await assertHasPermission(current.context, current.context.accountId, "close_round");
+    canOpenRound = true;
+  } catch (err) {
+    if (!(err instanceof PermissionDeniedError)) throw err;
+  }
+
   return (
     <div className="mx-auto max-w-2xl space-y-6 p-6">
       {/* A resident reaches O1 from the avatar menu or Start's moderation bridge, and the (org)
@@ -51,7 +66,7 @@ export default async function OrganizationPage() {
           <span className="badge mt-2">{de.status.round[active.status as keyof typeof de.status.round]}</span>
           <LinkPendingHint />
         </Link>
-      ) : (
+      ) : canOpenRound ? (
         // The single most important prompt on this page when nothing else is going on yet —
         // the "banded" featured-card variant (09-Design-System.md), not a quiet one.
         <div className="card card-featured">
@@ -67,9 +82,14 @@ export default async function OrganizationPage() {
             </Link>
           </div>
         </div>
+      ) : (
+        <div className="card space-y-1">
+          <p className="text-lg font-semibold">{t.noRoundYetHeading}</p>
+          <p className="text-sm text-muted-foreground">{t.noRoundYetBody}</p>
+        </div>
       )}
 
-      {active && (
+      {active && canOpenRound && (
         <Link href="/rounds/new" className="btn-link">
           {t.openAnotherRound}
           <LinkPendingHint />

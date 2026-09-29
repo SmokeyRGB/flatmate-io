@@ -10,6 +10,11 @@ type SubmitButtonProps = {
   pendingLabel?: ReactNode;
   className: string;
   disabled?: boolean;
+  // For a form that submits through onSubmit + startTransition instead of the <form action> prop
+  // (application-capture's O3, whose controlled inputs must not be reset by React 19's automatic
+  // form reset): useFormStatus() reports pending only for an action-prop form, so such a form
+  // passes its own transition's pending flag here. When omitted, useFormStatus decides, as always.
+  pending?: boolean;
 } & Omit<
   ButtonHTMLAttributes<HTMLButtonElement>,
   "type" | "disabled" | "children" | "className" | "onClick"
@@ -36,9 +41,11 @@ export function SubmitButton({
   pendingLabel,
   className,
   disabled,
+  pending: pendingOverride,
   ...rest
 }: SubmitButtonProps) {
-  const { pending } = useFormStatus();
+  const formStatus = useFormStatus();
+  const pending = pendingOverride ?? formStatus.pending;
   const disabledNotPending = Boolean(disabled) && !pending;
 
   return (

@@ -5,6 +5,12 @@ import { afterEach, describe, expect, it } from "vitest";
 import { withSessionContext } from "@/db/session-context";
 import { recordActivityEvent } from "@/modules/audit/repository";
 import { application } from "@/modules/casting/schema";
+import {
+  applicationInsertValuesSql,
+  APPLICATION_INSERT_COLUMNS_SQL,
+  insertTestRound,
+  syntheticApplication,
+} from "../../helpers/applications";
 import { registerTestHousehold, type TestHousehold } from "../../helpers/identity";
 import { uuid } from "../../helpers/uuid";
 
@@ -34,22 +40,25 @@ describe("[GUARDED] G-D15: no Application is visible or writable without a resid
     const residentContext = { ...hh.context, profileId: residentProfileId };
     const householdId = hh.householdId;
 
+    // Setup only (drizzle/0023): a real round of this household, so the refused insert below is
+    // refused by the RLS policy (42501) and not, earlier, by the round-pairing trigger (23503).
+    const roundId = await withSessionContext(residentContext, (tx) => insertTestRound(tx, householdId));
     const seeded = await withSessionContext(residentContext, (tx) =>
       tx
         .insert(application)
         .values([
-          {
+          syntheticApplication({
             householdId,
-            state: "new" as const,
+            roundId,
             createdByAccountId: hh!.accountId,
             createdByProfileId: residentProfileId,
-          },
-          {
+          }),
+          syntheticApplication({
             householdId,
-            state: "new" as const,
+            roundId,
             createdByAccountId: hh!.accountId,
             createdByProfileId: residentProfileId,
-          },
+          }),
         ])
         .returning(),
     );
@@ -73,8 +82,8 @@ describe("[GUARDED] G-D15: no Application is visible or writable without a resid
     try {
       await withSessionContext(hh.context, (tx) =>
         tx.execute(
-          sql`INSERT INTO application (household_id, state, created_by_account_id, created_by_profile_id)
-              VALUES (${householdId}::uuid, 'new', ${hh!.accountId}::uuid, ${uuid()}::uuid)`,
+          sql`INSERT INTO application (${APPLICATION_INSERT_COLUMNS_SQL})
+              VALUES ${applicationInsertValuesSql({ householdId, roundId, accountId: hh!.accountId, profileId: uuid() })}`,
         ),
       );
     } catch (err) {
@@ -116,22 +125,23 @@ describe("[GUARDED] G-D15: no Application is visible or writable without a resid
     const residentContext = { ...hh.context, profileId: residentProfileId };
     const householdId = hh.householdId;
 
-    await withSessionContext(residentContext, (tx) =>
-      tx.insert(application).values([
-        {
+    await withSessionContext(residentContext, async (tx) => {
+      const roundId = await insertTestRound(tx, householdId);
+      await tx.insert(application).values([
+        syntheticApplication({
           householdId,
-          state: "new" as const,
+          roundId,
           createdByAccountId: hh!.accountId,
           createdByProfileId: residentProfileId,
-        },
-        {
+        }),
+        syntheticApplication({
           householdId,
-          state: "new" as const,
+          roundId,
           createdByAccountId: hh!.accountId,
           createdByProfileId: residentProfileId,
-        },
-      ]),
-    );
+        }),
+      ]);
+    });
 
     // A dedicated raw client, not the app's shared `db` — this test drives SET LOCAL itself
     // (allowed here: scripts/lint/session-context.ts scans src/ only, and
@@ -200,17 +210,20 @@ describe("[GUARDED] G-D15: no Application is visible or writable without a resid
       const residentContext = { ...hh.context, profileId: residentProfileId };
       const householdId = hh.householdId;
 
-      const [seededApplication] = await withSessionContext(residentContext, (tx) =>
-        tx
+      const [seededApplication] = await withSessionContext(residentContext, async (tx) => {
+        const roundId = await insertTestRound(tx, householdId);
+        return tx
           .insert(application)
-          .values({
-            householdId,
-            state: "new",
-            createdByAccountId: hh!.accountId,
-            createdByProfileId: residentProfileId,
-          })
-          .returning(),
-      );
+          .values(
+            syntheticApplication({
+              householdId,
+              roundId,
+              createdByAccountId: hh!.accountId,
+              createdByProfileId: residentProfileId,
+            }),
+          )
+          .returning();
+      });
 
       await withSessionContext(residentContext, (tx) =>
         recordActivityEvent(tx, {

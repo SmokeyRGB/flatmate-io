@@ -5,10 +5,13 @@ import { claimResidentProfile, registerHousehold, signIn } from "@/modules/ident
 import * as castingRepo from "@/modules/casting/repository";
 import * as identityRepo from "@/modules/identity/repository";
 import { PermissionDeniedError, ResidentListActionDeniedError } from "@/modules/identity/repository";
-import type { SessionContext } from "@/db/session-context";
+import { eq } from "drizzle-orm";
+import { withSessionContext, type SessionContext } from "@/db/session-context";
+import { application } from "@/modules/casting/schema";
 import {
   cleanupAll,
   cleanupHousehold,
+  createTestModerator,
   deleteTestAccount,
   testEmail,
   type TestHousehold,
@@ -94,6 +97,16 @@ const NOT_APPLICABLE_CASTING: Record<string, string> = {
   // start-screen design.md Decision 4: read-only; carries no application-derived value (not a
   // G-D15 read), visibility tested in tests/integration/policy/organisation-tasks.test.ts.
   listOrganisationTasks: "read-only",
+  // application-capture design D5: read-only; the visibility rule is tested in
+  // tests/integration/policy/organisation-application-visibility.test.ts.
+  getOrganisationApplication:
+    "read-only; visibility tested in organisation-application-visibility.test.ts",
+  // application-capture design D4: the write half of captureApplication (INSERT + audit event),
+  // exported only as the test seam for "no value leaves in an error". It performs NO
+  // authorization itself: captureApplication checks the permission and the round first. No
+  // src/app file may reference it (asserted below), so a route cannot bypass those checks.
+  insertCapturedApplicationTx:
+    "Tx primitive, no authorization by contract (captureApplication checks first); no route caller, asserted below",
 };
 
 const KNOWN_OPEN_CASTING: Record<string, string> = {
@@ -123,6 +136,9 @@ const NOT_APPLICABLE_IDENTITY: Record<string, string> = {
     "a code has no session, and rate limiting must run before any code lookup (AC-2.25).",
   assertAccountCanVote: "assertion helper, not itself a mutation",
   assertHasPermission: "assertion helper — the permission primitive other functions build on",
+  membershipHoldsPermission: "pure helper — no SessionContext, no DB access",
+  assertHasPermissionTx: "assertion helper — the in-transaction permission primitive",
+  assertHoldsAnyPermissionTx: "assertion helper — the in-transaction permission primitive",
   getMembershipForAccount: "read-only",
   getIdentityLabel: "read-only",
   getHousehold: "read-only",
@@ -179,6 +195,10 @@ function residentContext(
 
 describe("authorization matrix (M6): every exported casting/identity mutator decides its authorization", () => {
   describe("set coverage — every export is classified exactly once", () => {
+    it("insertCapturedApplicationTx (a no-authorization test seam) has no route caller", () => {
+      expect(srcAppReferencesName("insertCapturedApplicationTx")).toBe(false);
+    });
+
     it("casting/repository.ts: NOT_APPLICABLE + KNOWN_OPEN + cases below == every exported function", () => {
       const all = new Set(exportedFunctionNames(castingRepo as unknown as Record<string, unknown>));
       const classified = new Set([
@@ -228,6 +248,8 @@ describe("authorization matrix (M6): every exported casting/identity mutator dec
     let resident: { profileId: string; accountId: string; displayName: string };
     let residentActor: { accountId: string; profileId: string };
     let residentCtx: SessionContext;
+    let moderator: { context: SessionContext; accountId: string; profileId: string };
+    let moderatorActor: { accountId: string; profileId: string };
 
     beforeAll(async () => {
       hh = await registerSharedHousehold();
@@ -235,6 +257,10 @@ describe("authorization matrix (M6): every exported casting/identity mutator dec
       resident = await claim(hh, "Resident1", []);
       residentActor = { accountId: resident.accountId, profileId: resident.profileId };
       residentCtx = residentContext(hh, resident);
+      // Design D13: the household account no longer creates or opens rounds, so the setup of the
+      // cases below that need a round is done by a moderator. Its cleanup rides on hh.cleanup().
+      moderator = await createTestModerator(hh);
+      moderatorActor = { accountId: moderator.accountId, profileId: moderator.profileId };
     });
 
     // Guarded: if beforeAll failed partway, hh or resident is still unset, and dereferencing it
@@ -286,7 +312,7 @@ describe("authorization matrix (M6): every exported casting/identity mutator dec
 
     it("openRound", async () => {
       const room = await castingRepo.createRoom(hh.context, "Room A", adminActor);
-      const round = await castingRepo.createRound(hh.context, "Round", [room.id], adminActor);
+      const round = await castingRepo.createRound(moderator.context, "Round", [room.id], moderatorActor);
       await expect(
         castingRepo.openRound(residentCtx, round.id, residentActor),
       ).rejects.toThrow(PermissionDeniedError);
@@ -301,10 +327,27 @@ describe("authorization matrix (M6): every exported casting/identity mutator dec
 
     it("addResidentToRound", async () => {
       const room = await castingRepo.createRoom(hh.context, "Room A", adminActor);
-      const round = await castingRepo.createRound(hh.context, "Round", [room.id], adminActor);
+      const round = await castingRepo.createRound(moderator.context, "Round", [room.id], moderatorActor);
       await expect(
         castingRepo.addResidentToRound(residentCtx, round.id, resident.profileId, residentActor),
       ).rejects.toThrow(PermissionDeniedError);
+    });
+
+    it("captureApplication", async () => {
+      // A plain resident's own context: refused for the missing permission, and no row is written.
+      const room = await castingRepo.createRoom(hh.context, "Room A", adminActor);
+      const round = await castingRepo.createAndOpenRound(moderator.context, "Round", [room.id], moderatorActor);
+      await expect(
+        castingRepo.captureApplication(residentCtx, {
+          roundId: round.id,
+          applicantName: "Testbewerbung Matrix",
+          collectedFrom: "data_subject",
+        }),
+      ).rejects.toThrow(PermissionDeniedError);
+      const rows = await withSessionContext(residentCtx, (tx) =>
+        tx.select().from(application).where(eq(application.roundId, round.id)),
+      );
+      expect(rows).toHaveLength(0);
     });
 
     it("updateHouseholdSettingsWithProcedureLock", async () => {
@@ -317,7 +360,7 @@ describe("authorization matrix (M6): every exported casting/identity mutator dec
       // openRoundTx (via createAndOpenRound) refuses to open with zero eligible residents
       // (EC-1.3) — the shared resident (claimed in beforeAll) already satisfies that.
       const room = await castingRepo.createRoom(hh.context, "Room A", adminActor);
-      const round = await castingRepo.createAndOpenRound(hh.context, "Round", [room.id], adminActor);
+      const round = await castingRepo.createAndOpenRound(moderator.context, "Round", [room.id], moderatorActor);
       await expect(
         castingRepo.forceChangeSettingWhileRoundOpen(residentCtx, "quorumShare", "0.6", round.id, residentActor),
       ).rejects.toThrow(PermissionDeniedError);
@@ -472,6 +515,7 @@ const CASTING_CASE_NAMES = [
   "openRound",
   "createAndOpenRound",
   "addResidentToRound",
+  "captureApplication",
   "updateHouseholdSettingsWithProcedureLock",
   "forceChangeSettingWhileRoundOpen",
 ];

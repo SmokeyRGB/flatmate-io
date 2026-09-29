@@ -162,6 +162,20 @@
       "when": 1790324456761,
       "tag": "0022_account_password_changed_at",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1790665517779,
+      "tag": "0023_application_capture",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1790665597201,
+      "tag": "0024_membership_role_integrity",
+      "breakpoints": true
     }
   ]
 }

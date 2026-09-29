@@ -2,7 +2,7 @@ import { sql } from "drizzle-orm";
 import { afterEach, describe, expect, it } from "vitest";
 import { withSessionContext } from "@/db/session-context";
 import { createRoom, createRound } from "@/modules/casting/repository";
-import { cleanupAll, registerTestHousehold, type TestHousehold } from "../../helpers/identity";
+import { cleanupAll, createTestModerator, registerTestHousehold, type TestHousehold } from "../../helpers/identity";
 
 type Row = { id: string; household_id: string };
 
@@ -26,9 +26,18 @@ describe("casting_round household isolation — raw SQL", () => {
     const actorB = { accountId: b.accountId, profileId: null };
 
     const roomA = await createRoom(a.context, "Room A", actorA);
-    const roundA = await createRound(a.context, "Round A", [roomA.id], actorA);
+    // Setup only (design D13): rounds are created by a moderator of each household.
+    const modA = await createTestModerator(a);
+    const roundA = await createRound(modA.context, "Round A", [roomA.id], {
+      accountId: modA.accountId,
+      profileId: modA.profileId,
+    });
     const roomB = await createRoom(b.context, "Room B", actorB);
-    const roundB = await createRound(b.context, "Round B", [roomB.id], actorB);
+    const modB = await createTestModerator(b);
+    const roundB = await createRound(modB.context, "Round B", [roomB.id], {
+      accountId: modB.accountId,
+      profileId: modB.profileId,
+    });
 
     const rows = await withSessionContext(a.context, (tx) =>
       tx.execute<Row>(sql`SELECT id, household_id FROM casting_round`),

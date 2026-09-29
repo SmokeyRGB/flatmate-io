@@ -7,6 +7,7 @@ import { addResidentToRound, createRoom, createRound, openRound } from "@/module
 import { roundParticipation } from "@/modules/casting/schema";
 import {
   cleanupAll,
+  createTestModerator,
   deleteTestAccount,
   registerTestHousehold,
   type TestHousehold,
@@ -43,11 +44,12 @@ describe("Quorum denominator growth after opening", () => {
   it("automatically includes a resident who claims their profile after the round opened", async () => {
     hh = await registerTestHousehold();
     const actor = { accountId: hh.accountId, profileId: null };
-    const r1 = await claim(hh, "Resident1");
-    accountIds.push(r1.accountId);
+    // Design D13: a moderator (also the one eligible resident) creates and opens the round.
+    const mod = await createTestModerator(hh, "Resident1");
+    const modActor = { accountId: mod.accountId, profileId: mod.profileId };
     const roomA = await createRoom(hh.context, "Room A", actor);
-    const round = await createRound(hh.context, "Round", [roomA.id], actor);
-    await openRound(hh.context, round.id, actor);
+    const round = await createRound(mod.context, "Round", [roomA.id], modActor);
+    await openRound(mod.context, round.id, modActor);
 
     expect(await activeParticipants(hh, round.id)).toHaveLength(1);
 
@@ -69,11 +71,12 @@ describe("Quorum denominator growth after opening", () => {
   it("addResidentToRound remains available as a moderator's manual correction path", async () => {
     hh = await registerTestHousehold();
     const actor = { accountId: hh.accountId, profileId: null };
-    const r1 = await claim(hh, "Resident1");
-    accountIds.push(r1.accountId);
+    // Design D13: a moderator (also the one eligible resident) creates and opens the round.
+    const mod = await createTestModerator(hh, "Resident1");
+    const modActor = { accountId: mod.accountId, profileId: mod.profileId };
     const roomA = await createRoom(hh.context, "Room A", actor);
-    const round = await createRound(hh.context, "Round", [roomA.id], actor);
-    await openRound(hh.context, round.id, actor);
+    const round = await createRound(mod.context, "Round", [roomA.id], modActor);
+    await openRound(mod.context, round.id, modActor);
 
     // A resident who somehow wasn't auto-added (e.g. claimed before this round existed at all,
     // in a household with no open round yet) can still be added by hand.
@@ -82,7 +85,7 @@ describe("Quorum denominator growth after opening", () => {
     // (claim() above happens while the round is already open in this test, so it WAS
     // auto-added — this call exercises the manual path as a correction on top of that, which
     // must not create a duplicate entry with a different source for the same profile pairing.)
-    const addedRow = await addResidentToRound(hh.context, round.id, r2.profileId, actor);
+    const addedRow = await addResidentToRound(mod.context, round.id, r2.profileId, modActor);
     expect(addedRow?.source).toBe("joined_after_open"); // the trigger's row wins, not a second row
 
     const active = await activeParticipants(hh, round.id);
@@ -93,18 +96,19 @@ describe("Quorum denominator growth after opening", () => {
   it("addResidentToRound called twice for the same resident does not duplicate the row", async () => {
     hh = await registerTestHousehold();
     const actor = { accountId: hh.accountId, profileId: null };
-    const r1 = await claim(hh, "Resident1");
-    accountIds.push(r1.accountId);
+    // Design D13: a moderator (also the one eligible resident) creates and opens the round.
+    const mod = await createTestModerator(hh, "Resident1");
+    const modActor = { accountId: mod.accountId, profileId: mod.profileId };
     const roomA = await createRoom(hh.context, "Room A", actor);
-    const round = await createRound(hh.context, "Round", [roomA.id], actor);
-    await openRound(hh.context, round.id, actor);
+    const round = await createRound(mod.context, "Round", [roomA.id], modActor);
+    await openRound(mod.context, round.id, modActor);
 
     // A profile with no Membership yet (not claimed) — never touched by the auto-join trigger —
     // isolates the manual-path insert from a second manual-path insert for the same pairing.
     const profile = await createResidentProfile(hh.context, "Resident2", actor);
 
-    const first = await addResidentToRound(hh.context, round.id, profile.id, actor);
-    const second = await addResidentToRound(hh.context, round.id, profile.id, actor);
+    const first = await addResidentToRound(mod.context, round.id, profile.id, modActor);
+    const second = await addResidentToRound(mod.context, round.id, profile.id, modActor);
     expect(second?.id).toBe(first?.id);
 
     const active = await activeParticipants(hh, round.id);

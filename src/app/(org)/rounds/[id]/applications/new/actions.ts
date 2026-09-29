@@ -1,0 +1,84 @@
+"use server";
+
+import { redirect } from "next/navigation";
+import { ApplicationInputError, type ApplicationInputField } from "@/modules/casting/application-input";
+import {
+  ApplicationCaptureError,
+  ApplicationWriteError,
+  captureApplication,
+  ProfileRequiredError,
+} from "@/modules/casting/repository";
+import { PermissionDeniedError } from "@/modules/identity/repository";
+import { getCurrentSession } from "@/modules/identity/session-cookie";
+
+export type CaptureErrorCode =
+  | ApplicationInputError["code"]
+  | ApplicationCaptureError["code"]
+  | "permission_denied"
+  | "profile_required"
+  | "save_failed";
+
+// D4 / spec "a refusal never echoes what was typed": the ONLY thing that comes back is a refusal
+// code and at most a field name. No message, no value, no error object. `next dev` logs a server
+// action's previous state in full (F2 lesson), so anything put here would reach a log.
+export type CaptureFormState =
+  | { status: "idle" }
+  | { status: "error"; code: CaptureErrorCode; field?: ApplicationInputField };
+
+function text(formData: FormData, key: string): string {
+  const v = formData.get(key);
+  return typeof v === "string" ? v : "";
+}
+
+// Screen O3. Maps FormData to the raw input and calls the repository, which decides everything
+// (permission, round state, parsing, the write). Every error is mapped to a code by CLASS, never by
+// message. This function never logs an error object: where the precedent writes `console.error(err)`
+// (rounds/new/actions.ts), a database refusal here would put the typed values into the log through
+// Drizzle's "params:" (design D4). It logs at most { code, sqlState, constraint }.
+export async function captureApplicationAction(
+  _prevState: CaptureFormState,
+  formData: FormData,
+): Promise<CaptureFormState> {
+  const current = await getCurrentSession();
+  if (!current) redirect("/sign-in");
+
+  const roundId = text(formData, "roundId");
+  const labels = formData.getAll("attrLabel").map((v) => (typeof v === "string" ? v : ""));
+  const values = formData.getAll("attrValue").map((v) => (typeof v === "string" ? v : ""));
+  const attributes = labels.map((label, i) => ({ label, value: values[i] ?? "" }));
+
+  let createdId: string;
+  try {
+    const created = await captureApplication(current.context, {
+      roundId,
+      applicantName: text(formData, "applicantName"),
+      age: text(formData, "age"),
+      contactEmail: text(formData, "contactEmail"),
+      contactPhone: text(formData, "contactPhone"),
+      contactOther: text(formData, "contactOther"),
+      messageRaw: text(formData, "messageRaw"),
+      attributes,
+      collectedFrom: text(formData, "collectedFrom"),
+    });
+    createdId = created.id;
+  } catch (err) {
+    if (err instanceof PermissionDeniedError) return { status: "error", code: "permission_denied" };
+    if (err instanceof ProfileRequiredError) return { status: "error", code: "profile_required" };
+    if (err instanceof ApplicationCaptureError) return { status: "error", code: err.code };
+    if (err instanceof ApplicationInputError) return { status: "error", code: err.code, field: err.field };
+    if (err instanceof ApplicationWriteError) {
+      console.error({ code: err.code, sqlState: err.sqlState, constraint: err.constraint });
+      return { status: "error", code: "save_failed" };
+    }
+    // Anything else: no message, no object. A code is enough to find the failing call path.
+    console.error({ code: "unexpected" });
+    return { status: "error", code: "save_failed" };
+  }
+
+  // redirect() works by throwing, so it stays OUTSIDE the try/catch above (design D6). The round id
+  // is a uuid by now (the repository refused anything else), and collectedFrom was validated.
+  if (text(formData, "collectedFrom") === "third_party") {
+    redirect(`/rounds/${roundId}/applications/${createdId}`);
+  }
+  redirect(`/rounds/${roundId}?saved=1`);
+}

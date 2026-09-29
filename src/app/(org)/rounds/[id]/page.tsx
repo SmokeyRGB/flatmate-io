@@ -6,20 +6,46 @@ import {
   getRoundParticipants,
   hasProcedureChangedNotice,
 } from "@/modules/casting/repository";
+import {
+  assertHasPermission,
+  PermissionDeniedError,
+} from "@/modules/identity/repository";
 import { getCurrentSession } from "@/modules/identity/session-cookie";
 import { de } from "@/ui/strings";
 import { LinkPendingHint } from "@/ui/link-pending-hint";
+import { SavedToast } from "./saved-toast";
 
 // Convergence T084/T085: the round-detail screen FR-1.19 (participant names) and FR-1.22 (the
 // "procedure changed" notice) both need — `getRoundParticipants`/`hasProcedureChangedNotice`
 // existed and were tested at the repository layer, but no route ever called either.
-export default async function RoundDetailPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function RoundDetailPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams?: Promise<{ saved?: string }>;
+}) {
   const { id } = await params;
+  const saved = (await searchParams)?.saved === "1";
   const current = await getCurrentSession();
   if (!current) redirect("/sign-in");
 
   const round = await getRoundForSession(current.context, id);
   if (!round) notFound();
+
+  // F3 change 2: the way to capture an application is offered only to a resident profile that holds
+  // create_application, for a round that is open. Nothing changes for the household account. The
+  // check is the same try/catch pattern rounds/new uses; the capture page and the repository
+  // refuse again on their own.
+  let canCapture = false;
+  if (current.context.profileId !== null && round.status === "open") {
+    try {
+      await assertHasPermission(current.context, current.context.accountId, "create_application");
+      canCapture = true;
+    } catch (err) {
+      if (!(err instanceof PermissionDeniedError)) throw err;
+    }
+  }
 
   const [participants, procedureChanged] = await Promise.all([
     getRoundParticipants(current.context, id),
@@ -37,6 +63,15 @@ export default async function RoundDetailPage({ params }: { params: Promise<{ id
         <h1 className="font-serif text-2xl font-semibold">{round.title}</h1>
         <span className="badge mt-1">{de.status.round[round.status as keyof typeof de.status.round]}</span>
       </div>
+
+      {saved && <SavedToast message={de.applications.saved} />}
+
+      {canCapture && (
+        <Link href={`/rounds/${id}/applications/new`} className="btn btn-primary">
+          {de.rounds.detail.captureApplication}
+          <LinkPendingHint />
+        </Link>
+      )}
 
       {procedureChanged && (
         <div role="alert" className="callout callout-caution">

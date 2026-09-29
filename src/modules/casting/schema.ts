@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 import {
   boolean,
+  check,
   date,
   index,
   integer,
@@ -39,12 +40,33 @@ export const applicationStateEnum = pgEnum("application_state", [
   "archived",
 ]);
 
+// S-38 axis 1: the intake path. Set by the system, never taken from a submission. No default
+// anywhere (C-3.2, AC-3.7). Only `manual_form` is written by this slice.
+export const applicationSourceEnum = pgEnum("application_source", [
+  "manual_form",
+  "paste_parser",
+  "availability_link",
+  "portal_import",
+]);
+
+// S-38 axis 2: whose data it is, i.e. the legal bearer of the Art. 13/14 choice (Compliance
+// §4.4). Independent of the intake path (C-3.10). No default anywhere (C-3.2, AC-3.7): a
+// submission without it is refused, never defaulted.
+export const applicationCollectedFromEnum = pgEnum("application_collected_from", [
+  "data_subject",
+  "third_party",
+]);
+
 export const application = pgTable(
   "application",
   {
     id: uuid("id").primaryKey().defaultRandom(),
     householdId: uuid("household_id").notNull(), // Anker der RLS-Policy (ADR-004)
-    roundId: uuid("round_id"),
+    // NOT NULL since drizzle/0023 (A-3.4, C-3.11). The pairing with `household_id` (the round must
+    // be a round of the SAME household) is enforced by the trigger
+    // `application_round_same_household` in drizzle/0023, hand-written because drizzle-kit does
+    // not generate triggers (design D12). There are no foreign keys.
+    roundId: uuid("round_id").notNull(),
     state: applicationStateEnum("state").notNull(),
     stateChangedAt: timestamp("state_changed_at", { withTimezone: true }).notNull().defaultNow(),
     becameResidentId: uuid("became_resident_id"),
@@ -56,8 +78,54 @@ export const application = pgTable(
     retentionUntil: date("retention_until"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     deletedAt: timestamp("deleted_at", { withTimezone: true }),
+    // Applicant columns of docs/domain/casting.md §2.2. Personal data (data-inventory.yml).
+    // Empty optional fields are NULL, never '' (assumption A4).
+    applicantName: text("applicant_name").notNull(),
+    age: integer("age"),
+    contactEmail: text("contact_email"),
+    contactPhone: text("contact_phone"),
+    contactOther: text("contact_other"),
+    messageRaw: text("message_raw"),
+    attributes: jsonb("attributes"),
+    // NO .default() on either axis (C-3.2, AC-3.7).
+    source: applicationSourceEnum("source").notNull(),
+    collectedFrom: applicationCollectedFromEnum("collected_from").notNull(),
   },
   (t) => [
+    // C-3.14 limits as CHECKs (drizzle/0023). Every value is written as literal SQL, never
+    // interpolated as `${value}`: drizzle-kit keeps only the SQL text of a check() and drops its
+    // bound parameters, which would leave `$1` in the migration (design D1).
+    check(
+      "application_applicant_name_length",
+      sql`char_length(btrim(applicant_name)) BETWEEN 1 AND 200`,
+    ),
+    // btrim strips spaces only; this makes tabs, line breaks and NBSP-only names fail as well.
+    check("application_applicant_name_not_blank", sql`applicant_name ~ '[^[:space:]]'`),
+    check(
+      "application_contact_email_length",
+      sql`contact_email IS NULL OR char_length(contact_email) <= 254`,
+    ),
+    check(
+      "application_contact_phone_length",
+      sql`contact_phone IS NULL OR char_length(contact_phone) <= 50`,
+    ),
+    check(
+      "application_contact_other_length",
+      sql`contact_other IS NULL OR char_length(contact_other) <= 200`,
+    ),
+    check(
+      "application_message_raw_length",
+      sql`message_raw IS NULL OR char_length(message_raw) <= 4000`,
+    ),
+    check("application_age_range", sql`age IS NULL OR age BETWEEN 0 AND 150`),
+    // Only the list shape and its length (1-10) are enforced here. The per-element limits (label
+    // 1-60, value 1-500, the object shape) are enforced in the repository ONLY: a CHECK cannot
+    // contain a subquery. CASE, not AND: jsonb_array_length on a non-array raises 22023 instead of
+    // a check violation, and AND has no evaluation-order guarantee.
+    check(
+      "application_attributes_shape",
+      sql`attributes IS NULL OR CASE WHEN jsonb_typeof(attributes) = 'array' THEN jsonb_array_length(attributes) BETWEEN 1 AND 10 ELSE false END`,
+    ),
     // Every RLS policy filters by household_id — an unindexed scan here would be the single
     // biggest hot path in the app (Supabase's own RLS-performance guidance).
     index("application_household_id_idx").on(t.householdId),
@@ -136,6 +204,12 @@ export const castingRound = pgTable(
     id: uuid("id").primaryKey().defaultRandom(),
     householdId: uuid("household_id").notNull(),
     title: text("title").notNull(),
+    // Every writer of `status` takes FOR UPDATE on the row (openRoundTx does): captureApplication
+    // reads it FOR SHARE, and the pair is serialised only while every status writer locks the row
+    // (design D4). A future close or pause must do the same.
+    // Also (design D12): application.round_id points here without a foreign key. No path may
+    // delete a casting_round or change its household_id without considering the applications
+    // pointing at it; the pairing trigger in drizzle/0023 checks only writes to application.
     status: castingRoundStatusEnum("status").notNull().default("draft"),
     roomIds: uuid("room_ids")
       .array()

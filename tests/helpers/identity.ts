@@ -1,7 +1,8 @@
 import { createClient } from "@supabase/supabase-js";
 import { sql } from "drizzle-orm";
 import { withSessionContext, type SessionContext } from "@/db/session-context";
-import { registerHousehold } from "@/modules/identity/auth";
+import { claimResidentProfile, registerHousehold } from "@/modules/identity/auth";
+import { createResidentProfile, setMemberRole } from "@/modules/identity/repository";
 import { uuid } from "./uuid";
 
 // The household-scoped delete set (M2, P6: "no foreign keys means a hand-kept deletion
@@ -223,4 +224,33 @@ export async function cleanupAll(...tasks: Array<Promise<unknown> | undefined>):
   if (reasons.length > 0) {
     throw new AggregateError(reasons, "test cleanup failed");
   }
+}
+
+// Design D13 (application-capture): the household account no longer creates, opens or closes a
+// round (03-PRD.md §4.0.1, S-50/U-20), so a test that needs a round sets it up as a moderator.
+// Claims a synthetic resident profile, appoints it moderator through setMemberRole (which stores
+// the moderator's permission set), and returns its SessionContext. The new Auth account is
+// registered with the household's own cleanup, so hh.cleanup() deletes it as well; a caller that
+// also tracks the account id and deletes it itself is harmless (deleteTestAccount tolerates 404).
+//
+// Note: the moderator is a real active resident, so a round opened afterwards counts it as a
+// participant. A test that asserts participant counts must account for it.
+export async function createTestModerator(
+  hh: TestHousehold,
+  displayName = `Moderator ${uuid().slice(0, 8)}`,
+): Promise<{ context: SessionContext; accountId: string; profileId: string }> {
+  const actor = { accountId: hh.accountId, profileId: null };
+  const profile = await createResidentProfile(hh.context, displayName, actor);
+  const { accountId } = await claimResidentProfile(hh.context, profile.id, "test-password-not-real-1234");
+  await setMemberRole(hh.context, hh.accountId, accountId, "moderator");
+  const originalCleanup = hh.cleanup;
+  hh.cleanup = async () => {
+    await originalCleanup();
+    await deleteTestAccount(accountId);
+  };
+  return {
+    context: { accountId, householdId: hh.householdId, profileId: profile.id },
+    accountId,
+    profileId: profile.id,
+  };
 }

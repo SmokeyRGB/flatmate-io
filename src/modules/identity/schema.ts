@@ -24,6 +24,38 @@ const HOUSEHOLD_MATCH = sql`household_id = (select current_setting('app.househol
 const IS_OWN_HOUSEHOLD = sql`id = (select current_setting('app.household_id', true)::uuid)`;
 const IS_OWN_HOUSEHOLD_SETTINGS = sql`household_id = (select current_setting('app.household_id', true)::uuid)`;
 
+// Roles are only NAMES for fixed sets of stored permissions (design D3; human decisions
+// 2026-09-28 and 2026-09-29: "The terms 'household' or 'moderator' should simply map to
+// permissions; they shouldn't be a separate workaround for permissions / Backdoor for ignoring
+// permissions."). A membership stores the union of the sets of the roles it occupies, and every
+// permission check reads only that stored list, never a role. domain/identity.md §2.1 calls the
+// sets „vorbelegt"; storing them is the literal reading of that word.
+//
+// A later permission needs, in ONE change: the constant here, a backfill of the existing
+// memberships, and the CHECK below that is built from it. The CHECKs are built from these
+// constants (array literals via sql.raw, never bound parameters: drizzle-kit would write `$1`
+// into the migration), so a constant and its constraint cannot drift.
+//
+// household: the administering membership (role = household_admin, never with a profile).
+// `close_round` is NOT in it: 03-PRD.md §4.0.1 gives the household account no rounds (S-50/U-20).
+export const HOUSEHOLD_PERMISSIONS = ["manage_rooms", "manage_settings"] as const;
+// resident: a live membership with is_resident. Empty until F4 adds `vote`.
+export const RESIDENT_PERMISSIONS = [] as readonly string[];
+// moderator: role = moderator.
+export const MODERATOR_PERMISSIONS = [
+  "manage_rooms",
+  "close_round",
+  "create_application",
+  "change_application_state",
+] as const;
+
+// Literal SQL for a text[] value: 'ARRAY[...]::text[]', or '{}'::text[] when empty. Values are
+// single-quote-escaped. Never a bound parameter (see above).
+function permissionArrayLiteral(values: readonly string[]) {
+  if (values.length === 0) return sql.raw(`'{}'::text[]`);
+  return sql.raw(`ARRAY[${values.map((v) => `'${v.replace(/'/g, "''")}'`).join(", ")}]::text[]`);
+}
+
 // data-model.md "ResidentProfile" — four states (transitions.ts). `removed` is U-27's hard tier:
 // final, no transition leads out of it (drizzle/0017's trigger enforces that in the database too).
 export const residentProfileStatusEnum = pgEnum("resident_profile_status", [
@@ -256,6 +288,35 @@ export const membership = pgTable(
     check(
       "membership_resident_pairing",
       sql`${t.isResident} = (${t.residentProfileId} IS NOT NULL)`,
+    ),
+    // drizzle/0024 (ADR-013: the account type is fixed; domain/identity.md §2.1). The household
+    // account is the WG's administration, never a resident, so the household and the resident
+    // role are never occupied by the same membership and the household set never mixes with the
+    // others. Load-bearing now that the household account holds a stored set.
+    check(
+      "membership_admin_has_no_profile",
+      sql`role <> 'household_admin' OR resident_profile_id IS NULL`,
+    ),
+    // drizzle/0024: a membership that disagrees with its roles would silently gain or lose rights,
+    // so it is a refused write, for every writer including raw SQL. Built from the constants
+    // above; a later permission needs the constant, a backfill and the CHECK in one change.
+    check(
+      "membership_moderator_holds_role_permissions",
+      sql`revoked_at IS NOT NULL OR role <> 'moderator' OR permissions @> ${permissionArrayLiteral(MODERATOR_PERMISSIONS)}`,
+    ),
+    // The set is EXACT: the matrix gives the household account no individual grant (no ⬜).
+    check(
+      "membership_household_admin_holds_role_permissions",
+      sql`revoked_at IS NOT NULL OR role <> 'household_admin' OR (permissions @> ${permissionArrayLiteral(HOUSEHOLD_PERMISSIONS)} AND permissions <@ ${permissionArrayLiteral(HOUSEHOLD_PERMISSIONS)})`,
+    ),
+    check(
+      "membership_resident_holds_role_permissions",
+      sql`revoked_at IS NOT NULL OR NOT is_resident OR permissions @> ${permissionArrayLiteral(RESIDENT_PERMISSIONS)}`,
+    ),
+    // A moved-out or removed person keeps nothing (D3): no permission, and not the moderator role.
+    check(
+      "membership_revoked_holds_nothing",
+      sql`revoked_at IS NULL OR (cardinality(permissions) = 0 AND role <> 'moderator')`,
     ),
     pgPolicy("membership_household_isolation", {
       as: "permissive",

@@ -2,8 +2,18 @@ import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import { isUuid, withSessionContext, type SessionContext } from "@/db/session-context";
 import { recordActivityEvent } from "@/modules/audit/repository";
 import { activityEvent } from "@/modules/audit/schema";
-import { assertHasPermission, PermissionDeniedError } from "@/modules/identity/repository";
+import {
+  assertHasPermission,
+  assertHasPermissionTx,
+  assertHoldsAnyPermissionTx,
+  PermissionDeniedError,
+} from "@/modules/identity/repository";
 import { householdSettings, membership, residentProfile } from "@/modules/identity/schema";
+import {
+  parseApplicationInput,
+  type ParsedApplication,
+  type RawApplicationInput,
+} from "./application-input";
 import { application, castingRound, room, roundParticipation } from "./schema";
 import { assertTransitionAllowed, type ApplicationState } from "./transitions";
 import { assertF1RoomTransitionAllowed, type RoomStatus } from "./room-transitions";
@@ -40,6 +50,183 @@ export async function getApplication(context: SessionContext, id: string) {
   if (context.profileId === null) return null;
   return withSessionContext(context, async (tx) => {
     const [row] = await tx.select().from(application).where(eq(application.id, id));
+    return row ?? null;
+  });
+}
+
+export type ApplicationCaptureErrorCode = "round_not_found" | "round_not_open";
+
+export class ApplicationCaptureError extends Error {
+  readonly code: ApplicationCaptureErrorCode;
+  constructor(code: ApplicationCaptureErrorCode) {
+    super(`Application capture refused: ${code}`);
+    this.name = "ApplicationCaptureError";
+    this.code = code;
+  }
+}
+
+// D4, "No value leaves in an error": Drizzle puts every bound value into a failed query's
+// message ("Failed query: ... params: ...") and Postgres adds "Failing row contains (...)" in the
+// cause. So the capture's writes are wrapped and any failure is rethrown as THIS, built fresh:
+// no cause, no message from the original, no params. It carries the SQLSTATE and the constraint
+// name and nothing else. (The Supabase Postgres log is outside the app's control; the parser
+// mirroring every CHECK is what keeps a normal refusal from ever reaching it.)
+export class ApplicationWriteError extends Error {
+  readonly code = "db_refused";
+  readonly sqlState: string | null;
+  readonly constraint: string | null;
+  constructor(sqlState: string | null, constraint: string | null) {
+    super(
+      `Application write refused by the database (${sqlState ?? "unknown"}${constraint ? `, ${constraint}` : ""})`,
+    );
+    this.name = "ApplicationWriteError";
+    this.sqlState = sqlState;
+    this.constraint = constraint;
+  }
+}
+
+function toApplicationWriteError(err: unknown): ApplicationWriteError {
+  // The postgres driver's error is on `cause` for a Drizzle-wrapped one, or the error itself.
+  const candidates = [err, (err as { cause?: unknown } | null)?.cause];
+  let sqlState: string | null = null;
+  let constraint: string | null = null;
+  for (const c of candidates) {
+    if (typeof c !== "object" || c === null) continue;
+    const code = (c as { code?: unknown }).code;
+    const name = (c as { constraint_name?: unknown }).constraint_name;
+    if (sqlState === null && typeof code === "string" && /^[0-9A-Z]{5}$/.test(code)) sqlState = code;
+    if (constraint === null && typeof name === "string" && /^[A-Za-z0-9_]{1,63}$/.test(name)) {
+      constraint = name;
+    }
+  }
+  return new ApplicationWriteError(sqlState, constraint);
+}
+
+// The write half of a capture: the INSERT and its audit event, wrapped so that no value can leave
+// in an error. Exported as the seam D4 asks for (and pre-mortem 1's test): a test calls it inside
+// its own transaction with a round id the repository's own round check would have refused, to
+// force a database refusal. `source` is a literal here, never from input (FR-3.6), and both actor
+// ids come from `context`.
+export async function insertCapturedApplicationTx(
+  tx: Tx,
+  context: SessionContext,
+  roundId: string,
+  parsed: ParsedApplication,
+): Promise<{ id: string }> {
+  if (context.profileId === null) throw new ProfileRequiredError("captureApplication");
+  try {
+    const [row] = await tx
+      .insert(application)
+      .values({
+        householdId: context.householdId,
+        roundId,
+        state: "new",
+        source: "manual_form",
+        collectedFrom: parsed.collectedFrom,
+        applicantName: parsed.applicantName,
+        age: parsed.age,
+        contactEmail: parsed.contactEmail,
+        contactPhone: parsed.contactPhone,
+        contactOther: parsed.contactOther,
+        messageRaw: parsed.messageRaw,
+        attributes: parsed.attributes,
+        createdByAccountId: context.accountId,
+        createdByProfileId: context.profileId,
+      })
+      .returning({ id: application.id });
+
+    await recordActivityEvent(tx, {
+      householdId: context.householdId,
+      eventType: "application.created",
+      subjectType: "application",
+      subjectId: row.id,
+      actorAccountId: context.accountId,
+      actorProfileId: context.profileId,
+      payload: { source: "manual_form", collectedFrom: parsed.collectedFrom },
+    });
+    return { id: row.id };
+  } catch (err) {
+    throw toApplicationWriteError(err);
+  }
+}
+
+// F3 change 2 (application-capture), FR-3.1-3.10, design D4. The only way an application is
+// created. Takes NO actor: both actor ids come from `context` (CLAUDE.md hazards: never from a
+// caller-supplied actor id).
+//
+// Order (G-D15 obligation (a) first): a profile-less session is refused BEFORE any query. Then
+// ONE transaction:
+//   a. the caller's live membership is read FOR SHARE and must hold `create_application`;
+//   b. the round is read FOR SHARE with the household predicate and must be `open`;
+//   c. only then is the input parsed, so a plain member learns only that the permission is
+//      missing, whatever it typed;
+//   d. the wrapped INSERT and the audit event.
+//
+// What serialises each read-then-write:
+//   - a against a revocation or role change: FOR SHARE conflicts with every membership writer's
+//     row lock (UPDATE), so a revocation committed first is seen and one in flight is waited for;
+//   - b against a status change: FOR SHARE conflicts with openRoundTx's FOR UPDATE. OBLIGATION:
+//     every future writer of casting_round.status takes FOR UPDATE on the row, or the pair is no
+//     longer serialised (also stated on castingRound.status in schema.ts);
+//   - capture against capture: two FOR SHARE locks are compatible and two inserts do not
+//     conflict. EC-3.1/3.11 want both rows.
+//
+// LOCK ORDER: membership, then casting_round. No existing function locks casting_round and then
+// membership (openRoundTx reads membership without a lock, revokeMembershipForProfileTx locks no
+// round), so no deadlock cycle exists. A future writer keeps this order.
+export async function captureApplication(
+  context: SessionContext,
+  input: RawApplicationInput & { roundId: string },
+): Promise<{ id: string }> {
+  if (context.profileId === null) throw new ProfileRequiredError("captureApplication");
+  const roundId = input.roundId;
+  if (typeof roundId !== "string" || !isUuid(roundId)) throw new ApplicationCaptureError("round_not_found");
+
+  return withSessionContext(context, async (tx) => {
+    await assertHasPermissionTx(tx, context, "create_application");
+
+    const [round] = await tx
+      .select({ id: castingRound.id, status: castingRound.status })
+      .from(castingRound)
+      .where(and(eq(castingRound.id, roundId), eq(castingRound.householdId, context.householdId)))
+      .for("share");
+    if (!round) throw new ApplicationCaptureError("round_not_found");
+    if (round.status !== "open") throw new ApplicationCaptureError("round_not_open");
+
+    const parsed = parseApplicationInput(input);
+    return insertCapturedApplicationTx(tx, context, roundId, parsed);
+  });
+}
+
+// D5: the ORGANISATION's read of one application, behind /rounds/[id]/applications/[applicationId]
+// (O5's shell). It is NOT the read F4's screening deck will use: there, every participating
+// resident sees the applicant's facts under V-2 through its own function with its own rule. The
+// two must never be merged into one "application detail" read with a role switch, which is why
+// this one is not called getApplicationDetail.
+//
+// Returns null for a profile-less session (no query runs), a malformed id, an unknown id, a round
+// mismatch or another household. Throws PermissionDeniedError when the live membership holds
+// neither create_application nor change_application_state. Sibling: `getApplication` above keeps
+// its profile-only check; change 3 folds it into this rule.
+export async function getOrganisationApplication(
+  context: SessionContext,
+  roundId: string,
+  applicationId: string,
+) {
+  if (context.profileId === null) return null;
+  if (!isUuid(roundId) || !isUuid(applicationId)) return null;
+  return withSessionContext(context, async (tx) => {
+    await assertHoldsAnyPermissionTx(tx, context, ["create_application", "change_application_state"]);
+    const [row] = await tx
+      .select()
+      .from(application)
+      .where(
+        and(
+          eq(application.id, applicationId),
+          eq(application.roundId, roundId),
+          eq(application.householdId, context.householdId),
+        ),
+      );
     return row ?? null;
   });
 }
@@ -558,8 +745,8 @@ export async function updateHouseholdSettingsWithProcedureLock(
 ) {
   // FR-1.8/G-C (Convergence): this had no authorization check at all — any signed-in account,
   // including a plain resident with no granted permissions, could change household settings as
-  // long as no round was open. `manage_settings` is household_admin-implicit (assertHasPermission)
-  // and otherwise individually grantable, same shape as manage_rooms/close_round elsewhere.
+  // long as no round was open. `manage_settings` is in the stored household set (identity/schema.ts,
+  // HOUSEHOLD_PERMISSIONS) and otherwise individually grantable; no role is read.
   if (!actor.accountId) throw new Error("updateHouseholdSettingsWithProcedureLock requires an actor accountId");
   await assertHasPermission(context, actor.accountId, "manage_settings");
 

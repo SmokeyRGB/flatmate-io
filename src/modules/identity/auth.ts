@@ -15,10 +15,12 @@ import {
 } from "./repository";
 import {
   account,
+  HOUSEHOLD_PERMISSIONS,
   household,
   householdSettings,
   joinCodeIssuance,
   membership,
+  RESIDENT_PERMISSIONS,
   residentProfile,
   session,
 } from "./schema";
@@ -201,7 +203,9 @@ export async function registerHousehold(email: string, password: string, name: s
           residentProfileId: null,
           isResident: false,
           role: "household_admin",
-          permissions: [],
+          // The household role is a name for HOUSEHOLD_PERMISSIONS (design D3): stored, so a
+          // check reads only this list. 0024's exact-set CHECK refuses anything else.
+          permissions: [...HOUSEHOLD_PERMISSIONS],
         })
         .returning();
 
@@ -358,9 +362,9 @@ export async function claimResidentProfile(
 
       // Human decision, 2026-09-22: no permission is inferred from being first, or from anything
       // else about how a membership came about (docs/domain/identity.md §2.1's close_round note).
-      // close_round is now a role default (MODERATOR_DEFAULT_PERMISSIONS in this file) held by
-      // every household_admin and moderator — a plain member membership starts with permissions: []
-      // unconditionally, the same as any other newly created membership.
+      // A claiming resident occupies the resident role, so it stores RESIDENT_PERMISSIONS (empty
+      // in this change; F4 adds `vote`). Moderator rights come only from an appointment
+      // (setMemberRole), never from how a membership came about.
       const [membershipRow] = await tx
         .insert(membership)
         .values({
@@ -369,7 +373,7 @@ export async function claimResidentProfile(
           residentProfileId,
           isResident: true,
           role: "member",
-          permissions: [],
+          permissions: [...RESIDENT_PERMISSIONS],
         })
         .returning();
 
@@ -955,16 +959,15 @@ export async function joinHousehold(
 
       // design.md Decision 7 (identity/permissions capability's "no permission is inferred from
       // how a membership came about"): role: "member", permissions: [] — nothing is inferred from
-      // being first, from the link used, or from anything else about the arrival. The
-      // household_admin/moderator close_round default (task group 1) is unaffected — a
-      // link-joiner is neither.
+      // being first, from the link used, or from anything else about the arrival. A joiner
+      // occupies the resident role only, so it stores RESIDENT_PERMISSIONS (design D3).
       await tx.insert(membership).values({
         householdId: resolved.householdId,
         accountId,
         residentProfileId,
         isResident: true,
         role: "member",
-        permissions: [],
+        permissions: [...RESIDENT_PERMISSIONS],
         joinedViaIssuanceId: claimed.issuanceId,
       });
 

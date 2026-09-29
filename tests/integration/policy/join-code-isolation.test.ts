@@ -9,8 +9,9 @@ import {
   issueJoinCode,
   listJoinCodeIssuances,
   ResidentListActionDeniedError,
+  setMemberRole,
 } from "@/modules/identity/repository";
-import { joinCodeIssuance, membership } from "@/modules/identity/schema";
+import { joinCodeIssuance } from "@/modules/identity/schema";
 import {
   cleanupAll,
   deleteTestAccount,
@@ -76,9 +77,9 @@ describe("Join code moderator boundary (FR-1.27/U-30)", () => {
       "test-password-not-real-1234",
     );
     accountIds.push(modAccountId);
-    await withSessionContext(hhA.context, (tx) =>
-      tx.update(membership).set({ role: "moderator" }).where(eq(membership.accountId, modAccountId)),
-    );
+    // Appointed through setMemberRole so the moderator's permission set is stored with the role
+    // (drizzle/0024 refuses a moderator without it); setup only, no assertion changes.
+    await setMemberRole(hhA.context, hhA.accountId, modAccountId, "moderator");
 
     const memberProfile = await createResidentProfile(hhA.context, "PlainMember", actor);
     const { accountId: memberAccountId } = await claimResidentProfile(

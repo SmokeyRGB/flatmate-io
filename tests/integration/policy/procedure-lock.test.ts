@@ -12,6 +12,7 @@ import {
 } from "@/modules/casting/repository";
 import {
   cleanupAll,
+  createTestModerator,
   deleteTestAccount,
   registerTestHousehold,
   type TestHousehold,
@@ -38,17 +39,19 @@ describe("Procedure lock while a round is open", () => {
   it("refuses a locked-setting change while open, names the round, allows it once no round is open (AC-1.13/AC-1.15)", async () => {
     hh = await registerTestHousehold();
     const actor = { accountId: hh.accountId, profileId: null };
-    const resident = await claim(hh, "Resident1");
-    accountIds.push(resident.accountId);
+    // Design D13: the household account no longer runs rounds; the eligible resident that
+    // openRound needs is the moderator who creates and opens it. Settings stay with the household.
+    const moderator = await createTestModerator(hh, "Resident1");
+    const modActor = { accountId: moderator.accountId, profileId: moderator.profileId };
     const roomA = await createRoom(hh.context, "Room A", actor);
-    const round = await createRound(hh.context, "Round", [roomA.id], actor);
+    const round = await createRound(moderator.context, "Round", [roomA.id], modActor);
 
     // AC-1.15: no round open yet (still draft) — the change succeeds.
     await expect(
       updateHouseholdSettingsWithProcedureLock(hh.context, { quorumShare: "0.6" }, actor),
     ).resolves.toMatchObject({ quorumShare: "0.6" });
 
-    await openRound(hh.context, round.id, actor);
+    await openRound(moderator.context, round.id, modActor);
 
     // AC-1.13: refused while open, and the error names the open round.
     await expect(
@@ -59,11 +62,13 @@ describe("Procedure lock while a round is open", () => {
   it("records an ActivityEvent and a procedure-changed notice when forced through anyway (AC-1.14)", async () => {
     hh = await registerTestHousehold();
     const actor = { accountId: hh.accountId, profileId: null };
-    const resident = await claim(hh, "Resident1");
-    accountIds.push(resident.accountId);
+    // Design D13: the household account no longer runs rounds; the eligible resident that
+    // openRound needs is the moderator who creates and opens it. Settings stay with the household.
+    const moderator = await createTestModerator(hh, "Resident1");
+    const modActor = { accountId: moderator.accountId, profileId: moderator.profileId };
     const roomA = await createRoom(hh.context, "Room A", actor);
-    const round = await createRound(hh.context, "Round", [roomA.id], actor);
-    await openRound(hh.context, round.id, actor);
+    const round = await createRound(moderator.context, "Round", [roomA.id], modActor);
+    await openRound(moderator.context, round.id, modActor);
 
     await forceChangeSettingWhileRoundOpen(hh.context, "quorumShare", "0.9", round.id, actor);
 
@@ -103,9 +108,11 @@ describe("Procedure lock while a round is open", () => {
       householdId: hh.householdId,
       profileId: resident.profileId,
     };
+    const moderator = await createTestModerator(hh);
+    const modActor = { accountId: moderator.accountId, profileId: moderator.profileId };
     const roomA = await createRoom(hh.context, "Room A", actor);
-    const round = await createRound(hh.context, "Round", [roomA.id], actor);
-    await openRound(hh.context, round.id, actor);
+    const round = await createRound(moderator.context, "Round", [roomA.id], modActor);
+    await openRound(moderator.context, round.id, modActor);
 
     await expect(
       forceChangeSettingWhileRoundOpen(residentContext, "quorumShare", "0.9", round.id, residentActor),
