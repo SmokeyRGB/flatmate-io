@@ -8,24 +8,46 @@ import {
   oneMonthAfter,
 } from "@/modules/casting/application-notice";
 import { getOrganisationApplication } from "@/modules/casting/repository";
-import { getHousehold, PermissionDeniedError } from "@/modules/identity/repository";
+import { assertHasPermission, getHousehold, PermissionDeniedError } from "@/modules/identity/repository";
+import type { SessionContext } from "@/db/session-context";
 import { getCurrentSession } from "@/modules/identity/session-cookie";
 import { de } from "@/ui/strings";
 import { LinkPendingHint } from "@/ui/link-pending-hint";
-import { ThirdPartyNotice } from "../third-party-notice";
+import { SavedToast } from "../../saved-toast";
+import { ApplicantNotice, ThirdPartyNotice } from "../notice";
 
 const t = de.applications.detail;
+
+// A refusal is an answer here (false), never an error; anything else is rethrown.
+async function holdsCreateApplication(context: SessionContext): Promise<boolean> {
+  try {
+    await assertHasPermission(context, context.accountId, "create_application");
+    return true;
+  } catch (err) {
+    if (err instanceof PermissionDeniedError) return false;
+    throw err;
+  }
+}
 
 // The organisation's detail of one application (design D5): O5's first cut, which change 3
 // extends. Facts are shown as TEXT only: React escapes them and there is no
 // dangerouslySetInnerHTML (PRD §6.5). For a third-party collection the Art. 14 duty and text
-// appear here, with the date counted from created_at (EC-3.5: a passed date says so).
+// appear here, with the date counted from created_at (EC-3.5: a passed date says so). Every other
+// application gets the optional Art. 13 notice, collapsed (FR-3.23). „Bearbeiten" leads to the
+// correction form and is offered only to a holder of create_application.
 export default async function ApplicationDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string; applicationId: string }>;
+  searchParams?: Promise<{ updated?: string }>;
 }) {
   const { id, applicationId } = await params;
+  // ?updated=1 after a correction that changed something, ?updated=0 after one that changed nothing.
+  // Any other value shows no notice.
+  const updatedParam = (await searchParams)?.updated;
+  const updatedMessage =
+    updatedParam === "1" ? de.applications.edit.updated : updatedParam === "0" ? de.applications.edit.unchanged : null;
   const current = await getCurrentSession();
   if (!current) redirect("/sign-in");
 
@@ -58,8 +80,16 @@ export default async function ApplicationDetailPage({
     ? (application.attributes as { label: string; value: string }[])
     : [];
   const thirdParty = application.collectedFrom === "third_party";
-  const householdRow = thirdParty ? await getHousehold(current.context) : null;
   const deadline = oneMonthAfter(application.createdAt);
+
+  // The way to the correction form: only a resident profile holding create_application. The edit
+  // page and the repository refuse again on their own. Run together with the household read, which
+  // is independent of it (code review).
+  const context = current.context;
+  const [householdRow, canEdit] = await Promise.all([
+    thirdParty ? getHousehold(context) : Promise.resolve(null),
+    holdsCreateApplication(context),
+  ]);
 
   const fact = (label: string, value: string | number | null) => (
     <div>
@@ -75,6 +105,15 @@ export default async function ApplicationDetailPage({
         <h1 className="font-serif text-2xl font-semibold">{application.applicantName}</h1>
         <span className="badge mt-1">{thirdParty ? t.viaSomeoneElse : t.fromApplicant}</span>
       </div>
+
+      {updatedMessage && <SavedToast param="updated" message={updatedMessage} />}
+
+      {canEdit && (
+        <Link href={`/rounds/${id}/applications/${applicationId}/edit`} className="btn btn-secondary">
+          {de.applications.edit.editLink}
+          <LinkPendingHint />
+        </Link>
+      )}
 
       <dl className="card space-y-3">
         {fact(t.ageLabel, application.age)}
@@ -98,8 +137,9 @@ export default async function ApplicationDetailPage({
         )}
       </dl>
 
-      {thirdParty && (
+      {thirdParty ? (
         <ThirdPartyNotice
+          why
           applicantName={application.applicantName}
           household={householdRow?.name ?? ""}
           categories={noticeCategories({
@@ -114,6 +154,8 @@ export default async function ApplicationDetailPage({
           dateLabel={formatDateDe(deadline)}
           deadlinePassed={isDeadlinePassed(deadline, new Date())}
         />
+      ) : (
+        <ApplicantNotice why />
       )}
     </div>
   );

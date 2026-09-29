@@ -476,6 +476,8 @@ Vergebbare Werte in `permissions` (Vorschlag, erweiterbar):
 `manage_rooms` · `manage_settings` · `manage_members` · `extend_retention` · `delete_data` ·
 `export_subject_access`.
 
+Nur im Rechtebündel einer Rolle, nie einzeln vergebbar: `reverse_application_state` (Moderation).
+
 > **`manage_rooms` ist neu (P-O-10, 2026-09-14)** und trägt die **Verfügbarkeit** eines Zimmers:
 > anlegen, `planned → open`, `on_hold`, `not_available` (`zustandsmaschinen.md` §3.3). Vorbelegt bei
 > `household_admin` **und** `moderator`.
@@ -519,14 +521,21 @@ Vergebbare Werte in `permissions` (Vorschlag, erweiterbar):
 >
 > **Warum S-04 trotzdem nicht fällt:** Ausgeschlossen sind `Berechtigungsvorlagen`, also Bündel,
 > die jemand im Haushalt benennt, zusammenstellt oder ändert. Hier legt die Spezifikation vier
-> feste Vorbelegungen je Rolle fest, und jede davon steht bereits in der Rechtematrix; niemand im
+> feste Vorbelegungen je Rolle fest *(seit 2026-09-29 fünf für die Moderation: dazu kommt
+> `reverse_application_state`, und nur dort)*, und jede davon steht bereits in der Rechtematrix; niemand im
 > Haushalt kann ein Bündel definieren. Beide Rechte bleiben außerdem **einzeln vergebbar**, ohne
 > dass das Profil Moderator wird (die Rechtematrix: Bewohnender ⬜).
 >
-> **Was ausdrücklich kein vergebbares Recht ist:** `Application` **löschen** und einen Zustand
-> **zurücknehmen** hängen an der Rolle `moderator`, nicht an einem Recht — die Rechtematrix gibt
-> beiden Bewohnenden ❌, nicht ⬜. `delete_data` bleibt unvergeben; es gehört zum Löschweg der
-> Aufbewahrung und der Betroffenenrechte (v0.2), nicht zur Handlöschung.
+> **Was ausdrücklich kein vergebbares Recht ist** *(geändert 2026-09-29, F3-Planung)*: Einen
+> Zustand **zurücknehmen** ist das Recht `reverse_application_state`. Es steht nur im
+> Rechtebündel der Rolle `moderator`, und die Datenbank verweigert es jeder anderen
+> Mitgliedschaft. So bleibt das ❌ der Rechtematrix für Bewohnende „nicht vergebbar", und
+> geprüft wird trotzdem, wie überall, das Recht und nie die Rolle. *(Vorher: „hängen an der Rolle
+> `moderator`, nicht an einem Recht" — eine Rollenprüfung neben den Rechten, die die Entscheidung
+> „Rollen sind nur Namen für Rechtebündel" ausschließt.)* `Application` **löschen** hängt, bis
+> die Handlöschung gebaut ist, weiter an der Rolle `moderator` und wird dann ebenso umgestellt.
+> `delete_data` bleibt unvergeben; es gehört zum Löschweg der Aufbewahrung und der
+> Betroffenenrechte (v0.2), nicht zur Handlöschung.
 >
 > **Abgabebedingung (korrigiert 2026-09-28, F3-Planung):** Maßgeblich ist nicht die Zahl der
 > Vorbelegungen, sondern ihre Quelle. Moderator:in ist, wer die Rechte der Moderation **hat**:

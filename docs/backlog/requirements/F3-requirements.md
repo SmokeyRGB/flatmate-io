@@ -93,7 +93,7 @@ AI at all, so it costs nothing here.
 - **FR-3.21** The system shall allow a profile holding `create_application` to correct every field captured by the form, including the collection source, after saving. The correction path serves Art. 16 rectification (`06-Compliance-Anhang.md` §7.2) and the correction `03-PRD.md` §4.1.3 requires for `collected_from`.
 - **FR-3.22** Every correction shall be recorded as an audit entry that names the changed fields but never their values (G-D7). A correction never alters or removes a vote already cast.
 - **FR-3.23** The application detail shall offer, for every application, a collapsed and optional short privacy notice for the household to copy: the Art. 13 text of `06-Compliance-Anhang.md` §4.5 (Stufe 1), or its *Variante Dritterhebung* when the collection source is a third party. The system shall not require, track or remind anyone to send it.
-- **FR-3.24** A state change of an application shall require the `change_application_state` permission, which is pre-assigned to the `moderator` role; a backward state change shall additionally require the `moderator` role; the household account can change no state (`03-PRD.md` §4.0.1). F3 builds no state-change action on a screen — the first caller is F5 — but the rule holds from F3 on, in the repository and not only in a route.
+- **FR-3.24** A state change of an application shall require the `change_application_state` permission, which is pre-assigned to the `moderator` role; a backward state change shall additionally require `reverse_application_state`, which only the `moderator` role's permission set contains and no other membership can hold *(amended 2026-09-29: roles are names for permission sets, `domain/identity.md` §2.1)*; the household account can change no state (`03-PRD.md` §4.0.1). F3 builds no state-change action on a screen — the first caller is F5 — but the rule holds from F3 on, in the repository and not only in a route. A transition whose effects belong to a step not yet built is not executable until that step declares its rights and its operation (`domain/zustandsmaschinen.md` §3.1); in F3 only `new ⇄ screened ⇄ invited`, the exits from those states and their reopenings are *(amended 2026-09-29)*.
 
 ---
 
@@ -160,7 +160,7 @@ Given a saved application, when I correct its message text and its collection so
 Given any application, when I open its detail, then a collapsed short privacy notice is available to copy, it carries the third-party sentence exactly when the collection source is a third party, and nothing about the application depends on whether I open or copy it.
 
 **AC-3.21 — State changes are guarded** *(added 2026-09-28)*
-Given a resident profile without `change_application_state`, when it attempts any state change by any route, then the attempt is refused; given a profile holding that permission but not the `moderator` role, when it attempts a backward state change, then the attempt is refused; and the household account is refused every state change.
+Given a resident profile without `change_application_state`, when it attempts any state change by any route, then the attempt is refused; given a profile holding `change_application_state` but not `reverse_application_state`, when it attempts a backward state change, then the attempt is refused *(amended 2026-09-29)*; and the household account is refused every state change.
 
 ---
 
@@ -238,7 +238,8 @@ are settled, and the pre-build review of 2026-09-28 settled more:
 2. **The free-text length limit** has a value: C-3.14, set by a human, not derived.
 3. **Who may do what** — capture, correct, change state, delete — follows `03-PRD.md` §4.0.1 and
    is written into FR-3.1, FR-3.17, FR-3.21 and FR-3.24. The two new role defaults are recorded
-   in `domain/identity.md` §2.1.
+   in `domain/identity.md` §2.1. Reversing a state is a third, moderator-only permission
+   (`reverse_application_state`), which no other membership can hold *(amended 2026-09-29)*.
 4. **The Art. 14 text did not exist.** It is now `06-Compliance-Anhang.md` §4.5, *Variante
    Dritterhebung*. Whether it fully discharges Art. 14 stays a legal question (Q-15).
 

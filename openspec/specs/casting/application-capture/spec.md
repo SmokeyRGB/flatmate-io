@@ -353,10 +353,14 @@ unknown id SHALL show "not found", never an error. Sources: G-D15, ADR-014, F3 p
 
 The permission SHALL hold through the read itself: the membership stays locked from the check to
 the end of the read, so a revocation that commits in between makes the read wait and then refuse,
-and never lets it return personal data at no authorized instant. No other read SHALL return an
-application's personal columns: the profile-only read of an application returns its lifecycle
-columns (id, household, round, state, state change time, resident it became, creation time,
-retention date) and nothing else.
+and never lets it return personal data at no authorized instant.
+
+Exactly two reads SHALL return an application's personal columns: this detail, and the round's
+list of applications (`casting/application-pipeline`). The list follows the same rule and returns
+no message and no attributes. Every other function SHALL return lifecycle columns only (id,
+household, round, state, state change time, resident it became, creation time, retention date):
+- the profile-only read of an application;
+- a state change's result.
 
 #### Scenario: A moderator opens the organisation detail
 - **WHEN** a moderator opens the organisation detail of an application in their household
@@ -383,6 +387,10 @@ retention date) and nothing else.
 - **WHEN** an application is read by the profile-only read
 - **THEN** its result has no applicant name, contact, message, attributes, age, source or
   collection source
+
+#### Scenario: A state change returns no personal column
+- **WHEN** an application's state is changed
+- **THEN** the result carries lifecycle columns only
 
 ### Requirement: The capture screen has its four states, and a refusal never echoes what was typed
 

@@ -41,12 +41,20 @@ const IS_OWN_HOUSEHOLD_SETTINGS = sql`household_id = (select current_setting('ap
 export const HOUSEHOLD_PERMISSIONS = ["manage_rooms", "manage_settings"] as const;
 // resident: a live membership with is_resident. Empty until F4 adds `vote`.
 export const RESIDENT_PERMISSIONS = [] as readonly string[];
+// Permissions that only the moderator's set may contain. 03-PRD.md §4.0.1 gives
+// "Application.status zurücknehmen" a ✅ to the moderator and a ❌ (not ⬜) to everyone else, so
+// unlike `change_application_state` it is never an individual grant. Under the human decision that
+// roles are only names for permission sets (2026-09-28/29) it is still a stored permission that
+// every check reads, and the CHECK `membership_moderator_only_permissions` below makes "no other
+// membership holds it" a database invariant (drizzle/0027).
+export const MODERATOR_ONLY_PERMISSIONS = ["reverse_application_state"] as const;
 // moderator: role = moderator.
 export const MODERATOR_PERMISSIONS = [
   "manage_rooms",
   "close_round",
   "create_application",
   "change_application_state",
+  ...MODERATOR_ONLY_PERMISSIONS,
 ] as const;
 
 // Literal SQL for a text[] value: 'ARRAY[...]::text[]', or '{}'::text[] when empty. Values are
@@ -303,6 +311,18 @@ export const membership = pgTable(
     check(
       "membership_moderator_holds_role_permissions",
       sql`revoked_at IS NOT NULL OR role <> 'moderator' OR permissions @> ${permissionArrayLiteral(MODERATOR_PERMISSIONS)}`,
+    ),
+    // drizzle/0027 (design D8): a moderator-only permission (matrix ❌, not ⬜) cannot be held by
+    // any other membership, so raw SQL as app_runtime cannot grant it either. Why a CHECK and not
+    // only "no function grants it": the only difference between this permission and
+    // `change_application_state` is that the matrix allows an individual grant of the latter.
+    // Every other membership writer is already safe: registration writes the exact household
+    // set, claim/join the (empty) resident set, demotion removes MODERATOR_PERMISSIONS by
+    // EXCEPT (the moderator-only value goes with it), move-out/removal clear everything, and
+    // reactivation restores the resident set only.
+    check(
+      "membership_moderator_only_permissions",
+      sql`role = 'moderator' OR NOT (permissions && ${permissionArrayLiteral(MODERATOR_ONLY_PERMISSIONS)})`,
     ),
     // The set is EXACT: the matrix gives the household account no individual grant (no ⬜).
     check(

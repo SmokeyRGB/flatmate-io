@@ -60,8 +60,8 @@ function exportedFunctionNames(mod: Record<string, unknown>): string[] {
 
 const ROOT = join(__dirname, "..", "..", "..");
 
-// The KNOWN_OPEN exception (below) expires the moment a route reaches it — a plain textual grep
-// over src/app, not a claim to track every possible call path.
+// A plain textual grep over src/app, not a claim to track every possible call path. Used for the
+// no-authorization Tx primitives, which no route may reference.
 function srcAppReferencesName(name: string): boolean {
   const appDir = join(ROOT, "src", "app");
   const files: string[] = [];
@@ -101,19 +101,16 @@ const NOT_APPLICABLE_CASTING: Record<string, string> = {
   // tests/integration/policy/organisation-application-visibility.test.ts.
   getOrganisationApplication:
     "read-only; visibility tested in organisation-application-visibility.test.ts",
+  // application-pipeline design D1: read-only; the sibling of getOrganisationApplication with the
+  // same rule, tested per read in tests/integration/policy/application-pipeline-list.test.ts.
+  listOrganisationApplications:
+    "read; its visibility is tested per read in application-pipeline-list.test.ts (D1)",
   // application-capture design D4: the write half of captureApplication (INSERT + audit event),
   // exported only as the test seam for "no value leaves in an error". It performs NO
   // authorization itself: captureApplication checks the permission and the round first. No
   // src/app file may reference it (asserted below), so a route cannot bypass those checks.
   insertCapturedApplicationTx:
     "Tx primitive, no authorization by contract (captureApplication checks first); no route caller, asserted below",
-};
-
-const KNOWN_OPEN_CASTING: Record<string, string> = {
-  transitionApplication:
-    "No authorization rule exists yet: who may move an Application is F3's decision. Recorded in " +
-    "docs/review-log.md, Implementierungspflichten ('F3: transitionApplication'). Must be guarded " +
-    "before any route calls it.",
 };
 
 const NOT_APPLICABLE_IDENTITY: Record<string, string> = {
@@ -139,6 +136,7 @@ const NOT_APPLICABLE_IDENTITY: Record<string, string> = {
   membershipHoldsPermission: "pure helper — no SessionContext, no DB access",
   assertHasPermissionTx: "assertion helper — the in-transaction permission primitive",
   assertHoldsAnyPermissionTx: "assertion helper — the in-transaction permission primitive",
+  assertHoldsAllPermissionsTx: "assertion helper — the in-transaction permission primitive, every permission of a list",
   getMembershipForAccount: "read-only",
   getIdentityLabel: "read-only",
   getHousehold: "read-only",
@@ -215,11 +213,10 @@ describe("authorization matrix (M6): every exported casting/identity mutator dec
       expect(callers).toEqual([]);
     });
 
-    it("casting/repository.ts: NOT_APPLICABLE + KNOWN_OPEN + cases below == every exported function", () => {
+    it("casting/repository.ts: NOT_APPLICABLE + cases below == every exported function", () => {
       const all = new Set(exportedFunctionNames(castingRepo as unknown as Record<string, unknown>));
       const classified = new Set([
         ...Object.keys(NOT_APPLICABLE_CASTING),
-        ...Object.keys(KNOWN_OPEN_CASTING),
         ...CASTING_CASE_NAMES,
       ]);
       const unclassified = [...all].filter((n) => !classified.has(n)).sort();
@@ -239,12 +236,6 @@ describe("authorization matrix (M6): every exported casting/identity mutator dec
       const stale = [...classified].filter((n) => !all.has(n)).sort();
       expect(unclassified, `Unclassified identity export(s): ${unclassified.join(", ")}`).toEqual([]);
       expect(stale, `Stale classification entries (no longer exported): ${stale.join(", ")}`).toEqual([]);
-    });
-
-    it("KNOWN_OPEN's one entry (transitionApplication) has no route caller yet", () => {
-      for (const name of Object.keys(KNOWN_OPEN_CASTING)) {
-        expect(srcAppReferencesName(name), `${name} is now called from src/app — it must be guarded, not left KNOWN_OPEN`).toBe(false);
-      }
     });
   });
 
@@ -364,6 +355,50 @@ describe("authorization matrix (M6): every exported casting/identity mutator dec
         tx.select().from(application).where(eq(application.roundId, round.id)),
       );
       expect(rows).toHaveLength(0);
+    });
+
+    // FR-3.24, AC-3.21 (application-pipeline): the guard on every state change and on a correction.
+    // A plain resident holds neither permission, so both are refused on the permission before the
+    // row is read, and nothing changes. The finer cases (backward, pending step, stale) are in
+    // application-transition-guard.test.ts and application-correction.test.ts.
+    it("transitionApplication", async () => {
+      const room = await castingRepo.createRoom(hh.context, "Room A", adminActor);
+      const round = await castingRepo.createAndOpenRound(moderator.context, "Round", [room.id], moderatorActor);
+      const { id } = await castingRepo.captureApplication(moderator.context, {
+        roundId: round.id,
+        applicantName: "Testbewerbung Matrix",
+        collectedFrom: "data_subject",
+      });
+      await expect(castingRepo.transitionApplication(residentCtx, id, "screened")).rejects.toThrow(
+        PermissionDeniedError,
+      );
+      const [row] = await withSessionContext(moderator.context, (tx) =>
+        tx.select().from(application).where(eq(application.id, id)),
+      );
+      expect(row.state).toBe("new");
+    });
+
+    it("updateApplication", async () => {
+      const room = await castingRepo.createRoom(hh.context, "Room A", adminActor);
+      const round = await castingRepo.createAndOpenRound(moderator.context, "Round", [room.id], moderatorActor);
+      const { id } = await castingRepo.captureApplication(moderator.context, {
+        roundId: round.id,
+        applicantName: "Testbewerbung Matrix",
+        collectedFrom: "data_subject",
+      });
+      await expect(
+        castingRepo.updateApplication(residentCtx, {
+          roundId: round.id,
+          applicationId: id,
+          baseline: "not-a-real-baseline",
+          applicantName: "Geändert",
+          collectedFrom: "data_subject",
+        }),
+      ).rejects.toThrow(PermissionDeniedError);
+      const [row] = await withSessionContext(moderator.context, (tx) =>
+        tx.select().from(application).where(eq(application.id, id)),
+      );
+      expect(row.applicantName).toBe("Testbewerbung Matrix");
     });
 
     it("updateHouseholdSettingsWithProcedureLock", async () => {
@@ -532,6 +567,8 @@ const CASTING_CASE_NAMES = [
   "createAndOpenRound",
   "addResidentToRound",
   "captureApplication",
+  "transitionApplication",
+  "updateApplication",
   "updateHouseholdSettingsWithProcedureLock",
   "forceChangeSettingWhileRoundOpen",
 ];

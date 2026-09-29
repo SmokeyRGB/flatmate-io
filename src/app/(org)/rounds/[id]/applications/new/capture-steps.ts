@@ -9,6 +9,20 @@ import {
 
 export type CaptureStep = 1 | 2 | 3;
 
+// The two modes of the form (F3 change 3, design D5): capturing a new application, or correcting a
+// stored one. `wasThirdParty` is whether the STORED application already had a third-party source.
+export type StepMode = { kind: "capture" } | { kind: "edit"; wasThirdParty: boolean };
+
+// Whether the notice step applies: a capture with a third-party source (as before), or a
+// correction that SWITCHES to a third party during this correction (EC-3.5, "from the moment of the
+// change"). An application that already was a third party keeps its notice on the detail, so
+// repeating it in the correction form would be noise. Every place that branches on `thirdParty` for
+// the notice goes through this: decideSubmit, the step-2 button and the notice's mount.
+export function noticeDue(mode: StepMode, thirdParty: boolean): boolean {
+  if (!thirdParty) return false;
+  return mode.kind === "capture" || !mode.wasThirdParty;
+}
+
 export interface CaptureValues {
   message: string;
   name: string;

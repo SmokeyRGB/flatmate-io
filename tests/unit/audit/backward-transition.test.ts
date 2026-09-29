@@ -2,68 +2,51 @@ import { eq } from "drizzle-orm";
 import { afterEach, describe, expect, it } from "vitest";
 import { withSessionContext } from "@/db/session-context";
 import { activityEvent } from "@/modules/audit/schema";
-import { application, castingRound } from "@/modules/casting/schema";
+import { application } from "@/modules/casting/schema";
 import { transitionApplication } from "@/modules/casting/repository";
 import { isBackwardTransition } from "@/modules/casting/transitions";
 import { insertTestRound, syntheticApplication } from "../../helpers/applications";
-import { uuid } from "../../helpers/uuid";
+import { createTestModerator, registerTestHousehold, type TestHousehold } from "../../helpers/identity";
 
 // FR-0.11: a permitted backward transition produces exactly one ActivityEvent naming the acting
 // account and profile and recording the originating and target state.
 describe("Backward transition produces exactly one ActivityEvent (FR-0.11, G-D3)", () => {
-  // These households are invented uuids that no Household row backs, so registerTestHousehold's
-  // cleanup() never covered them and each run leaked its Application. The ActivityEvent this test
-  // asserts on is append-only (FR-0.13) and stays by design.
-  const seededHouseholds: string[] = [];
+  // Setup only (F3 change 3, FR-3.24): transitionApplication now checks the caller's permission
+  // in the repository, so the acting account must be a real moderator of a real household. The
+  // ActivityEvent this test asserts on is append-only (FR-0.13) and stays by design; everything
+  // else, the seeded round and application included, goes with hh.cleanup().
+  let hh: TestHousehold | undefined;
 
   afterEach(async () => {
-    // G-D15 (openspec application-requires-resident-profile, design Decision 6, human-approved
-    // 2026-09-24, teardown only): `application` now carries a RESTRICTIVE policy requiring a
-    // resident profile. A profile-less context here would make this DELETE match zero rows and
-    // silently orphan the seeded row instead of removing it — a synthetic profile id is used only
-    // to satisfy the policy for this teardown delete (Decision 1's policy checks presence, not
-    // identity).
-    for (const householdId of seededHouseholds) {
-      await withSessionContext({ accountId: uuid(), householdId, profileId: uuid() }, (tx) =>
-        tx.delete(application).where(eq(application.householdId, householdId)),
-      );
-      // The seeded round (drizzle/0023: an application needs a real round) is removed as well.
-      await withSessionContext({ accountId: uuid(), householdId, profileId: uuid() }, (tx) =>
-        tx.delete(castingRound).where(eq(castingRound.householdId, householdId)),
-      );
-    }
-    seededHouseholds.length = 0;
+    await hh?.cleanup();
+    hh = undefined;
   });
 
   it("records actor_account_id, actor_profile_id, fromState, and toState on screened -> new", async () => {
     expect(isBackwardTransition("screened", "new")).toBe(true);
 
-    const householdId = uuid();
-    seededHouseholds.push(householdId);
-    const profileId = uuid();
-    const actor = { accountId: uuid(), profileId };
+    hh = await registerTestHousehold();
+    const householdId = hh.householdId;
+    const moderator = await createTestModerator(hh);
+    const profileId = moderator.profileId;
+    const actor = { accountId: moderator.accountId, profileId: moderator.profileId };
 
-    const [seed] = await withSessionContext({ accountId: uuid(), householdId, profileId: profileId }, async (tx) => {
+    const [seed] = await withSessionContext(moderator.context, async (tx) => {
       const roundId = await insertTestRound(tx, householdId);
       return tx
         .insert(application)
         .values(
           syntheticApplication(
-            { householdId, roundId, createdByAccountId: uuid(), createdByProfileId: profileId },
+            { householdId, roundId, createdByAccountId: moderator.accountId, createdByProfileId: profileId },
             { state: "screened" },
           ),
         )
         .returning();
     });
 
-    await transitionApplication(
-      { accountId: uuid(), householdId, profileId: profileId },
-      seed.id,
-      "new",
-      actor,
-    );
+    await transitionApplication(moderator.context, seed.id, "new");
 
-    const events = await withSessionContext({ accountId: uuid(), householdId, profileId: profileId }, (tx) =>
+    const events = await withSessionContext(moderator.context, (tx) =>
       tx
         .select()
         .from(activityEvent)

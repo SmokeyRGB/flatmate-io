@@ -214,15 +214,20 @@ describe("getStartOverview (start-screen design.md Decision 4)", () => {
     const round = await createRound(founder.context, "Round", [room.id], actorOf(founder));
     await openRound(founder.context, round.id, actorOf(founder));
 
+    // F3 change 3 (FR-3.24, D6/D6a): the plain resident's walk-back from `moved_in` was reachable
+    // only while transitionApplication was unguarded. Now it needs the permission, and every row
+    // past `invited` is a `pending` step (appointment, interview, offer, move-in reversal) that is
+    // refused until that step is built. So the row is inserted directly at `invited`, with
+    // became_resident_id set, the state the declared walk-back (zustandsmaschinen.md §3.1, P-4)
+    // makes reachable once those steps exist. The founder (a moderator) then takes the one
+    // `state_only` step invited -> screened; a `screened` row that carries became_resident_id is
+    // exactly what the T-5 predicate must exclude.
     const own = await insertApplication(hh, other.context, {
       roundId: round.id,
-      state: "moved_in",
+      state: "invited",
       becameResidentId: founder.profileId,
     });
-    const actor = { accountId: other.accountId, profileId: other.profileId };
-    for (const to of ["offer_made", "interviewed", "scheduled", "invited", "screened"] as const) {
-      await transitionApplication(other.context, own.id, to, actor);
-    }
+    await transitionApplication(founder.context, own.id, "screened");
     await insertApplication(hh, other.context, { roundId: round.id, state: "new" });
 
     const founderView = await getStartOverview(founder.context);

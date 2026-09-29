@@ -44,10 +44,9 @@ describe("[GUARDED] G-D15: no Application is visible or writable without a resid
     const seenByHousehold = await getApplication(hh.context, seed.id);
     expect(seenByHousehold).toBeNull();
 
-    const actor = { accountId: hh.accountId, profileId: null };
     let caught: unknown;
     try {
-      await transitionApplication(hh.context, seed.id, "screened", actor);
+      await transitionApplication(hh.context, seed.id, "screened");
     } catch (error) {
       caught = error;
     }
@@ -98,9 +97,13 @@ describe("[GUARDED] G-D15: no Application is visible or writable without a resid
     expect(remaining).toHaveLength(0);
   });
 
-  // Deliberate break, seen failing 2026-09-24: removing the early
+  // Deliberate break, seen failing 2026-09-24 and again 2026-09-29: removing the early
   // `if (context.profileId === null) throw new ProfileRequiredError(...)` in
-  // transitionApplication makes this test fail on the error CODE, because the RESTRICTIVE policy
-  // still hides the row and the function instead throws a plain Error("Application not found")
-  // ("expected Error: Application not found: … to be an instance of ProfileRequiredError").
+  // transitionApplication makes this test fail on the error CLASS. Since F3 change 3 the function
+  // checks `change_application_state` before it reads the row: the household account's membership
+  // passes the profile match (both profiles are null) but holds no such permission, so it throws
+  // PermissionDeniedError instead ("expected PermissionDeniedError: Missing permission… to be an
+  // instance of ProfileRequiredError"). Before change 3 the RESTRICTIVE policy hid the row and the
+  // failure was a plain Error("Application not found"). Comment updated with the human's approval,
+  // 2026-09-29; no expect line changed.
 });

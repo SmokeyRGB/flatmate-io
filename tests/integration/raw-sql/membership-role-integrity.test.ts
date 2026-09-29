@@ -137,6 +137,48 @@ describe("[G-C7 raw SQL] membership role integrity (drizzle/0024)", () => {
     );
   });
 
+  // drizzle/0027: `reverse_application_state` is moderator-only (matrix ❌, not ⬜), while
+  // `change_application_state` may be granted individually (⬜).
+  it("a live member cannot be granted reverse_application_state, but can be granted change_application_state", async () => {
+    hh = await registerTestHousehold();
+    const member = await claimMember(hh, "GrantedMember");
+    // (a) refused, by the moderator-only CHECK and no other
+    await expectCheckViolation(
+      hh,
+      sql`UPDATE membership SET permissions = permissions || ARRAY['reverse_application_state']::text[]
+          WHERE account_id = ${member.accountId}::uuid`,
+      "membership_moderator_only_permissions",
+    );
+    // (b) accepted
+    await withSessionContext(hh.context, (tx) =>
+      tx.execute(
+        sql`UPDATE membership SET permissions = permissions || ARRAY['change_application_state']::text[]
+            WHERE account_id = ${member.accountId}::uuid`,
+      ),
+    );
+    const [row] = await withSessionContext(hh.context, (tx) =>
+      tx.select().from(membership).where(eq(membership.accountId, member.accountId)),
+    );
+    expect(row.permissions).toContain("change_application_state");
+    expect(row.permissions).not.toContain("reverse_application_state");
+  });
+
+  it("refuses to take reverse_application_state away from a live moderator (drizzle/0027)", async () => {
+    hh = await registerTestHousehold();
+    const moderator = await createTestModerator(hh);
+    await expectCheckViolation(
+      hh,
+      sql`UPDATE membership SET permissions = array_remove(permissions, 'reverse_application_state')
+          WHERE account_id = ${moderator.accountId}::uuid`,
+      "membership_moderator_holds_role_permissions",
+    );
+  });
+
+  // (a)'s deliberate break is ARGUED, not executed: without membership_moderator_only_permissions,
+  // the first UPDATE succeeds (no other constraint, trigger or policy looks at the value), so
+  // `caught` is undefined and `toBeInstanceOf(Error)` fails. (c) was run with a scratch pre-0027
+  // (four-value) literal: the array_remove would then be accepted and the test fails the same way.
+
   // Deliberate break (ARGUED, not executed — design D11: DATABASE_URL is app_runtime, which cannot
   // drop a constraint, and a drop on the shared dev database would take an ACCESS EXCLUSIVE lock;
   // the raw-sql/membership-resident-pairing.test.ts precedent). With drizzle/0024's five CHECKs

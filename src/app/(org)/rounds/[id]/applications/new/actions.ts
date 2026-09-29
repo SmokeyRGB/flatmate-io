@@ -16,7 +16,11 @@ export type CaptureErrorCode =
   | ApplicationCaptureError["code"]
   | "permission_denied"
   | "profile_required"
-  | "save_failed";
+  | "save_failed"
+  // Only the correction form (edit/actions.ts) returns these two; it shares this state shape so the
+  // one form component can drive either action.
+  | "not_found"
+  | "stale";
 
 // D4 / spec "a refusal never echoes what was typed": the ONLY thing that comes back is a refusal
 // code and at most a field name. No message, no value, no error object. `next dev` logs a server

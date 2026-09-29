@@ -7,10 +7,15 @@ import {
   MAX_CONTACTS,
   type ApplicationInputField,
 } from "@/modules/casting/application-input";
-import { formatDateDe, noticeCategories, oneMonthAfter } from "@/modules/casting/application-notice";
+import {
+  formatDateDe,
+  noticeCategories,
+  oneMonthAfter,
+} from "@/modules/casting/application-notice";
 import { de } from "@/ui/strings";
 import { SubmitButton } from "@/ui/submit-button";
-import { ThirdPartyNotice } from "../third-party-notice";
+import { ThirdPartyNotice } from "../notice";
+import { updateApplicationAction } from "../[applicationId]/edit/actions";
 import { captureApplicationAction, type CaptureErrorCode, type CaptureFormState } from "./actions";
 import {
   carriedFields,
@@ -18,13 +23,22 @@ import {
   tooLongContactIndex,
   contactFields,
   decideSubmit,
+  noticeDue,
   stepBack,
   stepForField,
   type CaptureStep,
+  type CaptureValues,
+  type StepMode,
 } from "./capture-steps";
 
 const t = de.applications.capture;
-const e = de.applications.errors;
+// The refusal texts by mode: the correction form names correcting where the capture text names
+// capturing (Copilot, PR #41); every other code reads the same in both.
+const CAPTURE_ERRORS = de.applications.errors;
+const EDIT_ERRORS = { ...de.applications.errors, ...de.applications.edit.errors };
+export function errorTextsFor(kind: FormMode["kind"]) {
+  return kind === "edit" ? EDIT_ERRORS : CAPTURE_ERRORS;
+}
 const FORM_ID = "capture-application-form";
 const initialState: CaptureFormState = { status: "idle" };
 
@@ -38,6 +52,23 @@ interface AttrRow {
   value: string;
 }
 
+// The two modes of the form (F3 change 3, design D5). `stored` is what the application holds now
+// (named `stored`, not `initial`, which is the test-only prop below); `baseline` is the digest of
+// those values, sent back so the repository can refuse a stale form; `capturedAt` is an ISO instant,
+// from which the one-month date of a switch to a third party is counted (EC-3.5), never from now.
+export type FormMode =
+  | { kind: "capture" }
+  | {
+      kind: "edit";
+      applicationId: string;
+      baseline: string;
+      stored: CaptureValues & { thirdParty: boolean };
+      capturedAt: string;
+      // Whether the one-month date has passed, decided by the page on the server: computing it
+      // with `new Date()` during render could differ between the server and the hydration.
+      deadlinePassed: boolean;
+    };
+
 // What the form shows under a field: a refusal's code and the field it named. Never a value.
 interface ShownError {
   code: CaptureErrorCode;
@@ -45,7 +76,9 @@ interface ShownError {
 }
 
 // Screen O3, in three quiet steps on one route (design D6): the message, the details, and the
-// notice only for a third-party source. Every value lives in CLIENT STATE (controlled inputs) until
+// notice only for a third-party source. In `edit` mode it is the correction form of O5 (design D5):
+// the same three steps, pre-filled, opening on the message; the notice step appears only when the
+// source is switched to a third party during this correction. Every value lives in CLIENT STATE (controlled inputs) until
 // the final click; nothing is kept in the URL, in storage or on the server, and a reload starts
 // over. The steps that are not on screen travel as hidden inputs (capture-steps.ts), so one <form>
 // spans all three.
@@ -63,27 +96,46 @@ export function CaptureForm({
   household,
   dateLabel,
   initial,
+  mode = { kind: "capture" },
 }: {
   roundId: string;
   household: string;
   dateLabel: string;
+  mode?: FormMode;
   // Only for the render tests, which cannot press a button: start on another step, with the box
   // ticked, or with some further-details rows.
   initial?: { step?: CaptureStep; thirdParty?: boolean; extraRows?: number };
 }) {
-  const [state, formAction] = useActionState(captureApplicationAction, initialState);
+  const edit = mode.kind === "edit" ? mode : null;
+  const e = errorTextsFor(mode.kind);
+  const stepMode: StepMode = edit ? { kind: "edit", wasThirdParty: edit.stored.thirdParty } : { kind: "capture" };
+  const [state, formAction] = useActionState(edit ? updateApplicationAction : captureApplicationAction, initialState);
   const [isPending, startTransition] = useTransition();
 
+  // Capture and correction both open on the message, so a correction walks the same steps (human
+  // walkthrough, 2026-09-29: opening on „Angaben" hid the message behind „Zurück").
   const [step, setStep] = useState<CaptureStep>(initial?.step ?? 1);
-  const [message, setMessage] = useState("");
-  const [name, setName] = useState("");
-  const [age, setAge] = useState("");
-  const [contacts, setContacts] = useState<string[]>([""]);
-  const [rows, setRows] = useState<AttrRow[]>(
-    Array.from({ length: initial?.extraRows ?? 0 }, (_, i) => ({ key: i + 1, label: "", value: "" })),
+  const [message, setMessage] = useState(edit?.stored.message ?? "");
+  const [name, setName] = useState(edit?.stored.name ?? "");
+  const [age, setAge] = useState(edit?.stored.age ?? "");
+  const [contacts, setContacts] = useState<string[]>(
+    edit && edit.stored.contacts.length > 0 ? edit.stored.contacts : [""],
   );
-  const [nextKey, setNextKey] = useState((initial?.extraRows ?? 0) + 1);
-  const [thirdParty, setThirdParty] = useState(initial?.thirdParty ?? false);
+  const storedRows: AttrRow[] = (edit?.stored.attributes ?? []).map((a, i) => ({
+    key: i + 1,
+    label: a.label,
+    value: a.value,
+  }));
+  const [rows, setRows] = useState<AttrRow[]>(
+    storedRows.length > 0
+      ? storedRows
+      : Array.from({ length: initial?.extraRows ?? 0 }, (_, i) => ({ key: i + 1, label: "", value: "" })),
+  );
+  const [nextKey, setNextKey] = useState((storedRows.length > 0 ? storedRows.length : (initial?.extraRows ?? 0)) + 1);
+  const [thirdParty, setThirdParty] = useState(initial?.thirdParty ?? edit?.stored.thirdParty ?? false);
+  // Every branch on the source for the notice goes through this one value (design D5): in edit mode
+  // the notice is due only when the source was switched to a third party in THIS correction.
+  const due = noticeDue(stepMode, thirdParty);
   const [shown, setShown] = useState<ShownError | null>(null);
   const [seenState, setSeenState] = useState(state);
 
@@ -109,7 +161,7 @@ export function CaptureForm({
   function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (isPending) return;
-    const decision = decideSubmit(step, { thirdParty, name });
+    const decision = decideSubmit(step, { thirdParty: due, name });
     if (decision.kind === "go") return goTo(decision.step);
     if (decision.kind === "blank_name") {
       // The server stays authoritative; this only spares a round trip for the one required field.
@@ -164,6 +216,8 @@ export function CaptureForm({
         noValidate
       >
         <input type="hidden" name="roundId" value={roundId} />
+        {edit && <input type="hidden" name="applicationId" value={edit.applicationId} />}
+        {edit && <input type="hidden" name="baseline" value={edit.baseline} />}
         {/* The collection source (S-38, FR-3.9): explicit in BOTH cases, carried by this input. */}
         <input type="hidden" name="collectedFrom" value={thirdParty ? "third_party" : "data_subject"} />
         {carriedFields(step, values).map((field, i) => (
@@ -172,7 +226,7 @@ export function CaptureForm({
 
         {step === 1 && (
           <>
-            <p className="text-sm text-muted-foreground">{t.messageIntro}</p>
+            <p className="text-sm text-muted-foreground">{edit ? de.applications.edit.messageIntro : t.messageIntro}</p>
             <div>
               <label htmlFor="message" className="field-label">
                 {t.messageLabel}
@@ -391,12 +445,12 @@ export function CaptureForm({
               <button type="button" className="btn btn-secondary" onClick={() => goTo(stepBack(2))}>
                 {t.back}
               </button>
-              {thirdParty ? (
+              {due ? (
                 <button
                   type="button"
                   className="btn btn-primary"
                   onClick={() => {
-                    const decision = decideSubmit(2, { thirdParty, name });
+                    const decision = decideSubmit(2, { thirdParty: due, name });
                     if (decision.kind === "go") goTo(decision.step);
                     else setShown({ code: "name_required", field: "applicantName" });
                   }}
@@ -404,8 +458,12 @@ export function CaptureForm({
                   {t.next}
                 </button>
               ) : (
-                <SubmitButton className="btn btn-primary" pending={isPending} pendingLabel={t.savePending}>
-                  {t.save}
+                <SubmitButton
+                  className="btn btn-primary"
+                  pending={isPending}
+                  pendingLabel={edit ? de.applications.edit.savePending : t.savePending}
+                >
+                  {edit ? de.applications.edit.save : t.save}
                 </SubmitButton>
               )}
             </div>
@@ -416,7 +474,7 @@ export function CaptureForm({
       {/* Outside the <form>: the edited text is never posted. „Verstanden" saves. */}
       {/* Kept mounted while the box is ticked and only hidden off step 3, so an edited example text
           survives „Zurück" and „Weiter" (code review). */}
-      {thirdParty && (
+      {due && (
         <div hidden={step !== 3} className="space-y-4">
           <ThirdPartyNotice
             applicantName={name}
@@ -426,8 +484,16 @@ export function CaptureForm({
             // across midnight would otherwise show a date a day earlier than the one the detail
             // page computes from created_at (code review). The server's value is the fallback for
             // the render tests, which have no live clock to match.
-            dateLabel={typeof window === "undefined" ? dateLabel : formatDateDe(oneMonthAfter(new Date()))}
-            deadlinePassed={false}
+            // In edit mode the date is counted from the CAPTURE, never from now (EC-3.5): the
+            // application is already stored, and a passed date says so.
+            dateLabel={
+              edit
+                ? formatDateDe(oneMonthAfter(new Date(edit.capturedAt)))
+                : typeof window === "undefined"
+                  ? dateLabel
+                  : formatDateDe(oneMonthAfter(new Date()))
+            }
+            deadlinePassed={edit ? edit.deadlinePassed : false}
             understood={{ formId: FORM_ID, pending: isPending }}
           />
           {step === 3 && generalError}

@@ -24,8 +24,9 @@ import {
 //   2. createResidentProfile's `if (actor.accountId)` skipped assertIsAdministration entirely for
 //      a null accountId, instead of refusing.
 //   3. transitionResidentProfileStatus had no authorization check anywhere in its call chain.
-// transitionApplication (casting/repository.ts) is the one gap NOT fixed here — no authorization
-// rule exists yet for it (F3's decision) — recorded as M6's KNOWN_OPEN entry instead.
+// transitionApplication (casting/repository.ts) was the one gap NOT fixed here — no authorization
+// rule existed for it yet (F3's decision), so it was M6's KNOWN_OPEN entry. F3 change 3
+// (application-pipeline, FR-3.24) guards it, and the entry is gone.
 
 const PASSWORD = "test-password-not-real-1234";
 

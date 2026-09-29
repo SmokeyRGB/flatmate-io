@@ -4,6 +4,7 @@ import {
   clashingContactIndex,
   contactFields,
   decideSubmit,
+  noticeDue,
   stepBack,
   stepForField,
   tooLongContactIndex,
@@ -123,5 +124,27 @@ describe("tooLongContactIndex", () => {
     expect(tooLongContactIndex(["lea@example.test", "x".repeat(200)])).toBeNull();
     // 230 code points: too long for the other column (200), not for the email column (254).
     expect(tooLongContactIndex(["a".repeat(225) + "@b.de"])).toBeNull();
+  });
+});
+
+describe("noticeDue: the notice step applies from the moment of the change (EC-3.5)", () => {
+  it("capture: exactly when the box is ticked", () => {
+    expect(noticeDue({ kind: "capture" }, true)).toBe(true);
+    expect(noticeDue({ kind: "capture" }, false)).toBe(false);
+  });
+
+  // Break: make noticeDue true for an application that was already a third party, and this fails.
+  it("a correction: only when it switches TO a third party, never for one that already was", () => {
+    expect(noticeDue({ kind: "edit", wasThirdParty: false }, true)).toBe(true);
+    expect(noticeDue({ kind: "edit", wasThirdParty: false }, false)).toBe(false);
+    expect(noticeDue({ kind: "edit", wasThirdParty: true }, true)).toBe(false);
+    expect(noticeDue({ kind: "edit", wasThirdParty: true }, false)).toBe(false);
+  });
+
+  it("feeds decideSubmit: an already-third-party correction goes straight to save from step 2", () => {
+    const mode = { kind: "edit", wasThirdParty: true } as const;
+    expect(decideSubmit(2, { thirdParty: noticeDue(mode, true), name: "Lea" })).toEqual({ kind: "save" });
+    const switching = { kind: "edit", wasThirdParty: false } as const;
+    expect(decideSubmit(2, { thirdParty: noticeDue(switching, true), name: "Lea" })).toEqual({ kind: "go", step: 3 });
   });
 });

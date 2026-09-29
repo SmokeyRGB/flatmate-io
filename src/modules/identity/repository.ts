@@ -451,14 +451,35 @@ export async function assertHoldsAnyPermissionTx(
   options: { lock: boolean } = { lock: true },
 ): Promise<void> {
   const denied = () => new PermissionDeniedError(permissions.join(" | "));
+  const row = await readLiveMembershipTx(tx, context, options.lock);
+  if (!row) throw denied();
+  if (!permissions.some((p) => membershipHoldsPermission(row, p))) throw denied();
+}
+
+// The same primitive for a rule that needs EVERY listed permission (a transition's `requires`,
+// casting/transitions.ts). One read of the locked row checks them all, where one
+// assertHasPermissionTx per entry would read the same row again for each (code review).
+export async function assertHoldsAllPermissionsTx(
+  tx: Tx,
+  context: SessionContext,
+  permissions: readonly string[],
+): Promise<void> {
+  const row = await readLiveMembershipTx(tx, context, true);
+  const missing = permissions.find((p) => !row || !membershipHoldsPermission(row, p));
+  if (!row || missing !== undefined) throw new PermissionDeniedError(missing ?? permissions.join(" & "));
+}
+
+// The caller's live membership, read inside the caller's transaction (FOR SHARE when `lock`), or
+// null when there is none or its resident profile is not the one the session claims (a stale
+// claim). Shared by the two in-transaction permission primitives above, so they cannot drift.
+async function readLiveMembershipTx(tx: Tx, context: SessionContext, lock: boolean) {
   const query = tx
     .select()
     .from(membership)
     .where(and(eq(membership.accountId, context.accountId), isNull(membership.revokedAt)));
-  const [row] = options.lock ? await query.for("share") : await query;
-  if (!row) throw denied();
-  if (row.residentProfileId !== context.profileId) throw denied();
-  if (!permissions.some((p) => membershipHoldsPermission(row, p))) throw denied();
+  const [row] = lock ? await query.for("share") : await query;
+  if (!row || row.residentProfileId !== context.profileId) return null;
+  return row;
 }
 
 export async function assertHasPermissionTx(
