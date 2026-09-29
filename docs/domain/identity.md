@@ -497,8 +497,8 @@ Vergebbare Werte in `permissions` (Vorschlag, erweiterbar):
 > `backlog/requirements/F1-requirements.md` §8 Punkt 1 (*„the household account's own resident
 > profile holds it initially"*), die daneben lag, sobald eine Mitbewohnerin vor der registrierenden
 > Person selbst beitrat, und die einem Profil eine für alle anderen unsichtbare Sonderstellung gab.
-> Jetzt gilt dasselbe Muster wie bei `manage_rooms` oben: **Vorbelegt bei `household_admin` und
-> `moderator`.** Wer eine Runde eröffnen, öffnen oder schließen will, muss dafür zur Moderation
+> Jetzt gilt dasselbe Muster wie bei `manage_rooms` oben: **Vorbelegt bei `moderator`** (`03-PRD.md` §4.0.1 und S-50/U-20:
+> „der Haushalts-Account eröffnet und schließt keine Runde"). Wer eine Runde eröffnen, öffnen oder schließen will, muss dafür zur Moderation
 > ernannt werden — das ist sichtbar und nachvollziehbar, der frühere Automatismus war es nicht.
 >
 > **Abgabebedingung, in dieser Notiz selbst getragen:** zwei benannte Rolle-Vorbelegungen sind noch
@@ -528,9 +528,20 @@ Vergebbare Werte in `permissions` (Vorschlag, erweiterbar):
 > beiden Bewohnenden ❌, nicht ⬜. `delete_data` bleibt unvergeben; es gehört zum Löschweg der
 > Aufbewahrung und der Betroffenenrechte (v0.2), nicht zur Handlöschung.
 >
-> **Neue Abgabebedingung:** Eine **fünfte** Rolle-Vorbelegung, oder eine, die keine höherrangige
-> Quelle (Rechtematrix) bereits vorgibt, oder ein Bündel, das Nutzende selbst zusammenstellen
-> können, ist ein Vorlagensystem. Dann wird S-04 ausdrücklich entschieden, nicht gedehnt.
+> **Abgabebedingung (korrigiert 2026-09-28, F3-Planung):** Maßgeblich ist nicht die Zahl der
+> Vorbelegungen, sondern ihre Quelle. Moderator:in ist, wer die Rechte der Moderation **hat**:
+> Die Ernennung trägt die Rechte, die die Rechtematrix (`03-PRD.md` §4.0.1) der Moderation mit ✅
+> gibt und die als Recht geprüft werden, in `Membership.permissions` ein. Die Rückstufung nimmt
+> sie wieder heraus, und die Datenbank verweigert eine Moderation ohne sie. Geprüft wird immer das
+> Recht, nie die Rolle. „Haushalt", „Bewohnende" und „Moderation" sind nur Namen für feste
+> Rechtebündel: Registrierung, Beitritt und Ernennung tragen sie ein; Rückstufung, Auszug und
+> Entfernen nehmen sie wieder heraus. Eine ✅-Handlung, die ein späteres Feature baut (etwa
+> `confirm_appointment`), wird dort zur Vorbelegung, ohne neue Entscheidung. **Ein
+> Vorlagensystem**, über das S-04 ausdrücklich zu entscheiden ist, statt es zu dehnen, wäre
+> dagegen: eine Vorbelegung, die die Matrix der Rolle nicht mit ✅ gibt, oder ein Bündel, das
+> Nutzende selbst zusammenstellen können. *(Vorher: „Eine **fünfte** Rolle-Vorbelegung, oder …" —
+> die Zählung hätte F5 für `confirm_appointment` eine S-04-Entscheidung abverlangt, die die Matrix
+> mit Vorrang 3 längst getroffen hat.)*
 
 > **`role` und `permissions` sind 🟠, nicht ⚙️** — entschieden in der Querprüfung gegen
 > `06-Compliance-Anhang.md` (O-9 Grenzfall 1), **gegen** den ursprünglichen Vorschlag dieses

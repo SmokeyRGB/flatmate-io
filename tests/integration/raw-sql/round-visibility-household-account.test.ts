@@ -2,7 +2,7 @@ import { sql } from "drizzle-orm";
 import { afterEach, describe, expect, it } from "vitest";
 import { withSessionContext } from "@/db/session-context";
 import { createRoom, createRound } from "@/modules/casting/repository";
-import { registerTestHousehold, type TestHousehold } from "../../helpers/identity";
+import { createTestModerator, registerTestHousehold, type TestHousehold } from "../../helpers/identity";
 
 let hh: TestHousehold | undefined;
 
@@ -20,7 +20,13 @@ describe("[GUARDED] G-D15: no Application-derived column exists on the base cast
     hh = await registerTestHousehold();
     const actor = { accountId: hh.accountId, profileId: null };
     const roomA = await createRoom(hh.context, "Room A", actor);
-    const round = await createRound(hh.context, "Test round", [roomA.id], actor);
+    // Setup only (design D13): the household account no longer creates rounds (S-50/U-20), so a
+    // moderator does. The assertions below still read the round as the household account.
+    const moderator = await createTestModerator(hh);
+    const round = await createRound(moderator.context, "Test round", [roomA.id], {
+      accountId: moderator.accountId,
+      profileId: moderator.profileId,
+    });
 
     const rows = await withSessionContext(hh.context, (tx) =>
       tx.execute<Record<string, unknown>>(

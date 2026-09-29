@@ -1,7 +1,9 @@
 import { createClient } from "@supabase/supabase-js";
 import { sql } from "drizzle-orm";
 import { withSessionContext, type SessionContext } from "@/db/session-context";
-import { registerHousehold } from "@/modules/identity/auth";
+import { claimResidentProfile, registerHousehold } from "@/modules/identity/auth";
+import { createResidentProfile, setMemberRole } from "@/modules/identity/repository";
+import { MODERATOR_PERMISSIONS, membership } from "@/modules/identity/schema";
 import { uuid } from "./uuid";
 
 // The household-scoped delete set (M2, P6: "no foreign keys means a hand-kept deletion
@@ -223,4 +225,61 @@ export async function cleanupAll(...tasks: Array<Promise<unknown> | undefined>):
   if (reasons.length > 0) {
     throw new AggregateError(reasons, "test cleanup failed");
   }
+}
+
+// Design D13 (application-capture): the household account no longer creates, opens or closes a
+// round (03-PRD.md §4.0.1, S-50/U-20), so a test that needs a round sets it up as a moderator.
+// Claims a synthetic resident profile, appoints it moderator through setMemberRole (which stores
+// the moderator's permission set), and returns its SessionContext. The new Auth account is
+// registered with the household's own cleanup, so hh.cleanup() deletes it as well; a caller that
+// also tracks the account id and deletes it itself is harmless (deleteTestAccount tolerates 404).
+//
+// Note: the moderator is a real active resident, so a round opened afterwards counts it as a
+// participant. A test that asserts participant counts must account for it.
+export async function createTestModerator(
+  hh: TestHousehold,
+  displayName = `Moderator ${uuid().slice(0, 8)}`,
+): Promise<{ context: SessionContext; accountId: string; profileId: string }> {
+  const actor = { accountId: hh.accountId, profileId: null };
+  const profile = await createResidentProfile(hh.context, displayName, actor);
+  const { accountId } = await claimResidentProfile(hh.context, profile.id, "test-password-not-real-1234");
+  await setMemberRole(hh.context, hh.accountId, accountId, "moderator");
+  const originalCleanup = hh.cleanup;
+  hh.cleanup = async () => {
+    await originalCleanup();
+    await deleteTestAccount(accountId);
+  };
+  return {
+    context: { accountId, householdId: hh.householdId, profileId: profile.id },
+    accountId,
+    profileId: profile.id,
+  };
+}
+
+// A moderator that is NOT a resident: a membership row with a random account id, role moderator,
+// is_resident false, no resident profile and the moderator permission set. It can act (round
+// creation, opening) but is never an eligible resident to snapshot, which is what tests of the
+// "no eligible residents" precondition need. Before this helper they moved a claimed moderator's
+// profile out with a direct status change, which left the membership live, a state the identity
+// module now refuses (ClaimedProfileTransitionError). No Auth user is needed (nothing signs in
+// as it), and hh.cleanup() removes the row through household_id.
+export async function createNonResidentModerator(
+  hh: TestHousehold,
+): Promise<{ context: SessionContext; accountId: string; profileId: null }> {
+  const accountId = uuid();
+  await withSessionContext(hh.context, (tx) =>
+    tx.insert(membership).values({
+      householdId: hh.householdId,
+      accountId,
+      residentProfileId: null,
+      isResident: false,
+      role: "moderator",
+      permissions: [...MODERATOR_PERMISSIONS],
+    }),
+  );
+  return {
+    context: { accountId, householdId: hh.householdId, profileId: null },
+    accountId,
+    profileId: null,
+  };
 }

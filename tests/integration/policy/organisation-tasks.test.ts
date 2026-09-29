@@ -10,7 +10,13 @@ import {
   openRound,
   transitionRoomStatus,
 } from "@/modules/casting/repository";
-import { cleanupAll, deleteTestAccount, registerTestHousehold, type TestHousehold } from "../../helpers/identity";
+import {
+  cleanupAll,
+  createTestModerator,
+  deleteTestAccount,
+  registerTestHousehold,
+  type TestHousehold,
+} from "../../helpers/identity";
 import type { SessionContext } from "@/db/session-context";
 
 let hh: TestHousehold | undefined;
@@ -49,34 +55,41 @@ describe("listOrganisationTasks (start-screen design.md Decision 4)", () => {
     hh = await registerTestHousehold();
     const room = await createRoom(hh.context, "Room A", adminActor());
     await openRoom(hh, room.id);
+    // Design D13: the household account holds no close_round any more, so it gets no tasks. The
+    // read moves to a moderator's context; the household's own [] is asserted in its own case (g).
+    const moderator = await createTestModerator(hh);
 
-    const tasks = await listOrganisationTasks(hh.context);
+    const tasks = await listOrganisationTasks(moderator.context);
     expect(tasks).toEqual([{ kind: "open_round_for_room", roomId: room.id, label: "Room A" }]);
   });
 
   it("(b) covered by an open OR a draft round: not counted", async () => {
     hh = await registerTestHousehold();
-    const founder = await claim(hh, "Founder"); // eligible resident for openRound below
+    // Design D13: the moderator is the eligible resident and creates and opens the rounds; the
+    // tasks are read in its context (the household account gets none, case (g)).
+    const founder = await createTestModerator(hh, "Founder");
+    const founderActor = { accountId: founder.accountId, profileId: founder.profileId };
     const roomOpenCovered = await createRoom(hh.context, "Room B", adminActor());
     await openRoom(hh, roomOpenCovered.id);
     const roomDraftCovered = await createRoom(hh.context, "Room C", adminActor());
     await openRoom(hh, roomDraftCovered.id);
 
-    const round = await createRound(hh.context, "Round", [roomOpenCovered.id], adminActor());
-    await openRound(hh.context, round.id, adminActor());
-    await createRound(hh.context, "Draft round", [roomDraftCovered.id], adminActor());
+    const round = await createRound(founder.context, "Round", [roomOpenCovered.id], founderActor);
+    await openRound(founder.context, round.id, founderActor);
+    await createRound(founder.context, "Draft round", [roomDraftCovered.id], founderActor);
 
-    const tasks = await listOrganisationTasks(hh.context);
+    const tasks = await listOrganisationTasks(founder.context);
     expect(tasks.map((t) => t.roomId)).not.toContain(roomOpenCovered.id);
     expect(tasks.map((t) => t.roomId)).not.toContain(roomDraftCovered.id);
-    void founder;
   });
 
   it("(c) a planned room never appears", async () => {
     hh = await registerTestHousehold();
     await createRoom(hh.context, "Room D", adminActor()); // stays 'planned'
+    const moderator = await createTestModerator(hh);
 
-    const tasks = await listOrganisationTasks(hh.context);
+    // Read as a moderator (design D13): the household account's [] would make this vacuous.
+    const tasks = await listOrganisationTasks(moderator.context);
     expect(tasks).toEqual([]);
   });
 
@@ -117,5 +130,17 @@ describe("listOrganisationTasks (start-screen design.md Decision 4)", () => {
 
     const tasks = await listOrganisationTasks(moderator.context);
     expect(tasks.map((t) => t.roomId)).toContain(room.id);
+  });
+});
+
+// Design D13 (application-capture): 03-PRD.md §4.0.1 gives the household account no rounds
+// (S-50/U-20), and close_round is not in HOUSEHOLD_PERMISSIONS, so it gets no tasks.
+describe("listOrganisationTasks for the household account (design D13)", () => {
+  it("(g) the household account gets [] even with an open room covered by no round", async () => {
+    hh = await registerTestHousehold();
+    const room = await createRoom(hh.context, "Room H", adminActor());
+    await openRoom(hh, room.id);
+
+    expect(await listOrganisationTasks(hh.context)).toEqual([]);
   });
 });

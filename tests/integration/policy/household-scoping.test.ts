@@ -1,7 +1,8 @@
 import { eq } from "drizzle-orm";
 import { afterEach, describe, expect, it } from "vitest";
 import { withSessionContext } from "@/db/session-context";
-import { application } from "@/modules/casting/schema";
+import { application, castingRound } from "@/modules/casting/schema";
+import { insertTestRound, syntheticApplication } from "../../helpers/applications";
 import { uuid } from "../../helpers/uuid";
 
 let cleanupIds: string[] = [];
@@ -15,6 +16,12 @@ afterEach(async () => {
     );
   }
   cleanupIds = [];
+  // The rounds seeded for drizzle/0023 (an application needs a real round of its household).
+  for (const householdId of new Set(Object.values(HOUSEHOLD_FOR_CLEANUP))) {
+    await withSessionContext({ accountId: uuid(), householdId, profileId: uuid() }, (tx) =>
+      tx.delete(castingRound).where(eq(castingRound.householdId, householdId)),
+    );
+  }
 });
 
 const HOUSEHOLD_FOR_CLEANUP: Record<string, string> = {};
@@ -31,32 +38,40 @@ describe("Application household isolation — policy layer (AC-0.6)", () => {
 
     const [rowA] = await withSessionContext(
       { accountId: uuid(), householdId: householdA, profileId: profileA },
-      (tx) =>
-        tx
+      async (tx) => {
+        const roundId = await insertTestRound(tx, householdA);
+        return tx
           .insert(application)
-          .values({
-            householdId: householdA,
-            state: "new",
-            createdByAccountId: uuid(),
-            createdByProfileId: profileA,
-          })
-          .returning(),
+          .values(
+            syntheticApplication({
+              householdId: householdA,
+              roundId,
+              createdByAccountId: uuid(),
+              createdByProfileId: profileA,
+            }),
+          )
+          .returning();
+      },
     );
     HOUSEHOLD_FOR_CLEANUP[rowA.id] = householdA;
     cleanupIds.push(rowA.id);
 
     const [rowB] = await withSessionContext(
       { accountId: uuid(), householdId: householdB, profileId: profileB },
-      (tx) =>
-        tx
+      async (tx) => {
+        const roundId = await insertTestRound(tx, householdB);
+        return tx
           .insert(application)
-          .values({
-            householdId: householdB,
-            state: "new",
-            createdByAccountId: uuid(),
-            createdByProfileId: profileB,
-          })
-          .returning(),
+          .values(
+            syntheticApplication({
+              householdId: householdB,
+              roundId,
+              createdByAccountId: uuid(),
+              createdByProfileId: profileB,
+            }),
+          )
+          .returning();
+      },
     );
     HOUSEHOLD_FOR_CLEANUP[rowB.id] = householdB;
     cleanupIds.push(rowB.id);

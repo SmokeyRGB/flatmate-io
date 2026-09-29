@@ -1,11 +1,11 @@
 import { and, eq, isNull } from "drizzle-orm";
 import { afterEach, describe, expect, it } from "vitest";
 import { withSessionContext } from "@/db/session-context";
-import { claimResidentProfile, joinHousehold } from "@/modules/identity/auth";
+import { joinHousehold } from "@/modules/identity/auth";
 import { createRoom, createRound, openRound } from "@/modules/casting/repository";
 import { roundParticipation } from "@/modules/casting/schema";
-import { createResidentProfile, issueJoinCode } from "@/modules/identity/repository";
-import { cleanupAll, deleteTestAccount, registerTestHousehold, type TestHousehold } from "../../helpers/identity";
+import { issueJoinCode } from "@/modules/identity/repository";
+import { cleanupAll, createTestModerator, deleteTestAccount, registerTestHousehold, type TestHousehold } from "../../helpers/identity";
 
 let hh: TestHousehold | undefined;
 const accountIds: string[] = [];
@@ -35,18 +35,15 @@ describe("Joining and open rounds (EC-2.2/EC-2.3)", () => {
     const adminActor = { accountId: hh.accountId, profileId: null };
 
     // openRound needs at least one eligible resident to snapshot (EC-1.4) — unrelated to the join
-    // path itself, just a precondition of opening a round at all.
-    const firstProfile = await createResidentProfile(hh.context, "Founder", adminActor);
-    const { accountId: firstAccountId } = await claimResidentProfile(
-      hh.context,
-      firstProfile.id,
-      "test-password-not-real-1234",
-    );
-    accountIds.push(firstAccountId);
+    // path itself, just a precondition of opening a round at all. Since the household account no
+    // longer runs rounds (design D13), that founding resident is the moderator who opens it, so
+    // the participant counts below are unchanged.
+    const founder = await createTestModerator(hh, "Founder");
+    const founderActor = { accountId: founder.accountId, profileId: founder.profileId };
 
     const room = await createRoom(hh.context, "Room A", adminActor);
-    const round = await createRound(hh.context, "Round", [room.id], adminActor);
-    await openRound(hh.context, round.id, adminActor);
+    const round = await createRound(founder.context, "Round", [room.id], founderActor);
+    await openRound(founder.context, round.id, founderActor);
 
     expect(await activeParticipants(hh, round.id)).toHaveLength(1); // the founding snapshot
 

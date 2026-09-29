@@ -87,20 +87,35 @@ Prozess vs. Person, nicht bei „beschreibend vs. empfehlend".
 
 - Formular ausfüllen **oder** Nachricht einfügen mit Parser-Vorschlag zur Bestätigung (P-1, S-08).
   **In v0.1 nur das Formular**; der Parser-Weg ist v0.2 (S-39, `backlog/requirements/F3-requirements.md`)
-- Einziges Pflichtfeld: `applicant_name`. Optional: Alter, E-Mail, Telefon, anderer Kontakt,
-  Nachricht, weitere Angaben. Längengrenzen sichtbar, bevor sie erreicht sind (F3 C-3.14)
+- Einziges Pflichtfeld: `applicant_name`. Optional: Alter, Kontakt, Nachricht, weitere Angaben.
+  Längengrenzen sichtbar, bevor sie erreicht sind (F3 C-3.14)
+- **Drei ruhige Schritte** *(geändert 2026-09-29, Durchsicht)*: Die Erfassung läuft auf einer
+  Seite in drei Schritten: Nachricht (freiwillig, „Weiter" genügt) → Angaben (Name, Alter,
+  Kontakt, „+ Weitere Angaben", Erhebungsquelle) → Hinweis, der letzte Schritt nur bei
+  Dritterhebung. „Zurück" behält alle Eingaben, und vor dem Speichern geht nichts an den Server.
+  Lehnt der Server eine Angabe ab, springt das Formular zum Schritt mit dem genannten Feld.
+- **Ein Feld „Kontakt"** *(geändert 2026-09-29, Durchsicht)*: eine Eingabe, mit „+ weiteren
+  Kontakt" bis zu drei. Jeder Kontakt wird nach einer festen Regel einer der drei gespeicherten
+  Angaben zugeordnet, und der Bildschirm sagt unter jeder Eingabe, wie sie gespeichert wird:
+  eine Adresse mit genau einem „@" und einem Punkt dahinter als E-Mail-Adresse; Ziffern mit den
+  üblichen Satzzeichen, mindestens sechs Ziffern und höchstens 50 Zeichen, als Telefonnummer; alles andere als sonstiger
+  Kontakt. Zwei Eingaben derselben Art werden abgelehnt, und der Bildschirm nennt die Eingabe, die
+  kollidiert
 - **Erhebungsquelle** *(ergänzt 2026-09-28, S-38)*: die sichtbare Aussage „Angaben von der
   bewerbenden Person" (`collected_from = data_subject`, vorausgewählt) und daneben die Checkbox
   „Die Angaben stammen nicht von der Person selbst (z. B. jemand hat sie euch empfohlen)"
   (`03-PRD.md` §4.1.3)
-- **Art.-14-Hinweis, noch vor dem Speichern** *(ergänzt 2026-09-28)*: ist die Checkbox gesetzt,
-  erscheinen die Frist samt Datum und der Textbaustein *Variante Dritterhebung*
-  (`06-Compliance-Anhang.md` §4.5), vor dem Kopieren änderbar, mit Kopieren-Knopf. **Keine
-  Sende-Handlung** (S-16)
+- **Art.-14-Hinweis, noch vor dem Speichern** *(ergänzt 2026-09-28, geändert 2026-09-29,
+  Durchsicht)*: ist die Checkbox gesetzt, folgt als letzter Schritt ein kurzer, neutraler Hinweis
+  in zwei Zeilen: die Person muss erfahren, dass ihre Angaben gespeichert sind, und der Satz aus
+  `06-Compliance-Anhang.md` §4.5 mit Frist und Datum. „Verstanden" speichert. „Beispieltext
+  anzeigen" öffnet den Textbaustein *Variante Dritterhebung* (`06-Compliance-Anhang.md` §4.5),
+  vor dem Kopieren änderbar, mit Kopieren-Knopf. **Keine Sende-Handlung** (S-16)
 - Anlegt: `Application` im Zustand `new`
-- **Nach dem Speichern** *(ergänzt 2026-09-28)*: bei `data_subject` zurück auf O4 mit der neuen
-  Zeile hervorgehoben; bei `third_party` auf die Detailansicht (O5) mit dem Textbaustein — Pflicht
-  und Text im selben Schritt (F3 R-3.2)
+- **Nach dem Speichern** *(ergänzt 2026-09-28, geändert 2026-09-29, Durchsicht)*: bei beiden
+  Quellen zurück auf O4 mit kurzer Bestätigung. Die Detailansicht (O5) behält den Hinweis, mit
+  dem Datum ab der Erfassung und dem Beispieltext eingeklappt hinter „Beispieltext anzeigen".
+  Pflicht und Text wurden im letzten Schritt gezeigt (F3 R-3.2)
 
 **Abweichende Zustände**
 

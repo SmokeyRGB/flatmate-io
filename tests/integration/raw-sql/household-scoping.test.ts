@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 import { withSessionContext } from "@/db/session-context";
+import { applicationInsertValuesSql, APPLICATION_INSERT_COLUMNS_SQL, insertTestRound } from "../../helpers/applications";
 import { uuid } from "../../helpers/uuid";
 
 // AC-0.6/G-C7, via raw SQL: the SAME scenario as the policy-layer test, but issued as a raw SQL
@@ -17,9 +18,11 @@ describe("Application household isolation — raw SQL (AC-0.6)", () => {
     const rowA = await withSessionContext(
       { accountId: uuid(), householdId: householdA, profileId: profileA },
       async (tx) => {
+        // Setup only (drizzle/0023): every NOT NULL column, and a real round of the household.
+        const roundId = await insertTestRound(tx, householdA);
         const result = await tx.execute<{ id: string }>(
-          sql`INSERT INTO application (household_id, state, created_by_account_id, created_by_profile_id)
-              VALUES (${householdA}::uuid, 'new', ${uuid()}::uuid, ${profileA}::uuid)
+          sql`INSERT INTO application (${APPLICATION_INSERT_COLUMNS_SQL})
+              VALUES ${applicationInsertValuesSql({ householdId: householdA, roundId, accountId: uuid(), profileId: profileA })}
               RETURNING id`,
         );
         return result[0];
@@ -29,9 +32,11 @@ describe("Application household isolation — raw SQL (AC-0.6)", () => {
     const rowB = await withSessionContext(
       { accountId: uuid(), householdId: householdB, profileId: profileB },
       async (tx) => {
+        // Setup only (drizzle/0023): every NOT NULL column, and a real round of the household.
+        const roundId = await insertTestRound(tx, householdB);
         const result = await tx.execute<{ id: string }>(
-          sql`INSERT INTO application (household_id, state, created_by_account_id, created_by_profile_id)
-              VALUES (${householdB}::uuid, 'new', ${uuid()}::uuid, ${profileB}::uuid)
+          sql`INSERT INTO application (${APPLICATION_INSERT_COLUMNS_SQL})
+              VALUES ${applicationInsertValuesSql({ householdId: householdB, roundId, accountId: uuid(), profileId: profileB })}
               RETURNING id`,
         );
         return result[0];
@@ -56,6 +61,13 @@ describe("Application household isolation — raw SQL (AC-0.6)", () => {
     );
     await withSessionContext({ accountId: uuid(), householdId: householdB, profileId: profileB }, (tx) =>
       tx.execute(sql`DELETE FROM application WHERE id = ${rowB.id}::uuid`),
+    );
+    // Teardown of the rounds seeded above.
+    await withSessionContext({ accountId: uuid(), householdId: householdA, profileId: profileA }, (tx) =>
+      tx.execute(sql`DELETE FROM casting_round WHERE household_id = ${householdA}::uuid`),
+    );
+    await withSessionContext({ accountId: uuid(), householdId: householdB, profileId: profileB }, (tx) =>
+      tx.execute(sql`DELETE FROM casting_round WHERE household_id = ${householdB}::uuid`),
     );
   });
 });

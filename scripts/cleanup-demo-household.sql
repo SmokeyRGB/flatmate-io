@@ -56,12 +56,13 @@ BEGIN
   -- There are NO foreign keys in this schema (the two-Supabase-project split), so nothing cascades
   -- and deleting `household` alone would silently orphan every row below it. That is how the
   -- production project accumulated 1.9k rooms and 1.5k rounds before anyone noticed. Order does not
-  -- matter without FKs; the list is what matters, and it is the same list as
+  -- matter without FKs, except application before casting_round (drizzle/0026); the list is what matters, and it is the same list as
   -- tests/helpers/identity.ts's cleanup CTE.
   DELETE FROM round_participation  WHERE household_id = v_household;
+  -- application first: drizzle/0026 refuses to delete a round that still has applications.
+  DELETE FROM application          WHERE household_id = v_household;
   DELETE FROM casting_round        WHERE household_id = v_household;
   DELETE FROM room                 WHERE household_id = v_household;
-  DELETE FROM application          WHERE household_id = v_household;
   DELETE FROM resident_profile     WHERE household_id = v_household;
   DELETE FROM membership           WHERE household_id = v_household;
   DELETE FROM session              WHERE household_id = v_household;
