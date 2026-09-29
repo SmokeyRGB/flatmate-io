@@ -394,71 +394,90 @@ The page maps `null` → `notFound()`, and `PermissionDeniedError` → the permi
   it.
 - `getRoundForSession` / `getRoundParticipants` are unchanged.
 
-### D6 — O3: routes, client state and the PII rule
+### D6 — O3: three quiet steps, client state and the PII rule (human review 2026-09-29)
 
-- **Route** `src/app/(org)/rounds/[id]/applications/new/`:
-  - `page.tsx` (server), `loading.tsx` (a `SkeletonHeading` plus a form-outline skeleton),
-    `actions.ts` and `capture-form.tsx` (client).
-  - The page checks, in this order: session → `redirect("/sign-in")`; `getRoundForSession` null
-    → `notFound()`; profile null or `create_application` missing → the permission state (see
-    below); `round.status !== 'open'` → the no-open-round state; otherwise the form.
-  - For a profile-less session, the permission state uses the §8.6 sentence („Das WG-Konto
-    verwaltet die WG …"). For a resident without the permission it uses O3's text (why, and that
-    the moderation helps).
-- **The form's values live in client state** (`useState`, controlled inputs). The form submits
-  through `onSubmit` + `startTransition(() => formAction(formData))`, not through the `<form
-  action>` prop, so React 19's automatic reset after an action cannot clobber them (pre-mortem
-  17). `SubmitButton` still shows the pending state (the applier checks it reads the transition's
-  pending flag, or passes it explicitly). The action returns only `{ status: "error", code,
-  field? }` and redirects on success, with **`redirect()` outside any `try/catch`**, because it
-  works by throwing. This matters because React 19
-  resets an uncontrolled form after an action, so keeping the values would otherwise mean echoing
-  them through action state. `next dev` logs the previous action state in full (F2 lesson). The
-  name also carries `required`, and the submit handler blocks a whitespace-only name client-side.
-  The server stays authoritative.
-- **Collection source**: a written statement plus one checkbox. A hidden input carries
-  `collectedFrom = data_subject | third_party`, derived from the checkbox, so the value is
-  submitted in both cases (FR-3.9). The action refuses a missing or unknown value
-  (`collected_from_required`).
-- **Counter**: `[...message].length` against 4000, shown always and emphasised from 90 %. There is
-  deliberately **no `maxLength`** (a UTF-16 count, which would disagree with the database on emoji,
-  A5). Name and contact inputs show their limit only once near it.
-- **Weitere Angaben**: up to 10 label/value rows, added with „Weitere Angabe hinzufügen" (a
-  `type="button"`). Serialised into FormData as `attrLabel[]` / `attrValue[]`.
-- **The notice**: `third-party-notice.tsx` (client), under `rounds/[id]/applications/`, shared by
-  O3 and the detail page.
-  - It shows the duty line with both deadlines and the date, the text in a `<textarea>` pre-filled
-    and editable, one copy button (the `JoinCodeCopyButtons` pattern), and the placeholder hint
-    (A1).
-  - The `<textarea>` has **no `name`** and is rendered outside the `<form>`, so the edited text
-    is never posted to the server (Compliance §4.5 rule 4, pre-mortem 14).
-  - The text is **seeded** from the current inputs while untouched. Once the moderator edits it,
-    later field changes no longer overwrite it; a „Text neu erzeugen" button re-seeds it.
-  - No send control exists anywhere.
-- **Pure helpers** in `src/modules/casting/application-notice.ts`, with no DB access:
-  - `noticeCategories(input) → CategoryKey[]`, in a fixed order: name, age, email, phone, other,
-    message, attributes.
-  - `oneMonthAfter(date) → { y, m, d }`, the Europe/Berlin calendar date clamped to the month end
-    (A2).
+The first build put every field, the checkbox and the full Art. 14 notice on one page. The human's
+review of the walkthrough: *"The whole process should be streamlined and not overstimulating."*
+In detail: three contact inputs are clutter; the free text comes first, because the v0.2 parser
+will fill the rest from it; and the notice must be *"non invasive & simple … (i) the notice (ii)
+a 'understood' button finishing the process and (iii) a button to open the example text to
+copy"*. The flow, confirmed by the human against a preview:
 
-  The words and the text template live in `de.ts`, as functions (the vocabulary spec).
-  `{Haushaltsname}` comes from the page (D5 or `getHousehold`). Before saving, the page passes
-  the date for "now" (server clock, Berlin).
-- **After save**: `data_subject` → `redirect(/rounds/[id]?saved=1)`, and the round page shows
-  `SuccessToast` („Bewerbung gespeichert"). `third_party` → `redirect(/rounds/[id]/applications/
-  [applicationId])`.
-- **Round page** `/rounds/[id]`: for a profile session whose membership holds
-  `create_application`, and a round that is `open`, a primary link „Bewerbung erfassen" appears.
-  The check is a try/catch around `assertHasPermission`, the `rounds/new` pattern. Nothing
-  changes for the household account.
-- **Detail route** `src/app/(org)/rounds/[id]/applications/[applicationId]/`: `page.tsx` and
-  `loading.tsx`. It shows the facts as text only (React escapes, and there is no
-  `dangerouslySetInnerHTML`, PRD §6.5). For `third_party` it adds the notice, with the date counted
-  from `created_at`. If the date has passed, it says so plainly (EC-3.5's wording). This is O5's
-  shell, and change 3 adds the rest.
-- **Strings**: all of them go into `de.ts` under a new `applications` block. The labels match
-  §8.6 and PRD §4.1.3 verbatim. None may contain an Art.-9 stem (`herkunft` is one, so it is
-  never „Herkunft der Angaben").
+| Step | Shows | Buttons |
+|---|---|---|
+| 1 · Nachricht | the applicant's message (optional), with the code-point counter | „Überspringen", „Weiter" |
+| 2 · Angaben | Name* · Alter · **one** „Kontakt" input (with „+ weiteren Kontakt", at most 3) · „+ Weitere Angaben" (collapsed until used) · the statement „Angaben von der bewerbenden Person" and the checkbox | „Zurück" and „Speichern", or „Weiter" instead of „Speichern" when the box is ticked |
+| 3 · only when ticked | a short neutral notice, two lines | „Beispieltext anzeigen" (opens the editable text and „Text kopieren"), „Verstanden" |
+
+- **Same route, one client component, no server round trip between steps.** Every step's values
+  live in client state (`useState`) until the final click. A reload starts over: nothing is kept
+  in the URL, in storage or on the server. „Zurück" keeps what was typed.
+- **„Verstanden" saves.** So the notice is still displayed before saving (AC-3.8, O3 „noch vor dem
+  Speichern", R-3.2 duty and text in the same step), and it adds no extra click. Step 2's
+  „Speichern" saves for the applicant as source. Both use the one server action, and both land on
+  the **round** with the toast „Bewerbung gespeichert". The text was offered in step 3, and the
+  application's detail keeps it for later (FR-3.12, „afterwards").
+- **Validation per step, in the browser, for speed only**: step 2 blocks an empty name and marks
+  the field. The server stays authoritative. When the server refuses, the form goes to the step
+  holding the named field (the message → step 1, anything else → step 2), with every value intact
+  and the error beside that field.
+- **The notice (step 3), non-invasive.** It uses the neutral **info** style (`callout-info`), not
+  the caution style, with no red and no bold beyond the date, and exactly two lines:
+  - „Die Person muss erfahren, dass ihr ihre Angaben gespeichert habt."
+  - the Compliance §4.5 line, verbatim: *„Am besten gleich mit deiner ersten Nachricht an {Name}
+    schicken – spätestens bis {Datum}."*
+
+  Together they state both deadlines of FR-3.11: the first message, and the one-month date.
+  „Beispieltext anzeigen" toggles a panel with the editable text (Compliance §4.5 *Variante
+  Dritterhebung*, seeded as before), „Text kopieren", and one small line for the `[Link]`
+  placeholder. The panel's `<textarea>` has **no `name`** and sits outside the `<form>`, so the
+  edited text is never posted (Compliance §4.5 rule 4). There is no send control anywhere
+  (AC-3.10).
+- **The detail page** shows the same notice component in the same quiet form, with the example
+  text collapsed behind „Beispieltext anzeigen" and the date counted from `created_at`. A passed
+  date says so in the same neutral line (EC-3.5). There is no „Verstanden" there: nothing is
+  pending.
+- **One contact input, sorted deterministically (D15).** The browser shows under each contact how
+  it will be stored („wird als E-Mail-Adresse gespeichert" / „… als Telefonnummer …" / „… als
+  sonstiger Kontakt …"), computed by the same pure function the server uses. There is no
+  `type="email"`, since there is no format rule beyond the sorting.
+- **Submission.** `onSubmit` + `startTransition(() => formAction(formData))`, never the `<form
+  action>` prop: React 19 resets a form after an action (pre-mortem 17). `SubmitButton` gets the
+  transition's pending flag. The action returns only `{ status: "error", code, field? }`.
+  `redirect()` sits outside any `try/catch`. `FormData` carries `message`, `applicantName`, `age`,
+  `contact` (repeated), `attrLabel[]`/`attrValue[]` and `collectedFrom`. Hidden inputs carry the
+  values of steps that are not displayed, so a single `<form>` spans all three steps.
+- **Collection source.** The statement and the unticked checkbox, as before. A hidden input
+  carries `collectedFrom = data_subject | third_party` in both cases (FR-3.9).
+- **Route, guards and states, unchanged.** Still `src/app/(org)/rounds/[id]/applications/new/`
+  (`page.tsx`, `loading.tsx`, `actions.ts`, `capture-form.tsx`). The guard order is session →
+  round → profile/permission state → no-open-round state → form. The round page's „Bewerbung
+  erfassen" link and the organisation detail route stay as built. The loading skeleton now shows
+  step 1's shape: a heading, one textarea block and two buttons.
+- **Strings.** Every string is in `de.ts`. The labels follow §8.6 and PRD §4.1.3 verbatim, and none
+  contains an Art.-9 stem.
+
+### D15 — One contact input, sorted into the three stored columns (human review 2026-09-29)
+
+The schema keeps `contact_email`, `contact_phone` and `contact_other` (`domain/casting.md` §2.2,
+Compliance §6.2: the email doubles as identity proof in a subject request, so it must stay
+findable as an email). Only the form changes. Each „Kontakt" input is sorted by one pure,
+deterministic function in `casting/application-input.ts`, `classifyContact(value)`. It is used by
+the parser (server) and by the form's hint (browser), and applied in this order:
+
+1. **email**: no whitespace, exactly one `@`, at least one character before it, and a dot inside
+   the part after it. Goes to `contact_email` (≤ 254).
+2. **phone**: only digits, spaces and `+ ( ) - / .`, with at least 6 digits. Goes to
+   `contact_phone` (≤ 50).
+3. **anything else** goes to `contact_other` (≤ 200): a portal handle, a messenger id.
+
+This is P-3 explainable: a fixed rule that the screen names for each input, with no guessing model
+(P-5 untouched). The parser takes `contacts: string[]`: at most 3, blanks dropped, each trimmed and
+classified. Two contacts landing on the same kind are refused (`contact_kind_taken`, field
+`contact`), because each column holds one value. The screen then names the input that clashes.
+`readOptionalText`'s limits apply per column after sorting, and too long means `too_long` with
+field `contact`. The explicit `contactEmail`/`contactPhone`/`contactOther` inputs of the first
+build go away. The seed and the tests pass `contacts` instead.
 
 ### D7 — Audit registration
 

@@ -127,7 +127,7 @@ Sources: FR-3.4, FR-3.6, FR-3.8, FR-3.10, C-3.2, C-3.10, AC-3.7, AC-3.11, A-3.4,
 
 The fields SHALL be limited as C-3.14 sets:
 - name: 1–200 characters after trimming;
-- email: ≤ 254;
+- email: ≤ 254 (after the contact is sorted, see the contact requirement);
 - phone: ≤ 50;
 - other contact: ≤ 200;
 - message text: ≤ 4,000;
@@ -140,7 +140,7 @@ database SHALL enforce every limit except the per-attribute ones, which the serv
 Sources: C-3.14, EC-3.4.
 
 #### Scenario: A long message is counted before the limit
-- **WHEN** a message text is typed or pasted
+- **WHEN** a message text is typed or pasted on the message step
 - **THEN** its character count against 4,000 is visible before the limit is reached
 
 #### Scenario: Over the limit
@@ -169,25 +169,40 @@ source explicitly whether or not the box is ticked. Sources: FR-3.9, AC-3.6, `03
 - **THEN** the statement is visible, the checkbox is unticked, and the value the form would submit
   is `data_subject`
 
-### Requirement: A third-party source shows the duty and the text before saving, and nothing is sent
+### Requirement: A third-party source shows a short notice as the last step before saving, and nothing is sent
 
-When the checkbox is ticked, the form SHALL show before saving:
-- that the applicant must be informed at the latest with the household's first message to them,
-  and at the latest one month after capture;
-- the one-month date, as a date;
-- the Art. 14 text of `06-Compliance-Anhang.md` §4.5 (*Variante Dritterhebung*).
+When the checkbox is ticked, capture SHALL end with one more step before saving. It shows a short,
+neutral notice and nothing more:
+- that the person must learn that the household has their details;
+- the Compliance §4.5 line *„Am besten gleich mit deiner ersten Nachricht an {Name} schicken –
+  spätestens bis {Datum}."*, which states both deadlines of FR-3.11, the first message and the
+  one-month date;
+- „Verstanden", which saves;
+- „Beispieltext anzeigen", which opens the Art. 14 text of `06-Compliance-Anhang.md` §4.5
+  (*Variante Dritterhebung*).
 
-The text SHALL be filled with the applicant's name, the household's name and the categories of data
-actually entered, never a list that claims more than is filled in. It SHALL be editable before
-copying and copyable with one action. Its `[Link]` placeholder SHALL be accompanied by a plain
-statement that no privacy page exists yet to link to. The edited text SHALL NOT be stored or sent to the server. No
-control anywhere SHALL send the text or contact the applicant. Sources: FR-3.11, FR-3.12, FR-3.13,
-AC-3.8, AC-3.10, C-3.9, S-16, Compliance §4.5 (four rules on the wording, and the date beside the
-text).
+The notice SHALL use the neutral information style, never a warning style, and SHALL be shorter
+than the form it follows. The text SHALL be filled with the applicant's name, the household's name
+and the categories of data actually entered, never a list that claims more than is filled in. It
+SHALL be editable before copying and copyable with one action. Its `[Link]` placeholder SHALL be
+accompanied by a plain statement that no privacy page exists yet to link to. The edited text
+SHALL NOT be stored or sent to the server. No control anywhere SHALL send the text or contact the
+applicant. Sources: FR-3.11, FR-3.12, FR-3.13, AC-3.8, AC-3.10, C-3.9, S-16, Compliance §4.5; the
+human review of 2026-09-29 (*"non invasive & simple"*).
 
-#### Scenario: Ticking the box
-- **WHEN** the checkbox is ticked on the capture form
-- **THEN** both deadlines, the one-month date and the filled-in text appear before saving
+#### Scenario: Ticking the box adds the notice step
+- **WHEN** the checkbox is ticked and the moderator continues
+- **THEN** the notice step appears before anything is saved, with both deadlines and the one-month
+  date, „Verstanden" and „Beispieltext anzeigen"
+
+#### Scenario: Understood saves
+- **WHEN** the moderator presses „Verstanden"
+- **THEN** the application is saved with `collected_from = third_party`
+
+#### Scenario: The example text is behind a button
+- **WHEN** the notice step is shown
+- **THEN** the example text is not displayed until „Beispieltext anzeigen" is pressed, and then it
+  is editable and copyable
 
 #### Scenario: Categories follow the fields
 - **WHEN** only a name and a phone number are filled in
@@ -197,9 +212,59 @@ text).
 - **WHEN** the text is displayed
 - **THEN** a copy action exists and no send, share or email action exists
 
-#### Scenario: Unticking the box
-- **WHEN** the checkbox is ticked and then unticked
-- **THEN** the duty and the text disappear, and the form submits `data_subject`
+#### Scenario: Without the box there is no notice step
+- **WHEN** the checkbox is not ticked
+- **THEN** step two saves directly, and the form submits `data_subject`
+
+### Requirement: Capture is three quiet steps: the message, the details, and the notice only when due
+
+Capture SHALL proceed in steps on one screen: first the applicant's message (optional, and
+skippable), then the details (name, age, contact, further details, collection source), then the
+notice step only when the collection source is a third party. Every value typed SHALL survive
+moving back and forth between the steps. Nothing SHALL reach the server before the final save. A
+refusal SHALL return to the step holding the named field, with every value intact. The message
+comes first so that the v0.2 parser can fill the details step from it (S-08, ADR-009). Sources:
+FR-3.2, FR-3.3, AC-3.1–3.3; the human review of 2026-09-29.
+
+#### Scenario: A name is still enough
+- **WHEN** the moderator skips the message, enters only a name and saves
+- **THEN** the application is created in state `new`
+
+#### Scenario: Back keeps the values
+- **WHEN** the moderator goes from the details back to the message and forward again
+- **THEN** every value typed on either step is still there
+
+#### Scenario: A refused message returns to its step
+- **WHEN** the server refuses the message as too long
+- **THEN** the form shows the message step with the error beside the message, and every other
+  value is intact
+
+### Requirement: Contact is one input, sorted into email, phone or other by a fixed rule
+
+The details step SHALL offer one „Kontakt" input, with a way to add up to two more. Each contact
+SHALL be stored as an email, a phone number or another contact by a fixed, deterministic rule: an
+address shape with one `@` is an email; digits with the usual phone punctuation and at least six
+digits are a phone number; anything else is another contact. The screen SHALL name, beside each
+input, how it will be stored. Two contacts of the same kind SHALL be refused, naming the contact
+field. The stored columns and their limits are unchanged. Sources: `domain/casting.md` §2.2,
+Compliance §6.2, C-3.14, P-3; the human review of 2026-09-29.
+
+#### Scenario: An email is sorted as an email
+- **WHEN** the contact „lea@example.test" is entered
+- **THEN** the screen says it will be stored as an email address, and it is stored in the email
+  column
+
+#### Scenario: A phone number is sorted as a phone number
+- **WHEN** the contact „+49 30 23125 0101" is entered
+- **THEN** it is stored in the phone column
+
+#### Scenario: A handle is another contact
+- **WHEN** the contact „Portal: lea-sucht" is entered
+- **THEN** it is stored in the other-contact column
+
+#### Scenario: Two emails are refused
+- **WHEN** two contacts are both email addresses
+- **THEN** the capture is refused and the contact field is named
 
 ### Requirement: The form offers no structured field for special categories
 
@@ -228,23 +293,25 @@ Sources: FR-3.7, G-D7.
 - **WHEN** a capture is refused for any reason
 - **THEN** neither an application nor an audit entry is written
 
-### Requirement: After saving, the moderator lands where the next step is
+### Requirement: After saving, the moderator returns to the round, and the application keeps its notice
 
-After a capture with the applicant as source, the moderator SHALL return to the round with a short
-success notice. After a capture with a third-party source, the moderator SHALL land on the
-application's detail, which shows the application's details, the duty with the one-month date
-counted from the capture, and the copyable text. So the duty and its text appear in the same step
-as the capture. Sources: screen O3 „Nach dem Speichern", F3 R-3.2, FR-3.12 („afterwards from the
-application"), AC-3.9.
+After every capture the moderator SHALL return to the round with a short success notice, whatever
+the collection source. The duty and the text were already shown in the notice step. For a
+third-party application, the application's detail SHALL show the same quiet notice afterwards,
+with the one-month date counted from the capture and the example text behind „Beispieltext
+anzeigen". If the date has passed, the notice SHALL say so plainly. Sources: FR-3.12
+(„afterwards from the application"), AC-3.9, EC-3.5, F3 R-3.2 (the duty and its text in the same
+step, now the notice step).
 
-#### Scenario: Saved from the applicant
-- **WHEN** a capture with `data_subject` is saved
-- **THEN** the round's page is shown with a success notice
+#### Scenario: Saved
+- **WHEN** a capture is saved, from either source
+- **THEN** the round's page is shown with a success notice, and reloading it does not show the
+  notice again
 
-#### Scenario: Saved from a third party
-- **WHEN** a capture with `third_party` is saved
-- **THEN** the application's detail is shown with the duty, the date counted from the capture, and
-  the copyable text
+#### Scenario: The detail keeps the notice
+- **WHEN** a third-party application's detail is opened
+- **THEN** the quiet notice with the date counted from the capture is shown, and the example text
+  opens behind „Beispieltext anzeigen"
 
 ### Requirement: The organisation's view of an application is readable only to those who work on applications
 

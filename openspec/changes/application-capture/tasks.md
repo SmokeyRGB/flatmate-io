@@ -507,6 +507,82 @@ All in `tests/integration/policy/application-capture.test.ts` unless named other
 
   Paste the query output into the report.
 
+## 11. O3 as three quiet steps (human review of the walkthrough, 2026-09-29; design D6 and D15)
+
+- [ ] 11.1 `src/modules/casting/application-input.ts`: add `classifyContact(value): "email" |
+  "phone" | "other"` exactly per D15, and make the parser take `contacts: string[]` instead of
+  `contactEmail`/`contactPhone`/`contactOther`: at most 3; blanks dropped; each trimmed, checked
+  for invalid characters, classified, then length-checked against its column's limit (`too_long`,
+  field `contact`); two of one kind → `contact_kind_taken` (field `contact`). Add `contact` to
+  `ApplicationInputField` and `contact_kind_taken` to the codes. `ParsedApplication` keeps its
+  three columns. Unit tests in `tests/unit/casting/application-input.test.ts`:
+  - each D15 rule, with its edge cases: `a@b.de` email; `a@b` other (no dot); `a@@b.de` other;
+    `+49 (30) 23125-0101` phone; `12345` other (5 digits); `Portal: x` other;
+  - the kind clash;
+  - 4 contacts refused;
+  - per-column lengths.
+
+  **Break:** swap the email and phone checks' order, or drop the dot rule, and a case fails.
+- [ ] 11.2 Update every caller of the old contact fields: the seed (`scripts/seed-demo-household.ts`),
+  `tests/helpers/applications.ts` if it passes raw input, `tests/integration/policy/application-capture.test.ts`,
+  `tests/unit/casting/capture-action.test.ts` and any other test passing `contactEmail`/`contactPhone`/
+  `contactOther` **as raw input**. Stored-column assertions stay as they are. These are setup
+  changes only in non-guarded files; the grep of 5.2 stays empty for guarded files.
+- [ ] 11.3 `src/app/(org)/rounds/[id]/applications/new/capture-form.tsx`: rebuild as D6's three steps
+  in one client component, one `<form>` spanning them, hidden inputs for the steps not shown:
+  - step 1: the message with the counter, „Überspringen" and „Weiter";
+  - step 2: name, age, the contact list (one input, „+ weiteren Kontakt" up to 3, the sorting hint
+    per input from `classifyContact`), further details collapsed until „+ Weitere Angaben", the
+    statement and the checkbox, „Zurück", and „Speichern" or „Weiter" depending on the box;
+  - step 3 (ticked only): the notice.
+
+  A server refusal jumps to the step of the named field (`messageRaw` → 1, else 2) and shows the
+  error beside that field. The rest of D6 applies: `onSubmit` + `startTransition`, controlled
+  inputs, `SubmitButton` with the pending flag, no PII in action state.
+- [ ] 11.4 `src/app/(org)/rounds/[id]/applications/third-party-notice.tsx`: the quiet notice of D6:
+  `callout-info`, the two lines, a toggle „Beispieltext anzeigen"/„Beispieltext ausblenden" that
+  reveals the editable text, „Text kopieren", „Text neu erzeugen" and the one-line `[Link]` hint.
+  Props: an optional `onUnderstood` renders „Verstanden" as the form's submit button (step 3). On
+  the detail page there is no such button. The passed-date wording stays neutral.
+- [ ] 11.5 `actions.ts`: read `message`, `applicantName`, `age`, `contact` (all), the attributes and
+  `collectedFrom`. **Both sources redirect to `/rounds/[id]?saved=1`** (D6). The detail route stays
+  for later access. `de.ts`: the new step, contact and notice strings, and remove the strings the
+  rebuild no longer uses. Every label token goes through `matchArt9Term`.
+- [ ] 11.6 `loading.tsx` of the capture route: step 1's shape (a heading, one textarea block, two
+  buttons).
+- [ ] 11.7 Tests, updated or new, each with its break:
+  - `capture-page.test.ts`: AC-3.12's enumeration now covers all three steps' inputs (render each
+    step, or assert the hidden-input set plus the visible step), still ≥ 8 inputs, label tokens
+    included; AC-3.6 checks the statement, the unticked box and `collectedFrom = data_subject`.
+  - `third-party-notice.test.ts`:
+    - the example text is absent until the toggle;
+    - `callout-info`, never `callout-caution`;
+    - the two lines, with the date and the verbatim Compliance line;
+    - „Verstanden" renders only with `onUnderstood`;
+    - no send/share/mailto control, and the textarea has no `name` and sits in no form.
+  - A form-behaviour test with `@testing-library/react` **only if it is already a dependency**
+    (check `package.json`; do not add one). Otherwise a pure test of the step reducer or state
+    helper, if the component is split so that one exists: back and forth keeps values, a refusal
+    jumps to its step.
+  - `capture-action.test.ts`: both sources redirect to the round with `?saved=1`, and no value is
+    in the state.
+- [ ] 11.8 `npx tsc --noEmit`, `npm run lint`, the eight lint scripts, `node tools/check-refs.ts`,
+  then the affected test files against dev. Report their real output. Do not run the full
+  `npm run verify` (the planner does).
+- [ ] 11.9 `docs/screens/O-organisation.md` O3 (German, living file), amend the Kernelemente
+  in place, marked *(geändert 2026-09-29, Durchsicht)*:
+  - capture runs in three steps (Nachricht → Angaben → Hinweis, the last only for a third-party
+    source);
+  - one „Kontakt" field, sorted by a fixed rule into E-Mail, Telefon or sonstiger Kontakt, with
+    the screen saying how each one is stored;
+  - the Art.-14 notice is short and neutral: two lines, „Verstanden" saves, „Beispieltext
+    anzeigen" opens the text;
+  - after saving, back to the round for both sources; the detail view keeps the notice.
+
+  One closed row in `docs/review-log.md` §Offene-Punkte-Register records the human's reason.
+  `node tools/check-refs.ts` must stay green. The planner reviews the German wording with the
+  human.
+
 ## 10. Verify
 
 - [x] 10.1 `npm run verify` green: paste the real tail (files/tests counts). Then the dev row counts
