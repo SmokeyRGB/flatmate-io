@@ -70,8 +70,9 @@ export async function captureApplicationAction(
       console.error({ code: err.code, sqlState: err.sqlState, constraint: err.constraint });
       return { status: "error", code: "save_failed" };
     }
-    // Anything else: no message, no object. A code is enough to find the failing call path.
-    console.error({ code: "unexpected" });
+    // Anything else: no message, no object. The class name (e.g. NestedSessionContextError, a
+    // timeout) carries no typed value and is what makes the failure findable.
+    console.error({ code: "unexpected", name: err instanceof Error ? err.name : typeof err });
     return { status: "error", code: "save_failed" };
   }
 
