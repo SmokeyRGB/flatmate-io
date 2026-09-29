@@ -66,14 +66,30 @@ Elf Zustände: sieben auf dem Hauptpfad, vier Seitenzustände.
 
 | Von | Nach | Wer darf | Was protokolliert / bewirkt wird |
 |---|---|---|---|
-| `screened` | `new` | `change_application_state` | `application.state_reverted`, `reverses_event_id` gesetzt |
-| `invited` | `screened` | `change_application_state` | dito; der bereits erzeugte Copy-Paste-Text wird **nicht** zurückgenommen (er ist verschickt — das wäre eine Lüge im Log) |
-| `scheduled` | `invited` | `confirm_appointment` | setzt `Appointment.status = cancelled`, gibt den `Slot` frei |
-| `interviewed` | `scheduled` | `change_application_state` | schließt `stage = offer` wieder; **abgegebene Stimmen bleiben erhalten** und werden nicht gelöscht |
-| `offer_made` | `interviewed` | `change_application_state` | gibt das Zimmer frei (`promised → open`); **hebt die Veto-Sperre wieder auf** (`locked_at = null`) — sonst wäre eine wiedereröffnete Entscheidung ohne Einspruchsmöglichkeit |
-| `moved_in` | `offer_made` | `change_application_state`, zusätzlich `manage_members` | siehe Kasten unten — der teuerste Rückweg im Modell |
-| `rejected_by_household`, `declined_by_applicant`, `withdrawn` | letzter Hauptpfad-Zustand | `change_application_state` | `application.reopened` mit Begründungsfeld |
-| `archived` | vorheriger Zustand | `change_application_state` | nur solange die Daten noch nicht gelöscht sind — nach dem Löschen ist der Rückweg **nicht** verfügbar, und das ist beabsichtigt |
+| `screened` | `new` | `change_application_state`, zusätzlich `reverse_application_state` | `application.state_reverted`, `reverses_event_id` gesetzt |
+| `invited` | `screened` | `change_application_state`, zusätzlich `reverse_application_state` | dito; der bereits erzeugte Copy-Paste-Text wird **nicht** zurückgenommen (er ist verschickt — das wäre eine Lüge im Log) |
+| `scheduled` | `invited` | `confirm_appointment`, zusätzlich `reverse_application_state` | setzt `Appointment.status = cancelled`, gibt den `Slot` frei |
+| `interviewed` | `scheduled` | `change_application_state`, zusätzlich `reverse_application_state` | schließt `stage = offer` wieder; **abgegebene Stimmen bleiben erhalten** und werden nicht gelöscht |
+| `offer_made` | `interviewed` | `change_application_state`, zusätzlich `reverse_application_state` | gibt das Zimmer frei (`promised → open`); **hebt die Veto-Sperre wieder auf** (`locked_at = null`) — sonst wäre eine wiedereröffnete Entscheidung ohne Einspruchsmöglichkeit |
+| `moved_in` | `offer_made` | `change_application_state`, zusätzlich `manage_members` und `reverse_application_state` | siehe Kasten unten — der teuerste Rückweg im Modell |
+| `rejected_by_household`, `declined_by_applicant`, `withdrawn` | letzter Hauptpfad-Zustand | `change_application_state`, zusätzlich `reverse_application_state` | `application.reopened` mit Begründungsfeld |
+| `archived` | vorheriger Zustand | `change_application_state`, zusätzlich `reverse_application_state` | nur solange die Daten noch nicht gelöscht sind — nach dem Löschen ist der Rückweg **nicht** verfügbar, und das ist beabsichtigt |
+
+> *(ergänzt 2026-09-29, F3)* **Wer einen Zustand zurücknimmt.** Die Spalte „Wer darf" der
+> Rückwärtsübergänge nannte nur `change_application_state`. `03-PRD.md` §4.0.1 (Vorrang 3, vor
+> diesem Dokument) gibt „Kann Status ändern" mit ✅ an die Moderation und Bewohnenden ⬜, das
+> **Zurücknehmen** aber nur der Moderation, Bewohnenden ❌. Deshalb steht in jeder Zeile zusätzlich
+> `reverse_application_state`, ein Recht, das nur im Rechtebündel der Moderation liegt
+> (`identity.md` §2.1). Die übergangsspezifischen Rechte der Vorwärtszeilen (`confirm_appointment`,
+> `manage_members`) bleiben, wie sie sind: das Feature, das den jeweiligen Schritt baut,
+> entscheidet sie.
+>
+> *(ergänzt 2026-09-29, F3)* **Ausführbar ist ein Übergang erst, wenn der Schritt gebaut ist,
+> der seine Wirkungen trägt.** Solange es keinen Termin, kein Zimmer-Angebot und kein
+> Einzugsprofil gibt, würde ein reiner Zustandswechsel diese Wirkungen überspringen (I-1 bis
+> I-5). v0.1 führt deshalb nur `new ⇄ screened ⇄ invited` aus, dazu die Abbrüche aus diesen
+> Zuständen und das Wiedereröffnen in sie. Jeder weitere Schritt schaltet seine Übergänge
+> zusammen mit seinen Wirkungen und seinen Rechten frei.
 
 > **Der Rückweg `moved_in → offer_made` und was er *nicht* tut.**
 >

@@ -148,10 +148,9 @@ async function main() {
     const created = await captureApplication(alexContext, { roundId: round.id, ...capture });
     applicationIds.push(created.id);
   }
-  // transitionApplication is still unguarded until change 3; scripts/ is not src/app, so the
-  // authorization matrix's KNOWN_OPEN entry stays valid.
-  await transitionApplication(alexContext, applicationIds[0], "screened", alexActor);
-  await transitionApplication(alexContext, applicationIds[1], "screened", alexActor);
+  // Alex is a moderator, so holds change_application_state; the actor comes from the context.
+  await transitionApplication(alexContext, applicationIds[0], "screened");
+  await transitionApplication(alexContext, applicationIds[1], "screened");
 
   // join-by-link: registerHousehold already mints a founding link, but it is single-use by default
   // (FR-2.4: max_uses 1) — enough to walk the join path exactly once and then only the used-up

@@ -16,6 +16,14 @@ const PAYLOAD_ALLOWLIST: Readonly<Record<string, readonly string[]>> = {
   // source. Never the name, a contact, the message or an attribute. Deliberately NOT in
   // REDACTABLE_KEYS: whether deletion redacts them is change 4's decision.
   "application.created": ["source", "collectedFrom"],
+  // F3 (application-pipeline, D4, FR-3.22, AC-3.19): a correction names the CHANGED FIELDS from a
+  // fixed list of eight (`fields`, an array of names) and never a value, old or new (G-D7). The
+  // allowlist checks keys only, so updateApplication itself asserts that every element is one of
+  // the eight names before recording. Field names are not personal data, so nothing is registered
+  // in REDACTABLE_KEYS. F5's "changed since your vote" marker reads the content subset
+  // (applicantName, age, messageRaw, attributes); the history of collectedFrom is reconstructible
+  // from application.created plus each later entry that names it (EC-3.6).
+  "application.updated": ["fields"],
   // F1 event types (identity/casting modules) — registered here, the one write path, per FR-1.20.
   "resident_profile.created": [],
   "resident_profile.status_changed": ["fromStatus", "toStatus"],

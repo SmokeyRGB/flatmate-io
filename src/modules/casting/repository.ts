@@ -1,4 +1,4 @@
-import { and, eq, inArray, isNull, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { isUuid, withSessionContext, type SessionContext } from "@/db/session-context";
 import { PayloadValidationError, recordActivityEvent } from "@/modules/audit/repository";
 import { activityEvent } from "@/modules/audit/schema";
@@ -14,8 +14,14 @@ import {
   type ParsedApplication,
   type RawApplicationInput,
 } from "./application-input";
+import {
+  applicationBaseline,
+  changedApplicationFields,
+  CORRECTABLE_FIELDS,
+  type CorrectableField,
+} from "./application-changes";
 import { application, castingRound, room, roundParticipation } from "./schema";
-import { assertTransitionAllowed, type ApplicationState } from "./transitions";
+import { ruleFor, type ApplicationState } from "./transitions";
 import { assertF1RoomTransitionAllowed, type RoomStatus } from "./room-transitions";
 
 export interface Actor {
@@ -42,6 +48,19 @@ export class ProfileRequiredError extends Error {
   }
 }
 
+// The lifecycle columns of an application, never a personal one. Shared by getApplication and the
+// state change, so the two cannot drift apart (pre-mortem M10).
+const APPLICATION_LIFECYCLE_COLUMNS = {
+  id: application.id,
+  householdId: application.householdId,
+  roundId: application.roundId,
+  state: application.state,
+  stateChangedAt: application.stateChangedAt,
+  becameResidentId: application.becameResidentId,
+  createdAt: application.createdAt,
+  retentionUntil: application.retentionUntil,
+} as const;
+
 // FR-0.1: the only sanctioned entry point for reading/writing Application — every call opens its
 // transaction through the session-context helper (FR-0.3), never queries the raw client directly.
 //
@@ -54,16 +73,7 @@ export async function getApplication(context: SessionContext, id: string) {
   if (context.profileId === null) return null;
   return withSessionContext(context, async (tx) => {
     const [row] = await tx
-      .select({
-        id: application.id,
-        householdId: application.householdId,
-        roundId: application.roundId,
-        state: application.state,
-        stateChangedAt: application.stateChangedAt,
-        becameResidentId: application.becameResidentId,
-        createdAt: application.createdAt,
-        retentionUntil: application.retentionUntil,
-      })
+      .select(APPLICATION_LIFECYCLE_COLUMNS)
       .from(application)
       .where(eq(application.id, id));
     return row ?? null;
@@ -254,51 +264,261 @@ export async function getOrganisationApplication(
   });
 }
 
-// FR-0.10/FR-0.11/FR-0.12: validates against the declared transition table, throws on anything
-// undeclared, and writes exactly one ActivityEvent alongside the state change — `state` is the
-// only field this touches; no derived boolean is read or written for lifecycle status.
+// F3 change 3 (application-pipeline), design D1. The ORGANISATION's list of one round's
+// applications (screen O4). It is the sibling of getOrganisationApplication above and follows the
+// same rule, written the same way:
+//   - a profile-less session, or a malformed round id, returns null BEFORE any query (G-D15);
+//   - the caller's live membership must hold `create_application` or `change_application_state`,
+//     checked inside the read's transaction with the share lock kept to the end of the read. The
+//     rows carry names and contacts, so without the lock a revocation could commit between the
+//     check and the read (Copilot, PR #39);
+//   - only rows of the session's own household and of this round.
+// It is NOT merged with the detail read: one keyed on an id and one on a round are two reads with
+// two guards, and a "list or one" switch is the merged read change 2's D5 warns against.
+//
+// Lists the columns O4 shows and nothing else: never `message_raw` or `attributes`. There is no
+// `deleted_at IS NULL` filter, like getOrganisationApplication (change 4 drops the column).
+export async function listOrganisationApplications(context: SessionContext, roundId: string) {
+  if (context.profileId === null) return null;
+  if (typeof roundId !== "string" || !isUuid(roundId)) return null;
+  return withSessionContext(context, async (tx) => {
+    await assertHoldsAnyPermissionTx(tx, context, ["create_application", "change_application_state"]);
+    return tx
+      .select({
+        id: application.id,
+        applicantName: application.applicantName,
+        state: application.state,
+        collectedFrom: application.collectedFrom,
+        age: application.age,
+        contactEmail: application.contactEmail,
+        contactPhone: application.contactPhone,
+        contactOther: application.contactOther,
+        createdAt: application.createdAt,
+      })
+      .from(application)
+      .where(and(eq(application.roundId, roundId), eq(application.householdId, context.householdId)))
+      .orderBy(desc(application.createdAt));
+  });
+}
+
+export type ApplicationUpdateErrorCode = "not_found" | "stale";
+
+// Codes only: no field name and no value (a stale refusal names no field, FR-3.21).
+export class ApplicationUpdateError extends Error {
+  readonly code: ApplicationUpdateErrorCode;
+  constructor(code: ApplicationUpdateErrorCode) {
+    super(`Application update refused: ${code}`);
+    this.name = "ApplicationUpdateError";
+    this.code = code;
+  }
+}
+
+// F3 change 3, design D4, FR-3.21/3.22 (Art. 16). Corrects the eight captured fields of one
+// application. Takes NO actor: both ids come from `context`.
+//
+// Order: a profile-less session is refused BEFORE any query. Then ONE transaction:
+//   a. the caller's live membership is read FOR SHARE and must hold `create_application`;
+//   b. the row is read FOR UPDATE with the round and household predicates (no row -> not_found);
+//   c. the input is parsed, after the checks, so a member without the permission learns only that.
+//      Keys the parser does not know (`source`, `state`) are ignored: it never reads them, and
+//      `roundId` only selects the row;
+//   c2. STALE CHECK: the form carries a digest of the values it was shown. If it differs from the
+//      locked row, someone corrected the application in between, and the whole correction is
+//      refused with nothing written. Without it the diff would run against the locked row while
+//      the form holds page-load values, and B's save would silently revert A's correction;
+//   d. the diff over the eight fixed fields; nothing changed -> no UPDATE and no event;
+//   e. the UPDATE of the changed columns only, and one `application.updated` event that names
+//      those fields and never a value.
+//
+// The SET list never contains round_id or household_id, so the pairing trigger (UPDATE OF
+// round_id, household_id) does not fire and no round lock is taken. It never contains state,
+// state_changed_at, source, created_* or became_resident_id either.
+//
+// LOCK ORDER (design D7): membership FOR SHARE, then the application row FOR UPDATE, the same as
+// transitionApplication, so the two are serialised on the row and no cycle exists.
+//
+// Returns { changed } only, never the row.
+export async function updateApplication(
+  context: SessionContext,
+  input: RawApplicationInput & { roundId: string; applicationId: string; baseline: string },
+): Promise<{ changed: CorrectableField[] }> {
+  if (context.profileId === null) throw new ProfileRequiredError("updateApplication");
+  const { roundId, applicationId } = input;
+  if (
+    typeof roundId !== "string" ||
+    !isUuid(roundId) ||
+    typeof applicationId !== "string" ||
+    !isUuid(applicationId)
+  ) {
+    throw new ApplicationUpdateError("not_found");
+  }
+
+  return withSessionContext(context, async (tx) => {
+    await assertHasPermissionTx(tx, context, "create_application");
+
+    const [current] = await tx
+      .select()
+      .from(application)
+      .where(
+        and(
+          eq(application.id, applicationId),
+          eq(application.roundId, roundId),
+          eq(application.householdId, context.householdId),
+        ),
+      )
+      .for("update");
+    if (!current) throw new ApplicationUpdateError("not_found");
+
+    const parsed = parseApplicationInput(input);
+
+    if (typeof input.baseline !== "string" || applicationBaseline(current) !== input.baseline) {
+      throw new ApplicationUpdateError("stale");
+    }
+
+    const changed = changedApplicationFields(current, parsed);
+    if (changed.length === 0) return { changed: [] };
+
+    // The allowlist checks keys only, so a code bug could still put a value into the array. Every
+    // element must be one of the eight fixed names before it is recorded.
+    for (const field of changed) {
+      if (!(CORRECTABLE_FIELDS as readonly string[]).includes(field)) {
+        throw new Error("updateApplication: a changed field is not a correctable field");
+      }
+    }
+
+    try {
+      await tx
+        .update(application)
+        .set(Object.fromEntries(changed.map((field) => [field, parsed[field]])))
+        .where(and(eq(application.id, applicationId), eq(application.householdId, context.householdId)));
+
+      await recordActivityEvent(tx, {
+        householdId: context.householdId,
+        eventType: "application.updated",
+        subjectType: "application",
+        subjectId: applicationId,
+        actorAccountId: context.accountId,
+        actorProfileId: context.profileId,
+        payload: { fields: changed },
+      });
+    } catch (err) {
+      if (err instanceof PayloadValidationError) throw err;
+      throw toApplicationWriteError(err);
+    }
+    return { changed };
+  });
+}
+
+export type ApplicationTransitionErrorCode = "not_found" | "step_not_available";
+
+// Codes only, no id and no value in the message: the caller (a future screen's action) maps the
+// code to a sentence.
+export class ApplicationTransitionError extends Error {
+  readonly code: ApplicationTransitionErrorCode;
+  constructor(code: ApplicationTransitionErrorCode) {
+    super(`Application transition refused: ${code}`);
+    this.name = "ApplicationTransitionError";
+    this.code = code;
+  }
+}
+
+// The one place a state change is executed (F3 change 3, design D6/D6a). Runs inside the caller's
+// transaction, on a row the caller has already locked FOR UPDATE:
+//   ruleFor (throws InvalidTransitionError for an undeclared pair) -> a `pending` row is refused
+//   as not available -> EVERY permission of the row's `requires` is checked on the membership row
+//   the caller already share-locked (never assuming an entry was checked earlier: a later row may
+//   require `confirm_appointment` and not `change_application_state`) -> the UPDATE of `state` and
+//   `state_changed_at` -> exactly one `application.state_changed` event, the actor from `context`.
+//
+// It stays private here. The first feature that owns an operation with effects (an appointment, an
+// offer with its room), OR needs two or more rows in one transaction (F5's "Als eingeladen
+// markieren" takes new -> screened -> invited in one action; two transitionApplication calls would
+// be two transactions and nesting them is refused, NestedSessionContextError), exports it with an
+// `expectedKind` argument.
+//
+// Both the SELECT the caller made and the RETURNING here list lifecycle columns only: this used to
+// hand out the whole row, name, contacts and message included (pre-mortem M10).
+async function applyTransitionTx(
+  tx: Tx,
+  context: SessionContext,
+  current: { id: string; householdId: string; state: ApplicationState },
+  toState: ApplicationState,
+) {
+  const fromState = current.state;
+  const rule = ruleFor(fromState, toState);
+  if (rule.kind === "pending") throw new ApplicationTransitionError("step_not_available");
+  for (const permission of rule.requires) {
+    await assertHasPermissionTx(tx, context, permission);
+  }
+
+  const [updated] = await tx
+    .update(application)
+    .set({ state: toState, stateChangedAt: new Date() })
+    .where(and(eq(application.id, current.id), eq(application.householdId, context.householdId)))
+    .returning(APPLICATION_LIFECYCLE_COLUMNS);
+
+  await recordActivityEvent(tx, {
+    householdId: current.householdId,
+    eventType: "application.state_changed",
+    subjectType: "application",
+    subjectId: current.id,
+    actorAccountId: context.accountId,
+    actorProfileId: context.profileId,
+    payload: { fromState, toState },
+  });
+
+  return updated;
+}
+
+// FR-0.10/FR-0.11/FR-0.12, FR-3.24, AC-3.21. Takes NO actor: the account and profile come from
+// `context` (BREAKING: the caller-supplied actor parameter is gone).
+//
+// Order: a profile-less session is refused BEFORE any query (G-D15). Then ONE transaction:
+//   a. the caller's live membership is read FOR SHARE and must hold `change_application_state`,
+//      so someone without it learns nothing about the row;
+//   b. the row is read FOR UPDATE with the household predicate (no row -> `not_found`). Before
+//      this lock, two concurrent transitions both read `new` and both wrote;
+//   c. applyTransitionTx: the declared rule (D6a), every permission it requires, the UPDATE and
+//      the event.
+//
+// Writers of an application row (design D7), each serialised on the row lock in ONE lock order,
+// membership -> round -> application:
+//   captureApplication: INSERT, membership FOR SHARE -> round FOR SHARE;
+//   updateApplication / transitionApplication: membership FOR SHARE -> application FOR UPDATE;
+//   deleteApplication (change 4) OBLIGATION: takes FOR UPDATE (or DELETE ... RETURNING).
+// Raw SQL as app_runtime is bound by RLS (household) only: the application-level rules do not
+// apply there (ADR-004 layering), as for every table.
+//
+// Returns lifecycle columns only, like getApplication.
 export async function transitionApplication(
   context: SessionContext,
   applicationId: string,
   toState: ApplicationState,
-  actor: Actor,
 ) {
   // G-D15/ADR-014: a household-account session may not transition an Application. Refused here,
-  // before any query, so the error names the missing profile instead of arriving as "Application
-  // not found" once RLS hides the row (Decision 4).
+  // before any query, so the error names the missing profile instead of arriving as "not found"
+  // once RLS hides the row.
   if (context.profileId === null) {
     throw new ProfileRequiredError("transitionApplication");
   }
+  if (typeof applicationId !== "string" || !isUuid(applicationId)) {
+    throw new ApplicationTransitionError("not_found");
+  }
   return withSessionContext(context, async (tx) => {
+    await assertHasPermissionTx(tx, context, "change_application_state");
+
     const [current] = await tx
-      .select()
+      .select({
+        id: application.id,
+        householdId: application.householdId,
+        state: application.state,
+      })
       .from(application)
-      .where(eq(application.id, applicationId));
+      .where(and(eq(application.id, applicationId), eq(application.householdId, context.householdId)))
+      .for("update");
+    if (!current) throw new ApplicationTransitionError("not_found");
 
-    if (!current) {
-      throw new Error(`Application not found: ${applicationId}`);
-    }
-
-    const fromState = current.state as ApplicationState;
-    assertTransitionAllowed(fromState, toState);
-
-    const [updated] = await tx
-      .update(application)
-      .set({ state: toState, stateChangedAt: new Date() })
-      .where(eq(application.id, applicationId))
-      .returning();
-
-    await recordActivityEvent(tx, {
-      householdId: current.householdId,
-      eventType: "application.state_changed",
-      subjectType: "application",
-      subjectId: applicationId,
-      actorAccountId: actor.accountId,
-      actorProfileId: actor.profileId,
-      payload: { fromState, toState },
-    });
-
-    return updated;
+    return applyTransitionTx(tx, context, current, toState);
   });
 }
 

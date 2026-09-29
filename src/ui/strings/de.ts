@@ -70,6 +70,23 @@ export const de = {
       closed: "Geschlossen",
       archived: "Archiviert",
     },
+    // Application states (data-model.md "Application", eleven states): the words of §8.6
+    // (ergänzt 2026-09-28, F3-Vorprüfung), verbatim. They describe where the PROCESS stands, never
+    // the person (C-10). tests/unit/casting/application-state-words.test.ts keeps the keys equal to
+    // the enum's values.
+    application: {
+      new: "Neu",
+      screened: "Gesichtet",
+      invited: "Eingeladen",
+      scheduled: "Termin steht",
+      interviewed: "Kennengelernt",
+      offer_made: "Zusage erteilt",
+      moved_in: "Eingezogen",
+      rejected_by_household: "Abgesagt (von uns)",
+      declined_by_applicant: "Abgesagt (von der Person)",
+      withdrawn: "Zurückgezogen",
+      archived: "Archiviert",
+    },
     // §8.6: "`moved_out` (weich)" → „Ausgezogen" — the reversible removal tier's status label.
     // Kept distinguishable from common.remove ("Entfernen", the permanent tier) per U-27.
     movedOut: "Ausgezogen",
@@ -339,7 +356,7 @@ export const de = {
     },
     detail: {
       procedureChangedNotice: "Eine Abstimmungsregel wurde geändert, während diese Runde offen war.",
-      participantsHeading: "Teilnehmende",
+      participantsHeading: "Teilnehmende Mitbewohner:innen",
       // F3 change 2: shown only to a session holding create_application, for an open round.
       captureApplication: "Bewerbung erfassen",
     },
@@ -424,6 +441,31 @@ export const de = {
       detailPermissionDenied:
         "Diese Seite ist für die Moderation der WG. Wende dich an sie, wenn du etwas zu einer Bewerbung wissen möchtest.",
     },
+    // O4, the round's list of applications (F3 change 3, design D2).
+    list: {
+      heading: "Bewerbungen",
+      empty: "Noch keine Bewerbung erfasst",
+      // The group heading: the §8.6 state word and the number of applications in it.
+      groupLabel: (word: string, count: number) => `${word} · ${count}`,
+      age: (years: number) => `${years} Jahre`,
+      // Joins the age and the stored contacts on the muted line of a row.
+      summarySeparator: " · ",
+      loadError: "Die Bewerbungen konnten gerade nicht geladen werden. Lade die Seite neu.",
+    },
+    // O5's correction form (F3 change 3, design D5).
+    edit: {
+      heading: "Bewerbung bearbeiten",
+      save: "Änderungen speichern",
+      savePending: "Wird gespeichert…",
+      updated: "Änderungen gespeichert",
+      // A correction saved without any change writes nothing (FR-3.22), so it says so.
+      unchanged: "Keine Änderungen",
+      editLink: "Bearbeiten",
+      // Shown to a member without create_application; the action refuses anyway.
+      permissionDenied: "Bewerbungen bearbeitet die Moderation der WG.",
+      // Refused as stale: someone corrected the application after the form was loaded (D4 c2).
+      stale: "Die Bewerbung wurde inzwischen geändert. Lade die Seite neu, um die aktuelle Fassung zu sehen.",
+    },
     // Only a code and at most a field name ever reach the form, never a typed value (D4). One
     // text per code; the field is named by the field-level text below where it helps.
     errors: {
@@ -443,6 +485,9 @@ export const de = {
       permission_denied: "Du hast keine Berechtigung, Bewerbungen zu erfassen.",
       profile_required: "Bewerbungen können nur Bewohner:innen erfassen.",
       save_failed: "Die Bewerbung konnte nicht gespeichert werden. Deine Eingaben stehen noch im Formular.",
+      // Only the correction form can return these two.
+      not_found: "Diese Bewerbung gibt es nicht mehr.",
+      stale: "Die Bewerbung wurde inzwischen geändert. Lade die Seite neu, um die aktuelle Fassung zu sehen.",
     },
     saved: "Bewerbung gespeichert",
     viewSaved: "Bewerbung ansehen",
@@ -477,6 +522,25 @@ export const de = {
         message: "deine Nachricht",
         attributes: "weitere Angaben",
       },
+      // 06-Compliance-Anhang.md §4.5 „Stufe 1" (the Art. 13 text for an application collected from
+      // the applicant), verbatim, including its fixed „(Name, Kontakt, deine Nachricht)" (A1: only
+      // the Art. 14 variant generates its categories, because Art. 14(1)(d) requires them). The
+      // bold markers of the source are formatting, not words, and are not part of the copied text.
+      applicantText:
+        `Kurz zum Datenschutz: Deine Angaben (Name, Kontakt, deine Nachricht) speichern wir als WG, ` +
+        `um die Zimmervergabe zu organisieren. Wir notieren dazu auch unsere Eindrücke aus dem ` +
+        `Kennenlernen. Spätestens 180 Tage nach Abschluss löschen wir alles wieder. Du kannst ` +
+        `jederzeit erfahren, was wir gespeichert haben — auch die Notizen —, es berichtigen oder löschen ` +
+        `lassen. Melde dich einfach hier. Details: [Link]`,
+      showApplicantNotice: "Datenschutz-Hinweis anzeigen",
+      hideApplicantNotice: "Datenschutz-Hinweis ausblenden",
+      // „Warum steht das hier?" (D3). AWAITING THE HUMAN'S WORDING: the draft below states the
+      // household's responsibility in three sentences. Nothing depends on it.
+      whyToggle: "Warum steht das hier?",
+      why:
+        "Ihr als WG speichert die Angaben und entscheidet, was damit passiert. Deshalb seid ihr dafür " +
+        "verantwortlich, die Person darüber zu informieren. Flatmate.io schlägt euch nur einen Text " +
+        "vor und verschickt nichts selbst.",
       // 06-Compliance-Anhang.md §4.5 „Stufe 1, Variante Dritterhebung", verbatim except {Name},
       // {Haushaltsname} and {Kategorien}.
       thirdPartyText: (v: { name: string; household: string; categories: string }) =>

@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { ThirdPartyNotice } from "@/app/(org)/rounds/[id]/applications/third-party-notice";
+import { ApplicantNotice, ThirdPartyNotice } from "@/app/(org)/rounds/[id]/applications/notice";
 import { de } from "@/ui/strings";
 
 function render(overrides: Partial<Parameters<typeof ThirdPartyNotice>[0]> = {}) {
@@ -29,7 +29,7 @@ function escapeHtml(s: string): string {
 }
 
 describe("the quiet Art. 14 notice (AC-3.8, AC-3.10)", () => {
-  // Break: start with useState(true) in third-party-notice.tsx (open by default), and this fails.
+  // Break: start with useState(true) in notice.tsx (open by default), and this fails.
   it("the example text is absent until the toggle is pressed", () => {
     const html = render();
     expect(html).not.toContain("<textarea");
@@ -146,5 +146,103 @@ describe("the quiet Art. 14 notice (AC-3.8, AC-3.10)", () => {
     const notice = source.indexOf("<ThirdPartyNotice");
     expect(closeForm).toBeGreaterThan(-1);
     expect(notice).toBeGreaterThan(closeForm);
+  });
+});
+
+// F3 change 3, task 6.4 (FR-3.23, AC-3.20): the optional notice on EVERY application's detail.
+describe("the notice on every application (FR-3.23, AC-3.20)", () => {
+  const renderApplicant = (defaultOpen = false) => renderToStaticMarkup(createElement(ApplicantNotice, { defaultOpen }));
+
+  // Break: seed ApplicantNotice with the third-party text, and this fails.
+  it("ApplicantNotice is collapsed first and, opened, holds the Stufe 1 text and not the third-party sentence", () => {
+    const closed = renderApplicant();
+    expect(closed).not.toContain("<textarea");
+    expect(closed).toContain(de.applications.notice.showApplicantNotice);
+    expect(closed).toContain('aria-expanded="false"');
+    expect(closed).not.toContain("callout");
+
+    const open = renderApplicant(true);
+    const start = open.indexOf("<textarea");
+    expect(start).toBeGreaterThan(-1);
+    const body = open.slice(open.indexOf(">", start) + 1, open.indexOf("</textarea>"));
+    expect(body).toBe(escapeHtml(de.applications.notice.applicantText));
+    expect(body).toContain("Kurz zum Datenschutz");
+    expect(body).toContain("Name, Kontakt, deine Nachricht");
+    expect(body).toContain("Spätestens 180 Tage nach Abschluss löschen wir alles wieder.");
+    expect(body).not.toContain("über eine andere Person");
+    expect(open).toContain('aria-expanded="true"');
+    expect(open).toContain(de.applications.notice.hideApplicantNotice);
+  });
+
+  it("ThirdPartyNotice, opened, carries the third-party sentence and the stored categories", () => {
+    const body = renderOpen();
+    expect(body).toContain("über eine andere Person");
+    expect(body).toContain("Name, Telefonnummer");
+  });
+
+  it("ThirdPartyNotice offers the why toggle only when asked (the detail asks, O3 does not)", () => {
+    expect(render()).not.toContain(de.applications.notice.whyToggle);
+    expect(render({ why: true })).toContain(de.applications.notice.whyToggle);
+  });
+
+  it("no variant renders an element with a name attribute, a form, a mailto link or a send or share button", () => {
+    const forbidden = /senden|send|mailto:|teilen|share/i;
+    const pieces = [
+      renderApplicant(),
+      renderApplicant(true),
+      render({ why: true }),
+      renderOpen({ why: true }),
+      renderToStaticMarkup(createElement(ApplicantNotice, { why: true, defaultWhyOpen: true })),
+      render({ why: true, defaultWhyOpen: true }),
+    ];
+    for (const html of pieces) {
+      expect(html).not.toContain("<form");
+      expect(html).not.toContain("mailto:");
+      // Only the textarea is an input here, and it has no name.
+      expect(html.includes(" name=")).toBe(false);
+      const buttons = [...html.matchAll(/<button\b[^>]*>([^]*?)<\/button>/g)].map((m) => m[1].replace(/<[^>]*>/g, " "));
+      for (const text of buttons) expect(text).not.toMatch(forbidden);
+    }
+  });
+
+  // Human walkthrough, 2026-09-29: a round (?) with the question on hover, in the notice's own
+  // button row. Break: render the question as the button's text again, and this fails.
+  const whyButton = (html: string) => {
+    const label = `aria-label="${escapeHtml(de.applications.notice.whyToggle)}"`;
+    return [...html.matchAll(/<button\s([^>]*)>([^]*?)<\/button>/g)].find((m) => m[1].includes(label));
+  };
+
+  it("the why toggle is a round (?) icon in each notice's button row: the question is its name and hover text, not visible text", () => {
+    for (const html of [
+      renderToStaticMarkup(createElement(ApplicantNotice, { why: true })),
+      render({ why: true }),
+    ]) {
+      const button = whyButton(html);
+      expect(button).toBeDefined();
+      const [, attrs, inner] = button!;
+      expect(attrs).toContain(`title="${escapeHtml(de.applications.notice.whyToggle)}"`);
+      expect(attrs).toContain("rounded-full");
+      expect(inner).toContain("<svg");
+      expect(inner.replace(/<[^>]*>/g, "").trim()).toBe("");
+    }
+    // The applicant notice without `why` has no (?).
+    expect(whyButton(renderToStaticMarkup(createElement(ApplicantNotice)))).toBeUndefined();
+  });
+
+  it("the explanation opens in place: closed shows only the (?), open shows the sentences and no link", () => {
+    for (const [closed, open] of [
+      [
+        renderToStaticMarkup(createElement(ApplicantNotice, { why: true })),
+        renderToStaticMarkup(createElement(ApplicantNotice, { why: true, defaultWhyOpen: true })),
+      ],
+      [render({ why: true }), render({ why: true, defaultWhyOpen: true })],
+    ]) {
+      expect(closed).not.toContain(escapeHtml(de.applications.notice.why));
+      expect(whyButton(closed)![1]).toContain('aria-expanded="false"');
+      expect(open).toContain(escapeHtml(de.applications.notice.why));
+      expect(whyButton(open)![1]).toContain('aria-expanded="true"');
+      expect(open).not.toContain("<a ");
+      expect(open).not.toContain("href=");
+    }
   });
 });

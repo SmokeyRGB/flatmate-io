@@ -44,10 +44,9 @@ describe("[GUARDED] G-D15: no Application is visible or writable without a resid
     const seenByHousehold = await getApplication(hh.context, seed.id);
     expect(seenByHousehold).toBeNull();
 
-    const actor = { accountId: hh.accountId, profileId: null };
     let caught: unknown;
     try {
-      await transitionApplication(hh.context, seed.id, "screened", actor);
+      await transitionApplication(hh.context, seed.id, "screened");
     } catch (error) {
       caught = error;
     }
