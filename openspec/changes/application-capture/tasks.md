@@ -591,7 +591,7 @@ All in `tests/integration/policy/application-capture.test.ts` unless named other
   evidence (5.2); the 1.8 grep; anything not done or deviating from design.md, with the reason.
   **A deviation from D4's lock order or transaction shape is not taken on its local merits. Stop
   and report it.**
-- [ ] 10.3 Human-gated, **not ticked by the applier**: the browser walkthrough (sign in as the demo
+- [x] 10.3 Human-gated, **not ticked by the applier**: the browser walkthrough (sign in as the demo
   moderator; capture a name only; capture third-party and see the duty, date and text before
   saving; copy it; no send; land on the detail; a refused save keeps the values; the dev server log
   contains no typed value), done by the planner with the human.
