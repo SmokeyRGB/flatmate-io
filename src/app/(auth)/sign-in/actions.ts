@@ -55,6 +55,8 @@ export async function signInAction(
           return { error: de.auth.errors.signIn.noHousehold };
         case "no_membership":
           return { error: de.auth.errors.signIn.noMembership };
+        case "provider_unavailable":
+          return { error: de.auth.errors.signIn.providerUnavailable };
         default: {
           const _exhaustive: never = code;
           return _exhaustive;

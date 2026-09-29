@@ -1,5 +1,6 @@
 import { config } from "dotenv";
 import { afterEach } from "vitest";
+import { withLostResponseDeadline } from "./helpers/lost-response-fetch";
 
 // `quiet: true` suppresses dotenv's own stdout "tip" advertisements (confirmed in its source,
 // node_modules/dotenv/lib/main.js) — not a security concern, just noise in test output.
@@ -28,6 +29,29 @@ for (const [name, value] of [
         `  Point .env.local at flatmate-io-dev instead — see .env.example.`,
     );
   }
+}
+
+// A Supabase request whose response never comes gets a deadline and, where that is safe, a
+// second copy, instead of hanging until the 60s test timeout (tests/helpers/lost-response-fetch.ts
+// has the measurements). 8s is six times the slowest request GoTrue logged, and three attempts
+// (24s) leave most of a test's 60s budget for the test itself, even one already slow under load. Installed before any test module creates a Supabase client, which
+// captures the global fetch when it is created.
+//
+// The application's own deadline (src/modules/identity/auth-provider.ts, default 5s) sits ABOVE
+// this wrapper and passes its signal down, so at 5s it would abort every lost request before this
+// wrapper's 8s deadline could resend it, quietly turning this resend off for all application
+// calls. So the suite runs the application with a deadline longer than all three attempts here
+// (24s): this wrapper resends first, and the application's deadline only ends a request the
+// wrapper has already given up on. Set on every file, not `??=`, because a fault-injection test
+// sets 3000 at module load (auth-provider-deadline design.md D12) and process.env outlives a test
+// file within a worker.
+process.env.AUTH_PROVIDER_DEADLINE_MS = "30000";
+if (process.env.NEXT_PUBLIC_SUPABASE_URL) {
+  globalThis.fetch = withLostResponseDeadline(globalThis.fetch, {
+    origin: new URL(process.env.NEXT_PUBLIC_SUPABASE_URL).origin,
+    deadlineMs: 8000,
+    attempts: 3,
+  });
 }
 
 // A net beneath each file's own afterEach, not a replacement for it. If this ever ran before a

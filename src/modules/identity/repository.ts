@@ -39,19 +39,26 @@ export async function isDisplayNameTaken(
   context: SessionContext,
   displayName: string,
 ): Promise<boolean> {
-  return withSessionContext(context, async (tx) => {
-    const rows = await tx
-      .select({ id: residentProfile.id })
-      .from(residentProfile)
-      .where(
-        and(
-          eq(residentProfile.householdId, context.householdId),
-          eq(residentProfile.displayName, displayName),
-          notInArray(residentProfile.status, [...NAME_RELEASING_STATUSES]),
-        ),
-      );
-    return rows.length > 0;
-  });
+  return withSessionContext(context, (tx) => isDisplayNameTakenTx(tx, context.householdId, displayName));
+}
+
+// The same check on a transaction the caller already holds. createResidentProfile used to call
+// isDisplayNameTaken from inside its own transaction, which checked out a second pooled
+// connection while still holding the first. Once every Supavisor server connection is held by
+// such a caller, all of them wait for a second one that never comes free: a pool deadlock with no
+// timeout, which showed up as `Test timed out in 60000ms` against flatmate-io-dev.
+async function isDisplayNameTakenTx(tx: Tx, householdId: string, displayName: string): Promise<boolean> {
+  const rows = await tx
+    .select({ id: residentProfile.id })
+    .from(residentProfile)
+    .where(
+      and(
+        eq(residentProfile.householdId, householdId),
+        eq(residentProfile.displayName, displayName),
+        notInArray(residentProfile.status, [...NAME_RELEASING_STATUSES]),
+      ),
+    );
+  return rows.length > 0;
 }
 
 export class DuplicateDisplayNameError extends Error {
@@ -78,7 +85,7 @@ export async function createResidentProfile(
   if (!actor.accountId) throw new ResidentListActionDeniedError();
   await assertIsAdministration(context, actor.accountId);
   return withSessionContext(context, async (tx) => {
-    if (await isDisplayNameTaken(context, displayName)) {
+    if (await isDisplayNameTakenTx(tx, context.householdId, displayName)) {
       throw new DuplicateDisplayNameError(displayName);
     }
 

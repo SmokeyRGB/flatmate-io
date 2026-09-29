@@ -69,6 +69,11 @@ Three more rules at that boundary, from PR #23's fourth round:
   authenticating and refuses when `account.password_changed_at` is later (`drizzle/0022`).
 - A stamp written inside a long transaction uses `clock_timestamp()`, not `now()`. `now()` is
   fixed at transaction start, so it predates the provider calls made in between.
+- An unanswered provider call is an *unknown* outcome, not a refusal — auth-js returns it as
+  `AuthRetryableFetchError`, and it is never distinguishable from a definite decline by an `if
+  (error)` check alone. The request may or may not have taken effect. A mutating call resolves this
+  by reading the provider back under the same lock the call itself was made under; it is never
+  resent blind (`src/modules/identity/auth-provider.ts`, auth-provider-deadline proposal.md).
 
 **Every writer of the same state, pairwise.** When two functions write the same thing (a password,
 a provider address, the set of live sessions), each pair has to be serialized against each other,
@@ -76,6 +81,16 @@ not each against its own caller. `changeResidentPassword` and `redeemPasswordRes
 the password and both take the `account` row lock (PR #23). A new session is created inside the
 same transaction, under the same `membership` lock, that decides the membership still stands, as
 `signIn` does. Inserting it after that transaction commits reopens the race with removal.
+
+**One pooled connection per call chain.** A `withSessionContext` opened inside another's callback
+holds one Supavisor connection while it waits for a second. Once every server connection (16 for
+`app_runtime` on dev) is held that way, the pool deadlocks, with no timeout to break it:
+`createResidentProfile` did this until 2026-09-28, and it surfaced as dozens of `Test timed out in
+60000ms` whenever two suites overlapped. `withSessionContextOn` now refuses the nested call
+(`NestedSessionContextError`), so pass the `tx` you hold to a `...Tx` helper instead.
+`flatmate-io-dev` is shared: CI's `verify-hosted` and other sessions' pre-push runs overlap yours.
+Anything unique project-wide, such as an Auth address or a join code, must be random per run,
+never a counter or a literal.
 
 Anything keyed on request data — a header, a cookie, a route param — ask who can set it.
 `x-forwarded-for` is caller-supplied unless `JOIN_ATTEMPT_TRUSTED_IP_HEADER` names a proxy that

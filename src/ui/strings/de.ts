@@ -100,6 +100,12 @@ export const de = {
       // revoked in phase 1, link spent) — only the immediate sign-in afterwards failed, so this is
       // a note beside the ordinary form, not an error. Recreated exactly as in commit a95bbb9.
       passwordResetNote: "Dein neues Passwort ist gesetzt. Melde dich damit an.",
+      // auth-provider-deadline design.md D8/D10 (draft, awaiting human confirmation):
+      // redeemPasswordReset's `reset_outcome_unknown` — neither phase 2's write nor any check of
+      // it (nor phase 3's own sign-in) could be confirmed either way.
+      passwordResetUnknownNote:
+        "Dein neues Passwort ist möglicherweise schon gesetzt. Versuche, dich damit anzumelden. " +
+        "Klappt das nicht, bitte die Verwaltung um einen neuen Link.",
     },
     register: {
       heading: "WG gründen",
@@ -142,6 +148,9 @@ export const de = {
         invalidCredentials: "Diese Anmeldedaten sind ungültig.",
         noHousehold: "Dieses Konto ist keinem Haushalt zugeordnet.", // auth.ts:366
         noMembership: "Für dieses Konto besteht keine Mitgliedschaft.", // auth.ts:372
+        // auth-provider-deadline design.md D10 (draft, awaiting human confirmation): the identity
+        // provider's answer never arrived — never shown as "invalid credentials" (identity/sign-in).
+        providerUnavailable: "Die Anmeldung ist gerade nicht möglich. Bitte versuche es gleich noch einmal.",
       },
       // Decision 6: a third-party (Supabase Auth) or genuinely unanticipated failure past the
       // point a domain error could describe it. The real message still reaches the log.
@@ -706,6 +715,10 @@ export const de = {
         // happened at all.
         changeIncomplete:
           "Die Änderung wurde möglicherweise nur teilweise übernommen. Bitte versuche es erneut.",
+        // auth-provider-deadline design.md D10 (draft, awaiting human confirmation): the identity
+        // provider's answer never arrived and could not be resolved — nothing was changed.
+        providerUnavailable:
+          "Das ist gerade nicht möglich. Es wurde nichts geändert – bitte versuche es gleich noch einmal.",
       },
     },
     password: {
@@ -729,6 +742,19 @@ export const de = {
         // situation, changeResidentPassword's own compensating transaction also failed.
         changeIncomplete:
           "Die Änderung wurde möglicherweise nur teilweise übernommen. Bitte versuche es erneut.",
+        // auth-provider-deadline design.md D10 (draft, awaiting human confirmation).
+        providerUnavailable:
+          "Das ist gerade nicht möglich. Es wurde nichts geändert – bitte versuche es gleich noch einmal.",
+        // D7's SAFE DIRECTION (pre-mortem findings 3/4): an unanswered write may still apply later,
+        // after this lock releases — every other session already ended as a precaution, whatever
+        // is found afterwards.
+        unchangedSessionsEnded:
+          "Dein Passwort wurde nicht geändert – bitte versuche es gleich noch einmal. " +
+          "Deine anderen Anmeldungen wurden vorsichtshalber beendet.",
+        uncertainSessionsEnded:
+          "Ob dein neues Passwort übernommen wurde, ließ sich nicht feststellen. Deine anderen " +
+          "Anmeldungen wurden vorsichtshalber beendet. Ändere es am besten gleich noch einmal – als " +
+          "aktuelles Passwort gilt das alte oder das neue.",
       },
     },
     signOut: {

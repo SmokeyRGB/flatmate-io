@@ -65,6 +65,13 @@ export async function registerHouseholdAction(
             return { error: de.auth.errors.signIn.noHousehold, fieldError: null };
           case "no_membership":
             return { error: de.auth.errors.signIn.noMembership, fieldError: null };
+          case "provider_unavailable":
+            // auth-provider-deadline design.md D9 (pre-mortem finding 14): undoRegisterHousehold
+            // has already run above — the household is gone, so "try signing in again" would send
+            // the person to an account that no longer exists. Shows the REGISTRATION's own failure
+            // text, not sign-in's, even though a SignInError is what was caught.
+            console.error(sessionErr);
+            return { error: de.auth.errors.register.signupFailed, fieldError: null };
           default: {
             const _exhaustive: never = code;
             return _exhaustive;
