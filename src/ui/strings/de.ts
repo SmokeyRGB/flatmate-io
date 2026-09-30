@@ -760,18 +760,48 @@ export const de = {
       button: "Zur Organisation →",
     },
   },
-  // start-screen: the Casting tab (placeholder until F4/F5) and its screening step placeholder.
+  // F4 change 1 (screening-pass): the Casting tab is the D1 shell until F5 builds the ranking. No
+  // evaluative text (C-4.11), no scores, and nothing about revising (C1 decision 2026-09-15).
   casting: {
-    placeholderHeading: "Casting",
-    placeholderBody: "Wird in F4 & F5 gebaut.",
+    rankingHeading: "Rangliste",
+    rankingBody: "Hier erscheint die Rangliste dieser Runde.",
     backToStart: "Zurück zu Start",
   },
+  // F4 change 1: screen C1, the screening pass. The four labels are the settled German ones
+  // (Nein · Eher nicht · Finde gut · Unbedingt); how the weights are phrased is P-O-04 and stays
+  // reword-able here. The buttons carry no numbers (human decision Q-3, 2026-09-30); the weights
+  // sit behind the "(?)" pop-over.
   screening: {
-    placeholderHeading: "Sichten",
-    placeholderBody: (count: number) =>
-      count === 1
-        ? "1 Bewerbung wartet auf deine Stimme. Das Sichten selbst wird in F4 gebaut."
-        : `${count} Bewerbungen warten auf deine Stimme. Das Sichten selbst wird in F4 gebaut.`,
+    ratings: {
+      no: "Nein",
+      rather_not: "Eher nicht",
+      good: "Finde gut",
+      definitely: "Unbedingt",
+    },
+    // The visually hidden companion to the check glyph on the selected rating, so the selected
+    // level is never told by colour alone (FR-4.19).
+    selected: "gewählt",
+    favouriteNote: "= dein Favorit",
+    progress: (n: number, total: number) => `${n} von ${total}`,
+    progressLabel: "Fortschritt beim Sichten",
+    ratingGroupLabel: "Deine Bewertung",
+    weightsToggle: "(?)",
+    weightsToggleLabel: "Punkte der Stufen anzeigen",
+    weightsHeading: "Punkte der Stufen",
+    weightsSentence: (rather: string, good: string) => `Der große Sprung liegt zwischen ${rather} und ${good}.`,
+    points: (n: number) => (n === 1 ? "1 Punkt" : `${n} Punkte`),
+    ageYears: (n: number) => `${n} Jahre`,
+    empty: "Nichts wartet auf dich",
+    emptyBody: "Du hast alles bewertet, was gerade ansteht.",
+    refusal: {
+      roundNotOpen: (statusLabel: string) =>
+        `Diese Runde ist gerade nicht offen (Stand: ${statusLabel}). Stimmen sind jetzt nicht möglich, deine bisherigen bleiben.`,
+      notEligible: "Du kannst in dieser Runde gerade nicht abstimmen.",
+      rulesInvalid: "Die Regeln dieser Runde lassen sich gerade nicht lesen. Bitte melde dich bei der Verwaltung.",
+      voteFailed: "Das hat nicht geklappt — nichts ist verloren. Nochmal?",
+    },
+    back: "Zurück",
+    backAria: "Zurück zur vorherigen Bewerbung",
     backToStart: "Zurück zu Start",
   },
   // resident-settings (E1): the resident's own settings screen — email, password, sign-out.

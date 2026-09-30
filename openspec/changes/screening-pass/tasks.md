@@ -180,10 +180,10 @@
 
 ## 4. Apply `0028` to dev
 
-- [ ] 4.1 Run `gh pr list` and `git log origin/main..origin/<branch> -- drizzle/` for every remote
+- [x] 4.1 Run `gh pr list` and `git log origin/main..origin/<branch> -- drizzle/` for every remote
   branch with an open PR. If any other branch adds a migration, **stop and report**. Otherwise
   state in the report that none was in flight.
-- [ ] 4.2 Apply `drizzle/0028_vote.sql` to **`flatmate-io-dev`** via Supabase MCP
+- [x] 4.2 Apply `drizzle/0028_vote.sql` to **`flatmate-io-dev`** via Supabase MCP
   `apply_migration`, never production. Then, as owner through the MCP, check:
   - `to_regclass('public.vote')` is not null;
   - `pg_policies` for `vote` lists the four policies with the right `permissive`/`cmd`;
@@ -198,13 +198,13 @@
 
 ## 5. Deliberation repository (design D3–D5)
 
-- [ ] 5.1 `src/modules/deliberation/scale-weights.ts`: `parseScaleWeights(raw: unknown):
+- [x] 5.1 `src/modules/deliberation/scale-weights.ts`: `parseScaleWeights(raw: unknown):
   ScaleWeights | null`. It needs exactly the four keys, each `typeof number`, finite and ≥ 0. Extra
   keys are refused too. It has no default. Test `tests/unit/deliberation/scale-weights.test.ts`:
   valid; missing key; extra key; string `"3"`; `NaN`; `Infinity`; negative; null; array; nested
   object as a value. **Code break:** make the parser return defaults on failure → the malformed
   cases fail.
-- [ ] 5.2 `src/modules/deliberation/repository.ts`:
+- [x] 5.2 `src/modules/deliberation/repository.ts`:
   - `VoteError` (codes `invalid_input | not_found | round_not_open | not_eligible | not_votable |
     own_application`, plus `roundStatus?`), `VoteWriteError`, and the `ScreeningPass` union;
   - private `awaitingVoteTx`;
@@ -218,7 +218,7 @@
   round-status enum value. Any other error is wrapped in `VoteWriteError` (SQLSTATE and constraint
   in the message, never params; `cause` kept). No pre-check of round or eligibility in TypeScript
   (D5 "Why"). Files: `src/modules/deliberation/repository.ts`.
-- [ ] 5.3 Comments only:
+- [x] 5.3 Comments only:
   - `src/modules/identity/repository.ts` `assertAccountCanVote`: "(F3)" → "F4, called by
     deliberation's `castVote`";
   - the `removeMember` header's U-27 sentence, per design D10.
@@ -233,7 +233,7 @@ teardown in `afterEach`. Assert error **codes and constraint names**, not only e
 this group names a **database break**, it is run in group 9; here, write the test so that the
 break can fail it.
 
-- [ ] 6.1 `tests/integration/deliberation/cast-vote.test.ts` (repository):
+- [x] 6.1 `tests/integration/deliberation/cast-vote.test.ts` (repository):
   - **AC-4.10:** rate `good` then `no` → one row, value `no`, `updated_at > created_at`,
     `withdrawn_at` null, and `household_id`/`round_id`/`stage`/`resident_profile_id` as written.
     Assert every column.
@@ -254,7 +254,7 @@ break can fail it.
   - **Invariant guard (unreachable state)**, in its own `describe`: `can_vote = false` and
     `removed_at` set → `not_eligible`. A comment cites design Context: no production path writes
     either. DB break: step 3 removed, which can fail these.
-- [ ] 6.2 `tests/integration/raw-sql/vote-guard.test.ts` (G-C7's other side, and AC-4.3's DB
+- [x] 6.2 `tests/integration/raw-sql/vote-guard.test.ts` (G-C7's other side, and AC-4.3's DB
   half). As `app_runtime` with a resident profile set, raw `INSERT INTO vote` for each case below,
   each rejected with SQLSTATE `23514` and the expected `constraint_name`:
   - the own application;
@@ -275,7 +275,7 @@ break can fail it.
 
   DB breaks (group 9): drop `vote_guard` → the own-application insert succeeds; drop
   `application_keeps_votes` → the move succeeds.
-- [ ] 6.3 `tests/integration/policy/vote-scoping.test.ts` and
+- [x] 6.3 `tests/integration/policy/vote-scoping.test.ts` and
   `tests/integration/raw-sql/vote-scoping.test.ts` (G-C7 pair). Through the policy layer and by
   raw SQL:
   - another household's votes are invisible, and `count(*)` counts only one's own;
@@ -290,7 +290,7 @@ break can fail it.
   - replace `vote_household_isolation` with `USING (true)` → the cross-household count fails.
 
   State in the test comment that the insert case is held by the trigger, not by the policy.
-- [ ] 6.4 `tests/integration/deliberation/cast-vote-concurrency.test.ts` (EC-4.6), using
+- [x] 6.4 `tests/integration/deliberation/cast-vote-concurrency.test.ts` (EC-4.6), using
   `holdTransaction` + `settlesWithin`:
   - T1 holds an uncommitted upsert of `good`, and T2's `no` upsert must not settle. Commit T1, T2
     completes, and exactly one row exists with value `no`.
@@ -300,7 +300,7 @@ break can fail it.
 
   DB break (group 9): step 4 without `FOR SHARE` → T2 settles early and the test fails. The
   timing-based "not settled" is evidence only together with that break (pre-mortem L).
-- [ ] 6.5 `tests/integration/deliberation/screening-pass.test.ts`:
+- [x] 6.5 `tests/integration/deliberation/screening-pass.test.ts`:
   - **AC-4.1:** set equality and order with five applications. Include one `invited`, one
     `rejected_by_household` and one own application in `screened`, and prove they are absent
     (AC-4.2/4.3).
@@ -328,7 +328,7 @@ break can fail it.
     non-participant → cards leak;
   - replace `IS DISTINCT FROM` with `<>` → the NULL-`became_resident_id` cards vanish;
   - add `contact_email` to the select → the key test fails.
-- [ ] 6.6 `tests/integration/deliberation/awaiting-vote-counts.test.ts`:
+- [x] 6.6 `tests/integration/deliberation/awaiting-vote-counts.test.ts`:
   - the map equals the deck size per round (same fixture as 6.5);
   - after one vote the count drops by one;
   - **a withdrawn vote counts again** (pre-mortem M14);
@@ -337,7 +337,7 @@ break can fail it.
   - the household account gets an empty map with no query.
 
   Code break: make `awaitingVoteTx` ignore `withdrawn_at` → the withdrawn case fails.
-- [ ] 6.7 `tests/integration/policy/authorization-matrix.test.ts`:
+- [x] 6.7 `tests/integration/policy/authorization-matrix.test.ts`:
   - the deliberation set-coverage block;
   - the `castVote` case: household account → `ProfileRequiredError`, and a claimed plain member in
     a round built without their participation → `VoteError` `not_eligible`;
@@ -347,7 +347,7 @@ break can fail it.
 
   Code breaks: export a dummy function from deliberation's repository → the coverage test fails;
   import `listVoteCandidatesTx` in a `src/app` file → the caller assertion fails.
-- [ ] 6.8 Plumbing:
+- [x] 6.8 Plumbing:
   - `tests/helpers/identity.ts` `HOUSEHOLD_SCOPED_TABLES` gets `"vote"`;
   - `scripts/cleanup-demo-household.sql` deletes from `vote`;
   - `data-inventory.yml` gets the `vote` block (D10, context `deliberation`), whose purpose and
@@ -362,7 +362,7 @@ break can fail it.
 
 ## 7. The screen (design D9)
 
-- [ ] 7.1 `src/ui/strings/de.ts`: replace the `screening` placeholder keys with:
+- [x] 7.1 `src/ui/strings/de.ts`: replace the `screening` placeholder keys with:
   - `ratings` (`no` „Nein", `rather_not` „Eher nicht", `good` „Finde gut", `definitely`
     „Unbedingt");
   - `selected` (the visually hidden or visible "gewählt" companion to the check glyph);
@@ -380,7 +380,7 @@ break can fail it.
   `casting` gets `rankingHeading` „Rangliste" and `rankingBody` „Hier erscheint die Rangliste
   dieser Runde." in place of the placeholder keys. No evaluative text, and no mention of revising.
   Remove keys nobody reads anymore (`grep` for them). Files: `src/ui/strings/de.ts`.
-- [ ] 7.2 `src/app/(resident)/casting/screening/deck-state.ts`: the pure reducer of D9 (`submitted`,
+- [x] 7.2 `src/app/(resident)/casting/screening/deck-state.ts`: the pure reducer of D9 (`submitted`,
   `rated`, `failed`, `back`, `forward`, `dropped`; `pending` blocks navigation) and
   `tests/unit/screening/deck-state.test.ts`:
   - forward is refused on an unrated card and at the last index;
@@ -396,7 +396,7 @@ break can fail it.
 
   Code breaks: allow `forward` on an unrated card; use `index + 1` in `rated`; omit `done` in
   `dropped` → each fails its case.
-- [ ] 7.3 `src/app/(resident)/casting/screening/actions.ts`: the `castVoteAction` server action
+- [x] 7.3 `src/app/(resident)/casting/screening/actions.ts`: the `castVoteAction` server action
   (D5). It resolves the session, refuses a missing session with a code, calls `castVote`, and
   returns codes only, with **no `revalidatePath`**.
   `src/app/(resident)/casting/screening/screening-deck.tsx`, the client component of D9:
@@ -413,16 +413,16 @@ break can fail it.
   - the refusal-code table of D9;
   - `router.push("/casting")` on `done`;
   - `useReducer` initialised once from props, and no `router.refresh()`.
-- [ ] 7.4 `src/app/(resident)/casting/screening/page.tsx`: D9's server page (`searchParams.round`
+- [x] 7.4 `src/app/(resident)/casting/screening/page.tsx`: D9's server page (`searchParams.round`
   normalised, `getScreeningPass`, the three states). `loading.tsx`: a card-shaped skeleton
   (progress bar, tall card, a row of four pill buttons at the bottom) importing `@/ui/skeletons`.
   `src/app/globals.css`: the deck classes and keyframes, plus the `prefers-reduced-motion`
   crossfade. Transform and opacity only, on the card element; the controls stay outside it. Files:
   those three.
-- [ ] 7.5 `src/app/(resident)/casting/page.tsx`: the D1 shell (heading, sentence, back link),
+- [x] 7.5 `src/app/(resident)/casting/page.tsx`: the D1 shell (heading, sentence, back link),
   keeping the redirect via `shouldOpenScreening(overview, awaitingVotes)`. `loading.tsx` stays
   valid. Files: that page.
-- [ ] 7.6 `src/app/(resident)/dashboard/dashboard-view.ts` and `page.tsx`:
+- [x] 7.6 `src/app/(resident)/dashboard/dashboard-view.ts` and `page.tsx`:
   - `buildDashboardView(overview, awaitingVotes, …)`;
   - `pendingVoteCount(overview, awaitingVotes)` and `shouldOpenScreening(...)`;
   - the task `href` becomes `/casting/screening?round=<id>`;
@@ -431,7 +431,7 @@ break can fail it.
   `tests/unit/start/dashboard-view.test.ts` is adapted: the same cases, fed through the map, plus
   "each round's task links to its round" (start spec "Two rounds"). Code break: drop the
   `?round=` → the new case fails.
-- [ ] 7.7 `tests/unit/screening/screening-deck.test.ts` — **`.test.ts`, not `.tsx`**: vitest
+- [x] 7.7 `tests/unit/screening/screening-deck.test.ts` — **`.test.ts`, not `.tsx`**: vitest
   collects only `tests/**/*.test.ts` in the `node` environment, and the repo has no
   testing-library (pre-mortem H3). Render with `createElement` + `react-dom/server`
   `renderToStaticMarkup` and `vi.mock("next/navigation")`, the pattern of

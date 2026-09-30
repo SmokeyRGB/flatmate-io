@@ -660,3 +660,227 @@ h3 {
     }
   }
 }
+
+/* F4 change 1: screen C1, the screening deck (design D9). Motion is CSS only: transform and opacity
+   on the card elements, never on the controls, which stay put (09-Design-System.md, feedback
+   states). Reduced motion swaps the slide for a plain crossfade. */
+@layer components {
+  .deck-screen {
+    padding-bottom: 7rem;
+  }
+  .deck-topbar {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+  .deck-back,
+  .deck-back-spacer {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 2rem;
+    min-height: 2rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--color-muted-foreground);
+  }
+  .deck-progress {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .deck-progress-track {
+    flex: 1;
+    height: 0.375rem;
+    border-radius: 9999px;
+    background: var(--color-muted);
+    overflow: hidden;
+  }
+  .deck-progress-fill {
+    height: 100%;
+    border-radius: 9999px;
+    background: var(--color-primary);
+    transition: width 0.2s ease;
+  }
+  .deck-progress-text {
+    font-size: 0.75rem;
+    color: var(--color-muted-foreground);
+    white-space: nowrap;
+  }
+  .deck-help {
+    width: 2rem;
+    height: 2rem;
+    border-radius: 9999px;
+    border: 1px solid var(--color-border);
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--color-muted-foreground);
+  }
+  .weights-popover {
+    margin: auto;
+    max-width: 20rem;
+    color: var(--color-card-foreground);
+  }
+
+  .deck-stack {
+    display: grid;
+    position: relative;
+  }
+  .deck-stack > .deck-card {
+    grid-area: 1 / 1;
+  }
+  .deck-card {
+    min-height: 16rem;
+    max-height: calc(100dvh - 21rem);
+    overflow-y: auto;
+  }
+  .deck-card-current {
+    z-index: 2;
+    touch-action: pan-y;
+  }
+  .deck-card-next {
+    z-index: 0;
+    transform: translateY(0.625rem) scale(0.96);
+    opacity: 0.7;
+    pointer-events: none;
+  }
+  .deck-card-leaving {
+    z-index: 3;
+    pointer-events: none;
+  }
+  .deck-card-current[data-entering="true"][data-dir="forward"] {
+    animation: deck-rise 240ms ease-out both;
+  }
+  .deck-card-current[data-entering="true"][data-dir="back"] {
+    z-index: 4;
+    animation: deck-slide-in 240ms ease-out both;
+  }
+  .deck-card-leaving[data-dir="forward"] {
+    animation: deck-slide-out 240ms ease-in both;
+  }
+  .deck-card-leaving[data-dir="back"] {
+    z-index: 1;
+    animation: deck-sink 240ms ease-in both;
+  }
+  @keyframes deck-rise {
+    from {
+      transform: translateY(0.625rem) scale(0.96);
+      opacity: 0.7;
+    }
+    to {
+      transform: none;
+      opacity: 1;
+    }
+  }
+  @keyframes deck-slide-out {
+    to {
+      transform: translateX(-110%) rotate(-6deg);
+      opacity: 0;
+    }
+  }
+  @keyframes deck-slide-in {
+    from {
+      transform: translateX(-110%) rotate(-6deg);
+      opacity: 0;
+    }
+    to {
+      transform: none;
+      opacity: 1;
+    }
+  }
+  @keyframes deck-sink {
+    to {
+      transform: translateY(0.625rem) scale(0.96);
+      opacity: 0;
+    }
+  }
+  @keyframes deck-fade-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+  @keyframes deck-fade-out {
+    to {
+      opacity: 0;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .deck-card-current[data-entering="true"][data-dir] {
+      animation: deck-fade-in 150ms linear both;
+    }
+    .deck-card-leaving[data-dir] {
+      animation: deck-fade-out 150ms linear both;
+    }
+    .deck-progress-fill {
+      transition: none;
+    }
+  }
+
+  /* Four ratings side by side in one row, fixed above the bottom bar on mobile. */
+  .rating-bar {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.5rem;
+    position: fixed;
+    inset-inline: 0;
+    bottom: calc(4.25rem + env(safe-area-inset-bottom, 0px));
+    z-index: 30;
+    padding: 0.5rem 1rem;
+    background: var(--color-background);
+  }
+  @media (min-width: 768px) {
+    .deck-screen {
+      padding-bottom: 1.5rem;
+    }
+    .rating-bar {
+      position: static;
+      padding: 0;
+      background: transparent;
+    }
+    .deck-card {
+      max-height: calc(100dvh - 18rem);
+    }
+  }
+  .rating-btn {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 4rem;
+    padding: 0.5rem 0.25rem;
+    border-radius: 1rem;
+    border: 1px solid var(--color-border);
+    background: var(--color-secondary);
+    color: var(--color-secondary-foreground);
+    font-size: 0.75rem;
+    font-weight: 500;
+    line-height: 1rem;
+    text-align: center;
+  }
+  .rating-btn .submit-stack > span {
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+  .rating-btn-selected {
+    background: var(--color-primary);
+    color: var(--color-primary-foreground);
+    border-color: var(--color-primary);
+  }
+  .rating-btn:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+  }
+  .rating-btn[disabled] {
+    opacity: 0.6;
+  }
+  .rating-check {
+    position: absolute;
+    top: 0.25rem;
+    right: 0.25rem;
+  }
+}
