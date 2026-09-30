@@ -108,7 +108,7 @@
 
 ## 2. Deliberation schema and migration `0028` (written, not yet applied)
 
-- [ ] 2.1 `src/db/rls-predicates.ts`: add `OWN_PROFILE`, a builder for the `resident_profile_id =
+- [x] 2.1 `src/db/rls-predicates.ts`: add `OWN_PROFILE`, a builder for the `resident_profile_id =
   (select nullif(current_setting('app.profile_id', true), '')::uuid)` predicate, next to
   `PROFILE_PRESENT` with the same style of comment. `src/modules/deliberation/vote-values.ts`:
   `VOTE_VALUES` (readonly tuple, in order) and `VoteValue`, with no imports.
@@ -122,7 +122,7 @@
 
   `drizzle.config.ts`: add the schema path. Files: `src/db/rls-predicates.ts`,
   `src/modules/deliberation/{vote-values.ts,schema.ts}`, `drizzle.config.ts`.
-- [ ] 2.2 `npx drizzle-kit generate --name vote`, which produces `drizzle/0028_vote.sql` and the
+- [x] 2.2 `npx drizzle-kit generate --name vote`, which produces `drizzle/0028_vote.sql` and the
   meta. **Stop if the generated SQL contains anything but vote objects** (drift). Then hand-edit
   it into design D6's five steps:
   - the guarded `DO $$` enum creates;
@@ -147,7 +147,7 @@
 
 ## 3. Casting query ports and Start without the stub (design D2, D3)
 
-- [ ] 3.1 `src/modules/casting/repository.ts`: add `listVoterRoundsTx` and `listVoteCandidatesTx`
+- [x] 3.1 `src/modules/casting/repository.ts`: add `listVoterRoundsTx` and `listVoteCandidatesTx`
   exactly as D2 specifies:
   - `ProfileRequiredError` first;
   - every predicate carries `household_id`;
@@ -163,11 +163,11 @@
   `resident_profile` join precedent. Update the comments at `APPLICATION_LIFECYCLE_COLUMNS` and
   `getOrganisationApplication` to name `listVoteCandidatesTx` as the second, voter-gated
   personal-column read.
-- [ ] 3.2 Same file: delete `notVotedByViewer` and the grouped T-5 query from `getStartOverview`,
+- [x] 3.2 Same file: delete `notVotedByViewer` and the grouped T-5 query from `getStartOverview`,
   and `voteCount` from `StartOpenRound`. Keep the participation read, the standing and the
   profile-less early `null` unchanged. Replace the Decision 9 comment with one line naming
   deliberation's `getAwaitingVoteCounts` (design D3).
-- [ ] 3.3 `tests/integration/policy/start-overview.test.ts` and
+- [x] 3.3 `tests/integration/policy/start-overview.test.ts` and
   `start-overview-household-account.test.ts`: remove the `voteCount` assertions and the "T-5 = raw
   count" pin, with a comment naming F4 change 1 D3 as its planned end.
   - **Port case (f5)**, the V-1 walk-back (an application that became the viewer and walked back

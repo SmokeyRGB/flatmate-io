@@ -197,6 +197,13 @@
       "when": 1790694603482,
       "tag": "0027_reverse_application_state",
       "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1790765030593,
+      "tag": "0028_vote",
+      "breakpoints": true
     }
   ]
 }
