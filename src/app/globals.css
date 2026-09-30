@@ -17,6 +17,7 @@
   --destructive: #be241f;
   --destructive-foreground: #fbf8f1;
   --vote-no: #be241f;
+  --vote-no-foreground: #fbf8f1;
   --vote-rather-not: #dcaf61;
   --vote-rather-not-foreground: #402712;
   --vote-like: #69aa77;
@@ -44,6 +45,7 @@
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
   --color-vote-no: var(--vote-no);
+  --color-vote-no-foreground: var(--vote-no-foreground);
   --color-vote-rather-not: var(--vote-rather-not);
   --color-vote-rather-not-foreground: var(--vote-rather-not-foreground);
   --color-vote-like: var(--vote-like);
@@ -72,6 +74,7 @@
     --destructive: #da4339;
     --destructive-foreground: #f0ebe0;
     --vote-no: #da4339;
+    --vote-no-foreground: #0d0705;
     --vote-rather-not: #c99d4e;
     --vote-rather-not-foreground: #241a0c;
     --vote-like: #63a471;
@@ -661,17 +664,31 @@ h3 {
   }
 }
 
-/* F4 change 1: screen C1, the screening deck (design D9). Motion is CSS only: transform and opacity
-   on the card elements, never on the controls, which stay put (09-Design-System.md, feedback
-   states). Reduced motion swaps the slide for a plain crossfade. */
+/* F4 change 1: screen C1, the screening deck (design D9, amended by the human 2026-09-30).
+   The previous, current and next card are all real cards in one grid cell; `data-pos` moves them
+   and a CSS transition carries the move, so the card being revealed is already there, also while
+   dragging (--drag / --tilt are set by the swipe handler). Transform and opacity only, on the
+   cards; the controls and the progress never move (09-Design-System.md, feedback states). Reduced
+   motion swaps the slide for a crossfade between the two real cards. */
 @layer components {
+  /* The deck fills the space between the header and the bottom bar: 100dvh minus the header and
+     the main area's bottom padding (5rem on mobile for the fixed nav, 1.5rem from md:). */
   .deck-screen {
-    padding-bottom: 7rem;
+    display: flex;
+    flex-direction: column;
+    height: max(28rem, calc(100dvh - 9rem));
+    min-height: 0;
+  }
+  @media (min-width: 768px) {
+    .deck-screen {
+      height: max(28rem, calc(100dvh - 6rem));
+    }
   }
   .deck-topbar {
     display: flex;
     align-items: center;
     gap: 0.75rem;
+    flex: none;
   }
   .deck-back,
   .deck-back-spacer {
@@ -723,129 +740,92 @@ h3 {
     color: var(--color-card-foreground);
   }
 
+  /* The stack takes all the height that is left; a long message scrolls inside its card. */
   .deck-stack {
+    flex: 1 1 0;
+    min-height: 0;
     display: grid;
+    grid-template-rows: minmax(0, 1fr);
     position: relative;
+    overflow-x: clip;
+    touch-action: pan-y;
+    --drag: 0px;
+    --tilt: 0deg;
   }
   .deck-stack > .deck-card {
     grid-area: 1 / 1;
-  }
-  .deck-card {
-    min-height: 16rem;
-    max-height: calc(100dvh - 21rem);
+    min-height: 0;
     overflow-y: auto;
+    overscroll-behavior: contain;
+    transition:
+      transform 240ms ease,
+      opacity 240ms ease;
   }
-  .deck-card-current {
+  .deck-card[data-pos="current"] {
     z-index: 2;
-    touch-action: pan-y;
+    opacity: 1;
+    transform: translateX(var(--drag)) rotate(var(--tilt));
   }
-  .deck-card-next {
-    z-index: 0;
-    transform: translateY(0.625rem) scale(0.96);
-    opacity: 0.7;
-    pointer-events: none;
-  }
-  .deck-card-leaving {
-    z-index: 3;
-    pointer-events: none;
-  }
-  .deck-card-current[data-entering="true"][data-dir="forward"] {
-    animation: deck-rise 240ms ease-out both;
-  }
-  .deck-card-current[data-entering="true"][data-dir="back"] {
-    z-index: 4;
-    animation: deck-slide-in 240ms ease-out both;
-  }
-  .deck-card-leaving[data-dir="forward"] {
-    animation: deck-slide-out 240ms ease-in both;
-  }
-  .deck-card-leaving[data-dir="back"] {
+  .deck-card[data-pos="next"] {
     z-index: 1;
-    animation: deck-sink 240ms ease-in both;
+    opacity: 0.85;
+    transform: translateY(0.625rem) scale(0.96);
+    pointer-events: none;
+    animation: deck-appear 240ms ease both;
   }
-  @keyframes deck-rise {
+  .deck-card[data-pos="prev"] {
+    z-index: 3;
+    opacity: 0;
+    transform: translateX(calc(-110% + max(var(--drag), 0px))) rotate(-6deg);
+    pointer-events: none;
+  }
+  /* Dragging back reveals the previous card following the finger. */
+  .deck-stack[data-dragging="back"] > .deck-card[data-pos="prev"] {
+    opacity: 1;
+    transform: translateX(calc(-100% + var(--drag)));
+  }
+  .deck-stack[data-dragging] > .deck-card {
+    transition: none;
+  }
+  @keyframes deck-appear {
     from {
-      transform: translateY(0.625rem) scale(0.96);
-      opacity: 0.7;
-    }
-    to {
-      transform: none;
-      opacity: 1;
-    }
-  }
-  @keyframes deck-slide-out {
-    to {
-      transform: translateX(-110%) rotate(-6deg);
-      opacity: 0;
-    }
-  }
-  @keyframes deck-slide-in {
-    from {
-      transform: translateX(-110%) rotate(-6deg);
-      opacity: 0;
-    }
-    to {
-      transform: none;
-      opacity: 1;
-    }
-  }
-  @keyframes deck-sink {
-    to {
-      transform: translateY(0.625rem) scale(0.96);
-      opacity: 0;
-    }
-  }
-  @keyframes deck-fade-in {
-    from {
-      opacity: 0;
-    }
-    to {
-      opacity: 1;
-    }
-  }
-  @keyframes deck-fade-out {
-    to {
       opacity: 0;
     }
   }
   @media (prefers-reduced-motion: reduce) {
-    .deck-card-current[data-entering="true"][data-dir] {
-      animation: deck-fade-in 150ms linear both;
+    .deck-stack > .deck-card {
+      transition: opacity 150ms linear;
     }
-    .deck-card-leaving[data-dir] {
-      animation: deck-fade-out 150ms linear both;
+    .deck-card[data-pos="current"],
+    .deck-card[data-pos="next"],
+    .deck-card[data-pos="prev"] {
+      transform: none;
+      animation: none;
+    }
+    .deck-card[data-pos="next"],
+    .deck-card[data-pos="prev"] {
+      opacity: 0;
     }
     .deck-progress-fill {
       transition: none;
     }
   }
 
-  /* Four ratings side by side in one row, fixed above the bottom bar on mobile. */
+  /* The four ratings, side by side in one row below the card. Each level has its own colour from
+     the design system's --vote-* tokens (red to green), AND a symbol and a label: colour is never
+     the only signal (FR-4.19). Unselected: a soft tint with the level's ink on the border and the
+     icon; selected: the solid colour with its own readable foreground. */
   .rating-bar {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 0.5rem;
-    position: fixed;
-    inset-inline: 0;
-    bottom: calc(4.25rem + env(safe-area-inset-bottom, 0px));
-    z-index: 30;
-    padding: 0.5rem 1rem;
-    background: var(--color-background);
-  }
-  @media (min-width: 768px) {
-    .deck-screen {
-      padding-bottom: 1.5rem;
-    }
-    .rating-bar {
-      position: static;
-      padding: 0;
-      background: transparent;
-    }
-    .deck-card {
-      max-height: calc(100dvh - 18rem);
-    }
+    flex: none;
+    padding-top: 0.75rem;
   }
   .rating-btn {
+    --rb: var(--vote-no);
+    --rb-foreground: var(--vote-no-foreground);
+    --rb-ink: color-mix(in srgb, var(--rb) 60%, var(--color-foreground));
     position: relative;
     display: flex;
     flex-direction: column;
@@ -854,22 +834,44 @@ h3 {
     min-height: 4rem;
     padding: 0.5rem 0.25rem;
     border-radius: 1rem;
-    border: 1px solid var(--color-border);
-    background: var(--color-secondary);
-    color: var(--color-secondary-foreground);
+    border: 2px solid var(--rb-ink);
+    background: color-mix(in srgb, var(--rb) 14%, var(--color-card));
+    color: var(--color-foreground);
     font-size: 0.75rem;
     font-weight: 500;
     line-height: 1rem;
     text-align: center;
+  }
+  .rating-btn-no {
+    --rb: var(--vote-no);
+    --rb-foreground: var(--vote-no-foreground);
+  }
+  .rating-btn-rather-not {
+    --rb: var(--vote-rather-not);
+    --rb-foreground: var(--vote-rather-not-foreground);
+  }
+  .rating-btn-good {
+    --rb: var(--vote-like);
+    --rb-foreground: var(--vote-like-foreground);
+  }
+  .rating-btn-definitely {
+    --rb: var(--vote-absolutely);
+    --rb-foreground: var(--vote-absolutely-foreground);
+  }
+  .rating-btn svg {
+    color: var(--rb-ink);
   }
   .rating-btn .submit-stack > span {
     flex-direction: column;
     gap: 0.25rem;
   }
   .rating-btn-selected {
-    background: var(--color-primary);
-    color: var(--color-primary-foreground);
-    border-color: var(--color-primary);
+    background: var(--rb);
+    border-color: var(--rb);
+    color: var(--rb-foreground);
+  }
+  .rating-btn-selected svg {
+    color: var(--rb-foreground);
   }
   .rating-btn:focus-visible {
     outline: 2px solid var(--color-primary);

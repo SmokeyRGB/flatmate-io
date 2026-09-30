@@ -43,8 +43,12 @@ describe("ScreeningDeck markup", () => {
     expect(buttons).toHaveLength(4);
     const labels = ["Nein", "Eher nicht", "Finde gut", "Unbedingt"];
     const values = ["no", "rather_not", "good", "definitely"];
+    const colourClasses = ["rating-btn-no", "rating-btn-rather-not", "rating-btn-good", "rating-btn-definitely"];
     buttons.forEach((b, i) => {
       expect(b).toContain(`value="${values[i]}"`);
+      // Each level carries its own colour class (a red-to-green scale), never sharing one.
+      expect(b).toContain(colourClasses[i]);
+      colourClasses.filter((c, j) => j !== i).forEach((other) => expect(b).not.toContain(other));
       expect(b).toContain("<svg"); // the symbol
       expect(textOf(b)).toContain(labels[i]);
       expect(textOf(b)).not.toMatch(/\d/);
@@ -89,8 +93,24 @@ describe("ScreeningDeck markup", () => {
     expect(text).toContain("Beruf: Lehrerin");
     expect(text).not.toMatch(/@|E-Mail|Telefon|Kontakt/i);
     expect(text).not.toMatch(/Budget|Favoriten|Warnung|Stimmen der anderen/i);
-    // The next card is only a decorative shell: none of its data reaches the DOM.
-    expect(text).not.toContain("Testperson Zwei");
+  });
+
+  // Human amendment 2026-09-30 (D9): the neighbours are REAL cards, so the card being revealed is
+  // already there; they are hidden from assistive technology and inert.
+  it("renders the next card with its real content, hidden and inert, beneath the current one", async () => {
+    const markup = await renderDeck();
+    const cards = markup.split('class="deck-card card"').slice(1);
+    expect(cards).toHaveLength(2); // current + next (there is no previous card at index 0)
+    const [current, next] = cards;
+    expect(current).toContain('data-pos="current"');
+    expect(current).not.toContain("aria-hidden");
+    expect(current).toContain("Testperson Eins");
+    expect(next).toContain('data-pos="next"');
+    expect(next).toContain('aria-hidden="true"');
+    expect(next).toMatch(/inert/);
+    expect(textOf(next)).toContain("Testperson Zwei");
+    // The third card is not rendered yet.
+    expect(markup).not.toContain("Testperson Drei");
   });
 
   it("the card type has no contact field", () => {
@@ -123,4 +143,4 @@ describe("RatingBar", () => {
   });
 });
 
-// Breaks (tasks 7.7): render `points(n)` on a button; drop `aria-pressed` -> each fails.
+// Breaks (tasks 7.7): render `points(n)` on a button; drop `aria-pressed`; drop a colour class -> each fails.

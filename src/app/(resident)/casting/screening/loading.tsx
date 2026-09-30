@@ -9,10 +9,8 @@ export default function ScreeningLoading() {
       <p role="status" className="sr-only">
         {de.common.loading}
       </p>
-      <div className="space-y-3" aria-hidden="true">
-        <SkeletonText width="w-full" />
-        <div className="skeleton h-72 w-full rounded-2xl" />
-      </div>
+      <SkeletonText width="w-full" />
+      <div className="skeleton min-h-0 w-full flex-1 rounded-2xl" aria-hidden="true" />
       <div className="rating-bar" aria-hidden="true">
         {Array.from({ length: 4 }).map((_, i) => (
           <div key={i} className="skeleton h-16 rounded-2xl" />

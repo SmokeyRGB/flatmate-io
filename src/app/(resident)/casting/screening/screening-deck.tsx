@@ -30,7 +30,16 @@ const SLOP_PX = 10;
 const HORIZONTAL_RATIO = 1.5;
 const RELEASE_FRACTION = 0.25;
 const RELEASE_MAX_PX = 80;
-const ANIMATION_MS = 240;
+
+// One colour class per level (a red-to-green scale from the design system's --vote-* tokens, see
+// globals.css). Colour never stands alone: every level also has its symbol and its label, and the
+// selected one a check glyph and aria-pressed (FR-4.19).
+const RATING_CLASS: Record<VoteValue, string> = {
+  no: "rating-btn-no",
+  rather_not: "rating-btn-rather-not",
+  good: "rating-btn-good",
+  definitely: "rating-btn-definitely",
+};
 
 const ICONS: Record<VoteValue, ReactNode> = {
   no: <X className="size-5" aria-hidden="true" />,
@@ -63,6 +72,24 @@ function CardBody({ card }: { card: ScreeningCard }) {
   );
 }
 
+// One card of the stack. The previous, current and next card are all rendered with their real
+// content, keyed by application id so React never remounts them mid-animation; only `data-pos`
+// changes, and CSS transitions carry the move (globals.css). The two neighbours are hidden from
+// assistive technology and inert: the resident is only ever on the current card.
+function DeckCard({ card, pos }: { card: ScreeningCard; pos: "prev" | "current" | "next" }) {
+  const isCurrent = pos === "current";
+  return (
+    <div
+      className="deck-card card"
+      data-pos={pos}
+      aria-hidden={isCurrent ? undefined : true}
+      inert={isCurrent ? undefined : true}
+    >
+      <CardBody card={card} />
+    </div>
+  );
+}
+
 // The four ratings, side by side in one form (one row, symbol above label, no numbers). Exported
 // so the selected-state markup is a unit test (tests/unit/screening/screening-deck.test.ts).
 export function RatingBar({
@@ -86,7 +113,7 @@ export function RatingBar({
             name="value"
             value={v}
             icon={ICONS[v]}
-            className={`rating-btn${isSelected ? " rating-btn-selected" : ""}`}
+            className={`rating-btn ${RATING_CLASS[v]}${isSelected ? " rating-btn-selected" : ""}`}
             aria-pressed={isSelected}
             disabled={busy}
             pending={chosen === v}
@@ -128,8 +155,7 @@ export function ScreeningDeck({
   const [chosen, setChosen] = useState<VoteValue | null>(null);
   const [refusal, setRefusal] = useState<Refusal | null>(null);
   const [failed, setFailed] = useState(false);
-  const [dir, setDir] = useState<"forward" | "back">("forward");
-  const [leaving, setLeaving] = useState<{ card: ScreeningCard; dir: "forward" | "back" } | null>(null);
+  const stackRef = useRef<HTMLDivElement>(null);
   // Read by event handlers only; refreshed after every committed render.
   const stateRef = useRef(state);
   useEffect(() => {
@@ -138,7 +164,8 @@ export function ScreeningDeck({
 
   const currentId = state.ids[state.index];
   const card = currentId ? byId.get(currentId) : undefined;
-  const nextId = state.ids[state.index + 1];
+  const prevCard = state.index > 0 ? byId.get(state.ids[state.index - 1]) : undefined;
+  const nextCard = state.index < state.ids.length - 1 ? byId.get(state.ids[state.index + 1]) : undefined;
 
   // When the last card is rated (or the last unratable one dropped) the pass leads to the Casting
   // tab (FR-4.18). The existing redirect there sends a resident with new arrivals into a fresh pass.
@@ -146,34 +173,17 @@ export function ScreeningDeck({
     if (state.phase === "done") router.push("/casting");
   }, [state.phase, router]);
 
-  // Keeps the leaving card in the DOM for the length of the animation, then drops it.
-  useEffect(() => {
-    if (!leaving) return;
-    const timer = window.setTimeout(() => setLeaving(null), ANIMATION_MS + 40);
-    return () => window.clearTimeout(timer);
-  }, [leaving]);
-
-  const leave = useCallback((direction: "forward" | "back") => {
-    const s = stateRef.current;
-    const id = s.ids[s.index];
-    const leavingCard = id ? byId.get(id) : undefined;
-    setDir(direction);
-    if (leavingCard) setLeaving({ card: leavingCard, dir: direction });
-  }, [byId]);
-
   const goBack = useCallback(() => {
     if (!canGoBack(stateRef.current)) return;
     setFailed(false);
-    leave("back");
     dispatch({ type: "back" });
-  }, [leave]);
+  }, []);
 
   const goForward = useCallback(() => {
     if (!canGoForward(stateRef.current)) return;
     setFailed(false);
-    leave("forward");
     dispatch({ type: "forward" });
-  }, [leave]);
+  }, []);
 
   // ← and → on desktop. Ignored with a modifier key, while the pop-over is open, and when the
   // event comes from a text field.
@@ -191,8 +201,23 @@ export function ScreeningDeck({
     return () => window.removeEventListener("keydown", onKey);
   }, [goBack, goForward]);
 
-  // Swipe (Pointer Events, touch only) on the top card. It never rates: it maps to back/forward.
+  // Swipe (Pointer Events, touch only) on the current card. It never rates: it maps to back/forward.
+  // While dragging, the stack's --drag variable moves the current card with the finger and pulls the
+  // previous card in behind it (globals.css); the card being revealed is already rendered.
   const swipe = useRef<{ x: number; y: number; decided: boolean; active: boolean; dx: number } | null>(null);
+  function setDrag(dx: number | null) {
+    const stack = stackRef.current;
+    if (!stack) return;
+    if (dx === null) {
+      stack.removeAttribute("data-dragging");
+      stack.style.removeProperty("--drag");
+      stack.style.removeProperty("--tilt");
+      return;
+    }
+    stack.setAttribute("data-dragging", dx > 0 ? "back" : "forward");
+    stack.style.setProperty("--drag", `${dx}px`);
+    stack.style.setProperty("--tilt", `${dx / 30}deg`);
+  }
   function onPointerDown(event: ReactPointerEvent<HTMLDivElement>) {
     if (event.pointerType !== "touch") return;
     swipe.current = { x: event.clientX, y: event.clientY, decided: false, active: false, dx: 0 };
@@ -209,17 +234,22 @@ export function ScreeningDeck({
       if (s.active) event.currentTarget.setPointerCapture(event.pointerId);
     }
     if (!s.active) return;
-    s.dx = dx;
-    event.currentTarget.style.transform = `translateX(${dx}px) rotate(${dx / 30}deg)`;
+    // Backward needs a previous card and forward a rated one; otherwise the card resists.
+    const allowed = dx > 0 ? canGoBack(stateRef.current) : canGoForward(stateRef.current);
+    s.dx = allowed ? dx : dx / 4;
+    setDrag(s.dx);
   }
   function endSwipe(event: ReactPointerEvent<HTMLDivElement>) {
     const s = swipe.current;
     swipe.current = null;
-    const el = event.currentTarget;
     if (!s || !s.active) return;
-    el.style.transform = "";
-    const threshold = Math.min(el.offsetWidth * RELEASE_FRACTION, RELEASE_MAX_PX);
-    if (Math.abs(s.dx) < threshold) return;
+    const width = stackRef.current?.offsetWidth ?? event.currentTarget.offsetWidth;
+    const threshold = Math.min(width * RELEASE_FRACTION, RELEASE_MAX_PX);
+    const commit = Math.abs(s.dx) >= threshold;
+    // The drag ends first; if the move commits, the state change then animates from where the
+    // finger let go, otherwise the card springs back.
+    setDrag(null);
+    if (!commit) return;
     // Right = back, left = forward; forward only if the card is rated (canGoForward).
     if (s.dx > 0) goBack();
     else goForward();
@@ -227,7 +257,6 @@ export function ScreeningDeck({
 
   function handleResult(result: CastVoteResult, id: string, value: VoteValue) {
     if (result.ok) {
-      leave("forward");
       dispatch({ type: "rated", id, value });
       setChosen(null);
       return;
@@ -238,7 +267,6 @@ export function ScreeningDeck({
       case "not_votable":
       case "own_application":
         // The card can never be rated again: drop it and go on.
-        leave("forward");
         dispatch({ type: "dropped", id });
         return;
       case "round_not_open":
@@ -345,25 +373,17 @@ export function ScreeningDeck({
         </p>
       </div>
 
-      <div className="deck-stack" data-dir={dir}>
-        {nextId && <div className="deck-card deck-card-next card" aria-hidden="true" />}
-        {leaving && (
-          <div key={`leaving-${leaving.card.applicationId}`} className="deck-card deck-card-leaving card" data-dir={leaving.dir} aria-hidden="true">
-            <CardBody card={leaving.card} />
-          </div>
-        )}
-        <div
-          key={card.applicationId}
-          className="deck-card deck-card-current card"
-          data-entering={leaving ? "true" : undefined}
-          data-dir={dir}
-          onPointerDown={onPointerDown}
-          onPointerMove={onPointerMove}
-          onPointerUp={endSwipe}
-          onPointerCancel={endSwipe}
-        >
-          <CardBody card={card} />
-        </div>
+      <div
+        ref={stackRef}
+        className="deck-stack"
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={endSwipe}
+        onPointerCancel={endSwipe}
+      >
+        {prevCard && <DeckCard key={prevCard.applicationId} card={prevCard} pos="prev" />}
+        <DeckCard key={card.applicationId} card={card} pos="current" />
+        {nextCard && <DeckCard key={nextCard.applicationId} card={nextCard} pos="next" />}
       </div>
 
       {failed && (
