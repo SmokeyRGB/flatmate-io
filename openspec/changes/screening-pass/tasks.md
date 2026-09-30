@@ -448,9 +448,9 @@ break can fail it.
 
 ## 8. Verify
 
-- [ ] 8.1 `npm run verify` → green. Report real totals and any flaky timeout by name, with a
+- [x] 8.1 `npm run verify` → green. Report real totals and any flaky timeout by name, with a
   re-run of that file alone.
-- [ ] 8.2 `grep -rn "notVotedByViewer\|voteCount\|placeholderBody\|placeholderHeading" src tests`
+- [x] 8.2 `grep -rn "notVotedByViewer\|voteCount\|placeholderBody\|placeholderHeading" src tests`
   → no output. `grep -n "deleted_at\|deletedAt" src/modules/deliberation
   src/modules/casting/repository.ts` shows no new lines. `grep -rn "revalidatePath\|router.refresh"
   "src/app/(resident)/casting/screening"` → no output.

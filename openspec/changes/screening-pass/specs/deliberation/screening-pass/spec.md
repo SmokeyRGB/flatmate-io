@@ -89,6 +89,9 @@ Each card SHALL offer exactly four ratings, in this order: `no` „Nein", `rathe
 level is distinguished by colour alone. The buttons SHALL show no point numbers. „Unbedingt" SHALL
 be the favourite; no separate favourite step exists. The ratings SHALL be operable by keyboard.
 The buttons SHALL be side by side in a single row at the bottom of the screen on mobile.
+They SHALL be colour-coded as a scale from red („Nein") to green („Unbedingt"), in addition to,
+never instead of, symbol and label, with readable contrast in every state (human decision
+2026-09-30).
 Sources: FR-4.8, AC-4.7 (V1.1, F-12), FR-4.16, F-17, PRD §4.1.4, human decision Q-3.
 
 #### Scenario: Enumerating the options
@@ -180,6 +183,16 @@ Moving forward SHALL slide the current card off and bring the next up from benea
 SHALL reverse it; while dragging, the card SHALL follow the finger. With reduced motion requested,
 the change SHALL be a crossfade. The rating buttons and the progress SHALL never move. Source:
 `docs/09-Design-System.md` feedback states; human decision Q-5 addendum.
+
+#### Scenario: The next card is already there
+- **WHEN** the current card slides off, forward or back, or is being dragged
+- **THEN** the card being revealed beneath is already shown with its content, never as an empty
+  placeholder (human decision 2026-09-30)
+
+#### Scenario: The card fills the screen
+- **WHEN** a card is shown on a phone
+- **THEN** it fills the height between the progress bar and the rating buttons, and a long message
+  scrolls inside it
 
 #### Scenario: Reduced motion
 - **WHEN** the device requests reduced motion and the resident moves to the next card

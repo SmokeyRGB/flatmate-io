@@ -501,6 +501,18 @@ re-validates under lock, so a stale card at worst produces a typed refusal.
   a 150 ms opacity crossfade. The buttons, progress bar and „(?)" sit outside the animated
   element, so they never move. The classes live in `src/app/globals.css` next to the Design
   System tokens.
+- **Amended by the human after the first mobile walkthrough (2026-09-30):**
+  - **Real neighbours in the stack.** The previous, current and next cards are all rendered with
+    their content, keyed by application id, so the card revealed by a slide or a drag is already
+    there, and never an empty placeholder that fills in afterwards.
+  - **A colour scale on the buttons:** red „Nein" (`--destructive`), then amber „Eher nicht",
+    light green „Finde gut", green „Unbedingt". The colours are new custom properties
+    `--vote-*`/`--vote-*-foreground` in `globals.css`, in light and dark mode. Unselected buttons
+    get a soft tint with a coloured border and icon; the selected one gets a solid fill of its own
+    colour, plus `aria-pressed` and the check glyph. Colour is added to symbol and label, never a
+    replacement (FR-4.19). Text contrast is WCAG AA in every state.
+  - **The card fills the height** between the progress bar and the button bar (flex, `min-h-0`,
+    dvh-safe), and a long message scrolls inside it.
 - **Strings.** All of them live in `de.ts` `screening`, replacing the placeholder keys: the four
   labels, `progress(n, total)`, the weights panel, the empty state, the refusals and the back
   labels. `casting` gets `rankingHeading` „Rangliste" and one sentence. No text evaluates a person
