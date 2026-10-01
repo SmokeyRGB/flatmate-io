@@ -1,5 +1,7 @@
--- Bootstrap for a fresh Supabase project. Run this ONCE, as `postgres`, BEFORE the first
--- migration in drizzle/.
+-- Bootstrap for a fresh Supabase project. Run it as `postgres`, twice: BEFORE the first
+-- migration in drizzle/ (app_runtime has to exist before drizzle/0005 grants to it) and AFTER
+-- the chain (table grants, and the anon/authenticated revoke below, have to cover objects the
+-- chain created). scripts/ci/bootstrap-local-db.sh does both passes.
 --
 -- Why it is not a numbered migration: drizzle/0005_identity_login_bootstrap_function.sql does
 -- `GRANT EXECUTE ... TO app_runtime`, so the role has to exist before the chain starts. A
@@ -39,3 +41,33 @@ grant usage on schema public to app_runtime;
 grant select, insert, update, delete on all tables in schema public to app_runtime;
 alter default privileges in schema public
   grant select, insert, update, delete on tables to app_runtime;
+
+-- Supabase grants anon and authenticated explicitly, so REVOKE ... FROM PUBLIC does not remove
+-- them. Guarded so a plain Postgres without those roles still bootstraps. Idempotent.
+-- rls_auto_enable() is Supabase's event-trigger function; skipped when it is not installed.
+-- The inner block catches insufficient_privilege: this file cannot always alter supabase_admin's
+-- default privileges, and objects the chain creates are owned by postgres.
+do $$
+begin
+  if exists (select 1 from pg_roles where rolname = 'anon')
+     and exists (select 1 from pg_roles where rolname = 'authenticated') then
+    revoke all on all tables in schema public from anon, authenticated;
+    revoke all on all sequences in schema public from anon, authenticated;
+    revoke execute on all functions in schema public from anon, authenticated;
+    if to_regprocedure('public.rls_auto_enable()') is not null then
+      revoke all on function public.rls_auto_enable() from public, anon, authenticated;
+    end if;
+    alter default privileges for role postgres in schema public revoke all on tables from anon, authenticated;
+    alter default privileges for role postgres in schema public revoke all on sequences from anon, authenticated;
+    alter default privileges for role postgres in schema public revoke all on functions from anon, authenticated;
+    begin
+      alter default privileges for role supabase_admin in schema public revoke all on tables from anon, authenticated;
+      alter default privileges for role supabase_admin in schema public revoke all on sequences from anon, authenticated;
+      alter default privileges for role supabase_admin in schema public revoke all on functions from anon, authenticated;
+    exception
+      when insufficient_privilege then
+        raise notice 'leaving supabase_admin default privileges unchanged: %', sqlerrm;
+    end;
+  end if;
+end
+$$;
