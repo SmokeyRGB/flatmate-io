@@ -5,6 +5,7 @@ import {
   createRoom,
   createRound,
   openRound,
+  ProcedureLockedError,
   updateHouseholdSettingsWithProcedureLock,
 } from "@/modules/casting/repository";
 import { castingRound, roundParticipation } from "@/modules/casting/schema";
@@ -88,6 +89,75 @@ describe("Casting lock order", () => {
     expect((opened.settingsSnapshot as { quorumShare: string }).quorumShare).toBe("0.6");
     const live = await getHouseholdSettings(household.context);
     expect(live?.quorumShare).toBe("0.6");
+  });
+
+  // Finding #3, opener side. The stand-in is a settings writer that already passed its
+  // open-round check and holds the settings row uncommitted.
+  it("C1: openRound waits for an in-flight settings change and snapshots that value", async () => {
+    const { household, moderator, modActor, round } = await draftRound();
+    const hold = holdOpen(household.context, async (tx) => {
+      await tx
+        .update(householdSettings)
+        .set({ quorumShare: "0.9" })
+        .where(eq(householdSettings.householdId, household.householdId));
+    });
+    await untilHeld(hold);
+
+    let settled = false;
+    const real = openRound(moderator.context, round.id, modActor).finally(() => {
+      settled = true;
+    });
+    await sleep(1500);
+    const settledBeforeRelease = settled;
+    hold.release();
+    await hold.done;
+    const opened = await real;
+
+    expect(opened.status).toBe("open");
+    expect((opened.settingsSnapshot as { quorumShare: string }).quorumShare).toBe("0.9");
+    const live = await getHouseholdSettings(household.context);
+    expect(live?.quorumShare).toBe((opened.settingsSnapshot as { quorumShare: string }).quorumShare);
+    expect(settledBeforeRelease).toBe(false);
+  });
+
+  // Finding #3, writer side. The stand-in models openRoundTx: settings FOR SHARE, then the
+  // round status written to open, uncommitted.
+  it("C2: a settings change waits for an in-flight opener and is refused", async () => {
+    const { household, actor, round } = await draftRound();
+    const hold = holdOpen(household.context, async (tx) => {
+      await tx
+        .select()
+        .from(householdSettings)
+        .where(eq(householdSettings.householdId, household.householdId))
+        .for("share");
+      await tx
+        .update(castingRound)
+        .set({ status: "open", openedAt: sql`now()` })
+        .where(eq(castingRound.id, round.id));
+    });
+    await untilHeld(hold);
+
+    let settled = false;
+    const real = updateHouseholdSettingsWithProcedureLock(household.context, { quorumShare: "0.7" }, actor).finally(
+      () => {
+        settled = true;
+      },
+    );
+    await sleep(1500);
+    const settledBeforeRelease = settled;
+    hold.release();
+    await hold.done;
+
+    const outcome = await real.then(
+      (value) => ({ ok: true as const, value }),
+      (err: unknown) => ({ ok: false as const, err }),
+    );
+    const result = outcome.ok ? outcome.value : outcome.err;
+    expect(result).toBeInstanceOf(ProcedureLockedError);
+    expect(result).toMatchObject({ openRoundId: round.id });
+    const live = await getHouseholdSettings(household.context);
+    expect(live?.quorumShare).toBe("0.5");
+    expect(settledBeforeRelease).toBe(false);
   });
 
   // Permission moves into the write transaction. The stand-in revokes the household admin

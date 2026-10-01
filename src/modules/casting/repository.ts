@@ -725,6 +725,13 @@ const LOCKED_ROOM_STATUSES: ReadonlySet<RoomStatus> = new Set(["occupied", "not_
 // RoundParticipation and freezes HouseholdSettings' four locked fields into settings_snapshot —
 // both effects or neither, in one transaction. EC-1.1/EC-1.2/EC-1.3 preconditions checked first.
 async function openRoundTx(tx: Tx, context: SessionContext, roundId: string, actor: Actor) {
+  const [settings] = await tx
+    .select()
+    .from(householdSettings)
+    .where(eq(householdSettings.householdId, context.householdId))
+    .for("share");
+  if (!settings) throw new Error(`HouseholdSettings not found for household ${context.householdId}`);
+
   // EC-1.9: two moderators opening the same draft round simultaneously must produce exactly
   // one opening. `FOR UPDATE` locks this row for the rest of the transaction — a concurrent
   // openRound's own SELECT ... FOR UPDATE blocks here until this transaction commits or rolls
@@ -771,12 +778,6 @@ async function openRoundTx(tx: Tx, context: SessionContext, roundId: string, act
     // EC-1.4: exactly one eligible resident is fine — only zero is refused.
     throw new RoundOpenPreconditionError("There are no eligible residents to snapshot", "no_eligible_residents");
   }
-
-  const [settings] = await tx
-    .select()
-    .from(householdSettings)
-    .where(eq(householdSettings.householdId, context.householdId));
-  if (!settings) throw new Error(`HouseholdSettings not found for household ${context.householdId}`);
 
   // FR-1.16: both effects together, in the same transaction — a thrown error above or below
   // this point leaves the round untouched in `draft` with no RoundParticipation rows written.
@@ -845,6 +846,8 @@ export async function createAndOpenRound(
   return withSessionContext(context, async (tx) => {
     await assertHasPermissionTx(tx, context, "close_round");
     const round = await insertDraftRoundTx(tx, context, title, roomIds, actor);
+    // The inserted row is new, so nobody else can lock it. Inserting it before openRoundTx
+    // takes the household_settings lock is not a lock-order violation.
     return openRoundTx(tx, context, round.id, actor);
   });
 }
@@ -995,6 +998,12 @@ export async function updateHouseholdSettingsWithProcedureLock(
 
   return withSessionContext(context, async (tx) => {
     await assertHasPermissionTx(tx, context, "manage_settings");
+    const [settings] = await tx
+      .select()
+      .from(householdSettings)
+      .where(eq(householdSettings.householdId, context.householdId))
+      .for("update");
+    if (!settings) throw new Error(`HouseholdSettings not found for household ${context.householdId}`);
     const changedFields = Object.keys(patch) as LockedSettingsField[];
     const [openRound] = await tx
       .select({ id: castingRound.id })
