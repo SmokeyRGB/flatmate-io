@@ -5,7 +5,7 @@ module.exports = {
       name: "no-cross-module-schema-or-repository",
       comment:
         "ADR-001: a module's schema.ts and repository.ts are not importable from another module. " +
-        "Known violations are baselined in .dependency-cruiser-known-violations.json until WP12 removes them.",
+        "Known violations are baselined in .dependency-cruiser-known-violations.json; delete an entry when its import is gone.",
       severity: "error",
       from: { path: "^src/modules/([^/]+)/" },
       to: {
