@@ -24,6 +24,7 @@ import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import { pathToFileURL } from "node:url";
 import { parse } from "yaml";
+import { blankComments, walk } from "./_shared";
 
 // ---------------------------------------------------------------------------
 // D4 — the Art.-9 blocklist: word-prefix stems, English + German, no exemption.
@@ -133,14 +134,10 @@ export interface LoadResult {
   violations: SourceScanViolation[];
 }
 
-// Comments stripped the same way rls-coverage.ts does, so a `pgTable(` mentioned only in a
-// comment is never counted as a real call.
-function stripComments(content: string): string {
-  return content.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
-}
-
 // Matches `pgTable(`, `pgTable.withRLS(` and `.table(` (a `pgSchema("x").table(...)` call),
-// whitespace allowed before the paren.
+// whitespace allowed before the paren. Comments are blanked first (scripts/lint/_shared.ts), so a
+// `pgTable(` mentioned only in a comment is never counted. Blanking keeps the length; this regex
+// does not match across the spaces a comment leaves behind.
 const TABLE_BUILDER_CALL = /\bpgTable(?:\.withRLS)?\s*\(|\.table\s*\(/g;
 
 // Every way a file outside a module's schema.ts can get hold of a table builder (`pgTable`,
@@ -165,18 +162,6 @@ const TABLE_BUILDER_IMPORTS: readonly RegExp[] = [
 // pgTable directly today).
 const TABLE_CREATOR_USE = /\bpgTableCreator\b/;
 
-function walkTsFiles(dir: string, out: string[]): void {
-  for (const entry of readdirSync(dir)) {
-    const full = join(dir, entry);
-    const st = statSync(full);
-    if (st.isDirectory()) {
-      walkTsFiles(full, out);
-    } else if (/\.tsx?$/.test(entry)) {
-      out.push(full);
-    }
-  }
-}
-
 // D1: discovers `src/modules/*/schema.ts` by walking (not a hard-coded list), imports each one,
 // keeps the exports that are actually a PgTable (deduplicated by object identity, so an aliased
 // re-export like `export const b = a` isn't counted twice), and runs the two source scans that
@@ -197,7 +182,7 @@ export async function loadSchemaTables(rootDir: string): Promise<LoadResult> {
 
     const relPath = relative(rootDir, schemaFile).replace(/\\/g, "/");
     const content = readFileSync(schemaFile, "utf8");
-    const code = stripComments(content);
+    const code = blankComments(content);
     const callCount = (code.match(TABLE_BUILDER_CALL) ?? []).length;
 
     if (TABLE_CREATOR_USE.test(code)) {
@@ -247,14 +232,13 @@ export async function loadSchemaTables(rootDir: string): Promise<LoadResult> {
   // schema.ts on Windows would read as "outside".
   for (const base of [join(rootDir, "src"), join(rootDir, "scripts")]) {
     if (!existsSync(base)) continue;
-    const files: string[] = [];
-    walkTsFiles(base, files);
+    const files = walk(base, (name) => /\.tsx?$/.test(name));
 
     for (const file of files) {
       const relPath = relative(rootDir, file).replace(/\\/g, "/");
       if (/^src\/modules\/[^/]+\/schema\.ts$/.test(relPath)) continue;
 
-      const code = stripComments(readFileSync(file, "utf8"));
+      const code = blankComments(readFileSync(file, "utf8"));
       if (TABLE_BUILDER_IMPORTS.some((re) => re.test(code))) {
         violations.push({
           file: relPath,
