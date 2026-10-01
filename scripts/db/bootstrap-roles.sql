@@ -57,6 +57,9 @@ begin
     if to_regprocedure('public.rls_auto_enable()') is not null then
       revoke all on function public.rls_auto_enable() from public, anon, authenticated;
     end if;
+    if to_regprocedure('public.casting_round_keeps_applications()') is not null then
+      revoke all on function public.casting_round_keeps_applications() from public;
+    end if;
     alter default privileges for role postgres in schema public revoke all on tables from anon, authenticated;
     alter default privileges for role postgres in schema public revoke all on sequences from anon, authenticated;
     alter default privileges for role postgres in schema public revoke all on functions from anon, authenticated;

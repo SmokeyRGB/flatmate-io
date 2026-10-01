@@ -32,6 +32,11 @@ BEGIN
   END IF;
 END $$;
 --> statement-breakpoint
+-- drizzle/0026 never revoked the EXECUTE that PUBLIC gets on every new function, so anon and
+-- authenticated still reach this SECURITY DEFINER function through PUBLIC. It is only ever a
+-- trigger function: EXECUTE is checked when a trigger is created, not when it fires.
+REVOKE ALL ON FUNCTION public.casting_round_keeps_applications() FROM PUBLIC;
+--> statement-breakpoint
 -- Future objects created by postgres start closed to the Data API roles.
 -- Read-only pg_default_acl on flatmate-io-dev: postgres IN SCHEMA public grants
 -- anon/authenticated on tables ('r'), functions ('f') and sequences ('S').
