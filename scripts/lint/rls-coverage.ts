@@ -12,7 +12,8 @@
 // prove it has a policy. loadSchemaTables already rejects that shape; this check names the table
 // when the call's SQL name is a string literal.
 import { readFileSync } from "node:fs";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { getTableConfig, type PgTable } from "drizzle-orm/pg-core";
 import { loadSchemaTables } from "./data-inventory";
 import { blankComments } from "./_shared";
@@ -94,9 +95,6 @@ export async function checkRlsCoverage(rootDir: string): Promise<RlsCoverageViol
 
   return violations;
 }
-
-import { fileURLToPath } from "node:url";
-import { resolve } from "node:path";
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1])) {
   checkRlsCoverage(process.cwd())
