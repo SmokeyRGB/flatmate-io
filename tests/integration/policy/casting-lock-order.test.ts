@@ -319,4 +319,34 @@ describe("Casting lock order", () => {
     expect(participants).toHaveLength(0);
     expect(settledBeforeRelease).toBe(false);
   });
+
+  // invariant guard; the pooler may serialise this by accident (CLAUDE.md hazards), C1-C4 are the regression tests.
+  it("C7: an opener and a settings writer cannot leave a snapshot that differs from live settings", async () => {
+    const { household, actor, moderator, modActor, round } = await draftRound();
+    const [opened, settingsWrite] = await Promise.allSettled([
+      openRound(moderator.context, round.id, modActor),
+      updateHouseholdSettingsWithProcedureLock(household.context, { quorumShare: "0.7" }, actor),
+    ]);
+
+    const [roundAfter] = await withSessionContext(household.context, (tx) =>
+      tx.select().from(castingRound).where(eq(castingRound.id, round.id)),
+    );
+    const live = await getHouseholdSettings(household.context);
+    const snapshotShare = (roundAfter?.settingsSnapshot as { quorumShare?: string } | null)?.quorumShare;
+    const writerRejected =
+      settingsWrite.status === "rejected" &&
+      settingsWrite.reason instanceof ProcedureLockedError &&
+      settingsWrite.reason.openRoundId === round.id;
+    const openerWon = roundAfter?.status === "open" && writerRejected && snapshotShare === live?.quorumShare;
+    const writerWon = settingsWrite.status === "fulfilled" && snapshotShare === live?.quorumShare;
+    if (!(openerWon || writerWon)) {
+      const openerDetail = opened.status === "rejected" ? String(opened.reason) : opened.status;
+      const writerDetail =
+        settingsWrite.status === "rejected" ? String(settingsWrite.reason) : settingsWrite.status;
+      expect.fail(
+        `invariant broken: opener ${openerDetail}; writer ${writerDetail}; snapshot ${snapshotShare}; live ${live?.quorumShare}`,
+      );
+    }
+    expect(openerWon || writerWon).toBe(true);
+  });
 });
