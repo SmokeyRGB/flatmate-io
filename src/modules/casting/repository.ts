@@ -202,9 +202,10 @@ export async function insertCapturedApplicationTx(
 //   - capture against capture: two FOR SHARE locks are compatible and two inserts do not
 //     conflict. EC-3.1/3.11 want both rows.
 //
-// LOCK ORDER: membership, then casting_round. No existing function locks casting_round and then
-// membership (openRoundTx reads membership without a lock, revokeMembershipForProfileTx locks no
-// round), so no deadlock cycle exists. A future writer keeps this order.
+// LOCK ORDER: membership (FOR SHARE) -> household_settings -> casting_round -> room -> application.
+// No existing function locks casting_round and then membership (openRoundTx reads membership
+// without a lock, revokeMembershipForProfileTx locks no round), so no deadlock cycle exists.
+// A future writer keeps this order.
 export async function captureApplication(
   context: SessionContext,
   input: RawApplicationInput & { roundId: string },
@@ -336,7 +337,8 @@ export class ApplicationUpdateError extends Error {
 // round_id, household_id) does not fire and no round lock is taken. It never contains state,
 // state_changed_at, source, created_* or became_resident_id either.
 //
-// LOCK ORDER (design D7): membership FOR SHARE, then the application row FOR UPDATE, the same as
+// LOCK ORDER: membership (FOR SHARE) -> household_settings -> casting_round -> room -> application.
+// This function takes membership FOR SHARE, then the application row FOR UPDATE, the same as
 // transitionApplication, so the two are serialised on the row and no cycle exists.
 //
 // Returns { changed } only, never the row.
@@ -485,7 +487,7 @@ async function applyTransitionTx(
 //      the event.
 //
 // Writers of an application row (design D7), each serialised on the row lock in ONE lock order,
-// membership -> round -> application:
+// membership (FOR SHARE) -> household_settings -> casting_round -> room -> application:
 //   captureApplication: INSERT, membership FOR SHARE -> round FOR SHARE;
 //   updateApplication / transitionApplication: membership FOR SHARE -> application FOR UPDATE;
 //   deleteApplication (change 4) OBLIGATION: takes FOR UPDATE (or DELETE ... RETURNING).
@@ -726,6 +728,11 @@ const LOCKED_ROOM_STATUSES: ReadonlySet<RoomStatus> = new Set(["occupied", "not_
 // FR-1.14/FR-1.15/FR-1.16: draft -> open takes an atomic snapshot of eligible residents into
 // RoundParticipation and freezes HouseholdSettings' four locked fields into settings_snapshot —
 // both effects or neither, in one transaction. EC-1.1/EC-1.2/EC-1.3 preconditions checked first.
+// LOCK ORDER (audit/cursor/WP03-casting-concurrency.md): membership (FOR SHARE) ->
+// household_settings -> casting_round -> room -> application. Settings come before the round
+// because the settings writer has no round id and locks the household's single settings row;
+// rooms come after the round because this function learns the covered ids from the locked round,
+// and removeRoom locks the room before it reads rounds.
 async function openRoundTx(tx: Tx, context: SessionContext, roundId: string, actor: Actor) {
   const [settings] = await tx
     .select()
