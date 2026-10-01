@@ -8,7 +8,9 @@ Every package file says: **read this README first.**
 
 `SmokeyRGB/flatmate-io` is a **public** repository. `.github/workflows/ci.yml` (lines ~172–173 and ~200) commits `flatmate-io-dev`'s URL and anon key. Combined with finding #2, anyone can call `claim_join_code`, `resolve_join_code`, `record_join_attempt` and `resolve_account_household` on dev through `/rest/v1/rpc/…`. Tables are guarded by RLS alone.
 
-🛑 **HUMAN, 2 minutes, no code:** in the Supabase dashboard for `flatmate-io-dev`, open Settings → Data API and remove `public` from the exposed schemas (or disable the Data API). The app never uses PostgREST, so nothing breaks. WP01 is the permanent fix.
+🛑 **HUMAN, 2 minutes, no code:** in the Supabase dashboard for `flatmate-io-dev`, open Settings → Data API and remove `public` from the exposed schemas (or disable the Data API). The app never uses PostgREST. Two **tests** did: they read and cleaned `join_attempt` through the service-role client. PR #42 fixes the one that failed (merge it before any package, or every pre-push run against dev fails). WP01 is the permanent fix.
+
+*2026-10-01: the Data API appears disabled on dev (inferred from the empty PostgREST error in the pre-push run; confirm in the dashboard).*
 
 ## Not in here: finding #1 and the members-page part of #20
 
@@ -50,7 +52,8 @@ Each package lists its open points in its own section 8. They are collected here
 
 | WP | Decision | Package's recommendation |
 |---|---|---|
-| WP01 | Remove `public` from the Data API's exposed schemas permanently? | Yes (see above) |
+| WP01 | Remove `public` from the Data API's exposed schemas permanently? | Yes (appears done on dev) |
+| WP01 | `join-rate-limit.test.ts` resets the **shared null-IP bucket** through REST, which is now a silent no-op. Other join tests (empty `Headers`) feed that bucket (limit 20 per 15 min), so parallel runs can hit `rate_limited`. Pick a non-REST reset: a test-only cleanup path, or give tests a trusted IP header so they never share the null bucket. | Decide; add to WP01 Phase B |
 | WP01 | Does `ALTER DEFAULT PRIVILEGES` also need `FOR ROLE supabase_admin`? | Check `pg_default_acl` first |
 | WP01 | Is `JOIN_ATTEMPT_SHARED_BUCKET_OK=1` acceptable as an opt-out for the trusted-IP-header startup assertion? | Decide |
 | WP02 | Default timeouts `statement_timeout` 30 s / `lock_timeout` 20 s | Only after counting the provider calls made under lock |
