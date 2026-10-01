@@ -1,5 +1,6 @@
 import { config } from "dotenv";
 import { afterEach } from "vitest";
+import { JOIN_TEST_CLIENT_IP_HEADER } from "./helpers/join-client-ip";
 import { withLostResponseDeadline } from "./helpers/lost-response-fetch";
 
 // `quiet: true` suppresses dotenv's own stdout "tip" advertisements (confirmed in its source,
@@ -46,6 +47,11 @@ for (const [name, value] of [
 // sets 3000 at module load (auth-provider-deadline design.md D12) and process.env outlives a test
 // file within a worker.
 process.env.AUTH_PROVIDER_DEADLINE_MS = "30000";
+// Join tests must not share record_join_attempt's null-IP bucket (limit 20 per 15 minutes on one
+// key). The header name is fixed for the suite; a test that builds request Headers puts a fresh
+// address in it (tests/helpers/join-client-ip.ts). Restored after every test because
+// join-attempt-trusted-ip.test.ts clears the variable to prove the unset case.
+process.env.JOIN_ATTEMPT_TRUSTED_IP_HEADER = JOIN_TEST_CLIENT_IP_HEADER;
 if (process.env.NEXT_PUBLIC_SUPABASE_URL) {
   globalThis.fetch = withLostResponseDeadline(globalThis.fetch, {
     origin: new URL(process.env.NEXT_PUBLIC_SUPABASE_URL).origin,
@@ -68,6 +74,7 @@ if (process.env.NEXT_PUBLIC_SUPABASE_URL) {
 // before this file's own body, pulling in ./helpers/identity.ts and, through it, src/db/client.ts
 // — which reads process.env.DATABASE_URL at module load — before dotenv has populated it.
 afterEach(async () => {
+  process.env.JOIN_ATTEMPT_TRUSTED_IP_HEADER = JOIN_TEST_CLIENT_IP_HEADER;
   const { sweepAbandonedHouseholds } = await import("./helpers/identity");
   await sweepAbandonedHouseholds();
 });
