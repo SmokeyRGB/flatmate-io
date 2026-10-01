@@ -473,6 +473,30 @@ Agents read these deliberately and found no debt:
 
 ---
 
+## Errata (2026-10-01, found while writing the work packages)
+
+The plan-writing agents re-read the code. The packages in `audit/cursor/` use these corrected facts; the findings above are left as first written.
+
+**Escalation of #2.** The repository `SmokeyRGB/flatmate-io` is **public** (V, `gh repo view`), and `ci.yml:172–173, 200` commits `flatmate-io-dev`'s URL and anon key (V). Item #24 called it a local-stack key; it is the hosted dev key. The exposure in #2 is therefore live on dev today. The immediate mitigation is in `audit/cursor/README.md`.
+
+| # | Correction |
+|---|---|
+| 7 | Only the email and password lock preambles are near-identical. The reset phases lock membership by profile id, and `signIn` takes `account FOR SHARE`. Extract with care. |
+| 10 | The uncaught actions also include `reactivateMemberAction`, `issueJoinCodeAction`, `issueJoinCodeForProfileAction`, `deleteJoinCodeAction`, `createResidentProfileAction` and `transitionRoomAction`. New: thrown server-action errors are masked in production, so `issuePasswordResetLinkAction`'s message never reaches the screen. |
+| 11 | `issueJoinCodeTx` has 3 callers (`registerHousehold` plus two inside `identity/repository.ts`), so it cannot simply become module-private. |
+| 13 | The audit/identity coupling is a layering violation of `docs/domain/kontextgrenzen.md` §4, not a runtime cycle. Casting's `getRoundParticipants` is a cross-context join that rule 1 forbids. |
+| 14 | A strict "actor = session account" rule would break `claimResidentProfile` and `redeemPasswordReset`, which record a different actor by design. |
+| 15 | postgres.js already defaults to `max: 10`. A fail-fast on `DATABASE_URL` must exempt `next build`, which CI runs without a database. |
+| 19 | `auth.ts` has 12 real `console.error` calls, not 18 (6 hits were comments). drizzle 0.45's `DrizzleQueryError` embeds bound `params` in its message, so `console.error(err)` can log values. |
+| 22 | There are 5 recursive walkers plus 2 flat listings, and 6 comment strippers, none of them string-aware. |
+| 24 | The second `check-refs` run is a deliberate named gate. |
+| 28 | There are 5 `Tx` aliases, 5 account-event sites and 4 `toISOString().slice(0,10)` sites (the 4th is in `identity/repository.ts`), all UTC dates. Replacing `permissionSet` with a bound array would change the SQL; reuse `permissionArrayLiteral` instead. |
+| 29 | The second "Room not found" throw is at line 600. |
+| 31 | Only `0026` is a `SECURITY DEFINER` function among 0023–0026 (0023 and 0025 are plain triggers). |
+| 33 | The "New round" literal is at `rounds/new/actions.ts:22`. |
+| 37 | `done-check.ts` is documented in four places; only its automation is missing. |
+| 2 | `rls_auto_enable` is Supabase's own helper, not the project's. Exclude it, don't revoke blindly. |
+
 ## Appendix: role-check inventory (input for change 2b)
 
 R = `src/modules/identity/repository.ts`, M = `src/app/(org)/members/page.tsx`. The proposed names are suggestions for 2b's propose step.
