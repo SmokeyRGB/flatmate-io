@@ -47,13 +47,19 @@ export function checkGuardedTests(rootDir: string): GuardedTestViolation[] {
     const content = readFileSync(fullPath, "utf8");
     // Strip `//` line comments before testing — otherwise a commented-out `it(...)` reads as a
     // real test body, and a comment mentioning ".skip(" as prose would false-positive.
+    // Split on CRLF too: with core.autocrlf the Windows checkout is CRLF, and a trailing \r
+    // makes `$` (no `m` flag) miss, so nothing was stripped on the author's machine.
+    // A `.skip(` inside a string literal is still visible here and is still a violation.
     const uncommented = content
-      .split("\n")
+      .split(/\r?\n/)
       .map((line) => line.replace(/\/\/.*$/, ""))
       .join("\n");
 
-    if (/\.(skip|only)\s*\(/.test(uncommented)) {
-      violations.push({ file, reason: `registered for ${label} but contains .skip(/.only(` });
+    if (/\.(skip|only|skipIf|runIf|todo)\s*\(|\b(xit|xtest|xdescribe)\s*\(/.test(uncommented)) {
+      violations.push({
+        file,
+        reason: `registered for ${label} but contains a skipped, exclusive, or placeholder test`,
+      });
     }
 
     if (!/\b(it|test)\s*\(/.test(uncommented)) {
