@@ -1,0 +1,138 @@
+[
+  {
+    "type": "dependency",
+    "from": "src/modules/audit/repository.ts",
+    "to": "src/modules/casting/schema.ts",
+    "unresolvedTo": "@/modules/casting/schema",
+    "dependencyTypes": [
+      "aliased",
+      "aliased-tsconfig",
+      "aliased-tsconfig-paths",
+      "local",
+      "import"
+    ],
+    "rule": {
+      "severity": "error",
+      "name": "no-cross-module-schema-or-repository"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "src/modules/audit/repository.ts",
+    "to": "src/modules/identity/schema.ts",
+    "unresolvedTo": "@/modules/identity/schema",
+    "dependencyTypes": [
+      "aliased",
+      "aliased-tsconfig",
+      "aliased-tsconfig-paths",
+      "local",
+      "import"
+    ],
+    "rule": {
+      "severity": "error",
+      "name": "no-cross-module-schema-or-repository"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "src/modules/casting/repository.ts",
+    "to": "src/modules/audit/repository.ts",
+    "unresolvedTo": "@/modules/audit/repository",
+    "dependencyTypes": [
+      "aliased",
+      "aliased-tsconfig",
+      "aliased-tsconfig-paths",
+      "local",
+      "import"
+    ],
+    "rule": {
+      "severity": "error",
+      "name": "no-cross-module-schema-or-repository"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "src/modules/casting/repository.ts",
+    "to": "src/modules/audit/schema.ts",
+    "unresolvedTo": "@/modules/audit/schema",
+    "dependencyTypes": [
+      "aliased",
+      "aliased-tsconfig",
+      "aliased-tsconfig-paths",
+      "local",
+      "import"
+    ],
+    "rule": {
+      "severity": "error",
+      "name": "no-cross-module-schema-or-repository"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "src/modules/casting/repository.ts",
+    "to": "src/modules/identity/repository.ts",
+    "unresolvedTo": "@/modules/identity/repository",
+    "dependencyTypes": [
+      "aliased",
+      "aliased-tsconfig",
+      "aliased-tsconfig-paths",
+      "local",
+      "import"
+    ],
+    "rule": {
+      "severity": "error",
+      "name": "no-cross-module-schema-or-repository"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "src/modules/casting/repository.ts",
+    "to": "src/modules/identity/schema.ts",
+    "unresolvedTo": "@/modules/identity/schema",
+    "dependencyTypes": [
+      "aliased",
+      "aliased-tsconfig",
+      "aliased-tsconfig-paths",
+      "local",
+      "import"
+    ],
+    "rule": {
+      "severity": "error",
+      "name": "no-cross-module-schema-or-repository"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "src/modules/identity/auth.ts",
+    "to": "src/modules/audit/repository.ts",
+    "unresolvedTo": "@/modules/audit/repository",
+    "dependencyTypes": [
+      "aliased",
+      "aliased-tsconfig",
+      "aliased-tsconfig-paths",
+      "local",
+      "import"
+    ],
+    "rule": {
+      "severity": "error",
+      "name": "no-cross-module-schema-or-repository"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "src/modules/identity/repository.ts",
+    "to": "src/modules/audit/repository.ts",
+    "unresolvedTo": "@/modules/audit/repository",
+    "dependencyTypes": [
+      "aliased",
+      "aliased-tsconfig",
+      "aliased-tsconfig-paths",
+      "local",
+      "import"
+    ],
+    "rule": {
+      "severity": "error",
+      "name": "no-cross-module-schema-or-repository"
+    }
+  }
+]
