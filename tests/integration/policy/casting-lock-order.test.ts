@@ -1,14 +1,19 @@
-import { eq, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { afterEach, describe, expect, it } from "vitest";
 import { withSessionContext, type SessionContext } from "@/db/session-context";
+import { activityEvent } from "@/modules/audit/schema";
 import {
   createRoom,
   createRound,
   openRound,
   ProcedureLockedError,
+  removeRoom,
+  RoomInUseByOpenRoundError,
+  RoundOpenPreconditionError,
+  transitionRoomStatus,
   updateHouseholdSettingsWithProcedureLock,
 } from "@/modules/casting/repository";
-import { castingRound, roundParticipation } from "@/modules/casting/schema";
+import { castingRound, room, roundParticipation } from "@/modules/casting/schema";
 import { getHouseholdSettings, PermissionDeniedError } from "@/modules/identity/repository";
 import { householdSettings, membership } from "@/modules/identity/schema";
 import { createTestModerator, registerTestHousehold, type TestHousehold } from "../../helpers/identity";
@@ -157,6 +162,85 @@ describe("Casting lock order", () => {
     expect(result).toMatchObject({ openRoundId: round.id });
     const live = await getHouseholdSettings(household.context);
     expect(live?.quorumShare).toBe("0.5");
+    expect(settledBeforeRelease).toBe(false);
+  });
+
+  // Finding #4, direction 1. The stand-in holds the room FOR SHARE and has marked the round
+  // open, uncommitted.
+  it("C3: removeRoom waits for an in-flight opener and is refused", async () => {
+    const { household, actor, roomRow, round } = await draftRound();
+    await transitionRoomStatus(household.context, roomRow.id, "open", actor);
+    const hold = holdOpen(household.context, async (tx) => {
+      await tx.select({ id: room.id }).from(room).where(eq(room.id, roomRow.id)).for("share");
+      await tx
+        .update(castingRound)
+        .set({ status: "open", openedAt: sql`now()` })
+        .where(eq(castingRound.id, round.id));
+    });
+    await untilHeld(hold);
+
+    let settled = false;
+    const real = removeRoom(household.context, roomRow.id, actor).finally(() => {
+      settled = true;
+    });
+    await sleep(1500);
+    const settledBeforeRelease = settled;
+    hold.release();
+    await hold.done;
+
+    const outcome = await real.then(
+      (value) => ({ ok: true as const, value }),
+      (err: unknown) => ({ ok: false as const, err }),
+    );
+    const result = outcome.ok ? outcome.value : outcome.err;
+    expect(result).toBeInstanceOf(RoomInUseByOpenRoundError);
+    const [roomAfter] = await withSessionContext(household.context, (tx) =>
+      tx.select().from(room).where(eq(room.id, roomRow.id)),
+    );
+    expect(roomAfter?.deletedAt).toBeNull();
+    const removedEvents = await withSessionContext(household.context, (tx) =>
+      tx
+        .select()
+        .from(activityEvent)
+        .where(and(eq(activityEvent.eventType, "room.removed"), eq(activityEvent.subjectId, roomRow.id))),
+    );
+    expect(removedEvents).toHaveLength(0);
+    expect(settledBeforeRelease).toBe(false);
+  });
+
+  // Finding #4, direction 2. The stand-in has removed the only covered room, uncommitted.
+  it("C4: openRound waits for an in-flight room removal and refuses with rooms_unavailable", async () => {
+    const { household, actor, moderator, modActor, roomRow, round } = await draftRound();
+    await transitionRoomStatus(household.context, roomRow.id, "open", actor);
+    const hold = holdOpen(household.context, async (tx) => {
+      await tx.update(room).set({ deletedAt: sql`now()` }).where(eq(room.id, roomRow.id));
+    });
+    await untilHeld(hold);
+
+    let settled = false;
+    const real = openRound(moderator.context, round.id, modActor).finally(() => {
+      settled = true;
+    });
+    await sleep(1500);
+    const settledBeforeRelease = settled;
+    hold.release();
+    await hold.done;
+
+    const outcome = await real.then(
+      (value) => ({ ok: true as const, value }),
+      (err: unknown) => ({ ok: false as const, err }),
+    );
+    const result = outcome.ok ? outcome.value : outcome.err;
+    expect(result).toBeInstanceOf(RoundOpenPreconditionError);
+    expect((result as RoundOpenPreconditionError).code).toBe("rooms_unavailable");
+    const [roundAfter] = await withSessionContext(household.context, (tx) =>
+      tx.select().from(castingRound).where(eq(castingRound.id, round.id)),
+    );
+    expect(roundAfter?.status).toBe("draft");
+    const participants = await withSessionContext(household.context, (tx) =>
+      tx.select().from(roundParticipation).where(eq(roundParticipation.roundId, round.id)),
+    );
+    expect(participants).toHaveLength(0);
     expect(settledBeforeRelease).toBe(false);
   });
 

@@ -596,7 +596,7 @@ export async function transitionRoomStatus(
   if (!actor.accountId) throw new Error("transitionRoomStatus requires an actor accountId");
   await assertHasPermission(context, actor.accountId, "manage_rooms");
   return withSessionContext(context, async (tx) => {
-    const [current] = await tx.select().from(room).where(eq(room.id, roomId));
+    const [current] = await tx.select().from(room).where(eq(room.id, roomId)).for("update");
     if (!current) throw new Error(`Room not found: ${roomId}`);
 
     const fromStatus = current.status;
@@ -635,6 +635,8 @@ export async function removeRoom(context: SessionContext, roomId: string, actor:
   if (actor.accountId !== context.accountId) throw new PermissionDeniedError("manage_rooms");
   return withSessionContext(context, async (tx) => {
     await assertHasPermissionTx(tx, context, "manage_rooms");
+    // Lock the row when it exists. A missing id stays today's no-op; a not-found error is WP04.
+    await tx.select({ id: room.id }).from(room).where(eq(room.id, roomId)).for("update");
     const [openRoundCoveringIt] = await tx
       .select({ id: castingRound.id })
       .from(castingRound)
@@ -748,8 +750,15 @@ async function openRoundTx(tx: Tx, context: SessionContext, roundId: string, act
     throw new RoundOpenPreconditionError("This round has no rooms selected", "no_rooms_selected");
   }
 
-  // EC-1.2: every covered room is already occupied/not_available.
-  const coveredRooms = await tx.select().from(room).where(inArray(room.id, round.roomIds));
+  // EC-1.2: every still-present covered room is already occupied/not_available.
+  // A removed room is ignored. A round whose covered rooms are all removed fails
+  // with rooms_unavailable.
+  const coveredRooms = await tx
+    .select()
+    .from(room)
+    .where(and(inArray(room.id, round.roomIds), isNull(room.deletedAt)))
+    .orderBy(room.id)
+    .for("share");
   const hasAvailableRoom = coveredRooms.some((r) => !LOCKED_ROOM_STATUSES.has(r.status));
   if (!hasAvailableRoom) {
     throw new RoundOpenPreconditionError(
