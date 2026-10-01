@@ -122,6 +122,8 @@ export interface SchemaTableInfo extends DescribedTable {
   context: string;
   /** Repo-relative path (forward slashes) to the schema.ts that declares it. */
   file: string;
+  /** The Drizzle table. Other lints read policies and columns from this instead of parsing the file. */
+  pgTable: PgTable;
 }
 
 export interface SourceScanViolation {
@@ -222,7 +224,7 @@ export async function loadSchemaTables(rootDir: string): Promise<LoadResult> {
 
     for (const table of exportedTables) {
       const described = describeTable(table);
-      tables.push({ ...described, context: mod, file: relPath });
+      tables.push({ ...described, context: mod, file: relPath, pgTable: table });
     }
   }
 

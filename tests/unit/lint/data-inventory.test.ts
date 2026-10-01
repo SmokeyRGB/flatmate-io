@@ -32,7 +32,7 @@ afterEach(() => {
 });
 
 function tableInfo(table: PgTable, context: string, file = "test-fixture.ts"): SchemaTableInfo {
-  return { ...describeTable(table), context, file };
+  return { ...describeTable(table), context, file, pgTable: table };
 }
 
 // ---------------------------------------------------------------------------

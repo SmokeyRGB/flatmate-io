@@ -34,8 +34,8 @@ describe("real-tree lint snapshots", () => {
     expect(checkInventory(tables, inventoryText)).toEqual([]);
   });
 
-  it("rls-coverage reports nothing", () => {
-    expect(checkRlsCoverage(root)).toEqual([]);
+  it("rls-coverage reports nothing", async () => {
+    expect(await checkRlsCoverage(root)).toEqual([]);
   });
 
   it("import-boundary reports nothing", () => {
