@@ -36,18 +36,8 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { db } from "@/db/client";
+import { isStrictCatalogCheck } from "../../helpers/live-catalog";
 import { loadSchemaTables, matchArt9Term, parseInventory } from "../../../scripts/lint/data-inventory";
-
-// Strict when the environment says the database was built from the repository alone:
-// scripts/ci/bootstrap-local-db.sh exports DATA_INVENTORY_LIVE_STRICT=1 for CI's `verify` job, so
-// the enforcing job doesn't depend on which hostname its DATABASE_URL happens to use. A loopback
-// host (a developer's own local stack) is strict too.
-function isLocalDatabase(): boolean {
-  if (process.env.DATA_INVENTORY_LIVE_STRICT === "1") return true;
-  const url = new URL(process.env.DATABASE_URL!);
-  // WHATWG URL keeps the brackets on an IPv6 hostname: `postgres://…@[::1]:5432` → "[::1]".
-  return url.hostname === "localhost" || url.hostname === "127.0.0.1" || url.hostname === "[::1]";
-}
 
 interface CatalogColumn {
   table: string;
@@ -85,7 +75,7 @@ describe("data-inventory live check (ADR-010, design.md D5)", () => {
     const { tables: schemaTables } = await loadSchemaTables(process.cwd());
     const catalogTableNames = new Set(catalogColumns.map((c) => c.table));
     const missingFromCatalog = schemaTables.filter((t) => !catalogTableNames.has(t.table)).map((t) => t.table);
-    if (isLocalDatabase()) {
+    if (isStrictCatalogCheck()) {
       expect(missingFromCatalog, "catalog is missing schema.ts tables").toEqual([]);
     } else {
       expect(missingFromCatalog.length).toBeLessThan(schemaTables.length);
@@ -119,7 +109,7 @@ describe("data-inventory live check (ADR-010, design.md D5)", () => {
       ...art9.map((name) => `Art.-9 blocklist match: ${name}`),
     ];
 
-    if (isLocalDatabase()) {
+    if (isStrictCatalogCheck()) {
       expect(findings, findings.join("\n")).toEqual([]);
     } else if (findings.length > 0) {
       console.warn(
