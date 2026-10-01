@@ -37,3 +37,16 @@ export function getClientIp(headersList: Headers): string | null {
     .filter(Boolean);
   return hops.length > 0 ? hops[hops.length - 1]! : null;
 }
+
+// Production refuses to start while the header is unset, so a deployed server cannot silently
+// put every visitor in one bucket. JOIN_ATTEMPT_SHARED_BUCKET_OK=1 is the explicit acknowledgement
+// of that bucket, including a laptop running `next start`. Called from src/instrumentation.ts.
+export function assertTrustedIpHeaderConfigured(env: Record<string, string | undefined>): void {
+  if (env.NODE_ENV !== "production") return;
+  if (env.JOIN_ATTEMPT_SHARED_BUCKET_OK === "1") return;
+  const header = env.JOIN_ATTEMPT_TRUSTED_IP_HEADER?.trim() ?? "";
+  if (header !== "") return;
+  throw new Error(
+    "JOIN_ATTEMPT_TRUSTED_IP_HEADER is unset. In production every join attempt shares one rate-limit bucket. Name a header a trusted proxy overwrites, or acknowledge the shared bucket with JOIN_ATTEMPT_SHARED_BUCKET_OK=1.",
+  );
+}
