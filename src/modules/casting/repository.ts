@@ -632,8 +632,9 @@ export class RoomInUseByOpenRoundError extends Error {
 // EC-1.6: refused while a round covering it is open; the room may be set not_available instead.
 export async function removeRoom(context: SessionContext, roomId: string, actor: Actor) {
   if (!actor.accountId) throw new Error("removeRoom requires an actor accountId");
-  await assertHasPermission(context, actor.accountId, "manage_rooms");
+  if (actor.accountId !== context.accountId) throw new PermissionDeniedError("manage_rooms");
   return withSessionContext(context, async (tx) => {
+    await assertHasPermissionTx(tx, context, "manage_rooms");
     const [openRoundCoveringIt] = await tx
       .select({ id: castingRound.id })
       .from(castingRound)
@@ -819,8 +820,11 @@ async function openRoundTx(tx: Tx, context: SessionContext, roundId: string, act
 
 export async function openRound(context: SessionContext, roundId: string, actor: Actor) {
   if (!actor.accountId) throw new Error("openRound requires an actor accountId");
-  await assertHasPermission(context, actor.accountId, "close_round");
-  return withSessionContext(context, (tx) => openRoundTx(tx, context, roundId, actor));
+  if (actor.accountId !== context.accountId) throw new PermissionDeniedError("close_round");
+  return withSessionContext(context, async (tx) => {
+    await assertHasPermissionTx(tx, context, "close_round");
+    return openRoundTx(tx, context, roundId, actor);
+  });
 }
 
 // rounds-new-orphan-draft-atomicity: createRound and openRound each committed in their own
@@ -837,8 +841,9 @@ export async function createAndOpenRound(
   actor: Actor,
 ) {
   if (!actor.accountId) throw new Error("createAndOpenRound requires an actor accountId");
-  await assertHasPermission(context, actor.accountId, "close_round");
+  if (actor.accountId !== context.accountId) throw new PermissionDeniedError("close_round");
   return withSessionContext(context, async (tx) => {
+    await assertHasPermissionTx(tx, context, "close_round");
     const round = await insertDraftRoundTx(tx, context, title, roomIds, actor);
     return openRoundTx(tx, context, round.id, actor);
   });
@@ -986,9 +991,10 @@ export async function updateHouseholdSettingsWithProcedureLock(
   // long as no round was open. `manage_settings` is in the stored household set (identity/schema.ts,
   // HOUSEHOLD_PERMISSIONS) and otherwise individually grantable; no role is read.
   if (!actor.accountId) throw new Error("updateHouseholdSettingsWithProcedureLock requires an actor accountId");
-  await assertHasPermission(context, actor.accountId, "manage_settings");
+  if (actor.accountId !== context.accountId) throw new PermissionDeniedError("manage_settings");
 
   return withSessionContext(context, async (tx) => {
+    await assertHasPermissionTx(tx, context, "manage_settings");
     const changedFields = Object.keys(patch) as LockedSettingsField[];
     const [openRound] = await tx
       .select({ id: castingRound.id })
