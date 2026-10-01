@@ -6,8 +6,14 @@
 // Same hand-written-lint trade-off as the repo's other scripts/lint/*.ts: plain TypeScript over
 // file contents, no parser — the regex approach can miss exotic JSX (e.g. a spread {...props}
 // carrying `type`), stated and accepted, same as import-boundary.ts and session-context.ts.
-import { readFileSync, readdirSync, statSync, existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
+import { blankComments, lineOf, walk } from "./_shared";
+
+// Re-exported under the name tests already import. blankComments keeps the source length and
+// the line breaks, where the old stripComments deleted comment text. A JSX comment
+// `{/* <button> */}` becomes spaces inside the braces, which findButtonTagFindings ignores.
+export { blankComments as stripComments };
 
 export interface LintViolation {
   file: string;
@@ -23,26 +29,12 @@ export const PAGE_LOADING_EXEMPTIONS: Record<string, string> = {
   "src/app/page.tsx": "redirects only, renders nothing",
 };
 
-function walk(dir: string, pattern: RegExp): string[] {
-  const out: string[] = [];
-  for (const entry of readdirSync(dir)) {
-    const full = join(dir, entry);
-    if (statSync(full).isDirectory()) {
-      out.push(...walk(full, pattern));
-    } else if (pattern.test(entry)) {
-      out.push(full);
-    }
-  }
-  return out;
+function isPage(name: string): boolean {
+  return name === "page.tsx";
 }
 
-// Strips `//` line comments, `/* … */` block comments (which also covers JSX's `{/* … */}` —
-// removing the `/* … */` body leaves a harmless stray `{}` behind) before any button-tag or
-// import match runs. Block comments are stripped first, so a `//` inside one isn't treated as its
-// own line comment.
-export function stripComments(source: string): string {
-  const withoutBlocks = source.replace(/\/\*[\s\S]*?\*\//g, "");
-  return withoutBlocks.replace(/\/\/.*$/gm, "");
+function isSource(name: string): boolean {
+  return /\.(ts|tsx)$/.test(name);
 }
 
 export type ButtonTagFinding = { snippet: string; index: number };
@@ -76,16 +68,12 @@ export function findButtonTagFindings(strippedSource: string): ButtonTagFinding[
   return findings;
 }
 
-function lineOf(source: string, index: number): number {
-  return source.slice(0, index).split("\n").length;
-}
-
 // Whether a loading.tsx renders at least one of the shared skeleton shapes. A `loading.tsx`
 // returning `null` would satisfy a mere-presence check while showing a blank screen, which the
 // spec forbids. An import alone isn't enough either (Copilot review of PR #26): the file must
 // import from @/ui/skeletons AND render one of the imported names as a JSX element.
 export function importsSkeletons(loadingContent: string): boolean {
-  const code = stripComments(loadingContent);
+  const code = blankComments(loadingContent);
   const importRe = /import\s*\{([^}]*)\}\s*from\s*["']@\/ui\/skeletons["']/g;
   const names: string[] = [];
   let match: RegExpExecArray | null;
@@ -103,12 +91,12 @@ export function checkPendingFeedbackLint(rootDir: string): LintViolation[] {
   const violations: LintViolation[] = [];
 
   // 1. No plain submit button anywhere in src/, except the shared component itself.
-  for (const file of walk(srcDir, /\.(ts|tsx)$/)) {
+  for (const file of walk(srcDir, isSource)) {
     const relPath = relative(rootDir, file).replace(/\\/g, "/");
     if (relPath === SUBMIT_BUTTON_FILE) continue;
 
     const raw = readFileSync(file, "utf8");
-    const stripped = stripComments(raw);
+    const stripped = blankComments(raw);
     for (const finding of findButtonTagFindings(stripped)) {
       violations.push({
         file: relPath,
@@ -121,7 +109,7 @@ export function checkPendingFeedbackLint(rootDir: string): LintViolation[] {
 
   // 2. Every page.tsx under src/app/ has a sibling loading.tsx importing @/ui/skeletons.
   const appDir = join(rootDir, "src", "app");
-  const pageFiles = existsSync(appDir) ? walk(appDir, /^page\.tsx$/) : [];
+  const pageFiles = existsSync(appDir) ? walk(appDir, isPage) : [];
   for (const pageFile of pageFiles) {
     const relPath = relative(rootDir, pageFile).replace(/\\/g, "/");
     if (relPath in PAGE_LOADING_EXEMPTIONS) continue;
