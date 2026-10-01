@@ -637,7 +637,6 @@ export async function removeRoom(context: SessionContext, roomId: string, actor:
   if (actor.accountId !== context.accountId) throw new PermissionDeniedError("manage_rooms");
   return withSessionContext(context, async (tx) => {
     await assertHasPermissionTx(tx, context, "manage_rooms");
-    // Lock the row when it exists. A missing id stays today's no-op; a not-found error is WP04.
     await tx.select({ id: room.id }).from(room).where(eq(room.id, roomId)).for("update");
     const [openRoundCoveringIt] = await tx
       .select({ id: castingRound.id })
@@ -728,7 +727,7 @@ const LOCKED_ROOM_STATUSES: ReadonlySet<RoomStatus> = new Set(["occupied", "not_
 // FR-1.14/FR-1.15/FR-1.16: draft -> open takes an atomic snapshot of eligible residents into
 // RoundParticipation and freezes HouseholdSettings' four locked fields into settings_snapshot —
 // both effects or neither, in one transaction. EC-1.1/EC-1.2/EC-1.3 preconditions checked first.
-// LOCK ORDER (audit/cursor/WP03-casting-concurrency.md): membership (FOR SHARE) ->
+// LOCK ORDER: membership (FOR SHARE) ->
 // household_settings -> casting_round -> room -> application. Settings come before the round
 // because the settings writer has no round id and locks the household's single settings row;
 // rooms come after the round because this function learns the covered ids from the locked round,
