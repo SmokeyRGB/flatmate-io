@@ -78,14 +78,14 @@ describe("Procedure lock while a round is open", () => {
   // FR-1.8/G-C (Convergence, found via manual UI testing): a plain resident with no granted
   // permissions must not be able to change household settings at all, regardless of the
   // procedure lock's own state.
-  it("refuses a plain resident with no manage_settings permission", async () => {
+  it("refuses a plain resident with no manage_voting_procedure permission", async () => {
     hh = await registerTestHousehold();
     const resident = await claim(hh, "Resident1");
     accountIds.push(resident.accountId);
     const residentActor = { accountId: resident.accountId, profileId: resident.profileId };
     // PR #19 review: authorization derives from the authenticated session — the resident's OWN
     // SessionContext, not hh.context (the admin's) paired with the resident's accountId, which
-    // would now be refused as a spoofed session rather than for lacking manage_settings.
+    // would now be refused as a spoofed session rather than for lacking manage_voting_procedure.
     const residentContext = {
       accountId: resident.accountId,
       householdId: hh.householdId,
@@ -97,7 +97,7 @@ describe("Procedure lock while a round is open", () => {
     ).rejects.toThrow(PermissionDeniedError);
   });
 
-  it("refuses a plain resident with no manage_settings permission from forcing a change while open", async () => {
+  it("refuses a plain resident with no manage_voting_procedure permission from forcing a change while open", async () => {
     hh = await registerTestHousehold();
     const actor = { accountId: hh.accountId, profileId: null };
     const resident = await claim(hh, "Resident1");

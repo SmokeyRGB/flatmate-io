@@ -12,7 +12,7 @@ import {
   type JoinHouseholdResult,
 } from "@/modules/identity/auth";
 import {
-  ResidentListActionDeniedError,
+  PermissionDeniedError,
   ResidentProfileNotEligibleForResetError,
   createResidentProfile,
   issuePasswordResetLink,
@@ -92,7 +92,7 @@ describe("issuePasswordResetLink (design.md Decision 6)", () => {
     expect(link.residentProfileId).toBe(resident.profileId);
   });
 
-  it("issuing as a moderator is refused (assert ResidentListActionDeniedError)", async () => {
+  it("issuing as a moderator is refused (assert PermissionDeniedError)", async () => {
     hh = await registerTestHousehold();
     const moderator = await claimResident(hh, "ModeratorIssuer");
     await setMemberRole(hh.context, hh.accountId, moderator.accountId, "moderator");
@@ -105,7 +105,7 @@ describe("issuePasswordResetLink (design.md Decision 6)", () => {
 
     await expect(
       issuePasswordResetLink(moderatorCtx, moderator.accountId, resident.profileId),
-    ).rejects.toThrow(ResidentListActionDeniedError);
+    ).rejects.toThrow(PermissionDeniedError);
   });
 
   it("issuing for a prepared, a moved-out, or an already-emailed profile is refused (assert the class)", async () => {

@@ -3,7 +3,7 @@ import { claimResidentProfile } from "@/modules/identity/auth";
 import {
   CannotChangeAdminRoleError,
   createResidentProfile,
-  ResidentListActionDeniedError,
+  PermissionDeniedError,
   setMemberRole,
 } from "@/modules/identity/repository";
 import {
@@ -61,7 +61,7 @@ describe("Moderator appointment (EC-1.7)", () => {
     const memberContext = { accountId: memberAccountId, householdId: hh.householdId, profileId: profile.id };
     await expect(
       setMemberRole(memberContext, memberAccountId, memberAccountId, "moderator"),
-    ).rejects.toThrow(ResidentListActionDeniedError);
+    ).rejects.toThrow(PermissionDeniedError);
 
     await expect(
       setMemberRole(hh.context, hh.accountId, hh.accountId, "moderator"),

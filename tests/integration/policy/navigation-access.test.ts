@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { afterEach, describe, expect, it } from "vitest";
 import { withSessionContext } from "@/db/session-context";
 import { claimResidentProfile } from "@/modules/identity/auth";
@@ -39,50 +39,68 @@ async function claim(household: TestHousehold, name: string): Promise<{
   };
 }
 
-describe("getNavigationAccess (start-screen design.md Decision 4)", () => {
-  it("household_admin -> both true", async () => {
+describe("getNavigationAccess (start-screen design.md Decision 4; role-permissions design D6, D9)", () => {
+  it("household_admin -> every flag true (it holds manage_rooms and manage_voting_procedure)", async () => {
     hh = await registerTestHousehold();
     const access = await getNavigationAccess(hh.context);
-    expect(access).toEqual({ organisation: true, membersList: true });
+    expect(access).toEqual({ organisation: true, membersList: true, rooms: true, settings: true });
   });
 
-  it("moderator -> both true", async () => {
+  it("moderator -> organisation, members list and rooms, but not the voting-procedure settings (matrix ⬜)", async () => {
     hh = await registerTestHousehold();
     const moderator = await claim(hh, "Moderator");
     await setMemberRole(hh.context, hh.accountId, moderator.accountId, "moderator");
 
     const access = await getNavigationAccess(moderator.context);
-    expect(access).toEqual({ organisation: true, membersList: true });
+    expect(access).toEqual({ organisation: true, membersList: true, rooms: true, settings: false });
   });
 
-  it("a member with any permission -> organisation true, membersList false", async () => {
+  it("a moderator individually granted manage_voting_procedure -> settings true (the one grant the matrix leaves)", async () => {
     hh = await registerTestHousehold();
-    const member = await claim(hh, "SomePermission");
+    const moderator = await claim(hh, "GrantedModerator");
+    await setMemberRole(hh.context, hh.accountId, moderator.accountId, "moderator");
     await withSessionContext(hh.context, (tx) =>
-      tx.update(membership).set({ permissions: ["manage_settings"] }).where(eq(membership.accountId, member.accountId)),
+      tx
+        .update(membership)
+        .set({ permissions: sql`permissions || ARRAY['manage_voting_procedure']::text[]` })
+        .where(eq(membership.accountId, moderator.accountId)),
     );
 
-    const access = await getNavigationAccess(member.context);
-    expect(access).toEqual({ organisation: true, membersList: false });
+    const access = await getNavigationAccess(moderator.context);
+    expect(access.settings).toBe(true);
   });
 
-  it("a plain member -> both false", async () => {
+  // F3 change 2b (human decision, 2026-10-01): a plain resident holds the resident set (`vote`) and
+  // nothing else. `vote` alone never opens the organisation area.
+  it("a plain resident (the resident set only) -> every flag false", async () => {
     hh = await registerTestHousehold();
     const member = await claim(hh, "PlainMember");
 
     const access = await getNavigationAccess(member.context);
-    expect(access).toEqual({ organisation: false, membersList: false });
+    expect(access).toEqual({ organisation: false, membersList: false, rooms: false, settings: false });
   });
 
-  it("after removeMember revokes the membership -> both false", async () => {
+  it("after removeMember revokes the membership -> every flag false", async () => {
     hh = await registerTestHousehold();
     const moderator = await claim(hh, "SoonRemoved");
     await setMemberRole(hh.context, hh.accountId, moderator.accountId, "moderator");
-    expect(await getNavigationAccess(moderator.context)).toEqual({ organisation: true, membersList: true });
+    expect((await getNavigationAccess(moderator.context)).organisation).toBe(true);
 
     await removeMember(hh.context, hh.accountId, moderator.accountId, moderator.displayName);
 
     const access = await getNavigationAccess(moderator.context);
-    expect(access).toEqual({ organisation: false, membersList: false });
+    expect(access).toEqual({ organisation: false, membersList: false, rooms: false, settings: false });
+  });
+
+  it("after a demotion the moderator loses the organisation flags at once, with no new sign-in", async () => {
+    hh = await registerTestHousehold();
+    const moderator = await claim(hh, "SoonDemoted");
+    await setMemberRole(hh.context, hh.accountId, moderator.accountId, "moderator");
+    expect((await getNavigationAccess(moderator.context)).organisation).toBe(true);
+
+    await setMemberRole(hh.context, hh.accountId, moderator.accountId, "member");
+
+    const access = await getNavigationAccess(moderator.context);
+    expect(access).toEqual({ organisation: false, membersList: false, rooms: false, settings: false });
   });
 });

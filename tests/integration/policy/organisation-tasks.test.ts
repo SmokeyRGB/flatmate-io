@@ -1,7 +1,5 @@
-import { eq } from "drizzle-orm";
 import { afterEach, describe, expect, it } from "vitest";
-import { withSessionContext } from "@/db/session-context";
-import { createResidentProfile, getNavigationAccess, membership, setMemberRole } from "@/modules/identity/repository";
+import { createResidentProfile, getNavigationAccess, setMemberRole } from "@/modules/identity/repository";
 import { claimResidentProfile } from "@/modules/identity/auth";
 import {
   createRoom,
@@ -55,7 +53,7 @@ describe("listOrganisationTasks (start-screen design.md Decision 4)", () => {
     hh = await registerTestHousehold();
     const room = await createRoom(hh.context, "Room A", adminActor());
     await openRoom(hh, room.id);
-    // Design D13: the household account holds no close_round any more, so it gets no tasks. The
+    // Design D13: the household account holds no manage_rounds, so it gets no tasks. The
     // read moves to a moderator's context; the household's own [] is asserted in its own case (g).
     const moderator = await createTestModerator(hh);
 
@@ -103,25 +101,23 @@ describe("listOrganisationTasks (start-screen design.md Decision 4)", () => {
     expect(tasks).toEqual([]);
   });
 
-  it("(e) a member holding a permission other than close_round: not counted, but organisation access is true", async () => {
+  // F3 change 2b (human decision, 2026-10-01): a plain member holds the resident set (`vote`) and
+  // nothing else, so the old case "a member individually granted manage_settings" is gone: it
+  // gets no task and no organisation access.
+  it("(e) a plain member (the resident set only): no task, and organisation access is false", async () => {
     hh = await registerTestHousehold();
     const room = await createRoom(hh.context, "Room F", adminActor());
     await openRoom(hh, room.id);
     const member = await claim(hh, "SomePermissions");
-    // No public action grants a single permission to a plain member — this is the direct row
-    // write the real thing would produce, same pattern as start-overview.test.ts's setCanVote.
-    await withSessionContext(hh.context, (tx) =>
-      tx.update(membership).set({ permissions: ["manage_settings"] }).where(eq(membership.accountId, member.accountId)),
-    );
 
     const tasks = await listOrganisationTasks(member.context);
     expect(tasks.map((t) => t.roomId)).not.toContain(room.id);
 
     const access = await getNavigationAccess(member.context);
-    expect(access.organisation).toBe(true);
+    expect(access.organisation).toBe(false);
   });
 
-  it("(f) a moderator (default close_round) sees the task", async () => {
+  it("(f) a moderator (default manage_rounds) sees the task", async () => {
     hh = await registerTestHousehold();
     const room = await createRoom(hh.context, "Room G", adminActor());
     await openRoom(hh, room.id);
@@ -134,7 +130,7 @@ describe("listOrganisationTasks (start-screen design.md Decision 4)", () => {
 });
 
 // Design D13 (application-capture): 03-PRD.md §4.0.1 gives the household account no rounds
-// (S-50/U-20), and close_round is not in HOUSEHOLD_PERMISSIONS, so it gets no tasks.
+// (S-50/U-20), and manage_rounds is not in HOUSEHOLD_PERMISSIONS, so it gets no tasks.
 describe("listOrganisationTasks for the household account (design D13)", () => {
   it("(g) the household account gets [] even with an open room covered by no round", async () => {
     hh = await registerTestHousehold();

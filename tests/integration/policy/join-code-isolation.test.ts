@@ -8,7 +8,7 @@ import {
   extendJoinCode,
   issueJoinCode,
   listJoinCodeIssuances,
-  ResidentListActionDeniedError,
+  PermissionDeniedError,
   setMemberRole,
 } from "@/modules/identity/repository";
 import { joinCodeIssuance } from "@/modules/identity/schema";
@@ -112,15 +112,15 @@ describe("Join code moderator boundary (FR-1.27/U-30)", () => {
     // A plain member is refused by all four actions.
     await expect(
       issueJoinCode(memberContext, memberAccountId, { validDays: 7, maxUses: 1 }),
-    ).rejects.toThrow(ResidentListActionDeniedError);
+    ).rejects.toThrow(PermissionDeniedError);
     await expect(listJoinCodeIssuances(memberContext, memberAccountId)).rejects.toThrow(
-      ResidentListActionDeniedError,
+      PermissionDeniedError,
     );
     await expect(extendJoinCode(memberContext, memberAccountId, asAdminLink.id)).rejects.toThrow(
-      ResidentListActionDeniedError,
+      PermissionDeniedError,
     );
     await expect(deleteJoinCode(memberContext, memberAccountId, asAdminLink.id)).rejects.toThrow(
-      ResidentListActionDeniedError,
+      PermissionDeniedError,
     );
   });
 
@@ -142,6 +142,6 @@ describe("Join code moderator boundary (FR-1.27/U-30)", () => {
 
     await expect(
       issueJoinCode(memberContext, hhA.accountId, { validDays: 7, maxUses: 1 }),
-    ).rejects.toThrow(ResidentListActionDeniedError);
+    ).rejects.toThrow(PermissionDeniedError);
   });
 });
