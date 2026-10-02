@@ -11,7 +11,7 @@
 //       the TypeScript layer would ever be caught (a policy-layer test alone calls through the
 //       app's own repository functions and would never notice a SECURITY DEFINER hole). A name
 //       merely MENTIONED (e.g. in a comment, a test title, a plain string, or a bare JS call that
-//       is never sent to Postgres) does not count — see stripJsComments and
+//       is never sent to Postgres) does not count — see blankComments (_shared.ts) and
 //       extractSqlTemplateContents below. "Called by name" means called from inside an actual
 //       sql`...` tagged template (PR #19 review: the old check matched `name(` anywhere in the
 //       file, so a test's own title or a JS-only call could satisfy it without ever reaching SQL).
@@ -40,6 +40,7 @@
 // now always includes trailing attributes wherever they're written — never a neighbour's.
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
+import { blankComments } from "./_shared";
 import { splitSqlStatements } from "./sql-statements";
 
 export interface DefinerViolation {
@@ -112,12 +113,9 @@ function collectDefinerFunctions(drizzleDir: string): Map<string, DefinerState> 
   return state;
 }
 
-// Strips `//` line comments and `/* */` block comments from a TypeScript source. Not a full
-// parser (same honesty tradeoff as this repo's other hand-written lints) — a `//` or `/*` inside a
-// string literal would be mishandled, but no raw-sql test file does that today.
-function stripJsComments(source: string): string {
-  return source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
-}
+// skipStringLiteral / skipNestedTemplate below walk the inside of a sql`...` template so a
+// nested string or template is not mistaken for the template's own end. They are a different job
+// from blankComments, which only clears comments before this walk starts.
 
 // PR #19 review: the old check matched `name(` anywhere in a comment-stripped raw-sql test file —
 // a test TITLE, a plain string, or a bare JS call (`covered_fn()`, never sent to Postgres) all
@@ -276,7 +274,7 @@ function rawSqlTestSources(rawSqlDir: string): string {
     return combined;
   }
   for (const file of files) {
-    const stripped = stripJsComments(readFileSync(join(rawSqlDir, file), "utf8"));
+    const stripped = blankComments(readFileSync(join(rawSqlDir, file), "utf8"));
     combined += extractSqlTemplateContents(stripped) + "\n";
   }
   return combined;

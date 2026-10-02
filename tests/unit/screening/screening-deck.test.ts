@@ -144,3 +144,16 @@ describe("RatingBar", () => {
 });
 
 // Breaks (tasks 7.7): render `points(n)` on a button; drop `aria-pressed`; drop a colour class -> each fails.
+
+// Regression (2026-10-02, swipe dead on mobile after the full-height card): each card is its own
+// scroll container, and touch-action is not inherited past one, so the card rule itself must say
+// pan-y or the browser claims the horizontal drag and cancels the pointer before a swipe can run.
+describe("deck CSS", () => {
+  it("every scrollable deck card allows only vertical panning to the browser", async () => {
+    const { readFileSync } = await import("node:fs");
+    const css = readFileSync("src/app/globals.css", "utf8");
+    const rule = css.match(/\.deck-stack > \.deck-card \{[^}]*\}/)?.[0] ?? "";
+    expect(rule).toContain("overflow-y: auto");
+    expect(rule).toMatch(/touch-action:\s*pan-y/);
+  });
+});

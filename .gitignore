@@ -53,3 +53,7 @@
 # tests/unit/lint/data-inventory.test.ts writes its fixtures into the repo root (they import
 # drizzle-orm, which a temp dir cannot resolve); afterEach removes them, this catches a killed run.
 /flatmate-data-inventory-fixture-*/
+
+# rls-coverage.test.ts imports fixture schemas from here (os.tmpdir() cannot resolve drizzle-orm).
+/tests/unit/lint/.tmp-fixtures/
+
