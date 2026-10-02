@@ -238,11 +238,14 @@ export const joinAttempt = pgTable(
   it.each(["\n", "\r\n"] as const)("passes on the repo's real schema files with %j line endings", async (eol) => {
     freshFixture();
     const modulesDir = join(process.cwd(), "src", "modules");
+    // Every file next to a schema.ts, because a schema imports its siblings (./vote-values).
     for (const mod of readdirSync(modulesDir)) {
-      const schema = join(modulesDir, mod, "schema.ts");
-      if (!existsSync(schema)) continue;
-      const normalised = readFileSync(schema, "utf8").replace(/\r?\n/g, eol);
-      writeFixture(`src/modules/${mod}/schema.ts`, normalised);
+      if (!existsSync(join(modulesDir, mod, "schema.ts"))) continue;
+      for (const name of readdirSync(join(modulesDir, mod))) {
+        if (!name.endsWith(".ts")) continue;
+        const normalised = readFileSync(join(modulesDir, mod, name), "utf8").replace(/\r?\n/g, eol);
+        writeFixture(`src/modules/${mod}/${name}`, normalised);
+      }
     }
     const predicates = join(process.cwd(), "src", "db", "rls-predicates.ts");
     writeFixture("src/db/rls-predicates.ts", readFileSync(predicates, "utf8").replace(/\r?\n/g, eol));

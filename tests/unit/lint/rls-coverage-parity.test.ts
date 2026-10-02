@@ -24,6 +24,7 @@ const AGREED = [
   { name: "room", hasHouseholdId: true, policyCount: 1 },
   { name: "round_participation", hasHouseholdId: true, policyCount: 1 },
   { name: "session", hasHouseholdId: true, policyCount: 1 },
+  { name: "vote", hasHouseholdId: true, policyCount: 4 },
 ];
 
 describe("rls-coverage schema shape agreed by the regex path and getTableConfig", () => {
