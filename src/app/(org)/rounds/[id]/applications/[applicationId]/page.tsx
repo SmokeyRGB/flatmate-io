@@ -11,6 +11,8 @@ import { getOrganisationApplication } from "@/modules/casting/repository";
 import { assertHasPermission, getHousehold, PermissionDeniedError } from "@/modules/identity/repository";
 import type { SessionContext } from "@/db/session-context";
 import { getCurrentSession } from "@/modules/identity/session-cookie";
+import { OrganisationAccessDenied } from "@/app/(org)/organisation-access-denied";
+import { requireOrganisationAccess } from "@/app/(org)/organisation-access";
 import { de } from "@/ui/strings";
 import { LinkPendingHint } from "@/ui/link-pending-hint";
 import { SavedToast } from "../../saved-toast";
@@ -50,6 +52,11 @@ export default async function ApplicationDetailPage({
     updatedParam === "1" ? de.applications.edit.updated : updatedParam === "0" ? de.applications.edit.unchanged : null;
   const current = await getCurrentSession();
   if (!current) redirect("/sign-in");
+
+  // role-permissions design D9: every page of the organisation area first checks the caller's
+  // stored permissions on this request (a demoted moderator loses the area on reload); the page's
+  // own narrower check below stays.
+  if (!(await requireOrganisationAccess(current))) return <OrganisationAccessDenied />;
 
   const back = (
     <Link href={`/rounds/${id}`} className="back-link">

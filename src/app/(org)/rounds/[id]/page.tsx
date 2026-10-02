@@ -36,6 +36,11 @@ export default async function RoundDetailPage({
   const current = await getCurrentSession();
   if (!current) redirect("/sign-in");
 
+  // Deliberately NOT behind requireOrganisationAccess (role-permissions design D9, pre-mortem H3):
+  // this is the only screen with the round's participant list, which FR-1.19 promises every
+  // participating resident ("All residents taking part in a round shall be able to see a list of
+  // the round's participants"). It is already gated by participation (getRoundForSession,
+  // getRoundParticipants) and shows organisation content only with the application permissions.
   const round = await getRoundForSession(current.context, id);
   if (!round) notFound();
 

@@ -182,6 +182,13 @@ export const de = {
     identityHousehold: (householdName: string) => `${householdName} (Verwaltung)`,
     identityHouseholdFallback: "Haushaltsverwaltung",
     identityResidentFallback: "Bewohner:in",
+    // role-permissions design D9: the one message every organisation page shows a caller whose
+    // stored permissions grant no organisation action (a plain resident, or a moderator demoted
+    // since the page was last loaded), with the way back to Start.
+    accessDenied: {
+      heading: "Organisation",
+      body: "Dieser Bereich ist für Verwaltung und Moderation.",
+    },
     dashboard: {
       heading: "Organisation",
       activeRoundEyebrow: "Aktuelle Runde",

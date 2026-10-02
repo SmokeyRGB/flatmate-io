@@ -10,6 +10,8 @@ import {
 import { getCurrentSession } from "@/modules/identity/session-cookie";
 import { de } from "@/ui/strings";
 import { LinkPendingHint } from "@/ui/link-pending-hint";
+import { OrganisationAccessDenied } from "../organisation-access-denied";
+import { requireOrganisationAccess } from "../organisation-access";
 
 const t = de.org.dashboard;
 
@@ -24,23 +26,25 @@ export default async function OrganizationPage() {
   const current = await getCurrentSession();
   if (!current) redirect("/sign-in");
 
+  // role-permissions design D9: every page of the organisation area checks the caller's stored
+  // permissions on this request, so a demoted moderator sees the access message on reload.
+  if (!(await requireOrganisationAccess(current))) return <OrganisationAccessDenied />;
+
   const rounds = await listRoundsForSession(current.context);
   const [active, ...rest] = rounds;
 
-  // FR-1.27: the Members link is only useful to administration/moderator — a plain resident
-  // following it would hit a refusal (now handled gracefully on that page, but there's no reason
-  // to lead them there in the first place). start-screen tasks.md 3.3: the resident branch of
-  // this rule now goes through getNavigationAccess, so the avatar menu and this page cannot
-  // disagree about who sees the members link.
-  const canSeeMembersList =
-    current.context.profileId === null || (await getNavigationAccess(current.context)).membersList;
+  // Every link is offered by the caller's stored permissions (design D9): rooms by manage_rooms,
+  // members by any member-administration permission, settings by manage_voting_procedure. One read
+  // through getNavigationAccess, so the avatar menu and this page cannot disagree. The household
+  // account's old `profileId === null` shortcut is gone: it holds these permissions or it does not.
+  const access = await getNavigationAccess(current.context);
 
   // Design D13 (application-capture): the household account runs no rounds (03-PRD.md §4.0.1,
-  // S-50/U-20), and neither does anyone without close_round. The way to open one is offered only to
+  // S-50/U-20), and neither does anyone without manage_rounds. The way to open one is offered only to
   // a session that holds it, checked the way rounds/new's own page does.
   let canOpenRound = false;
   try {
-    await assertHasPermission(current.context, current.context.accountId, "close_round");
+    await assertHasPermission(current.context, current.context.accountId, "manage_rounds");
     canOpenRound = true;
   } catch (err) {
     if (!(err instanceof PermissionDeniedError)) throw err;
@@ -113,20 +117,24 @@ export default async function OrganizationPage() {
       )}
 
       <div className="flex flex-wrap gap-4 border-t border-border pt-4 text-sm">
-        <Link href="/rooms" className="btn-link">
-          {t.roomsLink}
-          <LinkPendingHint />
-        </Link>
-        {canSeeMembersList && (
+        {access.rooms && (
+          <Link href="/rooms" className="btn-link">
+            {t.roomsLink}
+            <LinkPendingHint />
+          </Link>
+        )}
+        {access.membersList && (
           <Link href="/members" className="btn-link">
             {t.membersLink}
             <LinkPendingHint />
           </Link>
         )}
-        <Link href="/settings" className="btn-link">
-          {t.settingsLink}
-          <LinkPendingHint />
-        </Link>
+        {access.settings && (
+          <Link href="/settings" className="btn-link">
+            {t.settingsLink}
+            <LinkPendingHint />
+          </Link>
+        )}
         {current.context.profileId !== null && (
           <Link href="/who-lives-here" className="btn-link">
             {t.whoLivesHereLink}

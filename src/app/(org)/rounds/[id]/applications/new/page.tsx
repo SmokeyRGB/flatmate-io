@@ -9,6 +9,8 @@ import {
   PermissionDeniedError,
 } from "@/modules/identity/repository";
 import { getCurrentSession } from "@/modules/identity/session-cookie";
+import { OrganisationAccessDenied } from "@/app/(org)/organisation-access-denied";
+import { requireOrganisationAccess } from "@/app/(org)/organisation-access";
 import { de } from "@/ui/strings";
 import { LinkPendingHint } from "@/ui/link-pending-hint";
 import { CaptureForm } from "./capture-form";
@@ -25,6 +27,11 @@ export default async function CaptureApplicationPage({ params }: { params: Promi
   const { id } = await params;
   const current = await getCurrentSession();
   if (!current) redirect("/sign-in");
+
+  // role-permissions design D9: every page of the organisation area first checks the caller's
+  // stored permissions on this request (a demoted moderator loses the area on reload); the page's
+  // own narrower check below stays.
+  if (!(await requireOrganisationAccess(current))) return <OrganisationAccessDenied />;
 
   const round = await getRoundForSession(current.context, id);
   if (!round) notFound();

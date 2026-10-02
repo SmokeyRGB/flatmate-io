@@ -21,8 +21,9 @@ export interface RemoveMemberFormState {
   error: string | null;
 }
 
-// FR-1.3/FR-1.5: the household account creates a resident profile (including one for the person
-// operating it). The person then claims it by opening an invitation issued **for that profile**
+// FR-1.3/FR-1.5 (amended 2026-10-01): the household account or a moderator creates a resident
+// profile (including one for the person operating it); authorized by `create_resident_profile` in
+// the repository. The person then claims it by opening an invitation issued **for that profile**
 // (join-by-link design.md Decision 13) — `/claim` is deleted, and a link is now the only route to
 // a prepared profile. A duplicate display name (FR-1.4) surfaces via Next's error boundary, same as
 // every other unhandled repository error this form's siblings (setMovedOutAction etc.) leave
@@ -91,8 +92,9 @@ export async function reactivateMemberAction(formData: FormData): Promise<void> 
   revalidatePath("/members");
 }
 
-// EC-1.7 (Convergence): the "appoint it moderator" action — administration-only, toggles
-// member <-> moderator.
+// EC-1.7 (Convergence): the "appoint it moderator" action — authorized by the stored
+// permission `appoint_moderator` in the repository (the household account or a moderator, since
+// 2026-10-01); toggles member <-> moderator.
 export async function setMemberRoleAction(formData: FormData): Promise<void> {
   const current = await getCurrentSession();
   if (!current) throw new Error("Not signed in");
@@ -104,9 +106,9 @@ export async function setMemberRoleAction(formData: FormData): Promise<void> {
 }
 
 // design.md Decision 6: the create form parameterises the NEXT link, not an existing one — two
-// fields, one action. No permission check here (task 3.2) — assertIsAdministrationOrModerator
-// lives in the repository (2.3), the one place FR-1.27's "not reachable at all" boundary is
-// enforced.
+// fields, one action. No permission check here (task 3.2) — `manage_join_codes` is checked
+// inside issueJoinCode's own transaction, the one place FR-1.27's "not reachable at all" boundary
+// is enforced.
 export async function issueJoinCodeAction(formData: FormData): Promise<void> {
   const current = await getCurrentSession();
   if (!current) throw new Error("Not signed in");
@@ -125,7 +127,7 @@ export async function issueJoinCodeAction(formData: FormData): Promise<void> {
 
 // join-by-link design.md Decision 13 / task 12.8: the one place a bound link is issued — without
 // this action the feature is unreachable outside tests. No permission check here (same as
-// issueJoinCodeAction above): assertIsAdministrationOrModerator lives in issueJoinCode itself
+// issueJoinCodeAction above): `manage_join_codes` is checked inside issueJoinCode itself
 // (issueJoinCodeTx also verifies the named profile belongs to THIS household and is `prepared`
 // before it ever writes a row). Always 7 days / effectively single-use — issueJoinCodeTx forces
 // maxUses to 1 for a bound link regardless of what is passed, so there is no maxUses field on this
@@ -144,8 +146,9 @@ export async function issueJoinCodeForProfileAction(formData: FormData): Promise
   revalidatePath("/members");
 }
 
-// identity/password-reset (O-16, human decision 2026-09-24): household sessions only —
-// issuePasswordResetLink itself refuses a moderator (assertIsAdministration). Errors surface via
+// identity/password-reset (O-16, human decision 2026-09-24): only a caller holding
+// `issue_password_reset_link` (the household account) —
+// issuePasswordResetLink itself refuses everyone else. Errors surface via
 // Next's default error boundary, same convention as createResidentProfileAction's own
 // duplicate-name case: not worth a client-component reducer for one message.
 export async function issuePasswordResetLinkAction(formData: FormData): Promise<void> {
