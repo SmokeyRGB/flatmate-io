@@ -16,6 +16,7 @@ import {
   updateHouseholdSettingsWithProcedureLock,
 } from "@/modules/casting/repository";
 import { castingRound, room, roundParticipation } from "@/modules/casting/schema";
+import { castVote } from "@/modules/deliberation/repository";
 import {
   createResidentProfile,
   getHouseholdSettings,
@@ -33,6 +34,8 @@ import {
   registerTestHousehold,
   type TestHousehold,
 } from "../../helpers/identity";
+import { insertApplicationAt } from "../../helpers/pipeline";
+import { readVotes } from "../../helpers/votes";
 
 // The tx type withSessionContext's callback receives.
 type Tx = Parameters<Parameters<typeof withSessionContext>[1]>[0];
@@ -604,5 +607,68 @@ describe("Casting lock order", () => {
     expect(after[0]?.id).toBe(before[0]?.id);
     expect(eventsAfter).toHaveLength(eventsBefore.length);
     expect(eventsAfter).toHaveLength(0);
+  });
+
+  // Members UI "moved out" is setMovedOutAction, which calls setMovedOut. removeMember is final
+  // and cannot be reactivated. Move-out does not write round_participation.removed_at (human
+  // decision 2026-09-22, comment above getRoundParticipants). Reactivation's INSERT then hits
+  // ON CONFLICT DO NOTHING on the live snapshot row, so the participation is not replaced.
+  it("a mistaken move-out and reactivation keeps the snapshot participation", async () => {
+    const { household, actor, moderator, modActor, round } = await draftRound();
+    const profile = await createResidentProfile(
+      household.context,
+      `Keep ${randomUUID().slice(0, 8)}`,
+      actor,
+    );
+    const { accountId } = await claimResidentProfile(
+      household.context,
+      profile.id,
+      "test-password-not-real-1234",
+    );
+    extraAccountIds.push(accountId);
+    await openRound(moderator.context, round.id, modActor);
+
+    const before = await liveRowsFor(household, round.id, profile.id);
+    expect(before).toHaveLength(1);
+    expect(before[0]?.source).toBe("snapshot_at_open");
+    const participationId = before[0]?.id;
+    const canVoteBefore = before[0]?.canVote;
+
+    const application = await insertApplicationAt(
+      { hh: household, moderator, roundId: round.id },
+      "new",
+    );
+    const residentContext = {
+      accountId,
+      householdId: household.householdId,
+      profileId: profile.id,
+    };
+    await castVote(residentContext, {
+      roundId: round.id,
+      applicationId: application.id,
+      value: "good",
+    });
+    const votesBefore = await readVotes(residentContext, application.id);
+    expect(votesBefore).toHaveLength(1);
+
+    await setMovedOut(household.context, household.accountId, accountId);
+    await reactivateMember(household.context, household.accountId, accountId);
+
+    const after = await liveRowsFor(household, round.id, profile.id);
+    expect(after).toHaveLength(1);
+    expect(after[0]?.id).toBe(participationId);
+    expect(after[0]?.source).toBe("snapshot_at_open");
+    expect(after[0]?.canVote).toBe(canVoteBefore);
+    expect(after[0]?.removedAt).toBeNull();
+    const events = await participantAddedFor(household, profile.id);
+    expect(events).toHaveLength(0);
+
+    const votesAfter = await readVotes(residentContext, application.id);
+    expect(votesAfter).toHaveLength(1);
+    expect(votesAfter[0]?.id).toBe(votesBefore[0]?.id);
+    expect(votesAfter[0]?.value).toBe("good");
+    expect(votesAfter[0]?.withdrawnAt).toBeNull();
+    expect(votesAfter[0]?.createdAt.getTime()).toBe(votesBefore[0]?.createdAt.getTime());
+    expect(votesAfter[0]?.updatedAt.getTime()).toBe(votesBefore[0]?.updatedAt.getTime());
   });
 });
