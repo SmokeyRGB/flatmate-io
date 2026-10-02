@@ -145,7 +145,7 @@ Given a round with no applications, when I open the pipeline, then a message sta
 Given a round with three applications, when I delete one, then the other two and the round are unchanged.
 
 **AC-3.16 — Deletion removes the votes with it** *(forward contract to F4, 2026-09-28)*
-Given an application carrying four votes, when I delete it, then those four votes no longer exist and no other application's votes are affected. **`Vote` is F4's table, so this criterion is tested in F4**, the moment `vote` exists; F3 makes it impossible to forget through the check of FR-3.18. The same precedent as C-2.12 in F2.
+Given an application carrying four votes, when I delete it, then those four votes no longer exist and no other application's votes are affected. **`Vote` is F4's table, but the criterion is tested with F3 change 4's `deleteApplication`** (V1.1 of F4: `vote` exists since F4 change 1), and the check of FR-3.18 makes it impossible to forget. The same precedent as C-2.12 in F2. Lock order: `deleteApplication` locks the application `FOR UPDATE` first, then deletes its votes; a vote `UPDATE` path reads the application `FOR SHARE` before the vote row. The reverse order deadlocks against a vote in flight.
 
 **AC-3.17 — Deletion is confirmed**
 Given I trigger deletion, when the confirmation appears, then it names the applicant, and cancelling leaves the application intact.

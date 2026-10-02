@@ -12,3 +12,8 @@ import { sql } from "drizzle-orm";
 // Imports only drizzle-orm's `sql`, never ./client: schema files load this under drizzle-kit,
 // which must not open a database connection.
 export const PROFILE_PRESENT = sql`(select nullif(current_setting('app.profile_id', true), '')) IS NOT NULL`;
+
+// `resident_profile_id` is the profile acting in this session. Same `nullif` and the same
+// (select ...) wrapping as PROFILE_PRESENT above: an unset or '' setting yields NULL, the
+// comparison is then NULL, and the policy fails closed.
+export const OWN_PROFILE = sql`resident_profile_id = (select nullif(current_setting('app.profile_id', true), '')::uuid)`;

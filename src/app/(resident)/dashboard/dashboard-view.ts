@@ -62,23 +62,30 @@ function reasonForRound(round: StartOpenRound, now: Date): string {
   return de.start.reasonDated(formatGermanDate(round.phaseDeadlineAt));
 }
 
-function taskViewFor(round: StartOpenRound, now: Date): DashboardTaskView {
+// The count comes from deliberation's getAwaitingVoteCounts (F4 change 1, D3), passed in as a map
+// keyed by round; a round missing from it counts 0. Each round's task leads to that round's pass.
+export type AwaitingVotes = ReadonlyMap<string, number>;
+
+function taskViewFor(round: StartOpenRound, awaitingVotes: AwaitingVotes, now: Date): DashboardTaskView {
   return {
-    heading: de.start.voteTaskHeading(round.voteCount),
+    heading: de.start.voteTaskHeading(awaitingVotes.get(round.roundId) ?? 0),
     reason: reasonForRound(round, now),
-    href: "/casting/screening",
+    href: `/casting/screening?round=${round.roundId}`,
   };
 }
 
 export function buildDashboardView(
   overview: StartOverview | null,
+  awaitingVotes: AwaitingVotes,
   organisationTaskCount: number,
   access: { organisation: boolean },
   now: Date,
 ): DashboardView {
   // v0.1's only task type is T-5 (a vote task) — one per open round with a positive count and the
   // right to vote (EC-2.12: no vote task without can_vote).
-  const eligibleRounds = (overview?.openRounds ?? []).filter((r) => r.canVote && r.voteCount > 0);
+  const eligibleRounds = (overview?.openRounds ?? []).filter(
+    (r) => r.canVote && (awaitingVotes.get(r.roundId) ?? 0) > 0,
+  );
   const byRoundId = new Map(eligibleRounds.map((r) => [r.roundId, r]));
   const openTasks: OpenTask[] = eligibleRounds.map((r) => ({
     type: "T5",
@@ -90,10 +97,12 @@ export function buildDashboardView(
   const primaryTask = ordered[0] ?? null;
   const rowTasks = ordered.slice(1, 4);
   const folded = Math.max(0, ordered.length - 4);
-  const foldedTasks = ordered.slice(4).map((t) => taskViewFor(byRoundId.get(t.key) as StartOpenRound, now));
+  const foldedTasks = ordered.slice(4).map((t) => taskViewFor(byRoundId.get(t.key) as StartOpenRound, awaitingVotes, now));
 
-  const primary = primaryTask ? taskViewFor(byRoundId.get(primaryTask.key) as StartOpenRound, now) : null;
-  const rows = rowTasks.map((t) => taskViewFor(byRoundId.get(t.key) as StartOpenRound, now));
+  const primary = primaryTask
+    ? taskViewFor(byRoundId.get(primaryTask.key) as StartOpenRound, awaitingVotes, now)
+    : null;
+  const rows = rowTasks.map((t) => taskViewFor(byRoundId.get(t.key) as StartOpenRound, awaitingVotes, now));
 
   // design.md Decision 10: the primary card's place is taken by the standing card when there is
   // no primary — never both, never neither (spec "never a blank surface").
@@ -135,15 +144,14 @@ export function buildDashboardView(
 
 // tasks.md 8.1/8.3: the Casting tab redirects straight to screening when the viewer has anything
 // awaiting their vote in any open round — the same "eligible" test buildDashboardView uses for T-5.
-export function shouldOpenScreening(overview: StartOverview | null): boolean {
-  return pendingVoteCount(overview) > 0;
+export function shouldOpenScreening(overview: StartOverview | null, awaitingVotes: AwaitingVotes): boolean {
+  return pendingVoteCount(overview, awaitingVotes) > 0;
 }
 
 // The one definition of "applications awaiting this viewer's vote", summed over every open round
-// they may vote in: the Casting redirect and the screening placeholder's count both read it, so
-// F4 changes the rule in one place.
-export function pendingVoteCount(overview: StartOverview | null): number {
+// they may vote in. The counts are deliberation's (one definition, shared with the deck).
+export function pendingVoteCount(overview: StartOverview | null, awaitingVotes: AwaitingVotes): number {
   return (overview?.openRounds ?? [])
     .filter((r) => r.canVote)
-    .reduce((sum, r) => sum + r.voteCount, 0);
+    .reduce((sum, r) => sum + (awaitingVotes.get(r.roundId) ?? 0), 0);
 }
