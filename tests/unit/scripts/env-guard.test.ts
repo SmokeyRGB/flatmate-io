@@ -1,9 +1,13 @@
 import { Buffer } from "node:buffer";
 import { describe, expect, it } from "vitest";
-import { assertSafeSupabaseEnv, checkSupabaseEnv } from "../../../scripts/env-guard";
+import {
+  assertSafeSupabaseEnv,
+  checkSupabaseEnv,
+  DEFAULT_ALLOWED_SUPABASE_REFS,
+} from "../../../scripts/env-guard";
 
 const DEV_REF = "jrhkhjeybtkqpkggssif";
-const PROD_REF = "cjinhzzvjryojvhngjjn";
+const DENIED_REF = "notaproductionrefaa";
 const UNKNOWN_REF = "aaaaaaaaaaaaaaaaaaaa";
 const OTHER_REF = "bbbbbbbbbbbbbbbbbbbb";
 const FIXTURE_PASSWORD = "fixture-password-do-not-leak";
@@ -85,8 +89,8 @@ describe("Supabase environment guard", () => {
     expectOk(hosted());
   });
 
-  it("case 2 refuses the production ref in DATABASE_URL only", () => {
-    const env = hosted({ DATABASE_URL: poolerUrl(PROD_REF) });
+  it("case 2 refuses a non-allowlisted ref in DATABASE_URL only", () => {
+    const env = hosted({ DATABASE_URL: poolerUrl(DENIED_REF) });
     expectRefusal(env, ["DATABASE_URL"]);
     const result = checkSupabaseEnv(env);
     expect(result).toEqual({
@@ -95,14 +99,14 @@ describe("Supabase environment guard", () => {
         {
           variable: "DATABASE_URL",
           reason: "is not an allowlisted project ref",
-          foundRef: PROD_REF,
+          foundRef: DENIED_REF,
         },
       ],
     });
   });
 
-  it("case 2 refuses the production ref in NEXT_PUBLIC_SUPABASE_URL only", () => {
-    const env = hosted({ NEXT_PUBLIC_SUPABASE_URL: apiUrl(PROD_REF) });
+  it("case 2 refuses a non-allowlisted ref in NEXT_PUBLIC_SUPABASE_URL only", () => {
+    const env = hosted({ NEXT_PUBLIC_SUPABASE_URL: apiUrl(DENIED_REF) });
     expectRefusal(env, ["NEXT_PUBLIC_SUPABASE_URL"]);
     expect(checkSupabaseEnv(env)).toEqual({
       ok: false,
@@ -110,15 +114,15 @@ describe("Supabase environment guard", () => {
         {
           variable: "NEXT_PUBLIC_SUPABASE_URL",
           reason: "is not an allowlisted project ref",
-          foundRef: PROD_REF,
+          foundRef: DENIED_REF,
         },
       ],
     });
   });
 
-  it("case 2 refuses the production ref when it appears only in the service-role JWT", () => {
+  it("case 2 refuses a non-allowlisted ref when it appears only in the service-role JWT", () => {
     const env = hosted({
-      SUPABASE_SERVICE_ROLE_KEY: fakeJwt({ ref: PROD_REF, role: "service_role" }).token,
+      SUPABASE_SERVICE_ROLE_KEY: fakeJwt({ ref: DENIED_REF, role: "service_role" }).token,
     });
     expectRefusal(env, ["SUPABASE_SERVICE_ROLE_KEY"]);
     expect(checkSupabaseEnv(env)).toEqual({
@@ -127,7 +131,7 @@ describe("Supabase environment guard", () => {
         {
           variable: "SUPABASE_SERVICE_ROLE_KEY",
           reason: "JWT project ref is not allowlisted",
-          foundRef: PROD_REF,
+          foundRef: DENIED_REF,
         },
       ],
     });
@@ -244,7 +248,7 @@ describe("Supabase environment guard", () => {
       ["DATABASE_URL", "NEXT_PUBLIC_SUPABASE_URL"],
     );
 
-    for (const foreign of [PROD_REF, UNKNOWN_REF]) {
+    for (const foreign of [DENIED_REF, UNKNOWN_REF]) {
       expectRefusal(
         loopback({
           SUPABASE_SERVICE_ROLE_KEY: fakeJwt({ ref: foreign, role: "service_role" }).token,
@@ -252,6 +256,10 @@ describe("Supabase environment guard", () => {
         ["SUPABASE_SERVICE_ROLE_KEY"],
       );
     }
+  });
+
+  it("the default allowlist is exactly the dev ref", () => {
+    expect([...DEFAULT_ALLOWED_SUPABASE_REFS]).toEqual([DEV_REF]);
   });
 
   it("case 8 lets ALLOWED_SUPABASE_REFS add a ref, and an empty value keeps the dev default", () => {
@@ -318,9 +326,9 @@ describe("Supabase environment guard", () => {
   });
 
   it("case 10 keeps the password and every JWT segment out of the error text", () => {
-    const jwt = fakeJwt({ ref: PROD_REF, role: "service_role" });
+    const jwt = fakeJwt({ ref: DENIED_REF, role: "service_role" });
     const env = hosted({
-      DATABASE_URL: poolerUrl(PROD_REF),
+      DATABASE_URL: poolerUrl(DENIED_REF),
       SUPABASE_SERVICE_ROLE_KEY: jwt.token,
     });
     expectRefusal(env, ["DATABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"]);
