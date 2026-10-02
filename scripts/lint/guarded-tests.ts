@@ -4,6 +4,7 @@
 // Promotes T040's one-off manual grep into a persisted, re-runnable check.
 import { readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
+import { blankComments } from "./_shared";
 
 export interface GuardedTestViolation {
   file: string;
@@ -45,15 +46,12 @@ export function checkGuardedTests(rootDir: string): GuardedTestViolation[] {
     }
 
     const content = readFileSync(fullPath, "utf8");
-    // Strip `//` line comments before testing — otherwise a commented-out `it(...)` reads as a
-    // real test body, and a comment mentioning ".skip(" as prose would false-positive.
-    // Split on CRLF too: with core.autocrlf the Windows checkout is CRLF, and a trailing \r
-    // makes `$` (no `m` flag) miss, so nothing was stripped on the author's machine.
-    // A `.skip(` inside a string literal is still visible here and is still a violation.
-    const uncommented = content
-      .split(/\r?\n/)
-      .map((line) => line.replace(/\/\/.*$/, ""))
-      .join("\n");
+    // Blank `//` and `/* … */` before testing. A registered file whose only `it(` / `test(`
+    // sits inside a block comment would otherwise count as a real body. A `.skip(` inside a
+    // block comment is a comment, not a skip. blankComments keeps string and template text,
+    // so a `.skip(` inside a string literal is still visible and is still a violation.
+    // It is not a full parser; the limits are in scripts/lint/_shared.ts.
+    const uncommented = blankComments(content);
 
     if (/\.(skip|only|skipIf|runIf|todo)\s*\(|\b(xit|xtest|xdescribe)\s*\(/.test(uncommented)) {
       violations.push({

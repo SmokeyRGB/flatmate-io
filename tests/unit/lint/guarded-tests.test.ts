@@ -135,3 +135,42 @@ describe("guarded-tests check — skip spellings", () => {
     expect(violations.some((v) => v.file === "tests/pool-reuse.test.ts")).toBe(true);
   });
 });
+
+describe("guarded-tests check — block comments", () => {
+  it.each(["\n", "\r\n"] as const)(
+    "treats a test that exists only inside a one-line block comment as no body under %j",
+    (eol) => {
+      registerBoth(`/* it("leaks", () => {}); */\n`, eol);
+
+      const violations = checkGuardedTests(fixtureDir);
+      expect(
+        violations.some(
+          (v) => v.file === "tests/pool-reuse.test.ts" && v.reason.includes("no it(/test( body"),
+        ),
+      ).toBe(true);
+    },
+  );
+
+  it.each(["\n", "\r\n"] as const)(
+    "treats a test that exists only inside a multi-line block comment as no body under %j",
+    (eol) => {
+      registerBoth(`/*\nit("leaks", () => {});\n*/\n`, eol);
+
+      const violations = checkGuardedTests(fixtureDir);
+      expect(
+        violations.some(
+          (v) => v.file === "tests/pool-reuse.test.ts" && v.reason.includes("no it(/test( body"),
+        ),
+      ).toBe(true);
+    },
+  );
+
+  it.each(["\n", "\r\n"] as const)(
+    "ignores .skip( inside a block comment when the file has a real body under %j",
+    (eol) => {
+      registerBoth(`it("ok", () => {});\n/* it.skip( */\n`, eol);
+
+      expect(checkGuardedTests(fixtureDir)).toHaveLength(0);
+    },
+  );
+});
