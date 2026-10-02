@@ -20,7 +20,7 @@ import {
 // casting/identity repository.ts exports for M6's authorization matrix:
 //   1. revokeSession accepted ANY sessionId under RLS's household-only scoping — no check that it
 //      belonged to the caller's own account.
-//   2. createResidentProfile's `if (actor.accountId)` skipped assertIsAdministration entirely for
+//   2. createResidentProfile's `if (actor.accountId)` skipped its administration check entirely for
 //      a null accountId, instead of refusing.
 //   3. transitionResidentProfileStatus had no authorization check anywhere in its call chain.
 // transitionApplication (casting/repository.ts) was the one gap NOT fixed here — no authorization
