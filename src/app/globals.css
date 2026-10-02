@@ -752,11 +752,15 @@ h3 {
     --drag: 0px;
     --tilt: 0deg;
   }
+  /* Each card is its own scroll container, and touch-action is not inherited: the browser combines
+     it only from the touched element up to the nearest scroll container, i.e. the card itself. Without
+     pan-y HERE the browser claims a horizontal drag and cancels the pointer, so the swipe never runs. */
   .deck-stack > .deck-card {
     grid-area: 1 / 1;
     min-height: 0;
     overflow-y: auto;
     overscroll-behavior: contain;
+    touch-action: pan-y;
     transition:
       transform 240ms ease,
       opacity 240ms ease;
