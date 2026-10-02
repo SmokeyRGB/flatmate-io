@@ -732,6 +732,9 @@ const LOCKED_ROOM_STATUSES: ReadonlySet<RoomStatus> = new Set(["occupied", "not_
 // because the settings writer has no round id and locks the household's single settings row;
 // rooms come after the round because this function learns the covered ids from the locked round,
 // and removeRoom locks the room before it reads rounds.
+// The eligibility read below stays unlocked. auto_join_open_rounds (drizzle/0031) runs inside
+// the membership INSERT, which already holds that new row, and takes casting_round FOR SHARE.
+// Locking membership rows after this round lock would deadlock with a late joiner.
 async function openRoundTx(tx: Tx, context: SessionContext, roundId: string, actor: Actor) {
   const [settings] = await tx
     .select()

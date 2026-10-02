@@ -1,7 +1,9 @@
-import { and, eq, sql } from "drizzle-orm";
+import { randomUUID } from "node:crypto";
+import { and, eq, isNull, sql } from "drizzle-orm";
 import { afterEach, describe, expect, it } from "vitest";
 import { withSessionContext, type SessionContext } from "@/db/session-context";
 import { activityEvent } from "@/modules/audit/schema";
+import { joinHousehold } from "@/modules/identity/auth";
 import {
   createRoom,
   createRound,
@@ -14,9 +16,15 @@ import {
   updateHouseholdSettingsWithProcedureLock,
 } from "@/modules/casting/repository";
 import { castingRound, room, roundParticipation } from "@/modules/casting/schema";
-import { getHouseholdSettings, PermissionDeniedError } from "@/modules/identity/repository";
+import { getHouseholdSettings, issueJoinCode, PermissionDeniedError } from "@/modules/identity/repository";
 import { householdSettings, membership } from "@/modules/identity/schema";
-import { createTestModerator, registerTestHousehold, type TestHousehold } from "../../helpers/identity";
+import {
+  cleanupAll,
+  createTestModerator,
+  deleteTestAccount,
+  registerTestHousehold,
+  type TestHousehold,
+} from "../../helpers/identity";
 
 // The tx type withSessionContext's callback receives.
 type Tx = Parameters<Parameters<typeof withSessionContext>[1]>[0];
@@ -64,9 +72,12 @@ function sleep(ms: number): Promise<void> {
 }
 
 let hh: TestHousehold | undefined;
+let joinerAccountId: string | undefined;
 
 afterEach(async () => {
-  await hh?.cleanup();
+  const joiner = joinerAccountId;
+  await cleanupAll(joiner ? deleteTestAccount(joiner) : undefined, hh?.cleanup());
+  joinerAccountId = undefined;
   hh = undefined;
 });
 
@@ -349,4 +360,84 @@ describe("Casting lock order", () => {
     }
     expect(openerWon || writerWon).toBe(true);
   });
+
+  // The stand-in is openRoundTx after its unlocked eligibility read: settings FOR SHARE,
+  // the round FOR UPDATE, status written to open, and the existing resident already
+  // snapshotted — none of it committed. joinHousehold's membership INSERT fires
+  // auto_join_open_rounds. The trigger has to wait on that round lock; releasing at a
+  // fixed 1500ms is too early, because the join talks to the auth provider before the
+  // insert. Poll until the join settles or 20s passes (dev statement_timeout is 120s).
+  it(
+    "a late joiner waits for an opening round and is added with source joined_after_open",
+    async () => {
+      const { household, moderator, round } = await draftRound();
+      const link = await issueJoinCode(household.context, household.accountId, { validDays: 7, maxUses: 1 });
+      const hold = holdOpen(household.context, async (tx) => {
+        await tx
+          .select()
+          .from(householdSettings)
+          .where(eq(householdSettings.householdId, household.householdId))
+          .for("share");
+        await tx.select().from(castingRound).where(eq(castingRound.id, round.id)).for("update");
+        await tx
+          .update(castingRound)
+          .set({ status: "open", openedAt: sql`now()` })
+          .where(eq(castingRound.id, round.id));
+        await tx.insert(roundParticipation).values({
+          roundId: round.id,
+          householdId: household.householdId,
+          residentProfileId: moderator.profileId,
+          source: "snapshot_at_open",
+          canVote: true,
+        });
+      });
+      await untilHeld(hold);
+
+      let settled = false;
+      const real = joinHousehold(link.code, {
+        displayName: `Late ${randomUUID().slice(0, 8)}`,
+        password: "test-password-not-real-1234",
+      }).finally(() => {
+        settled = true;
+      });
+      const deadline = Date.now() + 20_000;
+      while (!settled && Date.now() < deadline) {
+        await sleep(250);
+      }
+      const settledBeforeRelease = settled;
+      hold.release();
+      await hold.done;
+      const result = await real;
+      joinerAccountId = result.context.accountId;
+      const joinerProfileId = result.context.profileId;
+      expect(typeof joinerProfileId).toBe("string");
+      if (typeof joinerProfileId !== "string") return;
+
+      const [roundAfter] = await withSessionContext(household.context, (tx) =>
+        tx.select().from(castingRound).where(eq(castingRound.id, round.id)),
+      );
+      const joinerRows = await withSessionContext(household.context, (tx) =>
+        tx
+          .select()
+          .from(roundParticipation)
+          .where(
+            and(
+              eq(roundParticipation.roundId, round.id),
+              eq(roundParticipation.residentProfileId, joinerProfileId),
+              isNull(roundParticipation.removedAt),
+            ),
+          ),
+      );
+
+      expect(
+        settledBeforeRelease,
+        `joinerLiveRows=${joinerRows.length} roundStatus=${roundAfter?.status ?? "missing"}`,
+      ).toBe(false);
+      expect(roundAfter?.status).toBe("open");
+      expect(joinerRows).toHaveLength(1);
+      expect(joinerRows[0]?.source).toBe("joined_after_open");
+      expect(joinerRows[0]?.canVote).toBe(true);
+    },
+    90_000,
+  );
 });
