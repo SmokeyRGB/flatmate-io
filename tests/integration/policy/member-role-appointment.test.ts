@@ -1,4 +1,7 @@
+import { and, eq } from "drizzle-orm";
 import { afterEach, describe, expect, it } from "vitest";
+import { withSessionContext } from "@/db/session-context";
+import { activityEvent } from "@/modules/audit/schema";
 import { claimResidentProfile } from "@/modules/identity/auth";
 import {
   CannotChangeAdminRoleError,
@@ -8,6 +11,7 @@ import {
 } from "@/modules/identity/repository";
 import {
   cleanupAll,
+  createTestModerator,
   deleteTestAccount,
   registerTestHousehold,
   type TestHousehold,
@@ -66,5 +70,68 @@ describe("Moderator appointment (EC-1.7)", () => {
     await expect(
       setMemberRole(hh.context, hh.accountId, hh.accountId, "moderator"),
     ).rejects.toThrow(CannotChangeAdminRoleError);
+  });
+});
+
+// F3 change 2b (human decision, 2026-10-01): appointing and demoting moderators belongs to the
+// moderator as well (`appoint_moderator`, matrix row „Moderator ernennen / zurückstufen"); the
+// administering membership is never a target; a no-op writes no event.
+describe("Moderator appointment by a moderator (appoint_moderator)", () => {
+  async function roleEvents(household: TestHousehold, subjectId: string) {
+    return withSessionContext(household.context, (tx) =>
+      tx
+        .select()
+        .from(activityEvent)
+        .where(and(eq(activityEvent.subjectId, subjectId), eq(activityEvent.eventType, "membership.role_changed"))),
+    );
+  }
+
+  it("a moderator may appoint a member, demote another moderator, and demote itself", async () => {
+    hh = await registerTestHousehold();
+    const moderator = await createTestModerator(hh, "Moderator1");
+    memberAccountId = moderator.accountId;
+    const actor = { accountId: hh.accountId, profileId: null };
+    const profile = await createResidentProfile(hh.context, "Appointee", actor);
+    const claimed = await claimResidentProfile(hh.context, profile.id, "test-password-not-real-1234");
+    accountId = claimed.accountId;
+
+    await setMemberRole(moderator.context, moderator.accountId, claimed.accountId, "moderator");
+    await setMemberRole(moderator.context, moderator.accountId, claimed.accountId, "member");
+    // the moderator demotes itself; the household account can always appoint again (EC-1.7)
+    await setMemberRole(moderator.context, moderator.accountId, moderator.accountId, "member");
+    await expect(
+      setMemberRole(moderator.context, moderator.accountId, claimed.accountId, "moderator"),
+    ).rejects.toThrow(PermissionDeniedError);
+    await expect(setMemberRole(hh.context, hh.accountId, moderator.accountId, "moderator")).resolves.toBeUndefined();
+  });
+
+  it("a moderator and the household account are both refused when the target is the administering membership", async () => {
+    hh = await registerTestHousehold();
+    const moderator = await createTestModerator(hh, "Moderator2");
+    memberAccountId = moderator.accountId;
+
+    await expect(
+      setMemberRole(moderator.context, moderator.accountId, hh.accountId, "member"),
+    ).rejects.toThrow(CannotChangeAdminRoleError);
+    await expect(setMemberRole(hh.context, hh.accountId, hh.accountId, "moderator")).rejects.toThrow(
+      CannotChangeAdminRoleError,
+    );
+  });
+
+  it("a no-op (member to member) writes no role_changed event", async () => {
+    hh = await registerTestHousehold();
+    const actor = { accountId: hh.accountId, profileId: null };
+    const profile = await createResidentProfile(hh.context, "Resident1", actor);
+    const claimed = await claimResidentProfile(hh.context, profile.id, "test-password-not-real-1234");
+    accountId = claimed.accountId;
+    const [membershipRow] = await withSessionContext(hh.context, (tx) =>
+      tx.execute<{ id: string }>(`select id from membership where account_id = '${claimed.accountId}'::uuid`),
+    );
+
+    await setMemberRole(hh.context, hh.accountId, claimed.accountId, "member");
+    expect(await roleEvents(hh, membershipRow.id)).toHaveLength(0);
+
+    await setMemberRole(hh.context, hh.accountId, claimed.accountId, "moderator");
+    expect(await roleEvents(hh, membershipRow.id)).toHaveLength(1);
   });
 });
