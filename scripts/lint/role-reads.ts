@@ -14,7 +14,7 @@
 // authorization matrix tests the behaviour; this keeps the obvious shape out.
 import { existsSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
-import { blankComments, walk } from "./session-context";
+import { blankComments, walk } from "./_shared";
 
 export interface LintViolation {
   file: string;
@@ -64,7 +64,7 @@ export function checkRoleReadsLint(rootDir: string): LintViolation[] {
   const srcDir = join(rootDir, "src");
   const violations: LintViolation[] = [];
   if (!existsSync(srcDir)) return violations;
-  for (const file of walk(srcDir, /\.(ts|tsx)$/)) {
+  for (const file of walk(srcDir, (name) => /\.(ts|tsx)$/.test(name))) {
     const relPath = relative(rootDir, file).split("\\").join("/");
     if (relPath === SCHEMA_FILE) continue;
     for (const f of findRoleReads(readFileSync(file, "utf8").replace(/\r\n/g, "\n"))) {

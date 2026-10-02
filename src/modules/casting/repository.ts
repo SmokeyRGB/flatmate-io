@@ -208,9 +208,10 @@ export async function insertCapturedApplicationTx(
 //   - capture against capture: two FOR SHARE locks are compatible and two inserts do not
 //     conflict. EC-3.1/3.11 want both rows.
 //
-// LOCK ORDER: membership, then casting_round. No existing function locks casting_round and then
-// membership (openRoundTx reads membership without a lock, revokeMembershipForProfileTx locks no
-// round), so no deadlock cycle exists. A future writer keeps this order.
+// LOCK ORDER: membership (FOR SHARE) -> household_settings -> casting_round -> room -> application.
+// No existing function locks casting_round and then membership (openRoundTx reads membership
+// without a lock, revokeMembershipForProfileTx locks no round), so no deadlock cycle exists.
+// A future writer keeps this order.
 export async function captureApplication(
   context: SessionContext,
   input: RawApplicationInput & { roundId: string },
@@ -343,7 +344,8 @@ export class ApplicationUpdateError extends Error {
 // round_id, household_id) does not fire and no round lock is taken. It never contains state,
 // state_changed_at, source, created_* or became_resident_id either.
 //
-// LOCK ORDER (design D7): membership FOR SHARE, then the application row FOR UPDATE, the same as
+// LOCK ORDER: membership (FOR SHARE) -> household_settings -> casting_round -> room -> application.
+// This function takes membership FOR SHARE, then the application row FOR UPDATE, the same as
 // transitionApplication, so the two are serialised on the row and no cycle exists.
 //
 // Returns { changed } only, never the row.
@@ -492,7 +494,7 @@ async function applyTransitionTx(
 //      the event.
 //
 // Writers of an application row (design D7), each serialised on the row lock in ONE lock order,
-// membership -> round -> application:
+// membership (FOR SHARE) -> household_settings -> casting_round -> room -> application:
 //   captureApplication: INSERT, membership FOR SHARE -> round FOR SHARE;
 //   updateApplication / transitionApplication: membership FOR SHARE -> application FOR UPDATE;
 //   deleteApplication (change 4) OBLIGATION: takes FOR UPDATE (or DELETE ... RETURNING).
@@ -603,7 +605,7 @@ export async function transitionRoomStatus(
   if (!actor.accountId) throw new Error("transitionRoomStatus requires an actor accountId");
   await assertHasPermission(context, actor.accountId, "manage_rooms");
   return withSessionContext(context, async (tx) => {
-    const [current] = await tx.select().from(room).where(eq(room.id, roomId));
+    const [current] = await tx.select().from(room).where(eq(room.id, roomId)).for("update");
     if (!current) throw new Error(`Room not found: ${roomId}`);
 
     const fromStatus = current.status;
@@ -639,8 +641,10 @@ export class RoomInUseByOpenRoundError extends Error {
 // EC-1.6: refused while a round covering it is open; the room may be set not_available instead.
 export async function removeRoom(context: SessionContext, roomId: string, actor: Actor) {
   if (!actor.accountId) throw new Error("removeRoom requires an actor accountId");
-  await assertHasPermission(context, actor.accountId, "manage_rooms");
+  if (actor.accountId !== context.accountId) throw new PermissionDeniedError("manage_rooms");
   return withSessionContext(context, async (tx) => {
+    await assertHasPermissionTx(tx, context, "manage_rooms");
+    await tx.select({ id: room.id }).from(room).where(eq(room.id, roomId)).for("update");
     const [openRoundCoveringIt] = await tx
       .select({ id: castingRound.id })
       .from(castingRound)
@@ -732,7 +736,23 @@ const LOCKED_ROOM_STATUSES: ReadonlySet<RoomStatus> = new Set(["occupied", "not_
 // FR-1.14/FR-1.15/FR-1.16: draft -> open takes an atomic snapshot of eligible residents into
 // RoundParticipation and freezes HouseholdSettings' four locked fields into settings_snapshot —
 // both effects or neither, in one transaction. EC-1.1/EC-1.2/EC-1.3 preconditions checked first.
+// LOCK ORDER: membership (FOR SHARE) ->
+// household_settings -> casting_round -> room -> application. Settings come before the round
+// because the settings writer has no round id and locks the household's single settings row;
+// rooms come after the round because this function learns the covered ids from the locked round,
+// and removeRoom locks the room before it reads rounds.
+// The eligibility read below stays unlocked. auto_join_open_rounds (drizzle/0031) runs inside
+// the membership INSERT, or the UPDATE that makes that membership a live resident. Either
+// statement already holds the membership row, and the trigger then takes casting_round FOR SHARE.
+// Locking membership rows after this round lock would deadlock with a late joiner.
 async function openRoundTx(tx: Tx, context: SessionContext, roundId: string, actor: Actor) {
+  const [settings] = await tx
+    .select()
+    .from(householdSettings)
+    .where(eq(householdSettings.householdId, context.householdId))
+    .for("share");
+  if (!settings) throw new Error(`HouseholdSettings not found for household ${context.householdId}`);
+
   // EC-1.9: two moderators opening the same draft round simultaneously must produce exactly
   // one opening. `FOR UPDATE` locks this row for the rest of the transaction — a concurrent
   // openRound's own SELECT ... FOR UPDATE blocks here until this transaction commits or rolls
@@ -749,8 +769,15 @@ async function openRoundTx(tx: Tx, context: SessionContext, roundId: string, act
     throw new RoundOpenPreconditionError("This round has no rooms selected", "no_rooms_selected");
   }
 
-  // EC-1.2: every covered room is already occupied/not_available.
-  const coveredRooms = await tx.select().from(room).where(inArray(room.id, round.roomIds));
+  // EC-1.2: every still-present covered room is already occupied/not_available.
+  // A removed room is ignored. A round whose covered rooms are all removed fails
+  // with rooms_unavailable.
+  const coveredRooms = await tx
+    .select()
+    .from(room)
+    .where(and(inArray(room.id, round.roomIds), isNull(room.deletedAt)))
+    .orderBy(room.id)
+    .for("share");
   const hasAvailableRoom = coveredRooms.some((r) => !LOCKED_ROOM_STATUSES.has(r.status));
   if (!hasAvailableRoom) {
     throw new RoundOpenPreconditionError(
@@ -779,12 +806,6 @@ async function openRoundTx(tx: Tx, context: SessionContext, roundId: string, act
     // EC-1.4: exactly one eligible resident is fine — only zero is refused.
     throw new RoundOpenPreconditionError("There are no eligible residents to snapshot", "no_eligible_residents");
   }
-
-  const [settings] = await tx
-    .select()
-    .from(householdSettings)
-    .where(eq(householdSettings.householdId, context.householdId));
-  if (!settings) throw new Error(`HouseholdSettings not found for household ${context.householdId}`);
 
   // FR-1.16: both effects together, in the same transaction — a thrown error above or below
   // this point leaves the round untouched in `draft` with no RoundParticipation rows written.
@@ -828,8 +849,11 @@ async function openRoundTx(tx: Tx, context: SessionContext, roundId: string, act
 
 export async function openRound(context: SessionContext, roundId: string, actor: Actor) {
   if (!actor.accountId) throw new Error("openRound requires an actor accountId");
-  await assertHasPermission(context, actor.accountId, "manage_rounds");
-  return withSessionContext(context, (tx) => openRoundTx(tx, context, roundId, actor));
+  if (actor.accountId !== context.accountId) throw new PermissionDeniedError("manage_rounds");
+  return withSessionContext(context, async (tx) => {
+    await assertHasPermissionTx(tx, context, "manage_rounds");
+    return openRoundTx(tx, context, roundId, actor);
+  });
 }
 
 // rounds-new-orphan-draft-atomicity: createRound and openRound each committed in their own
@@ -846,9 +870,12 @@ export async function createAndOpenRound(
   actor: Actor,
 ) {
   if (!actor.accountId) throw new Error("createAndOpenRound requires an actor accountId");
-  await assertHasPermission(context, actor.accountId, "manage_rounds");
+  if (actor.accountId !== context.accountId) throw new PermissionDeniedError("manage_rounds");
   return withSessionContext(context, async (tx) => {
+    await assertHasPermissionTx(tx, context, "manage_rounds");
     const round = await insertDraftRoundTx(tx, context, title, roomIds, actor);
+    // The inserted row is new, so nobody else can lock it. Inserting it before openRoundTx
+    // takes the household_settings lock is not a lock-order violation.
     return openRoundTx(tx, context, round.id, actor);
   });
 }
@@ -1156,9 +1183,16 @@ export async function updateHouseholdSettingsWithProcedureLock(
   // household ✅, moderator ⬜) is in the stored household set (identity/schema.ts,
   // HOUSEHOLD_PERMISSIONS) and otherwise individually grantable to a moderator; no role is read.
   if (!actor.accountId) throw new Error("updateHouseholdSettingsWithProcedureLock requires an actor accountId");
-  await assertHasPermission(context, actor.accountId, "manage_voting_procedure");
+  if (actor.accountId !== context.accountId) throw new PermissionDeniedError("manage_voting_procedure");
 
   return withSessionContext(context, async (tx) => {
+    await assertHasPermissionTx(tx, context, "manage_voting_procedure");
+    const [settings] = await tx
+      .select()
+      .from(householdSettings)
+      .where(eq(householdSettings.householdId, context.householdId))
+      .for("update");
+    if (!settings) throw new Error(`HouseholdSettings not found for household ${context.householdId}`);
     const changedFields = Object.keys(patch) as LockedSettingsField[];
     const [openRound] = await tx
       .select({ id: castingRound.id })

@@ -8,8 +8,9 @@
 //   - `SET SESSION …`, `SET … TO` and `SET LOCAL … TO` are now findings, same as `SET … =`;
 //   - `drizzle/*.sql` is scanned too, so a SECURITY DEFINER function can't set a session-wide
 //     value unnoticed.
-import { readFileSync, readdirSync, statSync, existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
+import { blankComments, lineOf, walk } from "./_shared";
 
 export interface LintViolation {
   file: string;
@@ -24,26 +25,13 @@ export interface LintViolation {
 
 const SESSION_CONTEXT_FILE = "src/db/session-context.ts";
 
-export function walk(dir: string, pattern: RegExp): string[] {
-  const out: string[] = [];
-  for (const entry of readdirSync(dir)) {
-    const full = join(dir, entry);
-    if (statSync(full).isDirectory()) {
-      out.push(...walk(full, pattern));
-    } else if (pattern.test(entry)) {
-      out.push(full);
-    }
-  }
-  return out;
-}
-
 // `SET` statements, matched across the whole file content (so a statement split over lines is
 // caught too; `\s` includes newlines), case-insensitive, in two forms:
 //   - `SET [LOCAL|SESSION] <any identifier> =`: any identifier, as the original rule had it. The
 //     first rewrite required a dotted name and so let `SET search_path = …` / `SET role = …` pass
 //     (code review of this change).
 //   - `SET [LOCAL|SESSION] <identifier> TO`: any identifier, any case. Comments are blanked
-//     first (blankComments below), so prose in them never matches.
+//     first (blankComments from _shared.ts), so prose in them never matches.
 // `UPDATE <table> SET col = …` is an ordinary column assignment, not a setting, and is excluded.
 const NOT_AFTER_UPDATE = String.raw`(?<!\bUPDATE\s+(?:ONLY\s+)?[\w."]+(?:\s+(?:AS\s+)?\w+)?\s+)`;
 const SET_EQ_RE = new RegExp(
@@ -55,14 +43,10 @@ const SET_TO_RE = new RegExp(
   "gi",
 );
 
-// Comments are blanked before the SET check, keeping every newline so reported line numbers stay
-// right. That is what lets the TO form be case-insensitive (Copilot review of PR #26: `SET
-// search_path to public` passed): English prose such as "... set it to `true` ..." lives in
-// comments, not in code.
-export function blankComments(source: string): string {
-  const keepNewlines = (text: string) => text.replace(/[^\n]/g, " ");
-  return source.replace(/\/\*[\s\S]*?\*\//g, keepNewlines).replace(/\/\/.*$/gm, keepNewlines);
-}
+// Comments are blanked before the SET check (blankComments in _shared.ts), keeping every newline
+// so reported line numbers stay right. That is what lets the TO form be case-insensitive (Copilot
+// review of PR #26: `SET search_path to public` passed): English prose such as "... set it to
+// `true` ..." lives in comments, not in code.
 
 // `set_config(...)`, case-insensitive, tolerating optional quotes and whitespace around the name
 // (`"set_config"(...)`) — matches even a call whose argument list spans multiple lines (`[^)]*`
@@ -78,7 +62,7 @@ function checkSetStatements(content: string, relPath: string, violations: LintVi
     while ((match = re.exec(code)) !== null) {
       if (seen.has(match.index)) continue;
       seen.add(match.index);
-      const line = content.slice(0, match.index).split("\n").length;
+      const line = lineOf(content, match.index);
       const text = content.split("\n")[line - 1].trim();
       const modifier = (match[1] ?? "").toUpperCase();
       if (modifier === "LOCAL") {
@@ -102,7 +86,7 @@ function checkSetConfigCalls(
   SET_CONFIG_RE.lastIndex = 0;
   let match: RegExpExecArray | null;
   while ((match = SET_CONFIG_RE.exec(content)) !== null) {
-    const line = content.slice(0, match.index).split("\n").length;
+    const line = lineOf(content, match.index);
     const argsText = match[1];
     const isMultiline = argsText.includes("\n");
     // A literal `true` as the third (is_local) argument, at the very end — anything else (a
@@ -133,7 +117,7 @@ export function checkSessionContextLint(rootDir: string): LintViolation[] {
   const srcDir = join(rootDir, "src");
   const violations: LintViolation[] = [];
 
-  const srcFiles = existsSync(srcDir) ? walk(srcDir, /\.(ts|tsx)$/) : [];
+  const srcFiles = existsSync(srcDir) ? walk(srcDir, (name) => /\.(ts|tsx)$/.test(name)) : [];
   for (const file of srcFiles) {
     const relPath = relative(rootDir, file).replace(/\\/g, "/");
     const content = readFileSync(file, "utf8");
@@ -143,7 +127,7 @@ export function checkSessionContextLint(rootDir: string): LintViolation[] {
 
   const drizzleDir = join(rootDir, "drizzle");
   if (existsSync(drizzleDir)) {
-    for (const file of walk(drizzleDir, /\.sql$/)) {
+    for (const file of walk(drizzleDir, (name) => name.endsWith(".sql"))) {
       const relPath = relative(rootDir, file).replace(/\\/g, "/");
       const content = readFileSync(file, "utf8");
       // drizzle/*.sql is scanned for a non-local set_config only — it is not src/db/…, so the

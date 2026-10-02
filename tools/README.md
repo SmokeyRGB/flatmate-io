@@ -92,9 +92,10 @@ The six conditions are listed in the script itself, each with the reason it is t
 
 ## The four tools for the implementation repo
 
-**None of these are installed yet** — the implementation repo does not exist. This is the
-recorded decision, so `GUARDRAILS.md` no longer says "TBD". Each one exists to enforce a rule
-that is already written; none was chosen for its own sake.
+dependency-cruiser and license-checker-rseidelsohn are installed and run from `npm run verify`.
+This remains the recorded decision for which tool enforces which rule, so `GUARDRAILS.md` no
+longer says "TBD". Each one exists to enforce a rule that is already written; none was chosen
+for its own sake.
 
 | Tool | What it does, plainly | Which rule it enforces, and why this tool |
 |---|---|---|
@@ -106,11 +107,15 @@ that is already written; none was chosen for its own sake.
 **The allowlist** (repo is private for now, so the project's own license is deferred):
 
 ```
-MIT · ISC · BSD-2-Clause · BSD-3-Clause · Apache-2.0 · 0BSD · Unlicense · CC0-1.0 · Python-2.0
+MIT · ISC · BSD-2-Clause · BSD-3-Clause · Apache-2.0 · 0BSD · Unlicense · CC0-1.0 · Python-2.0 · CC-BY-4.0
 ```
+
+`CC-BY-4.0` is the data package `caniuse-lite`: attribution only, not copyleft.
 
 Blocked without an explicit written decision: `GPL-*`, `AGPL-*`, `LGPL-*`, `SSPL`, `BUSL`,
 `CC-BY-NC-*`, and anything reported as `UNKNOWN`.
+
+Written decision, 2026-10-02, decided by the human: `@img/sharp-*` (libvips, `Apache-2.0 AND LGPL-3.0-or-later`) is accepted. Those binaries are an optional Next.js image-optimizer dependency, loaded as a separate shared library. The app is a hosted service and does not distribute them, and LGPL obligations attach to distribution. The check covers production dependencies only; G-H2 concerns copyleft reaching application code.
 
 **One thing that turned out to be a non-issue.** `GUARDRAILS.md` **G-H2** worried whether the solver's
 Apache-2.0 dependencies are compatible with the project's own licensing. They are, and the reason

@@ -80,3 +80,110 @@ describe("import-boundary lint", () => {
     expect(checkImportBoundaryLint(fixtureDir)).toHaveLength(0);
   });
 });
+
+describe("import-boundary lint — import forms and repository paths", () => {
+  it("flags a dynamic import() of postgres", () => {
+    fixtureDir = mkdtempSync(join(tmpdir(), "flatmate-import-boundary-"));
+    writeFixture("src/app/x.ts", `export const p = await import("postgres");`);
+
+    const violations = checkImportBoundaryLint(fixtureDir);
+    expect(violations.some((v) => v.file === "src/app/x.ts")).toBe(true);
+  });
+
+  it("flags require() of postgres", () => {
+    fixtureDir = mkdtempSync(join(tmpdir(), "flatmate-import-boundary-"));
+    writeFixture("src/app/x.ts", `const p = require("postgres");`);
+
+    const violations = checkImportBoundaryLint(fixtureDir);
+    expect(violations.some((v) => v.file === "src/app/x.ts")).toBe(true);
+  });
+
+  it("flags a multi-line import() of the db client", () => {
+    fixtureDir = mkdtempSync(join(tmpdir(), "flatmate-import-boundary-"));
+    writeFixture("src/app/x.ts", `export const p = await import(\n  "@/db/client"\n);\n`);
+
+    const violations = checkImportBoundaryLint(fixtureDir);
+    expect(violations.some((v) => v.file === "src/app/x.ts")).toBe(true);
+  });
+
+  it("flags a side-effect import of postgres", () => {
+    fixtureDir = mkdtempSync(join(tmpdir(), "flatmate-import-boundary-"));
+    writeFixture("src/app/x.ts", `import "postgres";`);
+
+    const violations = checkImportBoundaryLint(fixtureDir);
+    expect(violations.some((v) => v.file === "src/app/x.ts")).toBe(true);
+  });
+
+  it("flags a named re-export from the db client", () => {
+    fixtureDir = mkdtempSync(join(tmpdir(), "flatmate-import-boundary-"));
+    writeFixture("src/app/x.ts", `export { db } from "@/db/client";`);
+
+    const violations = checkImportBoundaryLint(fixtureDir);
+    expect(violations.some((v) => v.file === "src/app/x.ts")).toBe(true);
+  });
+
+  it("flags a star re-export of drizzle-orm/postgres-js", () => {
+    fixtureDir = mkdtempSync(join(tmpdir(), "flatmate-import-boundary-"));
+    writeFixture("src/app/x.ts", `export * from "drizzle-orm/postgres-js";`);
+
+    const violations = checkImportBoundaryLint(fixtureDir);
+    expect(violations.some((v) => v.file === "src/app/x.ts")).toBe(true);
+  });
+
+  it("flags a subpath import of postgres", () => {
+    fixtureDir = mkdtempSync(join(tmpdir(), "flatmate-import-boundary-"));
+    writeFixture("src/app/x.ts", `import type { Sql } from "postgres/types";\nimport { something } from "postgres/types";`);
+
+    // The type-only line is not a violation. The value import of the subpath is.
+    const violations = checkImportBoundaryLint(fixtureDir);
+    expect(violations).toHaveLength(1);
+    expect(violations[0].file).toBe("src/app/x.ts");
+    expect(violations[0].line).toBe(2);
+  });
+
+  it("flags repository.ts outside src/modules/<name>/", () => {
+    fixtureDir = mkdtempSync(join(tmpdir(), "flatmate-import-boundary-"));
+    writeFixture("src/app/repository.ts", `import { db } from "@/db/client";`);
+
+    const violations = checkImportBoundaryLint(fixtureDir);
+    expect(violations.some((v) => v.file === "src/app/repository.ts")).toBe(true);
+  });
+
+  it("flags a nested repository.ts under a module", () => {
+    fixtureDir = mkdtempSync(join(tmpdir(), "flatmate-import-boundary-"));
+    writeFixture("src/modules/casting/helpers/repository.ts", `import { db } from "@/db/client";`);
+
+    const violations = checkImportBoundaryLint(fixtureDir);
+    expect(violations.some((v) => v.file === "src/modules/casting/helpers/repository.ts")).toBe(true);
+  });
+
+  it("does not flag a commented-out raw client import", () => {
+    fixtureDir = mkdtempSync(join(tmpdir(), "flatmate-import-boundary-"));
+    writeFixture("src/app/x.ts", `// import postgres from "postgres"\nexport const x = 1;\n`);
+
+    expect(checkImportBoundaryLint(fixtureDir)).toHaveLength(0);
+  });
+
+  it("does not flag a type-only import from postgres", () => {
+    fixtureDir = mkdtempSync(join(tmpdir(), "flatmate-import-boundary-"));
+    writeFixture("src/app/x.ts", `import type { Sql } from "postgres";\nexport type T = Sql;\n`);
+
+    expect(checkImportBoundaryLint(fixtureDir)).toHaveLength(0);
+  });
+
+  it("does not flag a type-only re-export from postgres", () => {
+    fixtureDir = mkdtempSync(join(tmpdir(), "flatmate-import-boundary-"));
+    writeFixture("src/app/x.ts", `export type { Sql } from "postgres";\n`);
+
+    expect(checkImportBoundaryLint(fixtureDir)).toHaveLength(0);
+  });
+
+  // A specifier marked `type` inline is still an import from the module. Flag it.
+  it("flags an inline type specifier imported from postgres", () => {
+    fixtureDir = mkdtempSync(join(tmpdir(), "flatmate-import-boundary-"));
+    writeFixture("src/app/x.ts", `import { type Sql } from "postgres";`);
+
+    const violations = checkImportBoundaryLint(fixtureDir);
+    expect(violations.some((v) => v.file === "src/app/x.ts")).toBe(true);
+  });
+});

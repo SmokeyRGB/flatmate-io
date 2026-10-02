@@ -7,9 +7,9 @@
 // Usage: npm run seed:demo
 //
 // Not idempotent by design: run it once against a clean(ish) database. Re-running after the demo
-// household already exists fails loudly at Supabase Auth's "email already registered" step —
-// purge the old demo household (or the whole database) first, rather than layering another one
-// on top of it.
+// household already exists fails loudly at Supabase Auth's "email already registered" step.
+// The password is random per run unless DEMO_PASSWORD is set, and it is printed once on success.
+// Cleanup matches the fixed demo email (scripts/cleanup-demo-household.sql).
 
 // Env vars come from `--env-file=.env.local` (see package.json's "seed:demo" script), not a
 // dotenv.config() call here: ES module imports are hoisted and evaluated in dependency order
@@ -19,6 +19,7 @@
 // hazard entirely. (tests/setup.ts's dotenv.config() call works because vitest's `setupFiles`
 // genuinely run as a separate phase before test modules import anything — not the case here.)
 
+import { randomBytes } from "node:crypto";
 import { claimResidentProfile, registerHousehold } from "@/modules/identity/auth";
 import {
   createResidentProfile,
@@ -34,29 +35,18 @@ import {
   transitionApplication,
 } from "@/modules/casting/repository";
 import { db } from "@/db/client";
+import { assertSafeSupabaseEnv } from "./env-guard";
 
-// The same refusal as tests/setup.ts: this script writes real households and Auth users, and
-// activity_event is append-only, so a .env.local pointing at production must stop it before the
-// first query. The imports above only construct clients (postgres.js connects lazily), so this
-// top-level check still runs before anything reaches the database.
-const PRODUCTION_PROJECT_REF = "cjinhzzvjryojvhngjjn";
-for (const [name, value] of [
-  ["DATABASE_URL", process.env.DATABASE_URL],
-  ["NEXT_PUBLIC_SUPABASE_URL", process.env.NEXT_PUBLIC_SUPABASE_URL],
-] as const) {
-  if (value?.includes(PRODUCTION_PROJECT_REF)) {
-    throw new Error(
-      `Refusing to seed the production Supabase project.\n` +
-        `  ${name} points at ${PRODUCTION_PROJECT_REF} (flatmate-io).\n` +
-        `  Point .env.local at flatmate-io-dev instead — see .env.example.`,
-    );
-  }
-}
+// Same refusal as the test suite: this script writes real households and Auth users, and
+// activity_event is append-only, so a .env.local pointing at the wrong project must stop it
+// before the first query. The imports above only construct clients (postgres.js connects
+// lazily), so this top-level check still runs before anything reaches the database.
+assertSafeSupabaseEnv(process.env, "seed");
 
 // G-B1: synthetic-only data — @example.test is this project's fixed test-email convention
 // (tests/helpers/identity.ts's testEmail() uses the same domain).
 const DEMO_EMAIL = "demo-household@example.test";
-const PASSWORD = "demo-password-not-real-1234";
+const PASSWORD = process.env.DEMO_PASSWORD ?? randomBytes(18).toString("base64url");
 
 async function main() {
   const { household, context } = await registerHousehold(DEMO_EMAIL, PASSWORD, "Demo-WG");
@@ -210,8 +200,8 @@ main()
   .catch((err) => {
     console.error("\nSeeding failed:", err);
     console.error(
-      `\nIf this is "email already registered", a demo household already exists — sign in with ` +
-        `${DEMO_EMAIL} / ${PASSWORD} directly, or purge it first before re-seeding.`,
+      "\nIf this is \"email already registered\", a demo household already exists: " +
+        "run scripts/cleanup-demo-household.sql in the Supabase SQL editor for flatmate-io-dev (as postgres), then re-seed.",
     );
     process.exitCode = 1;
   })

@@ -204,7 +204,9 @@ export const castingRound = pgTable(
     id: uuid("id").primaryKey().defaultRandom(),
     householdId: uuid("household_id").notNull(),
     title: text("title").notNull(),
-    // Every writer of `status` takes FOR UPDATE on the row (openRoundTx does): captureApplication
+    // LOCK ORDER: membership (FOR SHARE) -> household_settings -> casting_round -> room -> application.
+    // Every writer of `status` takes FOR UPDATE on the row (openRoundTx does), and the
+    // household_settings row is locked before it (`openRoundTx`). captureApplication
     // reads it FOR SHARE, and the pair is serialised only while every status writer locks the row
     // (design D4). A future close or pause must do the same.
     // Also (design D12): application.round_id points here without a foreign key. No path may
