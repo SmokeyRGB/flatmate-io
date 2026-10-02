@@ -4,7 +4,7 @@
 
 # Guardrail lints
 
-The eight custom lints under `scripts/lint/` are hand-written checks (not eslint plugins), each
+The nine custom lints under `scripts/lint/` are hand-written checks (not eslint plugins), each
 enforcing one guardrail mechanically:
 
 | Script | Guardrail | What it checks |
@@ -17,8 +17,9 @@ enforcing one guardrail mechanically:
 | `migration-shape.ts` | — (re-runnability) | migrations after `0017`: an enum `ADD VALUE` alone in its file, `ADD COLUMN IF NOT EXISTS`, `DROP FUNCTION IF EXISTS` before a bare or `RETURNS TABLE` create, `search_path` on `SECURITY DEFINER` |
 | `guarded-tests.ts` | G-D | every entry in `test/guarded.manifest.json` (G-D1…G-D15) stays honest: `pending`/`implemented` must match reality |
 | `pending-feedback.ts` | `ui/pending-feedback` | no plain submit button anywhere in `src/` (only `src/ui/submit-button.tsx`'s shared one); every `page.tsx` under `src/app/` has a sibling `loading.tsx` importing `@/ui/skeletons`, short named exemptions aside |
+| `role-reads.ts` | identity/member-administration | no comparison against a role in `src/` (`m.role ===`, `eq(membership.role, …)`, SQL `role <> '…'`) outside a `role-state-read: <reason>` marker on the same or previous line; `src/modules/identity/schema.ts` (the CHECKs) exempt |
 
-`tests/unit/lint/cleanup-inventory.test.ts` is the ninth check, run inside vitest: it fails when
+`tests/unit/lint/cleanup-inventory.test.ts` is the vitest-side check, run inside vitest: it fails when
 a household-scoped table is missing from the delete set in `tests/helpers/identity.ts`, or when
 `undoRegisterHousehold` misses a table `registerHousehold` writes.
 

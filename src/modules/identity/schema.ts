@@ -127,7 +127,9 @@ export const MODERATOR_PERMISSIONS = ROLE_SETS.moderator;
 
 // The permissions whose holders are exactly `roles` and whose holder rule the database already
 // enforces (entries with `checkFrom` wait for the contract migration). The only grouping logic.
-export function permissionsHeldOnlyBy(roles: readonly Holder[]): PermissionName[] {
+// Not exported: data-inventory.ts refuses a schema.ts that exports a function; the groups below are
+// the exports.
+function permissionsHeldOnlyBy(roles: readonly Holder[]): PermissionName[] {
   return (Object.keys(PERMISSIONS) as PermissionName[]).filter((name) => {
     const entry: { holders: readonly Holder[]; checkFrom?: "contract" } = PERMISSIONS[name];
     return (

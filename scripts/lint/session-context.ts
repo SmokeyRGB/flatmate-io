@@ -24,7 +24,7 @@ export interface LintViolation {
 
 const SESSION_CONTEXT_FILE = "src/db/session-context.ts";
 
-function walk(dir: string, pattern: RegExp): string[] {
+export function walk(dir: string, pattern: RegExp): string[] {
   const out: string[] = [];
   for (const entry of readdirSync(dir)) {
     const full = join(dir, entry);
@@ -59,7 +59,7 @@ const SET_TO_RE = new RegExp(
 // right. That is what lets the TO form be case-insensitive (Copilot review of PR #26: `SET
 // search_path to public` passed): English prose such as "... set it to `true` ..." lives in
 // comments, not in code.
-function blankComments(source: string): string {
+export function blankComments(source: string): string {
   const keepNewlines = (text: string) => text.replace(/[^\n]/g, " ");
   return source.replace(/\/\*[\s\S]*?\*\//g, keepNewlines).replace(/\/\/.*$/gm, keepNewlines);
 }
