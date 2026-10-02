@@ -48,7 +48,7 @@ const ICONS: Record<VoteValue, ReactNode> = {
   definitely: <Star className="size-5" aria-hidden="true" />,
 };
 
-type Refusal = { kind: "round_not_open"; status: RoundStatus } | { kind: "not_eligible" };
+type Refusal = { kind: "round_not_open"; status: RoundStatus | null } | { kind: "not_eligible" };
 
 function CardBody({ card }: { card: ScreeningCard }) {
   return (
@@ -255,6 +255,13 @@ export function ScreeningDeck({
     else goForward();
   }
 
+  // A cancelled pointer (a system gesture, a call, a rotation) never moves the deck: the card only
+  // springs back (code review).
+  function cancelSwipe() {
+    swipe.current = null;
+    setDrag(null);
+  }
+
   function handleResult(result: CastVoteResult, id: string, value: VoteValue) {
     if (result.ok) {
       dispatch({ type: "rated", id, value });
@@ -271,7 +278,8 @@ export function ScreeningDeck({
         return;
       case "round_not_open":
         dispatch({ type: "failed", id });
-        setRefusal({ kind: "round_not_open", status: result.roundStatus ?? "paused" });
+        // No guessed state: an unknown status gets the message without one (code review).
+        setRefusal({ kind: "round_not_open", status: result.roundStatus ?? null });
         return;
       case "not_eligible":
         dispatch({ type: "failed", id });
@@ -309,7 +317,9 @@ export function ScreeningDeck({
       <div className="mx-auto max-w-md space-y-3 p-6">
         <p className="text-sm" role="status">
           {refusal.kind === "round_not_open"
-            ? t.refusal.roundNotOpen(de.status.round[refusal.status])
+            ? refusal.status
+              ? t.refusal.roundNotOpen(de.status.round[refusal.status])
+              : t.refusal.roundNotOpenUnknown
             : t.refusal.notEligible}
         </p>
         <Link href="/dashboard" className="btn-link">
@@ -379,7 +389,7 @@ export function ScreeningDeck({
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={endSwipe}
-        onPointerCancel={endSwipe}
+        onPointerCancel={cancelSwipe}
       >
         {prevCard && <DeckCard key={prevCard.applicationId} card={prevCard} pos="prev" />}
         <DeckCard key={card.applicationId} card={card} pos="current" />

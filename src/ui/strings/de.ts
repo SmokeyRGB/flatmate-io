@@ -796,6 +796,9 @@ export const de = {
     refusal: {
       roundNotOpen: (statusLabel: string) =>
         `Diese Runde ist gerade nicht offen (Stand: ${statusLabel}). Stimmen sind jetzt nicht möglich, deine bisherigen bleiben.`,
+      // The same refusal when the round's state could not be read (code review, 2026-10-02).
+      roundNotOpenUnknown:
+        "Diese Runde ist gerade nicht offen. Stimmen sind jetzt nicht möglich, deine bisherigen bleiben.",
       notEligible: "Du kannst in dieser Runde gerade nicht abstimmen.",
       rulesInvalid: "Die Regeln dieser Runde lassen sich gerade nicht lesen. Bitte melde dich bei der Verwaltung.",
       voteFailed: "Das hat nicht geklappt — nichts ist verloren. Nochmal?",
