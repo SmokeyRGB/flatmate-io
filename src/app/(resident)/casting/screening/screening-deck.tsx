@@ -224,11 +224,15 @@ export function ScreeningDeck({
       stack.removeAttribute("data-dragging");
       stack.style.removeProperty("--drag");
       stack.style.removeProperty("--tilt");
+      stack.style.removeProperty("--drag-p");
       return;
     }
     stack.setAttribute("data-dragging", dx > 0 ? "back" : "forward");
     stack.style.setProperty("--drag", `${dx}px`);
     stack.style.setProperty("--tilt", `${dx / 30}deg`);
+    // Back: the current card sinks into the pile in proportion to the drag (globals.css).
+    const width = stack.offsetWidth || 1;
+    stack.style.setProperty("--drag-p", `${Math.min(Math.abs(dx) / width, 1)}`);
   }
   function onPointerDown(event: ReactPointerEvent<HTMLDivElement>) {
     if (event.pointerType !== "touch") return;

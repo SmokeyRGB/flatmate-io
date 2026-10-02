@@ -751,6 +751,8 @@ h3 {
     touch-action: pan-y;
     --drag: 0px;
     --tilt: 0deg;
+    /* 0..1: how far a drag back has gone, relative to the card width (set by the deck, D9). */
+    --drag-p: 0;
   }
   /* Each card is its own scroll container, and touch-action is not inherited: the browser combines
      it only from the touched element up to the nearest scroll container, i.e. the card itself. Without
@@ -763,17 +765,21 @@ h3 {
     touch-action: pan-y;
     transition:
       transform 240ms ease,
-      opacity 240ms ease;
+      opacity 240ms ease,
+      filter 240ms ease;
   }
   .deck-card[data-pos="current"] {
     z-index: 2;
     opacity: 1;
     transform: translateX(var(--drag)) rotate(var(--tilt));
   }
+  /* The card waiting underneath sits a little lower, smaller and in shadow; the same place a card
+     goes back to when the resident moves back (human walkthrough 2026-10-02). */
   .deck-card[data-pos="next"] {
     z-index: 1;
     opacity: 0.85;
     transform: translateY(0.625rem) scale(0.96);
+    filter: brightness(0.9);
     pointer-events: none;
     animation: deck-appear 240ms ease both;
   }
@@ -783,10 +789,16 @@ h3 {
     transform: translateX(calc(-110% + max(var(--drag), 0px))) rotate(-6deg);
     pointer-events: none;
   }
-  /* Dragging back reveals the previous card following the finger. */
+  /* Dragging back mirrors going forward: the previous card slides in from the left ON TOP, and the
+     current card stays where it is and sinks back into the pile (smaller, lower, in shadow) as the
+     drag grows, ending exactly where a "next" card sits. */
   .deck-stack[data-dragging="back"] > .deck-card[data-pos="prev"] {
     opacity: 1;
     transform: translateX(calc(-100% + var(--drag)));
+  }
+  .deck-stack[data-dragging="back"] > .deck-card[data-pos="current"] {
+    transform: translateY(calc(0.625rem * var(--drag-p))) scale(calc(1 - 0.04 * var(--drag-p)));
+    filter: brightness(calc(1 - 0.1 * var(--drag-p)));
   }
   .deck-stack[data-dragging] > .deck-card {
     transition: none;
@@ -808,6 +820,15 @@ h3 {
     }
     .deck-card[data-pos="next"],
     .deck-card[data-pos="prev"] {
+      opacity: 0;
+    }
+    /* The drag rules above are more specific than these, so they are overridden here too: under
+       reduced motion nothing moves or darkens while dragging, and the move is a crossfade. */
+    .deck-stack[data-dragging] > .deck-card {
+      transform: none;
+      filter: none;
+    }
+    .deck-stack[data-dragging="back"] > .deck-card[data-pos="prev"] {
       opacity: 0;
     }
     .deck-progress-fill {
