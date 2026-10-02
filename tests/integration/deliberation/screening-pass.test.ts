@@ -171,7 +171,9 @@ describe("getScreeningPass: eligibility (FR-4.15, EC-4.3, V-2)", () => {
     await insertApplicationAt(s, "new");
     await setMovedOut(s.hh.context, s.hh.accountId, voter.accountId);
     expect(await getScreeningPass(voter.context, s.roundId)).toEqual({ kind: "refused", reason: "not_eligible" });
-    expect(await getScreeningPass(voter.context, null)).toEqual({ kind: "empty" });
+    // role-permissions: the moved-out membership holds no `vote` any more, so the pass refuses
+    // before it looks for a round (it used to fall through to "empty"). Either way no card leaves.
+    expect(await getScreeningPass(voter.context, null)).toEqual({ kind: "refused", reason: "not_eligible" });
     expect((await getAwaitingVoteCounts(voter.context)).size).toBe(0);
     // The candidates port itself, called directly: no card data reaches the caller.
     const leaked = await withSessionContext(voter.context, (tx) =>

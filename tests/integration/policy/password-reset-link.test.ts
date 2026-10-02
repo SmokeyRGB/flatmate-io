@@ -589,9 +589,11 @@ describe("redeemPasswordReset (design.md Decision 5)", () => {
       await tx.select().from(membership).where(eq(membership.residentProfileId, resident.profileId)).for("update");
       markLocked();
       await rawTxGate;
+      // The real revocation's shape (revokeMembershipForProfileTx): role member, no permissions; a
+      // revoked row holding `vote` is refused by membership_revoked_holds_nothing (role-permissions).
       await tx
         .update(membership)
-        .set({ revokedAt: new Date() })
+        .set({ revokedAt: new Date(), role: "member", permissions: [] })
         .where(eq(membership.residentProfileId, resident.profileId));
       await tx
         .update(session)

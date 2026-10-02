@@ -532,11 +532,14 @@ describe("authorization matrix (M6): every exported casting/identity mutator dec
         castingRepo.addResidentToRound(hh.context, round.id, resident.profileId, adminActor),
         "manage_round_participation",
       );
-      await expectDenied(
+      // The application mutators refuse a profile-less session before any permission check or query
+      // (S-50, ProfileRequiredError), which is the household account's refusal here.
+      await expect(
         castingRepo.captureApplication(hh.context, { roundId: round.id, applicantName: "X", collectedFrom: "data_subject" }),
-        "create_application",
+      ).rejects.toThrow(castingRepo.ProfileRequiredError);
+      await expect(castingRepo.transitionApplication(hh.context, id, "screened")).rejects.toThrow(
+        castingRepo.ProfileRequiredError,
       );
-      await expect(castingRepo.transitionApplication(hh.context, id, "screened")).rejects.toThrow(PermissionDeniedError);
       await expect(
         castingRepo.updateApplication(hh.context, {
           roundId: round.id,
@@ -545,7 +548,7 @@ describe("authorization matrix (M6): every exported casting/identity mutator dec
           applicantName: "Geändert",
           collectedFrom: "data_subject",
         }),
-      ).rejects.toThrow(PermissionDeniedError);
+      ).rejects.toThrow(castingRepo.ProfileRequiredError);
     });
 
     // Moderator column: rooms, rounds, participants and applications allowed ...

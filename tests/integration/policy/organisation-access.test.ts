@@ -107,6 +107,19 @@ async function html(page: () => Promise<unknown>): Promise<string> {
   return renderToStaticMarkup((await page()) as Parameters<typeof renderToStaticMarkup>[0]);
 }
 
+// Every page shows the organisation area's access message, except the members page, which keeps
+// its own refusal with the pointer to /who-lives-here for a resident (FR-1.31; code review
+// 2026-10-02). Both render no organisation content.
+function expectRefused(name: string, markup: string) {
+  if (name === "members") {
+    expect(markup, name).toContain(de.members.accessDeniedBody);
+    expect(markup, name).toContain('href="/who-lives-here"');
+  } else {
+    expect(markup, name).toContain(de.org.accessDenied.body);
+    expect(markup, name).toContain('href="/dashboard"');
+  }
+}
+
 describe("the organisation area is reached only with an organisation permission", () => {
   it("(a) a plain resident: the helper is false, and every page shows the access message and nothing else", async () => {
     hh = await registerTestHousehold();
@@ -115,9 +128,7 @@ describe("the organisation area is reached only with an organisation permission"
 
     expect(await requireOrganisationAccess({ context: resident.context })).toBe(false);
     for (const [name, page] of Object.entries(PAGES)) {
-      const markup = await html(page);
-      expect(markup, name).toContain(de.org.accessDenied.body);
-      expect(markup, name).toContain('href="/dashboard"');
+      expectRefused(name, await html(page));
     }
   });
 
@@ -135,7 +146,7 @@ describe("the organisation area is reached only with an organisation permission"
     // The same session cookie, a new request: the page reads the stored permissions again.
     expect(await requireOrganisationAccess({ context: moderator.context })).toBe(false);
     for (const [name, page] of Object.entries(PAGES)) {
-      expect(await html(page), name).toContain(de.org.accessDenied.body);
+      expectRefused(name, await html(page));
     }
   });
 
