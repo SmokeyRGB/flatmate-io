@@ -1,6 +1,6 @@
 {
   "id": "66eea9da-6968-4061-a7e0-7b1598023d2b",
-  "prevId": "0dcedf1f-2321-4cf6-96da-85ab4f978157",
+  "prevId": "25121023-1cc9-451e-9033-59ce6546fcfa",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -147,9 +147,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {},
@@ -320,9 +320,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {},
@@ -406,9 +406,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {},
@@ -497,9 +497,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "round_participation_round_id_idx": {
           "name": "round_participation_round_id_idx",
@@ -512,9 +512,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "round_participation_active_pairing_idx": {
           "name": "round_participation_active_pairing_idx",
@@ -533,10 +533,10 @@
             }
           ],
           "isUnique": true,
-          "with": {},
-          "method": "btree",
           "where": "removed_at IS NULL",
-          "concurrently": false
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {},
@@ -552,6 +552,182 @@
           ],
           "using": "household_id = (select current_setting('app.household_id', true)::uuid)",
           "withCheck": "household_id = (select current_setting('app.household_id', true)::uuid)"
+        }
+      },
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.vote": {
+      "name": "vote",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "household_id": {
+          "name": "household_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "round_id": {
+          "name": "round_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "application_id": {
+          "name": "application_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "resident_profile_id": {
+          "name": "resident_profile_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "stage": {
+          "name": "stage",
+          "type": "vote_stage",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "value": {
+          "name": "value",
+          "type": "vote_value",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "withdrawn_at": {
+          "name": "withdrawn_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "vote_household_id_idx": {
+          "name": "vote_household_id_idx",
+          "columns": [
+            {
+              "expression": "household_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "vote_round_id_idx": {
+          "name": "vote_round_id_idx",
+          "columns": [
+            {
+              "expression": "round_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "vote_application_profile_stage_idx": {
+          "name": "vote_application_profile_stage_idx",
+          "columns": [
+            {
+              "expression": "application_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "resident_profile_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "stage",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {
+        "vote_household_isolation": {
+          "name": "vote_household_isolation",
+          "as": "PERMISSIVE",
+          "for": "ALL",
+          "to": [
+            "public"
+          ],
+          "using": "household_id = (select current_setting('app.household_id', true)::uuid)",
+          "withCheck": "household_id = (select current_setting('app.household_id', true)::uuid)"
+        },
+        "vote_requires_resident_profile": {
+          "name": "vote_requires_resident_profile",
+          "as": "RESTRICTIVE",
+          "for": "ALL",
+          "to": [
+            "public"
+          ],
+          "using": "(select nullif(current_setting('app.profile_id', true), '')) IS NOT NULL",
+          "withCheck": "(select nullif(current_setting('app.profile_id', true), '')) IS NOT NULL"
+        },
+        "vote_own_profile_insert": {
+          "name": "vote_own_profile_insert",
+          "as": "RESTRICTIVE",
+          "for": "INSERT",
+          "to": [
+            "public"
+          ],
+          "withCheck": "resident_profile_id = (select nullif(current_setting('app.profile_id', true), '')::uuid)"
+        },
+        "vote_own_profile_update": {
+          "name": "vote_own_profile_update",
+          "as": "RESTRICTIVE",
+          "for": "UPDATE",
+          "to": [
+            "public"
+          ],
+          "using": "resident_profile_id = (select nullif(current_setting('app.profile_id', true), '')::uuid)",
+          "withCheck": "resident_profile_id = (select nullif(current_setting('app.profile_id', true), '')::uuid)"
         }
       },
       "checkConstraints": {},
@@ -649,9 +825,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {},
@@ -768,9 +944,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {},
@@ -967,9 +1143,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "join_attempt_attempted_at_idx": {
           "name": "join_attempt_attempted_at_idx",
@@ -982,9 +1158,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {},
@@ -1083,9 +1259,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "join_code_issuance_code_idx": {
           "name": "join_code_issuance_code_idx",
@@ -1098,9 +1274,9 @@
             }
           ],
           "isUnique": true,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {},
@@ -1207,9 +1383,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "membership_resident_profile_id_unique": {
           "name": "membership_resident_profile_id_unique",
@@ -1222,10 +1398,10 @@
             }
           ],
           "isUnique": true,
-          "with": {},
-          "method": "btree",
           "where": "\"membership\".\"resident_profile_id\" IS NOT NULL",
-          "concurrently": false
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         },
         "membership_account_id_unique": {
           "name": "membership_account_id_unique",
@@ -1238,9 +1414,9 @@
             }
           ],
           "isUnique": true,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {},
@@ -1359,9 +1535,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "resident_profile_display_name_active_idx": {
           "name": "resident_profile_display_name_active_idx",
@@ -1380,10 +1556,10 @@
             }
           ],
           "isUnique": true,
-          "with": {},
-          "method": "btree",
           "where": "status NOT IN ('moved_out', 'removed')",
-          "concurrently": false
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {},
@@ -1478,9 +1654,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "session_account_id_idx": {
           "name": "session_account_id_idx",
@@ -1493,9 +1669,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {},
@@ -1585,6 +1761,24 @@
         "joined_after_open"
       ]
     },
+    "public.vote_stage": {
+      "name": "vote_stage",
+      "schema": "public",
+      "values": [
+        "invite",
+        "offer"
+      ]
+    },
+    "public.vote_value": {
+      "name": "vote_value",
+      "schema": "public",
+      "values": [
+        "no",
+        "rather_not",
+        "good",
+        "definitely"
+      ]
+    },
     "public.join_code_purpose": {
       "name": "join_code_purpose",
       "schema": "public",
@@ -1614,10 +1808,10 @@
     }
   },
   "schemas": {},
-  "views": {},
   "sequences": {},
   "roles": {},
   "policies": {},
+  "views": {},
   "_meta": {
     "columns": {},
     "schemas": {},

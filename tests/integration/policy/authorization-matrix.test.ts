@@ -3,6 +3,10 @@ import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { claimResidentProfile, registerHousehold, signIn } from "@/modules/identity/auth";
 import * as castingRepo from "@/modules/casting/repository";
+import * as deliberationRepo from "@/modules/deliberation/repository";
+import { VoteError } from "@/modules/deliberation/repository";
+import { insertTestRound } from "../../helpers/applications";
+import { claimPlainMember, insertApplicationAt, setupPipeline } from "../../helpers/pipeline";
 import * as identityRepo from "@/modules/identity/repository";
 import { PermissionDeniedError, ResidentListActionDeniedError } from "@/modules/identity/repository";
 import { eq } from "drizzle-orm";
@@ -111,6 +115,21 @@ const NOT_APPLICABLE_CASTING: Record<string, string> = {
   // src/app file may reference it (asserted below), so a route cannot bypass those checks.
   insertCapturedApplicationTx:
     "Tx primitive, no authorization by contract (captureApplication checks first); no route caller, asserted below",
+  // F4 change 1 (screening-pass) design D2: the two query ports deliberation reads casting through.
+  // Both are `...Tx` reads that trust the context they are given, refuse a profile-less one, and
+  // re-apply the voter predicate themselves; deliberation's repository is the only caller (no
+  // src/app file may reference them, asserted below).
+  listVoterRoundsTx:
+    "Tx read port; visibility tested in tests/integration/deliberation/screening-pass.test.ts (non-participant, moved-out); no route caller, asserted below",
+  listVoteCandidatesTx:
+    "Tx read port; card visibility tested in tests/integration/deliberation/screening-pass.test.ts (non-participant, moved-out, key set); no route caller, asserted below",
+};
+
+// F4 change 1: deliberation/repository.ts. The reads carry their visibility in screening-pass.test.ts
+// and awaiting-vote-counts.test.ts; castVote is the one mutator and is decided below.
+const NOT_APPLICABLE_DELIBERATION: Record<string, string> = {
+  getAwaitingVoteCounts: "read; visibility tested in tests/integration/deliberation/awaiting-vote-counts.test.ts",
+  getScreeningPass: "read; visibility tested in tests/integration/deliberation/screening-pass.test.ts",
 };
 
 const NOT_APPLICABLE_IDENTITY: Record<string, string> = {
@@ -211,6 +230,37 @@ describe("authorization matrix (M6): every exported casting/identity mutator dec
       walk(join(ROOT, "scripts"));
       const callers = files.filter((f) => /\binsertCapturedApplicationTx\b/.test(readFileSync(f, "utf8")));
       expect(callers).toEqual([]);
+    });
+
+    it("the two casting query ports have no caller outside casting and deliberation's repository", () => {
+      for (const name of ["listVoterRoundsTx", "listVoteCandidatesTx"]) {
+        expect(srcAppReferencesName(name), `${name} is referenced under src/app`).toBe(false);
+        const allowed = [
+          join(ROOT, "src", "modules", "casting", "repository.ts"),
+          join(ROOT, "src", "modules", "deliberation", "repository.ts"),
+        ];
+        const files: string[] = [];
+        const walk = (dir: string) => {
+          for (const entry of readdirSync(dir)) {
+            const full = join(dir, entry);
+            if (statSync(full).isDirectory()) walk(full);
+            else if (/\.(ts|tsx)$/.test(entry) && !allowed.includes(full)) files.push(full);
+          }
+        };
+        walk(join(ROOT, "src"));
+        walk(join(ROOT, "scripts"));
+        const callers = files.filter((f) => new RegExp(`\\b${name}\\b`).test(readFileSync(f, "utf8")));
+        expect(callers, `${name} callers`).toEqual([]);
+      }
+    });
+
+    it("deliberation/repository.ts: NOT_APPLICABLE + cases below == every exported function", () => {
+      const all = new Set(exportedFunctionNames(deliberationRepo as unknown as Record<string, unknown>));
+      const classified = new Set([...Object.keys(NOT_APPLICABLE_DELIBERATION), ...DELIBERATION_CASE_NAMES]);
+      const unclassified = [...all].filter((n) => !classified.has(n)).sort();
+      const stale = [...classified].filter((n) => !all.has(n)).sort();
+      expect(unclassified, `Unclassified deliberation export(s): ${unclassified.join(", ")}`).toEqual([]);
+      expect(stale, `Stale classification entries (no longer exported): ${stale.join(", ")}`).toEqual([]);
     });
 
     it("casting/repository.ts: NOT_APPLICABLE + cases below == every exported function", () => {
@@ -552,6 +602,36 @@ describe("authorization matrix (M6): every exported casting/identity mutator dec
   });
 });
 
+describe("deliberation/repository.ts castVote refuses who may not vote (M6)", () => {
+  const households: TestHousehold[] = [];
+  const accountIds: string[] = [];
+
+  afterAll(async () => {
+    await cleanupAll(...accountIds.map(deleteTestAccount), ...households.map((h) => h.cleanup()));
+  });
+
+  it("castVote: the household account is refused with ProfileRequiredError", async () => {
+    const s = await setupPipeline(households);
+    const app = await insertApplicationAt(s, "new");
+    await expect(
+      deliberationRepo.castVote(s.hh.context, { roundId: s.roundId, applicationId: app.id, value: "good" }),
+    ).rejects.toThrow(castingRepo.ProfileRequiredError);
+  });
+
+  it("castVote: a claimed plain resident with no participation in the round gets not_eligible", async () => {
+    const s = await setupPipeline(households);
+    const resident = await claimPlainMember(s.hh, "Plain", accountIds);
+    // A claimed resident participates in every open round, so the round is built without them.
+    const round = await withSessionContext(s.moderator.context, (tx) => insertTestRound(tx, s.hh.householdId, "open"));
+    const app = await insertApplicationAt(s, "new", {}, round);
+    const err = await deliberationRepo
+      .castVote(resident.context, { roundId: round, applicationId: app.id, value: "good" })
+      .catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(VoteError);
+    expect((err as VoteError).code).toBe("not_eligible");
+  });
+});
+
 // Case name lists, declared after the `it` blocks above for readability but referenced (via
 // function hoisting semantics of the surrounding describe callbacks, which only run when Vitest
 // collects the file, by which point this module-level const is already initialized) by the set-
@@ -572,6 +652,8 @@ const CASTING_CASE_NAMES = [
   "updateHouseholdSettingsWithProcedureLock",
   "forceChangeSettingWhileRoundOpen",
 ];
+
+const DELIBERATION_CASE_NAMES = ["castVote"];
 
 const IDENTITY_CASE_NAMES = [
   "createResidentProfile",

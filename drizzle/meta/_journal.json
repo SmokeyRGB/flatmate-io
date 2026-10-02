@@ -201,6 +201,13 @@
     {
       "idx": 28,
       "version": "7",
+      "when": 1790765030593,
+      "tag": "0028_vote",
+      "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
       "when": 1790863115553,
       "tag": "0030_revoke_anon_authenticated",
       "breakpoints": true

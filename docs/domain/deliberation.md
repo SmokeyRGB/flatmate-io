@@ -11,6 +11,7 @@ Alles in diesem Kontext ist ⚫ — Beratungsinhalt über eine Person.
 | Feld | Typ | Klasse | Erläuterung |
 |---|---|:--:|---|
 | `id` | `uuid` | ⚙️ | |
+| `household_id` | `uuid` | ⚙️ | redundant zur Runde, aber Anker der RLS-Policy (ADR-004) |
 | `round_id` · `application_id` | `uuid` · `uuid` | ⚙️ | |
 | `resident_profile_id` | `uuid` | ⚫ | wer gestimmt hat |
 | `stage` | `enum(invite, offer)` | ⚙️ | Runde 1 (Einladen) und Runde 2 (Zusage) nutzen **dieselbe** Skala und dieselbe Tabelle |
