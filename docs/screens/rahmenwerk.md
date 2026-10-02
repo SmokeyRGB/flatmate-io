@@ -205,7 +205,7 @@ irreführend: Sie liest sich, als verliehe ein Null-Wert Rechte. Richtig ist und
 - **`Session.acting_profile_id = null`** heißt **nur** „diese Sitzung gehört zu einem
   Haushalts-Account". Mehr nicht.
 - **Die Rechte kommen aus `Membership.role`** (`household_admin` · `moderator` · `member`) **und
-  `Membership.permissions`** (`manage_settings`, `manage_members`, `close_round`, …). Ein Konto mit
+  `Membership.permissions`** (`manage_voting_procedure`, `manage_members`, `manage_rounds`, …). Ein Konto mit
   `role = member` bekommt durch `null` **nichts** dazu — es hat nur keine Stimmidentität.
 
 **Regel fürs Inventar:** Welche Abschnitte der Organisationsfläche erscheinen, entscheidet
