@@ -13,6 +13,7 @@ import {
   PermissionDeniedError,
   assertAccountCanVoteTx,
   assertHasPermissionTx,
+  assertHoldsAnyPermissionTx,
 } from "@/modules/identity/repository";
 import { parseScaleWeights, type ScaleWeights } from "./scale-weights";
 import { vote } from "./schema";
@@ -155,7 +156,9 @@ export async function getAwaitingVoteCounts(context: SessionContext): Promise<Ma
   if (context.profileId === null) return counts;
   return withSessionContext(context, async (tx) => {
     try {
-      await assertHasPermissionTx(tx, context, "vote");
+      // A count read: no row lock (identity's rule for a read that returns nothing an ended
+      // membership could not see), so Start does not hold the caller's membership row.
+      await assertHoldsAnyPermissionTx(tx, context, ["vote"], { lock: false });
     } catch (err) {
       if (err instanceof PermissionDeniedError) return counts;
       throw err;

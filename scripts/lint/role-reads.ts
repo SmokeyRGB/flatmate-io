@@ -32,6 +32,10 @@ const ROLE_READ_PATTERNS: readonly RegExp[] = [
   /(===|!==|==|!=)\s*[\w?.]*\.role\b/,
   /\b(eq|ne|inArray|notInArray)\(\s*[\w.]*\.role\b/,
   /\brole\s*(=|<>|!=|IN\b)\s*['(]/,
+  // code-review 2026-10-02: the cheap shapes the first four missed.
+  /\bswitch\s*\([^)]*\.role\b/,
+  /\.includes\(\s*[\w?.]*\.role\b/,
+  /\brole\s*(=|<>|!=)\s*\$\{/,
 ];
 
 const MARKER = /role-state-read:(.*)$/;

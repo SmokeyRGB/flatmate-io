@@ -7,7 +7,6 @@ import {
 } from "@/modules/identity/repository";
 import { getCurrentSession } from "@/modules/identity/session-cookie";
 import { de } from "@/ui/strings";
-import { OrganisationAccessDenied } from "../organisation-access-denied";
 import { requireOrganisationAccess } from "../organisation-access";
 import { MembersView } from "./members-view";
 
@@ -23,7 +22,9 @@ export default async function MembersPage() {
   // role-permissions design D9: every organisation page first checks the caller's stored
   // permissions on this request, so a demotion committed since the last load shows the access
   // message on reload.
-  if (!(await requireOrganisationAccess(current))) return <OrganisationAccessDenied />;
+  // A caller without organisation access gets this page's own refusal, which also points a resident
+  // to the read-only household list (FR-1.31), rather than the generic organisation message.
+  if (!(await requireOrganisationAccess(current))) return <MembersAccessDenied />;
 
   // FR-1.27: "not reachable at all — by any route" for a caller holding no member-administration
   // permission — this is that refusal actually reaching a resident (e.g. via the dashboard's
@@ -33,20 +34,7 @@ export default async function MembersPage() {
   try {
     residentList = await getResidentList(current.context, current.context.accountId);
   } catch (err) {
-    if (err instanceof PermissionDeniedError) {
-      return (
-        <div className="mx-auto max-w-md space-y-4 p-6">
-          <h1 className="font-serif text-2xl font-semibold">{t.heading}</h1>
-          <p className="text-sm text-muted-foreground">
-            {t.accessDeniedBody} {t.accessDeniedLinkPrefix}{" "}
-            <a href="/who-lives-here" className="btn-link">
-              {de.org.dashboard.whoLivesHereLink}
-            </a>
-            .
-          </p>
-        </div>
-      );
-    }
+    if (err instanceof PermissionDeniedError) return <MembersAccessDenied />;
     throw err;
   }
 
@@ -64,4 +52,21 @@ export default async function MembersPage() {
   // Copilot review fix: exactly one `now` per render, threaded through every helper, so a link's
   // live/dead split, its status label, and the removed-joiner caution cannot disagree.
   return <MembersView residentList={residentList} joinCodeIssuances={joinCodeIssuances} host={host} now={new Date()} />;
+}
+
+// Both refusals of this page: no organisation access at all, or organisation access without a
+// member-administration permission. The pointer to /who-lives-here serves a resident (FR-1.31).
+function MembersAccessDenied() {
+  return (
+    <div className="mx-auto max-w-md space-y-4 p-6">
+      <h1 className="font-serif text-2xl font-semibold">{t.heading}</h1>
+      <p className="text-sm text-muted-foreground">
+        {t.accessDeniedBody} {t.accessDeniedLinkPrefix}{" "}
+        <a href="/who-lives-here" className="btn-link">
+          {de.org.dashboard.whoLivesHereLink}
+        </a>
+        .
+      </p>
+    </div>
+  );
 }

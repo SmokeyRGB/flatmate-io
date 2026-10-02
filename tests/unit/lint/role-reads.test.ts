@@ -50,6 +50,12 @@ describe("role-reads lint (identity/member-administration)", () => {
     expect(findRoleReads("const q = sql`... AND role IN ('household_admin', 'moderator')`;\n")).toHaveLength(1);
   });
 
+  it("flags a switch on a role, an includes() of a role and a bound SQL role comparison", () => {
+    expect(findRoleReads(`switch (membershipRow.role) {\n`)).toHaveLength(1);
+    expect(findRoleReads(`if (["household_admin", "moderator"].includes(row.role)) {}\n`)).toHaveLength(1);
+    expect(findRoleReads("const q = sql`... WHERE role = ${wanted}`;\n")).toHaveLength(1);
+  });
+
   it("does not flag toRole / fromRole comparisons or a role write", () => {
     expect(findRoleReads(`if (toRole !== "member") return;\nif (fromRole === toRole) return;\n`)).toEqual([]);
     expect(findRoleReads(`await tx.update(membership).set({ role: "member", permissions: [] });\n`)).toEqual([]);

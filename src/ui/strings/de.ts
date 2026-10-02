@@ -583,7 +583,7 @@ export const de = {
   },
   settings: {
     heading: "Haushaltseinstellungen",
-    accessDeniedBody: "Diese Seite ist nur für die Verwaltung.",
+    accessDeniedBody: "Das Abstimmungsverfahren legt die Verwaltung fest.",
     lockedWhileRoundOpen: (roundTitle: string) =>
       `Solange „${roundTitle}" läuft, bleiben diese Einstellungen unverändert. Schließe die ` +
       `Runde, um sie hier zu ändern.`,
