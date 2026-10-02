@@ -64,7 +64,7 @@
 
 ## 1. The permission table, CHECKs and migration 0029 (design D1, D2, D3)
 
-- [ ] 1.1 `src/modules/identity/schema.ts`, per design D2:
+- [x] 1.1 `src/modules/identity/schema.ts`, per design D2:
   - `PERMISSIONS` (14 entries, `vote` with `holders: ["resident"]` meaning `is_resident`, each with its final `holders`, a `checkFrom: "contract"` on the three
     D1 marks with † (`manage_rooms`, `create_application`, `change_application_state`; never on
     `manage_voting_procedure`), and a comment naming its matrix row) and the `PermissionName` type; no
@@ -95,7 +95,7 @@
     and, where it tightens later, the contract migration.
   Keep every existing export name that casting, `auth.ts` and tests import; `npx tsc --noEmit`
   lists anything that breaks.
-- [ ] 1.2 Generate: `npx drizzle-kit generate --name role_permissions`. The file is
+- [x] 1.2 Generate: `npx drizzle-kit generate --name role_permissions`. The file is
   `0029_role_permissions` in every merge order. **General rule** (WP01's `0030` and WP03's `0031` both
   carry journal `idx` 29 on their branches): the journal on `main` must list entries in file-number
   order with sequential `idx`; `0029_role_permissions` sits directly after `0028_vote`; each later
@@ -121,12 +121,12 @@
     `prevId` per the rule; say so in the report for the human to pass on.
   Then `npx drizzle-kit check` (report its output). The contract migration (later change) takes the
   next free number.
-- [ ] 1.3 Hand-edit `drizzle/0029_role_permissions.sql` into D3's steps (1–8 with 6a), in order, with a header
+- [x] 1.3 Hand-edit `drizzle/0029_role_permissions.sql` into D3's steps (1–8 with 6a), in order, with a header
   comment arguing each step against the constraints live at it (copy `0027`'s header shape). Every
   array literal is written out, not bound. `grep -nE '\$[0-9]' drizzle/0029*` → no output (the `$$`
   of the `DO` block is expected). `npx tsx scripts/lint/migration-shape.ts` → passes. Keep
   `drizzle/meta/` as generated, apart from the rename.
-- [ ] 1.4 `tests/unit/identity/role-permissions-constants.test.ts`: read `0029` like `0027`; assert
+- [x] 1.4 `tests/unit/identity/role-permissions-constants.test.ts`: read `0029` like `0027`; assert
   that the last-adding migration's literals equal what `schema.ts` derives: household floor and
   ceiling; moderator floor (now from `0029`); the three holder CHECKs (moderator-only =
   `reverse_application_state`, `manage_rounds`, `manage_round_participation`); and `0029`'s backfill
@@ -141,7 +141,7 @@
   (c) leave `manage_round_participation` out of the `0029` moderator-only literal → fails; (d) drop
   `manage_settings` from the ceiling in both `schema.ts` and `0029` → the explicit containment
   assertion fails (the literal-equality check alone would not).
-- [ ] 1.5 New `tests/unit/identity/permission-declarations.test.ts` (design D10):
+- [x] 1.5 New `tests/unit/identity/permission-declarations.test.ts` (design D10):
   - every set entry is a key of `PERMISSIONS` whose `holders` include that set's role;
   - every permission string literal passed in `src/**/*.{ts,tsx}` to `assertHasPermission`,
     `assertHasPermissionTx`, `assertHoldsAnyPermissionTx`, `assertHoldsAllPermissionsTx`,
@@ -156,10 +156,10 @@
 
 ## 2. The permission primitive and one denial class (design D4, D5)
 
-- [ ] 2.1 No new read helper (pre-mortem L15): the reads in group 4 and `assertAccountCanVoteTx` use the
+- [x] 2.1 No new read helper (pre-mortem L15): the reads in group 4 and `assertAccountCanVoteTx` use the
   existing private `readLiveMembershipTx(tx, context, lock)`, which already returns the caller's live
   row with the session-profile predicate. The holding rule stays only in `membershipHoldsPermission`.
-- [ ] 2.2 Delete `ResidentListActionDeniedError`, `assertIsAdministration` and
+- [x] 2.2 Delete `ResidentListActionDeniedError`, `assertIsAdministration` and
   `assertIsAdministrationOrModerator`. Every refusal they produced becomes a `PermissionDeniedError`
   naming the permission (null actor, account mismatch, missing permission). `npx tsc --noEmit`
   lists every caller; each is fixed in groups 3–5.
@@ -173,16 +173,16 @@ Each task: refuse `actingAccountId !== context.accountId` (or a null `actor.acco
 matrix row (no "administration or moderator" wording left). All in
 `src/modules/identity/repository.ts`.
 
-- [ ] 3.1 `transitionResidentProfileStatus` → `manage_members`.
-- [ ] 3.2 `removeMember` → `manage_members`.
-- [ ] 3.3 `setMovedOut` → `manage_members`.
-- [ ] 3.4 `reactivateMember` → `manage_members`.
-- [ ] 3.5 `issueJoinCode` → `manage_join_codes` (inside the `withSessionContext` that calls
+- [x] 3.1 `transitionResidentProfileStatus` → `manage_members`.
+- [x] 3.2 `removeMember` → `manage_members`.
+- [x] 3.3 `setMovedOut` → `manage_members`.
+- [x] 3.4 `reactivateMember` → `manage_members`.
+- [x] 3.5 `issueJoinCode` → `manage_join_codes` (inside the `withSessionContext` that calls
   `issueJoinCodeTx`; `issueJoinCodeTx` itself stays ungated for `registerHousehold`).
-- [ ] 3.6 `extendJoinCode`, `deleteJoinCode` → `manage_join_codes`.
-- [ ] 3.7 `createResidentProfile` → `create_resident_profile` (a moderator may now create a profile; human decision 2026-10-01, design D1). Rewrite the FR-1.3 comment above it.
-- [ ] 3.8 `issuePasswordResetLink` → `issue_password_reset_link`.
-- [ ] 3.9 `setMemberRole` → `appoint_moderator` (a moderator may now appoint and demote, itself and other moderators included; design D1). Demotion sets `permissions = CASE WHEN is_resident THEN RESIDENT_PERMISSIONS ELSE '{}' END` (a
+- [x] 3.6 `extendJoinCode`, `deleteJoinCode` → `manage_join_codes`.
+- [x] 3.7 `createResidentProfile` → `create_resident_profile` (a moderator may now create a profile; human decision 2026-10-01, design D1). Rewrite the FR-1.3 comment above it.
+- [x] 3.8 `issuePasswordResetLink` → `issue_password_reset_link`.
+- [x] 3.9 `setMemberRole` → `appoint_moderator` (a moderator may now appoint and demote, itself and other moderators included; design D1). Demotion sets `permissions = CASE WHEN is_resident THEN RESIDENT_PERMISSIONS ELSE '{}' END` (a
   member holds the resident set and nothing else; a set-difference would leave an individually
   granted `manage_voting_procedure` behind and the administration CHECK would refuse the demotion).
   The target UPDATE gets `isNull(membership.revokedAt)` and the target is read `FOR UPDATE` (a
@@ -191,9 +191,9 @@ matrix row (no "administration or moderator" wording left). All in
   (`target.role === "household_admin"`) with `// role-state-read: …` (reason: a clear refusal; the
   household-only CHECK would also refuse it, but as a 500).
   The `fromRole === toRole` no-op stays.
-- [ ] 3.10 `triggerSubjectAccessExport` → `export_subject_access`. It has no transaction: use
+- [x] 3.10 `triggerSubjectAccessExport` → `export_subject_access`. It has no transaction: use
   `assertHasPermission` (no write follows; the stub returns a handle), and say so in its comment.
-- [ ] 3.10a `src/modules/casting/repository.ts`: `createRound`, `openRound`, `createAndOpenRound`,
+- [x] 3.10a `src/modules/casting/repository.ts`: `createRound`, `openRound`, `createAndOpenRound`,
   `listOrganisationTasks` → `manage_rounds`; `addResidentToRound` → `manage_round_participation`;
   `updateHouseholdSettingsWithProcedureLock`, `forceChangeSettingWhileRoundOpen` →
   `manage_voting_procedure`.
@@ -202,14 +202,14 @@ matrix row (no "administration or moderator" wording left). All in
   (`canOpenRound`): `close_round` → `manage_rounds`. Rewrite each comment that says „close_round".
   `grep -rn "close_round\|manage_settings" src` afterwards → only `REPLACED_PERMISSIONS`, the
   migration-history comments in `schema.ts`, and the demotion SQL.
-- [ ] 3.10b `assertAccountCanVote` (identity) becomes `assertAccountCanVoteTx(tx, context)`: the
+- [x] 3.10b `assertAccountCanVote` (identity) becomes `assertAccountCanVoteTx(tx, context)`: the
   session-account check, then the caller's live membership read `FOR SHARE` in `tx` (reuse
   `readLiveMembershipTx`), refusing with `HouseholdAccountCannotVoteError` unless it holds `vote`.
   Delete the old non-`Tx` export (no caller remains); move `account-cannot-vote.test.ts` onto
   `castVote` (FR-1.7 tested on the real path) and update `authorization-matrix.test.ts`'s exemption
   entry. Rewrite its comment (FR-1.7: the household account holds no `vote`; a moderator without a
   resident profile neither).
-- [ ] 3.10c `src/modules/deliberation/repository.ts` (F4): `castVote` — keep the early profile and input
+- [x] 3.10c `src/modules/deliberation/repository.ts` (F4): `castVote` — keep the early profile and input
   checks, replace the out-of-transaction `assertAccountCanVote` with `assertAccountCanVoteTx(tx,
   context)` as the first statement inside the insert's `withSessionContext`, mapping
   `HouseholdAccountCannotVoteError` to `VoteError("not_eligible")` as before; `getScreeningPass` and
@@ -220,48 +220,48 @@ matrix row (no "administration or moderator" wording left). All in
   `tests/integration/deliberation/cast-vote-invalid-input.test.ts` and `cast-vote.test.ts` (they mock
   or name `assertAccountCanVote`). Comments name `vote`
   and the matrix row.
-- [ ] 3.10d Lock order against the new in-transaction checks (pre-mortem M9): `castVote` and every
+- [x] 3.10d Lock order against the new in-transaction checks (pre-mortem M9): `castVote` and every
   identity mutator now take S(caller membership) first. `setMovedOut` and `removeMember` currently
   update the target's profile before its membership (X(profile) then X(membership)), which can
   deadlock with a vote by that target. Read the target membership `FOR UPDATE` at the start of both
   (it is already read, unlocked, near the top), so membership is always locked before profile.
   Write the order into a comment beside `revokeMembershipForProfileTx`: membership, then profile,
   then round/participation (0028's trigger).
-- [ ] 3.11 `grep -n "role" src/modules/identity/repository.ts`: every remaining hit is a write, a
+- [x] 3.11 `grep -n "role" src/modules/identity/repository.ts`: every remaining hit is a write, a
   type, a selected column, a comment, or a marked state read. Paste the list into the report.
 
 ## 4. Reads and capability flags (design D4, D6)
 
-- [ ] 4.1 `getResidentList(context, accountId)`: refuse `accountId !== context.accountId`; inside its
+- [x] 4.1 `getResidentList(context, accountId)`: refuse `accountId !== context.accountId`; inside its
   transaction, one `readLiveMembershipTx(tx, context, true)` (the existing helper; no new one); refuse unless it holds any of
   `manage_members`, `manage_join_codes`, `create_resident_profile`, `appoint_moderator`; return
   `{ members, canManageMembers, canManageJoinCodes, canCreateProfile, canAppointModerator,
   canIssueResetLink, leadWithJoinCode }` computed from that one set (D6). Remove `isAdmin`/`canAct`.
-- [ ] 4.2 `listJoinCodeIssuances`: same shape: one locked read inside the transaction; refuse without
+- [x] 4.2 `listJoinCodeIssuances`: same shape: one locked read inside the transaction; refuse without
   `manage_join_codes`; the reset-row filter keys on `issue_password_reset_link` from the same set.
   Rewrite the review-fix comment above it accordingly.
-- [ ] 4.3 `getNavigationAccess`: `membersList` = holds any of the four member-administration
+- [x] 4.3 `getNavigationAccess`: `membersList` = holds any of the four member-administration
   permissions; `organisation` = holds any key of `PERMISSIONS` outside `RESIDENT_PERMISSIONS`
   (retired names and unknown strings never count, D6). Comment cites change 5 as its replacement.
-- [ ] 4.4 `getHouseholdSettings`: call `assertHasPermission(context, context.accountId,
+- [x] 4.4 `getHouseholdSettings`: call `assertHasPermission(context, context.accountId,
   "manage_voting_procedure")` **before** its `withSessionContext`, never inside the callback
   (`assertHasPermission` opens its own transaction; nesting throws `NestedSessionContextError`).
 
 ## 5. Screens
 
-- [ ] 5.1 `src/app/(org)/members/page.tsx`: destructure the new flags; `createResidentForm` ←
+- [x] 5.1 `src/app/(org)/members/page.tsx`: destructure the new flags; `createResidentForm` ←
   `canCreateProfile`; the role toggle ← `canAppointModerator`; move-out, reactivate and remove ←
   `canManageMembers`; the join-link section and the per-profile invitation ← `canManageJoinCodes`;
   both reset-link blocks ← `canIssueResetLink`. The badge and the toggle direction keep
   `m.role`, each marked `{/* role-state-read: describes the listed member, not the caller */}`.
   Update the comments that cite `isAdmin` / `assertIsAdministration`.
-- [ ] 5.2 `src/app/(org)/settings/page.tsx`: drop the page-level gate; catch `PermissionDeniedError`
+- [x] 5.2 `src/app/(org)/settings/page.tsx`: drop the page-level gate; catch `PermissionDeniedError`
   from `getHouseholdSettings` and render the existing access message. Rewrite the O20 comment
   (`manage_voting_procedure`, not `household_admin`).
-- [ ] 5.3 `src/app/(org)/members/actions.ts`, `remove-member-form.tsx`,
+- [x] 5.3 `src/app/(org)/members/actions.ts`, `remove-member-form.tsx`,
   `src/app/(org)/organization/page.tsx`: comments that name the deleted gates now name the
   permission; no logic change.
-- [ ] 5.4 `tests/unit/identity/resident-list-empty-state.test.ts` (and any other render or unit test
+- [x] 5.4 `tests/unit/identity/resident-list-empty-state.test.ts` (and any other render or unit test
   `tsc` flags, e.g. `tests/unit/casting/organization-round-button.test.ts`): move to the new flags.
   Add a render test `tests/unit/identity/members-page-capabilities.test.ts` of the members list
   markup for flag sets: household (all five), moderator (all but `canIssueResetLink`), and one set
@@ -270,7 +270,7 @@ matrix row (no "administration or moderator" wording left). All in
   the same directory first, no behaviour change. **Break:** gate the profile form on
   `canAppointModerator` → the single-flag cases fail.
 
-- [ ] 5.5 Organisation-area check (design D9). First read the layout section of
+- [x] 5.5 Organisation-area check (design D9). First read the layout section of
   `node_modules/next/dist/docs/` and confirm that a layout is not re-rendered on navigation between
   sibling pages; quote it in the report (if it is re-rendered, say so and stop: D9 then belongs in
   `src/app/(org)/layout.tsx`). Add `src/app/(org)/organisation-access.ts` with
@@ -286,25 +286,25 @@ matrix row (no "administration or moderator" wording left). All in
   `tests/unit/casting/round-page-capture-link.test.ts` if it covers a guarded page) are updated in
   the same commit; list them. Each page's own narrower check stays. Every
   `page.tsx` keeps its `loading.tsx` (pending-feedback lint).
-- [ ] 5.6 `src/app/(org)/organization/page.tsx`: delete the `profileId === null ||` term; links by
+- [x] 5.6 `src/app/(org)/organization/page.tsx`: delete the `profileId === null ||` term; links by
   permission (rooms ← `manage_rooms`, members ← the members-list flag, settings ← `manage_voting_procedure`),
   read from one membership read (extend `getNavigationAccess` with `rooms` and `settings` flags
   rather than three `assertHasPermission` calls). Update `navigation-access` expectations.
 
 ## 6. The ninth lint (design D7)
 
-- [ ] 6.1 `scripts/lint/role-reads.ts` per D7 (patterns, the `role-state-read:` marker on the same
+- [x] 6.1 `scripts/lint/role-reads.ts` per D7 (patterns, the `role-state-read:` marker on the same
   or previous line with a non-empty reason, comments stripped before matching, markers read from the
   raw text, `src/modules/identity/schema.ts` exempt). Reuse an existing lint's walker and comment
   stripper rather than writing a seventh (audit finding #22). Output names file:line.
-- [ ] 6.2 `tests/unit/lint/role-reads.test.ts`, on the pattern of
+- [x] 6.2 `tests/unit/lint/role-reads.test.ts`, on the pattern of
   `tests/unit/lint/pending-feedback.test.ts`: fixtures for `m.role === "moderator"` (flagged),
   the same with a marker (passes), a marker without a reason (flagged), `eq(membership.role, …)`,
   SQL `role <> 'moderator'` in a template string (flagged), `toRole !== "member"` and
   `role: "member"` (not flagged), `role ===` inside a comment (not flagged). Plus one case running
   the lint over the real `src/` → zero findings. **Break:** put `isAdmin = membershipRow.role ===
   "household_admin"` back into a scratch copy of the fixture → flagged.
-- [ ] 6.3 `package.json` `verify`: add `tsx scripts/lint/role-reads.ts` after `pending-feedback.ts`.
+- [x] 6.3 `package.json` `verify`: add `tsx scripts/lint/role-reads.ts` after `pending-feedback.ts`.
   `.claude/rules/guardrail-lints.md`: a row for it; "eight" → "nine" there and in `CLAUDE.md`
   (both mentions in "Commands"). `tests/unit/lint/cleanup-inventory.test.ts` stays "the ninth
   check" in name only if the file says so; reword it to "the vitest-side check" if the count would
@@ -427,7 +427,7 @@ matrix row (no "administration or moderator" wording left). All in
 
 ## 8. Docs (German text below is for the human to approve)
 
-- [ ] 8.0 `docs/03-PRD.md` §4.0.1 Rechtematrix (precedence 3; human decision 2026-10-01, recorded
+- [x] 8.0 `docs/03-PRD.md` §4.0.1 Rechtematrix (precedence 3; human decision 2026-10-01, recorded
   in the commit message too):
   - row „`ResidentProfile` anlegen (aus Verwaltungskontext)" → „`ResidentProfile` anlegen (z. B.
     für einen persönlichen Beitrittslink)", Moderator ❌ → ✅;
@@ -453,7 +453,7 @@ matrix row (no "administration or moderator" wording left). All in
   - a Versionshistorie line for the same change;
   - check the Wechsel row „Moderator scheidet aus" and §4.0.1's last-moderator AC still read true
     (the household account can still do both) and leave them.
-- [ ] 8.0s `docs/02-SRD.md` (precedence 2 — a scope line; the human decision is quoted verbatim in the
+- [x] 8.0s `docs/02-SRD.md` (precedence 2 — a scope line; the human decision is quoted verbatim in the
   commit): S-04 „`Membership` mit orthogonalen `is_resident` / `role` plus einzeln vergebbare
   Berechtigungen (Bewerber anlegen, Status ändern, Runde schließen, Termine bestätigen)" →
   „… plus Berechtigungen, die einzeln nur an die Moderation vergeben werden können; Bewohnende
@@ -461,7 +461,7 @@ matrix row (no "administration or moderator" wording left). All in
   sentence at „plus einzeln vergebbaren Berechtigungen" likewise. Add an SRD Versionshistorie line.
   Check `docs/01`/`08` and `docs/COVERAGE.md` for an E-04/S-04 restatement that now contradicts and
   list each in the report (amend citations, not sources).
-- [ ] 8.0a `docs/backlog/requirements/F1-requirements.md`: FR-1.3 → "The system shall allow the
+- [x] 8.0a `docs/backlog/requirements/F1-requirements.md`: FR-1.3 → "The system shall allow the
   household account **and a moderator** to create resident profiles. *(Amended 2026-10-01, human
   decision: profile creation is part of running a casting.)*"; EC-1.7 gains "*(Amended
   2026-10-01: a moderator may do the same; administration keeps the fallback when no moderator is
@@ -469,7 +469,7 @@ matrix row (no "administration or moderator" wording left). All in
   round, confirm appointments)" → „plus permissions grantable individually to a moderator only;
   residents vote and take part *(amended 2026-10-01)*". Search the packet once more for "administration-only" claims about appointing and
   amend them the same way, listing each in the report.
-- [ ] 8.1 `docs/domain/identity.md` §2.1:
+- [x] 8.1 `docs/domain/identity.md` §2.1:
   - the list „Vergebbare Werte in `permissions`": `close_round` → `manage_rounds`, `manage_settings` →
     `manage_voting_procedure` (with „*(seit 2026-10-01; `manage_settings` war zu breit: alle
     gebauten Einstellungen sind das Abstimmungsverfahren. Haushalts-Einstellungen wie Name,
@@ -510,22 +510,22 @@ matrix row (no "administration or moderator" wording left). All in
     anlegen und direkt zum Moderator ernennen"): add „— seit 2026-10-01 auch die Moderation";
   - in the O-16 box (§2.1, `Account`): „(`Membership.is_resident = false`, `manage_members`)" →
     „(`Membership.is_resident = false`, `issue_password_reset_link`)".
-- [ ] 8.1b `docs/domain/zustandsmaschinen.md` (round table, „Recht" column), `docs/screens/rahmenwerk.md`
+- [x] 8.1b `docs/domain/zustandsmaschinen.md` (round table, „Recht" column), `docs/screens/rahmenwerk.md`
   (the permissions example list) and the F1 packet's §8 note: `close_round` → `manage_rounds`. The
   frozen `docs/04-Domaenenmodell.md` and `docs/07-Screen-Inventar.md` are **not** touched (Rule 4);
   they keep the old name as snapshots.
-- [ ] 8.1a `docs/screens/O-organisation.md` O16 (and the „Moderator ernennen" line near O20): where
+- [x] 8.1a `docs/screens/O-organisation.md` O16 (and the „Moderator ernennen" line near O20): where
   profile creation or appointing is described as the Verwaltung's alone, add the moderator, in the
   same words as 8.0. List each edit in the report.
-- [ ] 8.2 `docs/screens/O-organisation.md` O20, row **Zugang**: „Nur mit `manage_voting_procedure`
+- [x] 8.2 `docs/screens/O-organisation.md` O20, row **Zugang**: „Nur mit `manage_voting_procedure`
   (Haushalts-Account; einer Moderation nur als einzeln vergebenes Recht, ⬜), unabhängig von
   `acting_profile_id` (§4.2)". Also `domain/zustandsmaschinen.md`'s round row „`close_round` bzw.
   `manage_settings`" → „`manage_rounds`" (opening a round is round management; the procedure is
   only snapshotted).
-- [ ] 8.3 `docs/SPEC-INDEX.md`: new row „**Rechte und Rollen-Rechtebündel**" → authoritative
+- [x] 8.3 `docs/SPEC-INDEX.md`: new row „**Rechte und Rollen-Rechtebündel**" → authoritative
   **`03-PRD.md` §4.0.1** (Rechtematrix); also `domain/identity.md` §2.1 (Rechtenamen, Bündel),
   `backlog/requirements/F1-requirements.md` FR-1.3, FR-1.8, FR-1.27, EC-1.7.
-- [ ] 8.4 `docs/review-log.md` §Offene-Punkte-Register: closed rows (role checks → stored
+- [x] 8.4 `docs/review-log.md` §Offene-Punkte-Register: closed rows (role checks → stored
   permissions, F3 change 2b, 2026-10-01; moderator creates profiles and appoints/demotes, matrix
   amended 2026-10-01); open rows: (a) „`manage_rooms`
   ist für Bewohnende noch einzeln vergebbar (ebenso `create_application` und
@@ -539,7 +539,7 @@ matrix row (no "administration or moderator" wording left). All in
   Haushalts-Account; ob das Abstimmungsverfahren als Rundeneinstellung zur Moderation wandert, ist
   offen. Eine Verschiebung braucht die Entscheidung in `03-PRD.md` §4.0.1, die Bündel-Definition
   und eine Migration, keine Prüfung im Code — owner: human, no deadline.
-- [ ] 8.5 `node tools/check-refs.ts` → 0 failures. No frozen file touched (Rule 4); no pointer from
+- [x] 8.5 `node tools/check-refs.ts` → 0 failures. No frozen file touched (Rule 4); no pointer from
   `docs/` into `openspec/` (Rule 7).
 
 ## 9. Apply 0029 to dev, as late as possible
