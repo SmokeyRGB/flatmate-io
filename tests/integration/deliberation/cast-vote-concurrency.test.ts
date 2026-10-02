@@ -58,6 +58,11 @@ describe("castVote concurrency (EC-4.6)", () => {
     expect(rows[0].value).toBe("no");
   });
 
+  // Invariant guard for vote_guard step 4's FOR SHARE (design D7; human decision 2026-10-02, task
+  // 9.2): the break "step 4 without FOR SHARE" was argued, not run. Without the lock, step 4 reads
+  // the profile as still `active` (the UPDATE is uncommitted), nothing else the trigger locks is held
+  // by the move-out, so the insert would settle at once and `settlesWithin(...) === false` fails.
+  // The 2 s window is timing evidence, not proof.
   it("a move-out in flight: the vote waits for the profile lock, then is refused vote_voter_eligible", async () => {
     const s = await setupPipeline(households);
     const voter = await claimPlainMember(s.hh, "Voter", accountIds);

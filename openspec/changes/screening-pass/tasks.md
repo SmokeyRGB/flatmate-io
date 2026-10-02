@@ -455,38 +455,45 @@ break can fail it.
   src/modules/casting/repository.ts` shows no new lines. `grep -rn "revalidatePath\|router.refresh"
   "src/app/(resident)/casting/screening"` → no output.
 
-## 9. Database breaks on dev (owner, via MCP; human told first)
+## 9. Database breaks (revised by human decision 2026-10-02)
 
-- [ ] 9.1 **Before the first break, stop and report** to the orchestrating session: the list of
-  breaks below and the two md5 values from 4.2. The orchestrator asks the human, since dev is
-  shared. Continue only on the go.
-- [ ] 9.2 For each break, one at a time:
-  1. apply it as owner via MCP (`CREATE OR REPLACE` of the function with the one step removed, or
-     the `DROP`/replace);
-  2. run **only** the named test file(s) and record the failing test names and messages;
-  3. restore by re-running the exact statement(s) from `drizzle/0028_vote.sql`;
-  4. confirm the md5 matches 4.2's value, or `pg_policies`/`pg_trigger` show the original.
+> Running database breaks proved impractical. `app_runtime` owns nothing, the session's permission
+> classifier refused to run the suite against a weakened dev database, and probe branches would
+> have added worktrees beside two other workstreams. Break (a) was applied once and restored, and
+> its md5 was verified against 4.2's value. No test ran against it. The human chose to prove the
+> breaks by the tests' assertion structure instead, with (d) recorded as an invariant guard.
 
-  The breaks:
-  - (a) step 2 → 6.1 AC-4.13;
-  - (b) step 3 → 6.1 invariant guard;
-  - (c) step 4 → 6.2 moved-out;
-  - (d) step 4's `FOR SHARE` only → 6.4 second case;
-  - (e) step 5's round comparison → 6.1 mismatched round;
-  - (f) step 6 → 6.1 and 6.2 own application;
-  - (g) step 7 → 6.1 `invited`;
-  - (h) drop the `vote_guard` trigger → 6.2;
-  - (i) drop the `application_keeps_votes` trigger → 6.2 move;
-  - (j) drop `vote_requires_resident_profile` → 6.3;
-  - (k) `vote_household_isolation` as `USING (true)` → 6.3.
-
-  If a break does not make its test fail, stop and report: the test is vacuous.
-- [ ] 9.3 After the last restore, run `npm run verify` once more → green. Recheck 4.2's catalog
-  checks.
+- [x] 9.1 Stopped and reported before the first break. The human was asked (2026-09-30).
+- [x] 9.2 Each break, and how it is shown that its test fails:
+  - **(a) (b) (c) (e) (f) (g): a step of `vote_guard` removed. Proven by the assertion structure.**
+    - Every repository refusal test asserts the exact `VoteError` code.
+    - Every raw-SQL refusal test asserts SQLSTATE `23514` and the exact `constraint_name`
+      (`expectGuard`).
+    - The fixtures make exactly one step refuse each case: the own application sits in `screened`
+      (step 7 passes), the cross-round voter participates in both rounds (step 3 passes), and the
+      moved-out profile keeps an active participation (step 3 passes).
+    - So with the step removed, the case is either accepted or refused under another constraint.
+      Both fail the assertion.
+  - **(h) (i): a trigger not created.** The same argument for all of that trigger's steps at once.
+    The `application_keeps_votes` test asserts its constraint name.
+  - **(j) (k): a policy dropped or loosened. Proven by positive controls.**
+    - Each scoping test first casts one real vote through `castVote`.
+    - (k): both households must count exactly `1`, and `USING (true)` gives `2`.
+    - (j): the profile-less session of the same household must count `0` while that vote exists;
+      without the policy it counts `1`.
+  - **(d): step 4 without `FOR SHARE`. An invariant guard, not proven** (human decision
+    2026-10-02). The argument is in the comment on the test in
+    `tests/integration/deliberation/cast-vote-concurrency.test.ts`: without the lock, step 4 reads
+    the uncommitted move-out's profile as `active`, the trigger holds nothing else the move-out
+    touches, and the insert would settle at once. Backed by design D7's lock argument. The PR
+    states it as open.
+- [x] 9.3 Dev was left intact after (a)'s restore. md5 of `vote_guard` =
+  `6001cac929e312c7cd82d0ab11465c50` and `application_keeps_votes` =
+  `6b841198e1f438833a3ca32eb3f86aa1`, with 4 policies and 2 triggers, rechecked by the orchestrator.
 
 ## 10. Report
 
-- [ ] 10.1 Do **not** run the browser walkthrough (the human signs in). Report:
+- [x] 10.1 Do **not** run the browser walkthrough (the human signs in). Report:
   - every file touched;
   - every break and its failure text, with no break argued in place of a run unless a task says
     "invariant guard";
