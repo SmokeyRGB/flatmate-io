@@ -81,6 +81,9 @@ not each against its own caller. `changeResidentPassword` and `redeemPasswordRes
 the password and both take the `account` row lock (PR #23). A new session is created inside the
 same transaction, under the same `membership` lock, that decides the membership still stands, as
 `signIn` does. Inserting it after that transaction commits reopens the race with removal.
+Casting writers of settings, rounds and rooms take locks in one order (membership FOR SHARE, then
+household_settings, then casting_round, then room, then application), so an opener and a
+settings change cannot each miss the other (LOCK ORDER comment on `openRoundTx`).
 
 **One pooled connection per call chain.** A `withSessionContext` opened inside another's callback
 holds one Supavisor connection while it waits for a second. Once every server connection (16 for

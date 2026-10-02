@@ -204,6 +204,13 @@
       "when": 1790765030593,
       "tag": "0028_vote",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1790933294183,
+      "tag": "0031_auto_join_open_rounds_lock",
+      "breakpoints": true
     }
   ]
 }
