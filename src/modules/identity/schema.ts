@@ -31,31 +31,147 @@ const IS_OWN_HOUSEHOLD_SETTINGS = sql`household_id = (select current_setting('ap
 // permission check reads only that stored list, never a role. domain/identity.md §2.1 calls the
 // sets „vorbelegt"; storing them is the literal reading of that word.
 //
-// A later permission needs, in ONE change: the constant here, a backfill of the existing
-// memberships, and the CHECK below that is built from it. The CHECKs are built from these
+// role-permissions (F3 change 2b, design D1/D2): ONE declaration holds every permission, one per
+// row of the Rechtematrix (03-PRD.md §4.0.1), with the roles that may hold it at all. The role
+// sets and every holder CHECK below are derived from it, so moving a permission to another role
+// is one edit here plus one migration, never a change to a check. The CHECKs are built from these
 // constants (array literals via sql.raw, never bound parameters: drizzle-kit would write `$1`
 // into the migration), so a constant and its constraint cannot drift.
 //
-// household: the administering membership (role = household_admin, never with a profile).
-// `close_round` is NOT in it: 03-PRD.md §4.0.1 gives the household account no rounds (S-50/U-20).
-export const HOUSEHOLD_PERMISSIONS = ["manage_rooms", "manage_settings"] as const;
-// resident: a live membership with is_resident. Empty until F4 adds `vote`.
-export const RESIDENT_PERMISSIONS = [] as readonly string[];
-// Permissions that only the moderator's set may contain. 03-PRD.md §4.0.1 gives
-// "Application.status zurücknehmen" a ✅ to the moderator and a ❌ (not ⬜) to everyone else, so
-// unlike `change_application_state` it is never an individual grant. Under the human decision that
-// roles are only names for permission sets (2026-09-28/29) it is still a stored permission that
-// every check reads, and the CHECK `membership_moderator_only_permissions` below makes "no other
-// membership holds it" a database invariant (drizzle/0027).
-export const MODERATOR_ONLY_PERMISSIONS = ["reverse_application_state"] as const;
+// "household_admin" and "moderator" are role values; "resident" means `is_resident`, an attribute
+// (a moderator who also lives there holds both sets).
+type Holder = "household_admin" | "moderator" | "resident";
+
+// `checkFrom: "contract"`: the holder rule is enforced by the database only from the contract
+// migration (design D2, "Expand/contract"): old-code tests on other branches still grant these
+// three to plain members on the shared dev database. Deleted by the contract migration.
+export const PERMISSIONS = {
+  // „Abstimmungsverfahren ändern" (household ✅, moderator ⬜); renames manage_settings.
+  manage_voting_procedure: { holders: ["household_admin", "moderator"] },
+  // „Room anlegen · Verfügbarkeit ändern"
+  manage_rooms: { holders: ["household_admin", "moderator"], checkFrom: "contract" },
+  // „Beitrittscode erzeugen / löschen"
+  manage_join_codes: { holders: ["household_admin", "moderator"] },
+  // „ResidentProfile anlegen" (moderator ✅ since 2026-10-01)
+  create_resident_profile: { holders: ["household_admin", "moderator"] },
+  // „Moderator ernennen / zurückstufen" (moderator ✅ since 2026-10-01)
+  appoint_moderator: { holders: ["household_admin", "moderator"] },
+  // „Mitglied entfernen / auf moved_out setzen" (+ Reaktivierung)
+  manage_members: { holders: ["household_admin", "moderator"] },
+  // „Datenauskunft erzeugen"
+  export_subject_access: { holders: ["household_admin", "moderator"] },
+  // the O-16 box, domain/identity.md §2.1: the household account only
+  issue_password_reset_link: { holders: ["household_admin"] },
+  // „CastingRound anlegen / schließen / wiedereröffnen"; renames close_round
+  manage_rounds: { holders: ["moderator"] },
+  // „RoundParticipation hinzufügen / entfernen"
+  manage_round_participation: { holders: ["moderator"] },
+  // „Application anlegen"
+  create_application: { holders: ["moderator"], checkFrom: "contract" },
+  // „Application.status ändern (vorwärts)"
+  change_application_state: { holders: ["moderator"], checkFrom: "contract" },
+  // „Application.status zurücknehmen" (drizzle/0027)
+  reverse_application_state: { holders: ["moderator"] },
+  // „Vote abgeben / ändern": the resident set's first permission ("resident" = is_resident)
+  vote: { holders: ["resident"] },
+} as const satisfies Record<string, { holders: readonly Holder[]; checkFrom?: "contract" }>;
+
+export type PermissionName = keyof typeof PERMISSIONS;
+
+// A role set is the ✅ column of the matrix. `satisfies` makes an undeclared name a compile error;
+// tests/unit/identity/permission-declarations.test.ts refuses an entry its role may not hold.
+export const ROLE_SETS = {
+  household: [
+    "manage_voting_procedure",
+    "manage_rooms",
+    "manage_join_codes",
+    "create_resident_profile",
+    "appoint_moderator",
+    "manage_members",
+    "export_subject_access",
+    "issue_password_reset_link",
+  ],
+  moderator: [
+    "manage_rooms",
+    "manage_join_codes",
+    "create_resident_profile",
+    "appoint_moderator",
+    "manage_members",
+    "export_subject_access",
+    "manage_rounds",
+    "manage_round_participation",
+    "create_application",
+    "change_application_state",
+    "reverse_application_state",
+  ],
+  resident: ["vote"],
+} as const satisfies Record<string, readonly PermissionName[]>;
+
+// Replaced names: a rename has one target, a split several. The migration that introduces an entry
+// carries each holder over to every target its role may hold; the contract migration strips the
+// old name and deletes the entry. No check may name a key (permission-declarations test).
+export const REPLACED_PERMISSIONS = {
+  close_round: ["manage_rounds"],
+  manage_settings: ["manage_voting_procedure"],
+} as const satisfies Record<string, readonly PermissionName[]>;
+// Retired: kept on stored rows for branches without this change; carried over by 0029, stripped
+// by the contract migration. Grants nothing.
+export const RETIRED_PERMISSIONS: readonly string[] = Object.keys(REPLACED_PERMISSIONS);
+
+// The household account: the administering membership (role = household_admin, never a profile).
+export const HOUSEHOLD_PERMISSIONS = ROLE_SETS.household;
+// resident: a live membership with is_resident.
+export const RESIDENT_PERMISSIONS = ROLE_SETS.resident;
 // moderator: role = moderator.
-export const MODERATOR_PERMISSIONS = [
+export const MODERATOR_PERMISSIONS = ROLE_SETS.moderator;
+
+// The permissions whose holders are exactly `roles` and whose holder rule the database already
+// enforces (entries with `checkFrom` wait for the contract migration). The only grouping logic.
+export function permissionsHeldOnlyBy(roles: readonly Holder[]): PermissionName[] {
+  return (Object.keys(PERMISSIONS) as PermissionName[]).filter((name) => {
+    const entry: { holders: readonly Holder[]; checkFrom?: "contract" } = PERMISSIONS[name];
+    return (
+      entry.checkFrom === undefined &&
+      entry.holders.length === roles.length &&
+      roles.every((r) => entry.holders.includes(r))
+    );
+  });
+}
+// Permissions that only the moderator's set may contain (03-PRD.md §4.0.1 ❌, not ⬜), enforced by
+// membership_moderator_only_permissions (drizzle/0027, widened by drizzle/0029).
+export const MODERATOR_ONLY_PERMISSIONS = permissionsHeldOnlyBy(["moderator"]);
+// Held by the household account only (O-16 box): membership_household_only_permissions.
+export const HOUSEHOLD_ONLY_PERMISSIONS = permissionsHeldOnlyBy(["household_admin"]);
+// Held by the household account or a moderator, never a plain member:
+// membership_administration_permissions.
+export const ADMINISTRATION_PERMISSIONS = permissionsHeldOnlyBy(["household_admin", "moderator"]);
+// Held only by a resident membership (is_resident): membership_resident_only_permissions.
+export const RESIDENT_ONLY_PERMISSIONS = permissionsHeldOnlyBy(["resident"]);
+
+// --- Expand/contract (design D2). Each constant below is deleted by the contract migration, and no
+// permission check reads any of them. They are the old sets frozen, and the bounds 0029 enforces
+// meanwhile. ---
+export const HOUSEHOLD_PERMISSIONS_AT_0024 = ["manage_rooms", "manage_settings"] as const;
+export const MODERATOR_PERMISSIONS_AT_0027 = [
   "manage_rooms",
   "close_round",
   "create_application",
   "change_application_state",
-  ...MODERATOR_ONLY_PERMISSIONS,
+  "reverse_application_state",
 ] as const;
+export const MODERATOR_ONLY_PERMISSIONS_AT_0027 = ["reverse_application_state"] as const;
+export const RESIDENT_PERMISSIONS_AT_0024: readonly string[] = [];
+const intersection = (a: readonly string[], b: readonly string[]) => a.filter((x) => b.includes(x));
+// Old ∩ new = manage_rooms.
+export const HOUSEHOLD_FLOOR_UNTIL_CONTRACT = intersection(HOUSEHOLD_PERMISSIONS_AT_0024, HOUSEHOLD_PERMISSIONS);
+// The eight + the retired manage_settings that old-code registration and every backfilled
+// household row still carry.
+export const HOUSEHOLD_CEILING_UNTIL_CONTRACT = [
+  ...HOUSEHOLD_PERMISSIONS,
+  ...intersection(RETIRED_PERMISSIONS, HOUSEHOLD_PERMISSIONS_AT_0024),
+];
+// Old ∩ new = the four.
+export const MODERATOR_FLOOR_UNTIL_CONTRACT = intersection(MODERATOR_PERMISSIONS_AT_0027, MODERATOR_PERMISSIONS);
 
 // Literal SQL for a text[] value: 'ARRAY[...]::text[]', or '{}'::text[] when empty. Values are
 // single-quote-escaped. Never a bound parameter (see above).
@@ -308,30 +424,53 @@ export const membership = pgTable(
     // drizzle/0024: a membership that disagrees with its roles would silently gain or lose rights,
     // so it is a refused write, for every writer including raw SQL. Built from the constants
     // above; a later permission needs the constant, a backfill and the CHECK in one change.
+    // role-permissions / drizzle/0029 (expand, design D2): the FLOOR is the part of the new set
+    // that old-code branches still write too (old ∩ new); the contract migration raises it to
+    // MODERATOR_PERMISSIONS. A row short of its new values is accepted and simply denied the
+    // actions they gate.
     check(
       "membership_moderator_holds_role_permissions",
-      sql`revoked_at IS NOT NULL OR role <> 'moderator' OR permissions @> ${permissionArrayLiteral(MODERATOR_PERMISSIONS)}`,
+      sql`revoked_at IS NOT NULL OR role <> 'moderator' OR permissions @> ${permissionArrayLiteral(MODERATOR_FLOOR_UNTIL_CONTRACT)}`,
     ),
-    // drizzle/0027 (design D8): a moderator-only permission (matrix ❌, not ⬜) cannot be held by
-    // any other membership, so raw SQL as app_runtime cannot grant it either. Why a CHECK and not
-    // only "no function grants it": the only difference between this permission and
-    // `change_application_state` is that the matrix allows an individual grant of the latter.
-    // Every other membership writer is already safe: registration writes the exact household
-    // set, claim/join the (empty) resident set, demotion removes MODERATOR_PERMISSIONS by
-    // EXCEPT (the moderator-only value goes with it), move-out/removal clear everything, and
-    // reactivation restores the resident set only.
+    // drizzle/0027 (design D8), widened by drizzle/0029: a moderator-only permission (matrix ❌,
+    // not ⬜) cannot be held by any other membership, so raw SQL as app_runtime cannot grant it
+    // either. The contract migration adds create_application and change_application_state
+    // (their `checkFrom`).
     check(
       "membership_moderator_only_permissions",
       sql`role = 'moderator' OR NOT (permissions && ${permissionArrayLiteral(MODERATOR_ONLY_PERMISSIONS)})`,
     ),
-    // The set is EXACT: the matrix gives the household account no individual grant (no ⬜).
+    // drizzle/0029: household-only permissions (the O-16 box) are held by the administering
+    // membership alone.
+    check(
+      "membership_household_only_permissions",
+      sql`role = 'household_admin' OR NOT (permissions && ${permissionArrayLiteral(HOUSEHOLD_ONLY_PERMISSIONS)})`,
+    ),
+    // drizzle/0029: the household-or-moderator permissions are never held by a plain member
+    // (matrix ❌ for residents, not ⬜; human decision 2026-10-01). The contract migration adds
+    // manage_rooms (its `checkFrom`).
+    check(
+      "membership_administration_permissions",
+      sql`role IN ('household_admin', 'moderator') OR NOT (permissions && ${permissionArrayLiteral(ADMINISTRATION_PERMISSIONS)})`,
+    ),
+    // drizzle/0029: a resident-only permission needs the resident attribute ("resident" holder).
+    check(
+      "membership_resident_only_permissions",
+      sql`is_resident OR NOT (permissions && ${permissionArrayLiteral(RESIDENT_ONLY_PERMISSIONS)})`,
+    ),
+    // The household set has a FLOOR and a CEILING until the contract migration (drizzle/0029,
+    // design D2): the floor is old ∩ new (manage_rooms), the ceiling the eight plus the retired
+    // manage_settings that old-code registration still writes. The contract migration makes it
+    // exact again. The matrix gives the household account no individual grant (no ⬜).
     check(
       "membership_household_admin_holds_role_permissions",
-      sql`revoked_at IS NOT NULL OR role <> 'household_admin' OR (permissions @> ${permissionArrayLiteral(HOUSEHOLD_PERMISSIONS)} AND permissions <@ ${permissionArrayLiteral(HOUSEHOLD_PERMISSIONS)})`,
+      sql`revoked_at IS NOT NULL OR role <> 'household_admin' OR (permissions @> ${permissionArrayLiteral(HOUSEHOLD_FLOOR_UNTIL_CONTRACT)} AND permissions <@ ${permissionArrayLiteral(HOUSEHOLD_CEILING_UNTIL_CONTRACT)})`,
     ),
+    // Unchanged by 0029: old-code claim/join stores the empty resident set, so the floor stays
+    // empty until the contract migration requires RESIDENT_PERMISSIONS (`vote`).
     check(
       "membership_resident_holds_role_permissions",
-      sql`revoked_at IS NOT NULL OR NOT is_resident OR permissions @> ${permissionArrayLiteral(RESIDENT_PERMISSIONS)}`,
+      sql`revoked_at IS NOT NULL OR NOT is_resident OR permissions @> ${permissionArrayLiteral(RESIDENT_PERMISSIONS_AT_0024)}`,
     ),
     // A moved-out or removed person keeps nothing (D3): no permission, and not the moderator role.
     check(
