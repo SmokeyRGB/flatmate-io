@@ -17,10 +17,10 @@ export default async function NewRoundPage() {
 
   // rounds-new-page-missing-permission-guard: this page had no authorization check at all, only
   // an authentication one — any signed-in resident could reach and see the create/open form even
-  // without close_round (the permission the sibling server action already enforces). Mirrors the
+  // without manage_rounds (the permission the sibling server action already enforces). Mirrors the
   // settings page's guard-and-render-message pattern, checked before any data load.
   try {
-    await assertHasPermission(current.context, current.context.accountId, "close_round");
+    await assertHasPermission(current.context, current.context.accountId, "manage_rounds");
   } catch (err) {
     if (err instanceof PermissionDeniedError) {
       return (

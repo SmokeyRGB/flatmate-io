@@ -190,7 +190,7 @@ export const de = {
       openFirstRoundBody: "Noch läuft nichts — eröffne eine Runde, sobald du Zimmer zum Besetzen hast.",
       openNewRound: "Neue Runde eröffnen",
       openAnotherRound: "Weitere Runde eröffnen",
-      // D13 (application-capture): the household account and any session without close_round is
+      // D13 (application-capture): the household account and any session without manage_rounds is
       // not offered the way to open a round; runs of the round are the moderation's (S-50/U-20).
       noRoundYetHeading: "Noch keine Runde",
       noRoundYetBody: "Casting-Runden eröffnet die Moderation der WG.",

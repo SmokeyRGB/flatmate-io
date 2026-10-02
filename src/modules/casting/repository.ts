@@ -534,7 +534,7 @@ export async function transitionApplication(
 
 // FR-1.9: create, rename, remove — the moderator's room CRUD (manage_rooms).
 // G-C (speckit-analyze finding C1): these four functions had no authorization check of their
-// own — same class of bug already found and fixed once for `manage_settings` above — relying
+// own — same class of bug already found and fixed once for `manage_voting_procedure` above — relying
 // entirely on src/app/(org)/rooms/actions.ts to have checked first. Self-enforcing here matches
 // identity/repository.ts's member-management functions, which are safe regardless of caller.
 export async function createRoom(context: SessionContext, label: string, actor: Actor) {
@@ -673,8 +673,10 @@ export async function listRooms(context: SessionContext) {
 }
 
 // FR-1.12: create a round in draft, selecting the rooms it covers.
-// FR-1.12: round-lifecycle actions (create/open/manual-add) are gated on `close_round`, the
-// permission `data-model.md` already documents for `draft → open` — same G-C fix as createRoom
+// FR-1.12: round-lifecycle actions are gated on `manage_rounds` (create/open; matrix row
+// „CastingRound anlegen / schließen / wiedereröffnen", which renamed the earlier gate
+// in F3 change 2b) and `manage_round_participation` (manual add; matrix row
+// „RoundParticipation hinzufügen / entfernen") — same G-C fix as createRoom
 // above (speckit-analyze finding C1): no internal check previously, relied entirely on the one
 // caller (src/app/(org)/rounds/new/actions.ts) to have checked first.
 async function insertDraftRoundTx(
@@ -704,7 +706,7 @@ async function insertDraftRoundTx(
 
 export async function createRound(context: SessionContext, title: string, roomIds: string[], actor: Actor) {
   if (!actor.accountId) throw new Error("createRound requires an actor accountId");
-  await assertHasPermission(context, actor.accountId, "close_round");
+  await assertHasPermission(context, actor.accountId, "manage_rounds");
   return withSessionContext(context, (tx) => insertDraftRoundTx(tx, context, title, roomIds, actor));
 }
 
@@ -826,7 +828,7 @@ async function openRoundTx(tx: Tx, context: SessionContext, roundId: string, act
 
 export async function openRound(context: SessionContext, roundId: string, actor: Actor) {
   if (!actor.accountId) throw new Error("openRound requires an actor accountId");
-  await assertHasPermission(context, actor.accountId, "close_round");
+  await assertHasPermission(context, actor.accountId, "manage_rounds");
   return withSessionContext(context, (tx) => openRoundTx(tx, context, roundId, actor));
 }
 
@@ -844,7 +846,7 @@ export async function createAndOpenRound(
   actor: Actor,
 ) {
   if (!actor.accountId) throw new Error("createAndOpenRound requires an actor accountId");
-  await assertHasPermission(context, actor.accountId, "close_round");
+  await assertHasPermission(context, actor.accountId, "manage_rounds");
   return withSessionContext(context, async (tx) => {
     const round = await insertDraftRoundTx(tx, context, title, roomIds, actor);
     return openRoundTx(tx, context, round.id, actor);
@@ -864,7 +866,7 @@ export async function addResidentToRound(
   actor: Actor,
 ) {
   if (!actor.accountId) throw new Error("addResidentToRound requires an actor accountId");
-  await assertHasPermission(context, actor.accountId, "close_round");
+  await assertHasPermission(context, actor.accountId, "manage_round_participation");
   return withSessionContext(context, async (tx) => {
     const [inserted] = await tx
       .insert(roundParticipation)
@@ -1150,10 +1152,11 @@ export async function updateHouseholdSettingsWithProcedureLock(
 ) {
   // FR-1.8/G-C (Convergence): this had no authorization check at all — any signed-in account,
   // including a plain resident with no granted permissions, could change household settings as
-  // long as no round was open. `manage_settings` is in the stored household set (identity/schema.ts,
-  // HOUSEHOLD_PERMISSIONS) and otherwise individually grantable; no role is read.
+  // long as no round was open. `manage_voting_procedure` (matrix row „Abstimmungsverfahren ändern";
+  // household ✅, moderator ⬜) is in the stored household set (identity/schema.ts,
+  // HOUSEHOLD_PERMISSIONS) and otherwise individually grantable to a moderator; no role is read.
   if (!actor.accountId) throw new Error("updateHouseholdSettingsWithProcedureLock requires an actor accountId");
-  await assertHasPermission(context, actor.accountId, "manage_settings");
+  await assertHasPermission(context, actor.accountId, "manage_voting_procedure");
 
   return withSessionContext(context, async (tx) => {
     const changedFields = Object.keys(patch) as LockedSettingsField[];
@@ -1207,7 +1210,7 @@ export async function forceChangeSettingWhileRoundOpen(
 ) {
   if (!actor.accountId) throw new Error("forceChangeSettingWhileRoundOpen requires an actor accountId");
   const accountId = actor.accountId;
-  await assertHasPermission(context, accountId, "manage_settings");
+  await assertHasPermission(context, accountId, "manage_voting_procedure");
 
   return withSessionContext(context, async (tx) => {
     await tx
@@ -1271,13 +1274,13 @@ export interface OrganisationTask {
 
 // start-screen design.md Decision 4/Assumption 3 (tasks.md 3.2): a room open for letting and not
 // covered by any draft/open/paused round is v0.1's one organisation task. Returns `[]` for a
-// viewer who does not hold `close_round` — the permission `rounds/new`'s own action already
+// viewer who does not hold `manage_rounds` — the permission `rounds/new`'s own action already
 // requires — so the bridge's count never promises something the destination action would refuse.
 // Carries no application-derived value, so it is not a G-D15 read (design.md Decision 9's finding
 // is scoped to `application`, not `room`/`casting_round`).
 export async function listOrganisationTasks(context: SessionContext): Promise<OrganisationTask[]> {
   try {
-    await assertHasPermission(context, context.accountId, "close_round");
+    await assertHasPermission(context, context.accountId, "manage_rounds");
   } catch (err) {
     if (err instanceof PermissionDeniedError) return [];
     throw err;
