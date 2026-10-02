@@ -60,6 +60,7 @@ BEGIN
   -- tests/helpers/identity.ts's cleanup CTE.
   DELETE FROM round_participation  WHERE household_id = v_household;
   -- application first: drizzle/0026 refuses to delete a round that still has applications.
+  DELETE FROM vote                 WHERE household_id = v_household;
   DELETE FROM application          WHERE household_id = v_household;
   DELETE FROM casting_round        WHERE household_id = v_household;
   DELETE FROM room                 WHERE household_id = v_household;
@@ -109,6 +110,7 @@ UNION ALL SELECT 'join_attempt',         count(*) FROM join_attempt
 UNION ALL SELECT 'room',                 count(*) FROM room
 UNION ALL SELECT 'casting_round',        count(*) FROM casting_round
 UNION ALL SELECT 'round_participation',  count(*) FROM round_participation
+UNION ALL SELECT 'vote',                 count(*) FROM vote
 UNION ALL SELECT 'application',          count(*) FROM application
 UNION ALL SELECT 'activity_event (kept)', count(*) FROM activity_event
 ORDER BY table_name;

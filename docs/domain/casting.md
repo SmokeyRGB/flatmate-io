@@ -32,7 +32,7 @@ mit einem Zähler nicht darstellbar. Zustandsmaschine in §3.3.
 | `title` | `text` | ⚙️ | z. B. „Nachbesetzung Herbst" |
 | `status` | `enum(draft, open, paused, closed, archived)` | ⚙️ | §3.2 |
 | `room_ids` | `uuid[]` | ⚙️ | die Zimmer dieser Runde |
-| `settings_snapshot` | `jsonb` | ⚙️ | **Kopie der Verfahrensregeln beim Öffnen.** Sichert die Regel-Sperre ab: ändert der Haushalt später die Gewichte, bleibt die laufende Runde nach ihren eigenen Regeln bewertet |
+| `settings_snapshot` | `jsonb` | ⚙️ | **Kopie der Verfahrensregeln beim Öffnen.** Sichert die Regel-Sperre ab: ändert der Haushalt später die Gewichte, bleibt die laufende Runde nach ihren eigenen Regeln bewertet. *Umsetzungshinweis (2026-09-30):* der Code speichert den Schlüssel als `scaleWeights` (camelCase, innere Schlüssel `no`, `rather_not`, `good`, `definitely`), nicht als `scale_weights`; akzeptiert, ein Umbenennen würde das jsonb jeder geöffneten Runde umschreiben |
 | `opened_at` | `timestamptz?` | ⚙️ | |
 | `phase_deadline_at` | `timestamptz?` | ⚙️ | optionale weiche Frist der aktuellen Rundenphase (S-44), sichtbar als „Stimme ab bis X" / „X Tage/Stunden übrig" — **nie ohne die Phase, aus der sie stammt** (siehe Kasten „Geltungsbereich" unten). **Blockiert nichts** — nach Ablauf bleibt die Runde entscheidungsfähig, die moderierende Person entscheidet aktiv weiter oder verlängert. Speist die CTA-Sortierung (§8.7), analog zur bloß anzeigenden Rolle von `opened_at`/`closed_at` in dieser Tabelle. **Gesetzt und verlängert wird sie von der moderierenden Person, ohne Voreinstellung** (O-14) — eine automatisch gesetzte Frist wäre eine Erwartung, die niemand vereinbart hat |
 | `closed_at` | `timestamptz?` | ⚙️ | **Ankerpunkt der Aufbewahrungsfrist** |

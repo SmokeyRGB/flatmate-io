@@ -84,6 +84,24 @@ tables:
       added_at: { category: "⚙️" }
       removed_at: { category: "⚙️" }
 
+  # --- F4 (src/modules/deliberation/schema.ts) ---
+  # Personal data per docs/domain/personenbezogene-felder.md rows 27/28; legal basis lit. f for
+  # Beratungsartefakte (docs/06-Compliance-Anhang.md, Rechtsgrundlagen); retention 180 days after
+  # CastingRound.closed_at (docs/domain/aufbewahrung.md).
+  vote:
+    context: deliberation
+    columns:
+      id: { category: "⚙️" }
+      household_id: { category: "⚙️", purpose: "RLS-Anker (redundant zur Runde, ADR-004)" }
+      round_id: { category: "⚙️" }
+      application_id: { category: "⚙️" }
+      resident_profile_id: { category: "⚫", purpose: "wer gestimmt hat: Beratungsinhalt über beide Seiten (personenbezogene-felder.md, Vote)", legal_basis: "Art. 6(1)(f) DSGVO (Compliance-Anhang, Beratungsartefakte)", retention: "180 Tage nach CastingRound.closed_at (aufbewahrung.md)" }
+      stage: { category: "⚙️" }
+      value: { category: "⚫", purpose: "die Bewertung einer Bewerbung durch eine bewohnende Person (personenbezogene-felder.md, Vote)", legal_basis: "Art. 6(1)(f) DSGVO (Compliance-Anhang, Beratungsartefakte)", retention: "180 Tage nach CastingRound.closed_at (aufbewahrung.md)" }
+      created_at: { category: "⚙️" }
+      updated_at: { category: "⚙️" }
+      withdrawn_at: { category: "⚙️" }
+
   # --- F0 (src/modules/audit/schema.ts) ---
   activity_event:
     context: audit

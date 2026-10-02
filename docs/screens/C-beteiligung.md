@@ -13,7 +13,7 @@ Querformat** — eine Handlung pro Bildschirm, keine horizontal scrollende Tabel
 | | |
 |---|---|
 | **Zweck** | Die häufigste Handlung der Anwendung: Stimme zur Einladung (`stage = invite`) |
-| **Zugang** | Direkt nach A3/A4, sonst aus dem primären CTA (T-5) |
+| **Zugang** | Aus dem primären CTA (T-5) auf Start (B1); Beitritt landet seit 2026-09-21 auf B1 |
 
 **Kernelemente**
 
