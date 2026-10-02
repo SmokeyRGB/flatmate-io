@@ -103,6 +103,40 @@
   },
   {
     "type": "dependency",
+    "from": "src/modules/deliberation/repository.ts",
+    "to": "src/modules/casting/repository.ts",
+    "unresolvedTo": "@/modules/casting/repository",
+    "dependencyTypes": [
+      "aliased",
+      "aliased-tsconfig",
+      "aliased-tsconfig-paths",
+      "local",
+      "import"
+    ],
+    "rule": {
+      "severity": "error",
+      "name": "no-cross-module-schema-or-repository"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "src/modules/deliberation/repository.ts",
+    "to": "src/modules/identity/repository.ts",
+    "unresolvedTo": "@/modules/identity/repository",
+    "dependencyTypes": [
+      "aliased",
+      "aliased-tsconfig",
+      "aliased-tsconfig-paths",
+      "local",
+      "import"
+    ],
+    "rule": {
+      "severity": "error",
+      "name": "no-cross-module-schema-or-repository"
+    }
+  },
+  {
+    "type": "dependency",
     "from": "src/modules/identity/auth.ts",
     "to": "src/modules/audit/repository.ts",
     "unresolvedTo": "@/modules/audit/repository",
