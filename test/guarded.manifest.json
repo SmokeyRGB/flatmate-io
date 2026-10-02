@@ -99,7 +99,10 @@
         "tests/integration/policy/round-visibility-household-account.test.ts",
         "tests/integration/raw-sql/round-visibility-household-account.test.ts",
         "tests/integration/policy/application-visibility-household-account.test.ts",
-        "tests/integration/raw-sql/application-visibility-household-account.test.ts"
+        "tests/integration/raw-sql/application-visibility-household-account.test.ts",
+        "tests/integration/policy/vote-scoping.test.ts",
+        "tests/integration/raw-sql/vote-scoping.test.ts",
+        "tests/integration/policy/vote-household-account.test.ts"
       ]
     }
   ],
@@ -192,6 +195,14 @@
     "roundparticipation_via_raw_sql": {
       "status": "implemented",
       "testFile": "tests/integration/raw-sql/round-household-scoping.test.ts"
+    },
+    "vote_via_policy": {
+      "status": "implemented",
+      "testFile": "tests/integration/policy/vote-scoping.test.ts"
+    },
+    "vote_via_raw_sql": {
+      "status": "implemented",
+      "testFile": "tests/integration/raw-sql/vote-scoping.test.ts"
     }
   }
 }

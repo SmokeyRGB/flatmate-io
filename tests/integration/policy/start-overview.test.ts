@@ -8,6 +8,7 @@ import { application, roundParticipation } from "@/modules/casting/schema";
 import type { ApplicationState } from "@/modules/casting/transitions";
 import { eq } from "drizzle-orm";
 import { syntheticApplication } from "../../helpers/applications";
+import { setCanVote, setRemoved } from "../../helpers/votes";
 import { cleanupAll, createTestModerator, deleteTestAccount, registerTestHousehold, type TestHousehold } from "../../helpers/identity";
 
 let hh: TestHousehold | undefined;
@@ -79,26 +80,11 @@ const actorOf = (m: { accountId: string; profileId: string }) => ({
   profileId: m.profileId,
 });
 
-async function setCanVote(household: TestHousehold, roundId: string, residentProfileId: string, canVote: boolean) {
-  await withSessionContext(household.context, (tx) =>
-    tx
-      .update(roundParticipation)
-      .set({ canVote })
-      .where(eq(roundParticipation.roundId, roundId)),
-  );
-}
-
-async function setRemoved(household: TestHousehold, residentProfileId: string) {
-  await withSessionContext(household.context, (tx) =>
-    tx
-      .update(roundParticipation)
-      .set({ removedAt: new Date() })
-      .where(eq(roundParticipation.residentProfileId, residentProfileId)),
-  );
-}
-
 describe("getStartOverview (start-screen design.md Decision 4)", () => {
-  it("(b) counts new+screened as T-5, excludes invited/rejected", async () => {
+  // F4 change 1 (screening-pass) D3 ended the "T-5 = raw application count" pin that stood
+  // here while the vote table did not exist: T-5 now lives in deliberation's getAwaitingVoteCounts
+  // (tests/integration/deliberation/awaiting-vote-counts.test.ts).
+  it("(b) an open round the viewer takes part in is returned, with the standing's state counts", async () => {
     hh = await registerTestHousehold();
     const founder = await claimModerator(hh, "Founder");
     const room = await createRoom(hh.context, "Room A", { accountId: hh.accountId, profileId: null });
@@ -114,10 +100,10 @@ describe("getStartOverview (start-screen design.md Decision 4)", () => {
     const overview = await getStartOverview(founder.context);
     expect(overview?.openRounds).toHaveLength(1);
     expect(overview?.openRounds[0].canVote).toBe(true);
-    expect(overview?.openRounds[0].voteCount).toBe(3);
+    expect(overview?.standing?.stateCounts).toEqual({ new: 2, screened: 1, invited: 1, rejected_by_household: 1 });
   });
 
-  it("(c) can_vote = false: no T-5 count, but standing is still returned", async () => {
+  it("(c) can_vote = false: canVote is false, but standing is still returned", async () => {
     hh = await registerTestHousehold();
     const founder = await claimModerator(hh, "Founder");
     const room = await createRoom(hh.context, "Room A", { accountId: hh.accountId, profileId: null });
@@ -130,7 +116,6 @@ describe("getStartOverview (start-screen design.md Decision 4)", () => {
     const overview = await getStartOverview(founder.context);
     expect(overview?.openRounds).toHaveLength(1);
     expect(overview?.openRounds[0].canVote).toBe(false);
-    expect(overview?.openRounds[0].voteCount).toBe(0);
     expect(overview?.standing).not.toBeNull();
     expect(overview?.standing?.stateCounts.new).toBe(1);
   });
@@ -142,7 +127,7 @@ describe("getStartOverview (start-screen design.md Decision 4)", () => {
     const room = await createRoom(hh.context, "Room A", { accountId: hh.accountId, profileId: null });
     const round = await createRound(founder.context, "Round", [room.id], actorOf(founder));
     await openRound(founder.context, round.id, actorOf(founder));
-    await setRemoved(hh, second.profileId);
+    await setRemoved(hh, round.id, second.profileId);
 
     const overview = await getStartOverview(second.context);
     expect(overview?.openRounds).toHaveLength(0);
@@ -206,7 +191,10 @@ describe("getStartOverview (start-screen design.md Decision 4)", () => {
   // moved_in -> offer_made -> interviewed -> scheduled -> invited -> screened is ordinary app code
   // (P-4), and G-D9 guarantees became_resident_id survives it. 03-PRD.md §4.1.2 has the criterion
   // outright: an Application with became_resident_id == the active profile creates no vote task.
-  it("(f5) the viewer's own application walked back to screened creates no vote task for them", async () => {
+  // The vote-task half of this case (no T-5 count for the viewer's own walked-back application)
+  // moved to awaiting-vote-counts.test.ts with T-5 itself; what stays here is the standing's
+  // V-1 predicate.
+  it("(f5) the viewer's own application walked back to screened is not in their standing", async () => {
     hh = await registerTestHousehold();
     const founder = await claimModerator(hh, "Founder");
     const other = await claim(hh, "Other");
@@ -231,9 +219,9 @@ describe("getStartOverview (start-screen design.md Decision 4)", () => {
     await insertApplication(hh, other.context, { roundId: round.id, state: "new" });
 
     const founderView = await getStartOverview(founder.context);
-    expect(founderView?.openRounds[0].voteCount).toBe(1);
+    expect(founderView?.standing?.stateCounts).toEqual({ new: 1 });
     const otherView = await getStartOverview(other.context);
-    expect(otherView?.openRounds[0].voteCount).toBe(2);
+    expect(otherView?.standing?.stateCounts).toEqual({ new: 1, screened: 1 });
   });
 
   it("(f3) a removed participation while a round is open: anyOpenRound true, no state counts", async () => {
@@ -243,7 +231,7 @@ describe("getStartOverview (start-screen design.md Decision 4)", () => {
     const room = await createRoom(hh.context, "Room A", { accountId: hh.accountId, profileId: null });
     const round = await createRound(founder.context, "Round", [room.id], actorOf(founder));
     await openRound(founder.context, round.id, actorOf(founder));
-    await setRemoved(hh, second.profileId);
+    await setRemoved(hh, round.id, second.profileId);
 
     const overview = await getStartOverview(second.context);
     expect(overview?.anyOpenRound).toBe(true);
@@ -251,20 +239,9 @@ describe("getStartOverview (start-screen design.md Decision 4)", () => {
     expect(overview?.standing).toBeNull();
   });
 
-  it("(g) a deleted application is absent from every count", async () => {
-    hh = await registerTestHousehold();
-    const founder = await claimModerator(hh, "Founder");
-    const room = await createRoom(hh.context, "Room A", { accountId: hh.accountId, profileId: null });
-    const round = await createRound(founder.context, "Round", [room.id], actorOf(founder));
-    await openRound(founder.context, round.id, actorOf(founder));
-
-    await insertApplication(hh, founder.context, { roundId: round.id, state: "new" });
-    await insertApplication(hh, founder.context, { roundId: round.id, state: "new", deletedAt: new Date() });
-
-    const overview = await getStartOverview(founder.context);
-    expect(overview?.openRounds[0].voteCount).toBe(1);
-    expect(overview?.standing?.stateCounts.new).toBe(1);
-  });
+  // (g), a deleted application absent from every count, is dropped with the T-5 count: nothing sets
+  // `application.deleted_at` (F3 change 3 D1) and F3 change 4 drops the column. The standing keeps
+  // its `deleted_at IS NULL` filter until then.
 
   it("(h) a phase_deadline_at set on the round is returned", async () => {
     hh = await registerTestHousehold();
@@ -325,7 +302,6 @@ describe("getStartOverview (start-screen design.md Decision 4)", () => {
   // Breaks (tasks.md 3.5), applied and reverted by hand, reported in the apply summary:
   // (d) drop the removed_at IS NULL predicate -> case (d)/(f3) fail;
   // (f) remove the became_resident_id predicate -> case (f) fails;
-  // (f2) replace it with Drizzle ne() -> case (f2) fails;
-  // (g) remove deleted_at IS NULL -> case (g) fails.
+  // (f2) replace it with Drizzle ne() -> case (f2) fails.
 });
 

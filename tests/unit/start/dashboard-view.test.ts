@@ -10,7 +10,6 @@ function round(overrides: Partial<StartOpenRound>): StartOpenRound {
     title: "Round",
     phaseDeadlineAt: null,
     canVote: true,
-    voteCount: 3,
     ...overrides,
   };
 }
@@ -19,9 +18,19 @@ function overview(overrides: Partial<StartOverview>): StartOverview {
   return { anyOpenRound: false, openRounds: [], standing: null, ...overrides };
 }
 
+// The awaiting-vote counts are deliberation's (F4 change 1, D3); the view only reads the map.
+// Every round of the overview awaits 3 unless `counts` says otherwise.
+function awaiting(o: StartOverview, counts: Record<string, number> = {}): Map<string, number> {
+  return new Map(o.openRounds.map((r) => [r.roundId, counts[r.roundId] ?? 3]));
+}
+
+function build(o: StartOverview, organisationTaskCount = 0, organisation = false, now = NOW, counts = {}) {
+  return buildDashboardView(o, awaiting(o, counts), organisationTaskCount, { organisation }, now);
+}
+
 describe("buildDashboardView (start-screen design.md Decision 10, tasks.md 7.4)", () => {
   it("one T-5 -> primary, no rows", () => {
-    const view = buildDashboardView(overview({ openRounds: [round({})], anyOpenRound: true }), 0, { organisation: false }, NOW);
+    const view = build(overview({ openRounds: [round({})], anyOpenRound: true }));
     expect(view.primary).not.toBeNull();
     expect(view.rows).toEqual([]);
     expect(view.folded).toBe(0);
@@ -31,7 +40,7 @@ describe("buildDashboardView (start-screen design.md Decision 10, tasks.md 7.4)"
     const rounds = Array.from({ length: 5 }, (_, i) =>
       round({ roundId: `r${i}`, title: `Round ${i}`, phaseDeadlineAt: new Date(`2026-10-${10 + i}T00:00:00Z`) }),
     );
-    const view = buildDashboardView(overview({ openRounds: rounds, anyOpenRound: true }), 0, { organisation: false }, NOW);
+    const view = build(overview({ openRounds: rounds, anyOpenRound: true }));
     expect(view.primary).not.toBeNull();
     expect(view.rows).toHaveLength(3);
     expect(view.folded).toBe(1);
@@ -40,49 +49,62 @@ describe("buildDashboardView (start-screen design.md Decision 10, tasks.md 7.4)"
     expect(view.foldedTasks[0].reason).toContain("14. Oktober 2026");
   });
 
+  // Start spec, "Two rounds": each round's task leads to that round's pass.
+  it("each round's task links to its round", () => {
+    const rounds = [
+      round({ roundId: "round-a", phaseDeadlineAt: new Date("2026-10-10T00:00:00Z") }),
+      round({ roundId: "round-b", phaseDeadlineAt: new Date("2026-10-20T00:00:00Z") }),
+    ];
+    const view = build(overview({ openRounds: rounds, anyOpenRound: true }));
+    expect(view.primary?.href).toBe("/casting/screening?round=round-a");
+    expect(view.rows.map((r) => r.href)).toEqual(["/casting/screening?round=round-b"]);
+  });
+
+  it("a round awaiting nothing creates no task", () => {
+    const o = overview({ openRounds: [round({})], anyOpenRound: true });
+    const view = build(o, 0, false, NOW, { r1: 0 });
+    expect(view.primary).toBeNull();
+  });
+
   // Review finding: a deadline just after midnight in Berlin is the previous day in UTC. The
   // reason must name the household's day, whatever time zone the server runs in.
   it("the dated reason names the Berlin calendar day, not the server's", () => {
-    const view = buildDashboardView(
+    const view = build(
       overview({ openRounds: [round({ phaseDeadlineAt: new Date("2026-10-01T22:30:00Z") })], anyOpenRound: true }),
       0,
-      { organisation: false },
+      false,
       new Date("2026-09-30T12:00:00Z"),
     );
     expect(view.primary?.reason).toBe("Stimme ab bis 2. Oktober 2026.");
   });
 
   it("pendingVoteCount sums voting rounds only", () => {
-    expect(pendingVoteCount(null)).toBe(0);
-    expect(
-      pendingVoteCount(
-        overview({ openRounds: [round({ voteCount: 2 }), round({ roundId: "r2", canVote: false, voteCount: 0 }), round({ roundId: "r3", voteCount: 1 })] }),
-      ),
-    ).toBe(3);
+    expect(pendingVoteCount(null, new Map())).toBe(0);
+    const o = overview({
+      openRounds: [round({}), round({ roundId: "r2", canVote: false }), round({ roundId: "r3" })],
+    });
+    expect(pendingVoteCount(o, new Map([["r1", 2], ["r2", 5], ["r3", 1]]))).toBe(3);
   });
 
   it("no open round -> standing.noRound", () => {
-    const view = buildDashboardView(overview({ anyOpenRound: false }), 0, { organisation: false }, NOW);
+    const view = build(overview({ anyOpenRound: false }));
     expect(view.primary).toBeNull();
     expect(view.standing).toEqual({ kind: "noRound" });
   });
 
   it("anyOpenRound but no participation -> standing.runningWithoutYou, no numbers", () => {
-    const view = buildDashboardView(overview({ anyOpenRound: true, standing: null }), 0, { organisation: false }, NOW);
+    const view = build(overview({ anyOpenRound: true, standing: null }));
     expect(view.primary).toBeNull();
     expect(view.standing).toEqual({ kind: "runningWithoutYou" });
   });
 
   it("can_vote = false -> no primary, standing present", () => {
-    const view = buildDashboardView(
+    const view = build(
       overview({
         anyOpenRound: true,
         openRounds: [round({ canVote: false })],
         standing: { roundId: "r1", stateCounts: { new: 2 } },
       }),
-      0,
-      { organisation: false },
-      NOW,
     );
     expect(view.primary).toBeNull();
     expect(view.standing).toEqual({
@@ -93,48 +115,47 @@ describe("buildDashboardView (start-screen design.md Decision 10, tasks.md 7.4)"
   });
 
   it("bridge absent without access; 0 -> all-done; 2 -> plural", () => {
-    const noAccess = buildDashboardView(overview({}), 3, { organisation: false }, NOW);
+    const noAccess = build(overview({}), 3, false);
     expect(noAccess.bridge).toBeNull();
 
-    const zero = buildDashboardView(overview({}), 0, { organisation: true }, NOW);
+    const zero = build(overview({}), 0, true);
     expect(zero.bridge?.heading).toBe("Alles erledigt – gut gemacht");
 
-    const two = buildDashboardView(overview({}), 2, { organisation: true }, NOW);
+    const two = build(overview({}), 2, true);
     expect(two.bridge?.heading).toBe("2 Sachen warten auf dich");
   });
 
   it("an overdue deadline -> the overdue reason", () => {
-    const view = buildDashboardView(
+    const view = build(
       overview({
         anyOpenRound: true,
         openRounds: [round({ phaseDeadlineAt: new Date("2020-01-01T00:00:00Z") })],
       }),
-      0,
-      { organisation: false },
-      NOW,
     );
     expect(view.primary?.reason).toBe("Die Frist ist abgelaufen — deine Stimme zählt trotzdem noch.");
   });
 
   it("no view state yields both a primary and an empty surface", () => {
-    const withPrimary = buildDashboardView(overview({ openRounds: [round({})], anyOpenRound: true }), 0, { organisation: false }, NOW);
+    const withPrimary = build(overview({ openRounds: [round({})], anyOpenRound: true }));
     expect(withPrimary.primary && withPrimary.standing).toBeFalsy();
 
-    const withoutPrimary = buildDashboardView(overview({ anyOpenRound: false }), 0, { organisation: false }, NOW);
+    const withoutPrimary = build(overview({ anyOpenRound: false }));
     expect(withoutPrimary.primary === null && withoutPrimary.standing !== null).toBe(true);
   });
 });
 
 describe("shouldOpenScreening (tasks.md 8.3)", () => {
   it("true with a positive count", () => {
-    expect(shouldOpenScreening(overview({ openRounds: [round({})] }))).toBe(true);
+    const o = overview({ openRounds: [round({})] });
+    expect(shouldOpenScreening(o, awaiting(o))).toBe(true);
   });
 
   it("false with none", () => {
-    expect(shouldOpenScreening(overview({ openRounds: [round({ voteCount: 0 })] }))).toBe(false);
+    const o = overview({ openRounds: [round({})] });
+    expect(shouldOpenScreening(o, awaiting(o, { r1: 0 }))).toBe(false);
   });
 
   it("false for null", () => {
-    expect(shouldOpenScreening(null)).toBe(false);
+    expect(shouldOpenScreening(null, new Map())).toBe(false);
   });
 });

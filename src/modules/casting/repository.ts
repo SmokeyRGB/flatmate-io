@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { isUuid, withSessionContext, type SessionContext } from "@/db/session-context";
 import { PayloadValidationError, recordActivityEvent } from "@/modules/audit/repository";
 import { activityEvent } from "@/modules/audit/schema";
@@ -21,10 +21,13 @@ import {
   CORRECTABLE_FIELDS,
   type CorrectableField,
 } from "./application-changes";
-import { application, castingRound, room, roundParticipation } from "./schema";
+import { application, castingRound, castingRoundStatusEnum, room, roundParticipation } from "./schema";
 import { LOCKED_SETTINGS_FIELDS, type LockedSettingsField } from "./settings-fields";
 import { ruleFor, type ApplicationState } from "./transitions";
 import { assertF1RoomTransitionAllowed, type RoomStatus } from "./room-transitions";
+
+export const ROUND_STATUSES = castingRoundStatusEnum.enumValues;
+export type RoundStatus = (typeof ROUND_STATUSES)[number];
 
 export interface Actor {
   accountId: string | null;
@@ -51,7 +54,9 @@ export class ProfileRequiredError extends Error {
 }
 
 // The lifecycle columns of an application, never a personal one. Shared by getApplication and the
-// state change, so the two cannot drift apart (pre-mortem M10).
+// state change, so the two cannot drift apart (pre-mortem M10). Personal columns leave this module
+// through exactly two reads: getOrganisationApplication (permission-gated) and listVoteCandidatesTx
+// (voter-gated, card columns only).
 const APPLICATION_LIFECYCLE_COLUMNS = {
   id: application.id,
   householdId: application.householdId,
@@ -68,7 +73,8 @@ const APPLICATION_LIFECYCLE_COLUMNS = {
 //
 // Returns the LIFECYCLE columns only, never a personal one (applicant name, contact, message,
 // attributes, age, source, collected_from). Personal data leaves the module only through
-// `getOrganisationApplication`, which checks the caller's permission (Copilot, PR #39).
+// `getOrganisationApplication`, which checks the caller's permission (Copilot, PR #39), and the
+// voter-gated card columns of `listVoteCandidatesTx`.
 export async function getApplication(context: SessionContext, id: string) {
   // G-D15/ADR-014: a household-account session sees no Application row. Checked here, before
   // opening a transaction, rather than left to the RESTRICTIVE policy alone (Decision 4).
@@ -240,7 +246,8 @@ export async function captureApplication(
 // mismatch or another household. Throws PermissionDeniedError when the live membership holds
 // neither create_application nor change_application_state. Sibling: `getApplication` above keeps
 // its profile-only check but returns lifecycle columns only, so no other read returns an
-// application's personal columns.
+// application's personal columns except `listVoteCandidatesTx`, the second, voter-gated one (name,
+// age, message, attributes; never contact).
 export async function getOrganisationApplication(
   context: SessionContext,
   roundId: string,
@@ -990,6 +997,166 @@ export async function getRoundParticipants(context: SessionContext, roundId: str
   );
 }
 
+// ---------------------------------------------------------------------------------------------
+// Query ports for deliberation (F4 change 1, design D2). Deliberation owns the vote table, so it
+// never joins casting tables in its own SQL (docs/domain/kontextgrenzen.md §4 rule 1); it asks
+// casting through these two `...Tx` primitives, which take the caller's transaction so one pass
+// reads on one connection. Both trust the `context` they are given, and deliberation's repository
+// is the only caller (authorization-matrix.test.ts asserts no `src/app` file imports them). Both
+// refuse a profile-less context before any query, and neither takes a lock: every write
+// re-validates under lock (vote_guard, drizzle/0028), so a stale read costs at most a typed
+// refusal.
+//
+// The voter predicate joins `resident_profile`, an identity table, inside casting SQL. That
+// strictly breaks §4 rule 1, exactly as getRoundParticipants and openRoundTx already do; the
+// import direction casting -> identity is allowed, and a port for one status predicate would cost
+// a round-trip and a second copy of "active". Recorded as a register row (docs/review-log.md).
+// ---------------------------------------------------------------------------------------------
+
+export interface VoterRound {
+  roundId: string;
+  title: string;
+  status: RoundStatus;
+  phaseDeadlineAt: Date | null;
+  createdAt: Date;
+  settingsSnapshot: unknown;
+}
+
+// The rounds in which the session's profile holds an active participation with the right to
+// vote, and is itself an active resident. The status is returned rather than filtered, so the
+// caller can name a non-open state (AC-4.13). A draft round normally has no participations;
+// addResidentToRound has no status check, so one can, which the caller refuses as not open.
+export async function listVoterRoundsTx(
+  tx: Tx,
+  context: SessionContext,
+  options: { roundId?: string } = {},
+): Promise<VoterRound[]> {
+  if (context.profileId === null) throw new ProfileRequiredError("listVoterRoundsTx");
+  if (options.roundId !== undefined && !isUuid(options.roundId)) return [];
+  const rows = await tx
+    .select({
+      roundId: castingRound.id,
+      title: castingRound.title,
+      status: castingRound.status,
+      phaseDeadlineAt: castingRound.phaseDeadlineAt,
+      createdAt: castingRound.createdAt,
+      settingsSnapshot: castingRound.settingsSnapshot,
+    })
+    .from(roundParticipation)
+    .innerJoin(
+      castingRound,
+      and(
+        eq(castingRound.id, roundParticipation.roundId),
+        eq(castingRound.householdId, roundParticipation.householdId),
+      ),
+    )
+    .innerJoin(
+      residentProfile,
+      and(
+        eq(residentProfile.id, roundParticipation.residentProfileId),
+        eq(residentProfile.householdId, roundParticipation.householdId),
+      ),
+    )
+    .where(
+      and(
+        eq(roundParticipation.householdId, context.householdId),
+        eq(roundParticipation.residentProfileId, context.profileId),
+        isNull(roundParticipation.removedAt),
+        eq(roundParticipation.canVote, true),
+        eq(residentProfile.status, "active"),
+        ...(options.roundId !== undefined ? [eq(castingRound.id, options.roundId)] : []),
+      ),
+    )
+    .orderBy(desc(castingRound.createdAt), desc(castingRound.id));
+  return rows;
+}
+
+export interface VoteCandidateCard {
+  applicantName: string;
+  age: number | null;
+  messageRaw: string | null;
+  attributes: unknown;
+}
+
+export interface VoteCandidate {
+  applicationId: string;
+  roundId: string;
+  createdAt: Date;
+  // Present only when the caller asked for the card. Contact columns, `collected_from`, `source`
+  // and audit columns are never selected (human decision Q-2, Art. 5(1)(c)).
+  card?: VoteCandidateCard;
+}
+
+// The rounds' applications in `new`/`screened` that are not the viewer's own, oldest first. The
+// port re-applies the voter predicate itself: a round for which the viewer is not an active voting
+// participant contributes no row, so a caller that forgot the eligibility check cannot leak card
+// data (V-2, hazards "Authorization lives in the repository function"). The card columns are the
+// V-2 surface: the second, voter-gated personal-column read, beside getOrganisationApplication.
+// `IS DISTINCT FROM`, never `ne()`: became_resident_id is NULL for nearly every application.
+export async function listVoteCandidatesTx(
+  tx: Tx,
+  context: SessionContext,
+  roundIds: string[],
+  options: { withCard: boolean },
+): Promise<VoteCandidate[]> {
+  if (context.profileId === null) throw new ProfileRequiredError("listVoteCandidatesTx");
+  const ids = roundIds.filter((id) => isUuid(id));
+  if (ids.length === 0) return [];
+  const profileId = context.profileId;
+  const where = and(
+    eq(application.householdId, context.householdId),
+    inArray(application.roundId, ids),
+    inArray(application.state, ["new", "screened"]),
+    sql`${application.becameResidentId} IS DISTINCT FROM ${profileId}::uuid`,
+    sql`EXISTS (
+      SELECT 1 FROM round_participation rp
+      JOIN resident_profile rprof ON rprof.id = rp.resident_profile_id AND rprof.household_id = rp.household_id
+      WHERE rp.round_id = ${application.roundId}
+        AND rp.resident_profile_id = ${profileId}::uuid
+        AND rp.household_id = ${context.householdId}::uuid
+        AND rp.removed_at IS NULL
+        AND rp.can_vote
+        AND rprof.status = 'active'
+    )`,
+  );
+  const order = [asc(application.createdAt), asc(application.id)] as const;
+  if (!options.withCard) {
+    return tx
+      .select({
+        applicationId: application.id,
+        roundId: application.roundId,
+        createdAt: application.createdAt,
+      })
+      .from(application)
+      .where(where)
+      .orderBy(...order);
+  }
+  const rows = await tx
+    .select({
+      applicationId: application.id,
+      roundId: application.roundId,
+      createdAt: application.createdAt,
+      applicantName: application.applicantName,
+      age: application.age,
+      messageRaw: application.messageRaw,
+      attributes: application.attributes,
+    })
+    .from(application)
+    .where(where)
+    .orderBy(...order);
+  return rows.map((r) => ({
+    applicationId: r.applicationId,
+    roundId: r.roundId,
+    createdAt: r.createdAt,
+    card: {
+      applicantName: r.applicantName,
+      age: r.age,
+      messageRaw: r.messageRaw,
+      attributes: r.attributes,
+    },
+  }));
+}
+
 export class ProcedureLockedError extends Error {
   constructor(public readonly openRoundId: string, field: string) {
     super(`Cannot change ${field}: round ${openRoundId} is open (FR-1.21)`);
@@ -1175,8 +1342,6 @@ export interface StartOpenRound {
   title: string;
   phaseDeadlineAt: Date | null;
   canVote: boolean;
-  // Only meaningful when canVote is true — 0 otherwise (no vote task is offered, EC-2.12).
-  voteCount: number;
 }
 
 export interface StartStanding {
@@ -1190,14 +1355,8 @@ export interface StartOverview {
   standing: StartStanding | null;
 }
 
-// start-screen design.md Decision 9: a constant TRUE stand-in for "not yet voted by the viewer" —
-// there is no Vote table until F4. Kept as a private, non-exported helper (never inlined at each
-// call site) so F4's replacement with a `NOT EXISTS` against Vote is a one-place change, forced by
-// this file's own test asserting the T-5 count equals the raw application count (tasks.md 3.5,
-// design.md Risks).
-function notVotedByViewer() {
-  return sql`TRUE`;
-}
+// T-5 ("awaiting my vote") is not computed here: deliberation owns it once, in getAwaitingVoteCounts,
+// so the deck and the count cannot drift (F4 change 1, design D3).
 
 // start-screen design.md Decision 4/7/9 (FR-2.20-2.24, G-D15, V-1): the Start screen's one read.
 // `null` for a profile-less (household-account) session, checked as the FIRST statement — before
@@ -1238,40 +1397,12 @@ export async function getStartOverview(context: SessionContext): Promise<StartOv
           ORDER BY cr.created_at DESC`,
     );
 
-    // T-5 per round in ONE grouped query, not one COUNT per round in a sequential loop (review
-    // finding): applications still on the main path at the voting stage, not deleted, not yet
-    // voted on by the viewer (notVotedByViewer above), for every round the viewer may vote in.
-    const votingRoundIds = participationRows
-      .filter((row: { can_vote: boolean }) => row.can_vote)
-      .map((row: { round_id: string }) => row.round_id);
-    const voteCounts = new Map<string, number>();
-    if (votingRoundIds.length > 0) {
-      const countRows = await tx.execute<{ round_id: string; count: number }>(
-        sql`SELECT round_id, count(*)::int AS count FROM application
-            WHERE household_id = ${context.householdId}::uuid
-              AND round_id IN (${sql.join(votingRoundIds.map((id: string) => sql`${id}::uuid`), sql`, `)})
-              AND deleted_at IS NULL
-              AND state IN ('new', 'screened')
-              -- V-1 here too (PR #22 review, test f5): an application that became the viewer can
-              -- walk back to 'screened' along the declared P-4 path, and became_resident_id
-              -- survives it (G-D9). 03-PRD.md §4.1.2: it creates no vote task for that profile.
-              AND became_resident_id IS DISTINCT FROM ${profileId}::uuid
-              AND ${notVotedByViewer()}
-            GROUP BY round_id`,
-      );
-      for (const row of countRows as { round_id: string; count: number }[]) {
-        voteCounts.set(row.round_id, row.count);
-      }
-    }
-
     const openRounds: StartOpenRound[] = participationRows.map(
       (row: { round_id: string; title: string; phase_deadline_at: string | null; can_vote: boolean }) => ({
         roundId: row.round_id,
         title: row.title,
         phaseDeadlineAt: row.phase_deadline_at ? new Date(row.phase_deadline_at) : null,
         canVote: row.can_vote,
-        // Only meaningful when canVote is true, and 0 otherwise (no vote task is offered, EC-2.12).
-        voteCount: row.can_vote ? (voteCounts.get(row.round_id) ?? 0) : 0,
       }),
     );
 
