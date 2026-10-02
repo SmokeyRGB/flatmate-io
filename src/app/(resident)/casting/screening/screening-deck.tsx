@@ -307,7 +307,11 @@ export function ScreeningDeck({
     setChosen(rating);
     dispatch({ type: "submitted", id });
     startTransition(async () => {
-      const result = await castVoteAction({ roundId, applicationId: id, value: rating });
+      // A rejected action (the request never came back) is the same calm failure as a "failed"
+      // result: it clears `pending`, so the deck is never left locked (Copilot, PR #48).
+      const result = await castVoteAction({ roundId, applicationId: id, value: rating }).catch(
+        (): CastVoteResult => ({ ok: false, code: "failed" }),
+      );
       handleResult(result, id, rating);
     });
   }
