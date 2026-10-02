@@ -4,6 +4,7 @@ export default defineConfig({
   dialect: "postgresql",
   schema: [
     "./src/modules/casting/schema.ts",
+    "./src/modules/deliberation/schema.ts",
     "./src/modules/audit/schema.ts",
     "./src/modules/identity/schema.ts",
   ],

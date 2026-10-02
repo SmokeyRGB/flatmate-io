@@ -379,8 +379,7 @@ export class HouseholdAccountCannotVoteError extends Error {
 }
 
 // FR-1.7/AC-1.5: the household account shall not be able to cast a vote — the authorization check
-// itself, not the Vote table (F3), which is what every vote-casting route calls before recording
-// anything. Refuses by every route that would eventually call it, because there is exactly one
+// itself, not the Vote table. F4, called by deliberation's `castVote`, before anything is recorded. Refuses by every route that would eventually call it, because there is exactly one
 // such check, not one per route.
 export async function assertAccountCanVote(context: SessionContext, accountId: string): Promise<void> {
   // PR #19 review: authorization derives from the authenticated session, not from whatever
@@ -831,9 +830,10 @@ export class DisplayNameConfirmationMismatchError extends Error {
 // against a direct database update under app_runtime. Callable on an `active` OR a `moved_out`
 // profile (both `active -> removed` and `moved_out -> removed` are declared), so a moderator who
 // used the soft tier first does not have to reactivate before reaching the hard one. Purging
-// their votes/applications from score (U-27's other half) has nothing to act on yet —
-// Application/Vote don't exist until F3+; `removed` is the state that purge will key on, not
-// invented here ahead of them.
+// their votes/applications from score (U-27's other half) is F5's: votes now exist (F4) and are
+// kept on removal, and excluding a removed member's votes from the score and the log belongs to
+// the score computation (docs/review-log.md, "U-27: Stimmen entfernter Mitglieder"). `removed` is
+// the state that exclusion will key on.
 export async function removeMember(
   context: SessionContext,
   actingAccountId: string,

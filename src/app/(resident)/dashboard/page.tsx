@@ -2,6 +2,7 @@ import { ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getStartOverview, listOrganisationTasks } from "@/modules/casting/repository";
+import { getAwaitingVoteCounts } from "@/modules/deliberation/repository";
 import { getCurrentSession } from "@/modules/identity/session-cookie";
 import { de } from "@/ui/strings";
 import { landingPathFor } from "@/app/landing";
@@ -23,8 +24,9 @@ export default async function DashboardPage({
   if (!current) redirect("/sign-in");
   if (current.context.profileId === null) redirect(landingPathFor(current.context));
 
-  const [overview, organisationTasks, access, identity, household] = await Promise.all([
+  const [overview, awaitingVotes, organisationTasks, access, identity, household] = await Promise.all([
     getStartOverview(current.context),
+    getAwaitingVoteCounts(current.context),
     listOrganisationTasks(current.context),
     navigationAccessFor(current.context),
     identityLabelFor(current.context),
@@ -35,7 +37,7 @@ export default async function DashboardPage({
   const displayName =
     identity.kind === "resident" ? (identity.displayName ?? de.org.identityResidentFallback) : de.org.identityResidentFallback;
   const householdName = household?.name ?? de.org.identityHouseholdFallback;
-  const view = buildDashboardView(overview, organisationTasks.length, access, new Date());
+  const view = buildDashboardView(overview, awaitingVotes, organisationTasks.length, access, new Date());
 
   return (
     <div className="mx-auto max-w-2xl space-y-6 p-6">

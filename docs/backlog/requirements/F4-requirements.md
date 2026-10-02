@@ -3,7 +3,7 @@
 > **Feature:** [F4 — Screen the applications card by card, four ratings](../features/F4-screen-and-vote.md)
 > **Band:** `v0.1` · **Scope lines:** S-09, S-10
 > **Screens:** C1 Screening pass ⚡ — the most frequent action in the product
-> **Status:** V1.0 · 2026-09-08
+> **Status:** V1.1 · 2026-09-30 (V1.0 · 2026-09-08; the V1.1 corrections are marked "(V1.1: …)")
 >
 > **`requirements.md` only — what must be built, not how.**
 
@@ -18,7 +18,7 @@ giving each exactly one of four ratings whose weights are shown before use.
 per applicant · changing a rating while the round is open · progress and completion · excluding
 the resident's own application.
 
-**Out of scope:** the second pass at budget overrun (S-11/S-47, v0.2) · round-two voting and
+**Out of scope:** an offline buffer for ratings (v0.2, S-30; G-D11 stays `pending`; AC-4.11 and EC-4.6 hold without one) · the second pass at budget overrun (S-11/S-47, v0.2) · round-two voting and
 veto (S-23/S-24, v0.2) · the ranking itself (F5) · swipe gestures as the only input · batch
 rating · any wider rating scale · points-budget voting (a v1.1 option) · notes about candidates
 (S-22, v0.2).
@@ -43,30 +43,32 @@ rating · any wider rating scale · points-budget voting (a v1.1 option) · note
 
 ### The deck
 
-- **FR-4.1** The system shall present, to an eligible resident of an open round, the applications of that round that are open for screening, one at a time.
-- **FR-4.2** The deck shall exclude any application linked to the viewing resident's own profile.
-- **FR-4.3** The exclusion in FR-4.2 shall be applied before the data reaches the client, and shall not depend on client-side filtering.
+- **FR-4.1** The system shall present, to an eligible resident of an open round, the applications of that round that are open for screening, one at a time. *(V1.1: "open for screening" means the round's applications in state `new` or `screened`, excluding the viewer's own (FR-4.2) and excluding any application on which the viewer holds a non-withdrawn `invite` vote. This makes the deck equal to B1's task T-5 and to FR-4.17's "no application unrated". Deck order is oldest first, `created_at` then `id`, the same for everyone. In v0.1 the `invite` stage is open exactly while `casting_round.status = open`.)*
+- **FR-4.2** The deck shall exclude any application linked to the viewing resident's own profile. *(V1.1: linked means `application.became_resident_id` equals the viewer's profile. An earlier, unlinked application of the same person is the known gap R-3.3/R-5.4.)*
+- **FR-4.3** The exclusion in FR-4.2 shall be applied before the data reaches the client, and shall not depend on client-side filtering. *(V1.1: the server side is the deck read plus a database refusal of a vote on the own application. V-1's row-level half, hiding votes about a resident from that resident, is F5's.)*
 - **FR-4.4** The deck's composition shall be fixed when a pass begins. Applications created after that moment shall not enter the pass in progress.
 - **FR-4.5** Applications deleted during a pass shall be removed from the remaining deck without ending the pass.
 - **FR-4.6** The system shall show progress through the pass — position and total.
-- **FR-4.7** Each card shall show the applicant's name and whichever optional details were captured.
+- **FR-4.7** Each card shall show the applicant's name and whichever optional details were captured. *(V1.1: name, age, `message_raw` and `attributes`. The card carries no contact field (email, phone, other): the deck read does not select them, data minimisation Art. 5(1)(c), human decision Q-2 2026-09-30.)*
 
 ### Rating
 
 - **FR-4.8** Each card shall offer exactly four ratings, labelled **No**, **Rather not**, **Like**, **Must have**.
-- **FR-4.9** The system shall display the weight of each rating before it is used: 0, 1, 3, 5 respectively.
-- **FR-4.10** The displayed weights shall be the weights frozen for this round when it opened, not the household's current settings.
+- **FR-4.9** The system shall display the weight of each rating before it is used. *(V1.1: the round's frozen weights, `settings_snapshot.scaleWeights` (defaults 0/1/3/5 for No / Rather not / Like / Must have). The screen offers them one tap away, see AC-4.8.)*
+- **FR-4.10** The displayed weights shall be the weights frozen for this round when it opened (`settings_snapshot.scaleWeights`), not the household's current settings.
 - **FR-4.11** A resident shall hold at most one rating per application per voting stage. The screening pass is the invite stage.
 - **FR-4.12** Selecting a rating shall record it immediately, without a separate submit step for the pass as a whole.
-- **FR-4.13** A resident shall be able to change a previously given rating while the round is `open` and within the same voting stage.
-- **FR-4.14** Withdrawing a rating shall be recorded as a withdrawal, not by removing the record.
+- **FR-4.13** A resident shall be able to change a previously given rating while the round is `open` and within the same voting stage. *(V1.1: re-rating updates the same row, and clears `withdrawn_at` if it was set, because of the unique key of C-4.5. Before F5, changing a rating is reached by going back within a running pass.)*
+- **FR-4.14** Withdrawing a rating shall be recorded as a withdrawal, not by removing the record. *(V1.1: a later rating of the same application updates that row and clears `withdrawn_at`.)*
 - **FR-4.15** The system shall reject a rating when the round is not `open`, when the resident is not eligible to vote in it, or when the application is the resident's own.
 - **FR-4.16** "Must have" shall carry the meaning "this is my favourite". No separate favourite-selection step shall exist after the pass.
 
 ### Completion
 
 - **FR-4.17** When no application in the deck is unrated, the system shall state that nothing is waiting for this resident.
-- **FR-4.18** After the last card the system shall present the ranking, and shall never present an empty surface.
+- **FR-4.18** After the last card the system shall present the ranking, and shall never present an empty surface. *(V1.1: before F5 builds the ranking, the last card leads to the D1 shell on the Casting tab (heading and one sentence, no scores). F5 retargets it to the ranking.)*
+- **FR-4.19** *(V1.1)* Each rating level shall carry a symbol and a text label. No level, including the selected state, shall be distinguished by colour alone.
+- **FR-4.20** *(V1.1)* The pass shall be fully operable by keyboard.
 
 ---
 
@@ -91,13 +93,13 @@ Given a sixth application was captured during my previous pass, when I start a n
 Given I am on card 2 of five and a moderator deletes card 4, when I continue, then the pass completes over the four remaining cards without error.
 
 **AC-4.7 — Four ratings, no more**
-Given a card, when the rating options are enumerated, then exactly four exist: No, Rather not, Like, Must have.
+Given a card, when the rating options are enumerated, then exactly four exist, with the values `no`, `rather_not`, `good`, `definitely`, shown in German as „Nein · Eher nicht · Finde gut · Unbedingt". *(V1.1: the English labels of V1.0 followed the Miro board.)*
 
 **AC-4.8 — Weights are visible before use**
-Given a card, when it is displayed, then the weight of each rating is visible without interaction.
+Given a card, when it is displayed, then the weight of each rating is available on the screen without leaving it. *(V1.1: aligned with PRD §4.1.4, "abrufbar … ohne ihn zu verlassen". The weights sit one tap away, behind a small „(?)" pop-over, and the numbers are not on the buttons (human decision Q-3, 2026-09-30). P-3 holds, because the formula stays on the screen.)*
 
 **AC-4.9 — Displayed weights come from the round's frozen rules**
-Given a round opened while "Like" was worth 3, when the household later changes "Like" to 4, then the pass in that round still displays and applies 3.
+Given a round opened while "Like" was worth 3, when the household later changes "Like" to 4, then the pass in that round still displays and applies 3. *(V1.1: the household's weights are procedure-locked while a round is open, so this is exercised through the audited override `forceChangeSettingWhileRoundOpen`.)*
 
 **AC-4.10 — One rating per applicant**
 Given I have rated an applicant "Like", when I rate the same applicant "No", then exactly one rating exists for me on that applicant and its value is "No".
@@ -129,6 +131,15 @@ Given I rate the final card, when the pass ends, then the ranking is presented a
 **AC-4.19 — No separate favourites step**
 Given I have given several "Must have" ratings, when the pass ends, then no favourite-selection step is presented in this release.
 
+**AC-4.20 — Levels are told apart without colour** *(V1.1)*
+Given a card, when the four ratings are displayed, then each has a symbol and a text label, and the selected rating is marked by more than colour.
+
+**AC-4.21 — The pass is keyboard-operable** *(V1.1)*
+Given a keyboard only, when I go through a pass, then every rating and the back and forward moves can be operated without a pointer.
+
+**AC-4.22 — Nothing extra during the pass** *(V1.1)*
+Given a pass, when any card is displayed, then no budget hint, favourites counter, warning about my ratings, or other residents' votes appears, including when I rate every card "Must have".
+
 ---
 
 ## 5. Constraints
@@ -136,8 +147,8 @@ Given I have given several "Must have" ratings, when the pass ends, then no favo
 - **C-4.1** The scale is exactly four levels with weights **0 · 1 · 3 · 5**, non-linear on purpose because the decision boundary sits between "Rather not" and "Like". Source: **E-07**, `ADR-008`.
 - **C-4.2** Wider scales are excluded, not merely deferred: people cluster in the middle of a 5- or 10-point scale and stop differentiating, which is the reason the scale is four. Source: S-10 out-of-scope list, check-in decision 3.
 - **C-4.3** Displaying the weights is **P-3** (legitimacy before optimality), not decoration. A hidden formula is a defect.
-- **C-4.4** The weights and every other voting rule come from the round's frozen copy, never from live household settings. Source: `04-Domaenenmodell.md`; the same rule governs F5's score.
-- **C-4.5** At most one rating per `(application, resident profile, voting stage)`. Round two reuses the same structure at a different stage and is v0.2. Source: `04-Domaenenmodell.md` (`Vote`).
+- **C-4.4** The weights and every other voting rule come from the round's frozen copy, never from live household settings. Source: `docs/domain/casting.md` (`settings_snapshot`); the same rule governs F5's score.
+- **C-4.5** At most one rating per `(application, resident profile, voting stage)`. Round two reuses the same structure at a different stage and is v0.2. Source: `docs/domain/deliberation.md` (`Vote`).
 - **C-4.6** Revisability is part of the requirement itself — *"revidierbar innerhalb derselben `Vote.stage`, solange die `CastingRound` `open` ist"* — and not a later enhancement. Source: S-10, confirmed in §5.4.
 - **C-4.7** "Must have" is the favourite signal; there is no separate favourites round. Source: **E-07**.
 - **C-4.8** Swipe gestures must not be the only way to rate, and batch rating is excluded. Source: S-09 out-of-scope list.
@@ -148,13 +159,23 @@ Given I have given several "Must have" ratings, when the pass ends, then no favo
 
 ---
 
+### 5a. Dependencies *(V1.1)*
+
+- **G-D15 (b):** `vote` carries the RESTRICTIVE resident-profile policy from its first migration (`docs/GUARDRAILS.md`, G-D15).
+- **Row lock on the application:** a vote is written only after the application row is read `FOR SHARE`, so a concurrent state change or deletion is seen.
+- **AC-3.16 (F3, change 4):** deleting an application removes its votes in the same transaction. It is tested with F3 change 4's `deleteApplication`.
+- **V-2 (F3, change 6):** row-level visibility of rounds and applications is enforced in the repository and the vote trigger now, and in RLS later (`docs/review-log.md` §Offene-Punkte-Register).
+- **Lock-order obligations:** `deleteApplication` locks the application first, then deletes its votes. Any later `UPDATE` path on a vote reads the application `FOR SHARE` before it touches the vote row. The reverse orders deadlock against a vote in flight.
+
+---
+
 ## 6. Edge cases
 
 | ID | Case | Required behaviour |
 |---|---|---|
 | **EC-4.1** | The round has no applications open for screening | The pass is not offered; the resident is told nothing is waiting |
 | **EC-4.2** | The only application in the round is the resident's own | Same as EC-4.1 from that resident's point of view — the deck is empty and that is stated, not shown as an error |
-| **EC-4.3** | The resident is a household member but not a round participant | The pass is not offered; the round's standing is shown instead |
+| **EC-4.3** | The resident is a household member but not a round participant | The pass is not offered, and nothing about the round is shown (V-2). *(V1.1)* |
 | **EC-4.4** | The round is paused mid-pass | Further ratings are refused per AC-4.13; ratings already recorded stand |
 | **EC-4.5** | The round is closed mid-pass | As EC-4.4. Nothing already recorded is rolled back |
 | **EC-4.6** | The same resident rates from two devices at once | The last write wins and exactly one rating exists; no duplicate is created |
@@ -163,7 +184,7 @@ Given I have given several "Must have" ratings, when the pass ends, then no favo
 | **EC-4.9** | A resident rates every applicant "No" | Permitted. No prompt, no nudge, no commentary — that would be evaluative about people |
 | **EC-4.10** | An application is captured and deleted during the same pass | It never appears in the pass |
 | **EC-4.11** | The frozen weights are missing or malformed for a round | The pass is refused rather than falling back to defaults, because falling back would silently change the arithmetic |
-| **EC-4.12** | A resident reopens the pass after completing it | The already-rated cards are shown with their ratings, changeable per FR-4.13 |
+| **EC-4.12** | A resident reopens the pass after completing it | *(V1.1)* A reopened pass holds only unrated cards, so after completion the empty state „Nichts wartet auf dich" is shown. Revising ratings after a pass belongs to D2 (F5); screen C1's decision of 2026-09-15 is not to advertise it in the pass |
 
 ---
 

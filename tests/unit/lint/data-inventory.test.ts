@@ -53,14 +53,15 @@ const KNOWN_TABLES = [
   "room",
   "round_participation",
   "session",
+  "vote",
 ];
 
 describe("loadSchemaTables against the real repository", () => {
   // Break (executed by hand, see final report): temporarily filter out one module directory
   // (e.g. "identity") inside loadSchemaTables's moduleDirs computation — this test then finds
-  // only 5 tables instead of 13 and fails. Without this test, a loader bug that silently returns
+  // only 5 tables instead of 14 and fails. Without this test, a loader bug that silently returns
   // an empty (or partial) list would make every other check in this file vacuous.
-  it("finds exactly the 13 known tables, with correct contexts, and no source-scan violations", async () => {
+  it("finds exactly the 14 known tables, with correct contexts, and no source-scan violations", async () => {
     const { tables, violations } = await loadSchemaTables(process.cwd());
     expect(violations).toEqual([]);
     expect(tables.map((t) => t.table).sort()).toEqual(KNOWN_TABLES);
@@ -70,6 +71,7 @@ describe("loadSchemaTables against the real repository", () => {
       expect(byName.get(t)?.context).toBe("casting");
     }
     expect(byName.get("activity_event")?.context).toBe("audit");
+    expect(byName.get("vote")?.context).toBe("deliberation");
     for (const t of [
       "account",
       "session",

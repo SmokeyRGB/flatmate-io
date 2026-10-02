@@ -25,6 +25,7 @@ export const HOUSEHOLD_SCOPED_TABLES = [
   "round_participation",
   "casting_round",
   "room",
+  "vote",
   "application",
   "resident_profile",
   "membership",
