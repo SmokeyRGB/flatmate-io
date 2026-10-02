@@ -30,6 +30,9 @@ const SLOP_PX = 10;
 const HORIZONTAL_RATIO = 1.5;
 const RELEASE_FRACTION = 0.25;
 const RELEASE_MAX_PX = 80;
+// A quick flick counts too: on a phone the natural swipe is short and fast, not a long drag.
+const FLICK_MIN_PX = 30;
+const FLICK_MIN_SPEED = 0.4; // px per ms over the last move
 
 // One colour class per level (a red-to-green scale from the design system's --vote-* tokens, see
 // globals.css). Colour never stands alone: every level also has its symbol and its label, and the
@@ -204,7 +207,16 @@ export function ScreeningDeck({
   // Swipe (Pointer Events, touch only) on the current card. It never rates: it maps to back/forward.
   // While dragging, the stack's --drag variable moves the current card with the finger and pulls the
   // previous card in behind it (globals.css); the card being revealed is already rendered.
-  const swipe = useRef<{ x: number; y: number; decided: boolean; active: boolean; dx: number } | null>(null);
+  const swipe = useRef<{
+    x: number;
+    y: number;
+    decided: boolean;
+    active: boolean;
+    dx: number;
+    speed: number;
+    lastX: number;
+    lastT: number;
+  } | null>(null);
   function setDrag(dx: number | null) {
     const stack = stackRef.current;
     if (!stack) return;
@@ -220,7 +232,16 @@ export function ScreeningDeck({
   }
   function onPointerDown(event: ReactPointerEvent<HTMLDivElement>) {
     if (event.pointerType !== "touch") return;
-    swipe.current = { x: event.clientX, y: event.clientY, decided: false, active: false, dx: 0 };
+    swipe.current = {
+      x: event.clientX,
+      y: event.clientY,
+      decided: false,
+      active: false,
+      dx: 0,
+      speed: 0,
+      lastX: event.clientX,
+      lastT: event.timeStamp,
+    };
   }
   function onPointerMove(event: ReactPointerEvent<HTMLDivElement>) {
     const s = swipe.current;
@@ -231,21 +252,41 @@ export function ScreeningDeck({
       if (Math.hypot(dx, dy) < SLOP_PX) return;
       s.decided = true;
       s.active = Math.abs(dx) > HORIZONTAL_RATIO * Math.abs(dy);
-      if (s.active) event.currentTarget.setPointerCapture(event.pointerId);
+      if (s.active) {
+        // Best effort: capture keeps the release on the stack, but its absence must not stop the drag.
+        try {
+          event.currentTarget.setPointerCapture(event.pointerId);
+        } catch {}
+      }
     }
     if (!s.active) return;
     // Backward needs a previous card and forward a rated one; otherwise the card resists.
     const allowed = dx > 0 ? canGoBack(stateRef.current) : canGoForward(stateRef.current);
     s.dx = allowed ? dx : dx / 4;
+    const dt = event.timeStamp - s.lastT;
+    if (dt > 0) s.speed = Math.abs(event.clientX - s.lastX) / dt;
+    s.lastX = event.clientX;
+    s.lastT = event.timeStamp;
     setDrag(s.dx);
   }
-  function endSwipe(event: ReactPointerEvent<HTMLDivElement>) {
+  // `cancelled`: the browser ended the touch (pointercancel) instead of a release. Some mobile
+  // browsers do that at the end of a horizontal drag even under touch-action: pan-y (human
+  // walkthrough 2026-10-02: the drag previewed the card but never went back). A cancel then commits
+  // only a drag already clearly past the distance threshold, never a flick; anything less springs
+  // back. A swipe never rates, so the worst case of a wrongly committed cancel is a move to the
+  // neighbouring card.
+  function finishSwipe(event: ReactPointerEvent<HTMLDivElement>, cancelled: boolean) {
     const s = swipe.current;
     swipe.current = null;
-    if (!s || !s.active) return;
+    if (!s || !s.active) {
+      setDrag(null);
+      return;
+    }
     const width = stackRef.current?.offsetWidth ?? event.currentTarget.offsetWidth;
     const threshold = Math.min(width * RELEASE_FRACTION, RELEASE_MAX_PX);
-    const commit = Math.abs(s.dx) >= threshold;
+    const far = Math.abs(s.dx) >= threshold;
+    const flick = Math.abs(s.dx) >= FLICK_MIN_PX && s.speed >= FLICK_MIN_SPEED;
+    const commit = cancelled ? far : far || flick;
     // The drag ends first; if the move commits, the state change then animates from where the
     // finger let go, otherwise the card springs back.
     setDrag(null);
@@ -255,12 +296,6 @@ export function ScreeningDeck({
     else goForward();
   }
 
-  // A cancelled pointer (a system gesture, a call, a rotation) never moves the deck: the card only
-  // springs back (code review).
-  function cancelSwipe() {
-    swipe.current = null;
-    setDrag(null);
-  }
 
   function handleResult(result: CastVoteResult, id: string, value: VoteValue) {
     if (result.ok) {
@@ -392,8 +427,8 @@ export function ScreeningDeck({
         className="deck-stack"
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
-        onPointerUp={endSwipe}
-        onPointerCancel={cancelSwipe}
+        onPointerUp={(event) => finishSwipe(event, false)}
+        onPointerCancel={(event) => finishSwipe(event, true)}
       >
         {prevCard && <DeckCard key={prevCard.applicationId} card={prevCard} pos="prev" />}
         <DeckCard key={card.applicationId} card={card} pos="current" />
