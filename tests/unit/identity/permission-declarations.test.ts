@@ -56,7 +56,7 @@ function permissionLiteralsPassedToChecks(): { file: string; name: string }[] {
           else if (text[i] === ")") depth--;
           i++;
         }
-        for (const lit of text.slice(start, i).matchAll(/"([a-z]+(?:_[a-z]+)+)"/g)) {
+        for (const lit of text.slice(start, i).matchAll(/"([a-z]+(?:_[a-z]+)*)"/g)) {
           found.push({ file: file.slice(ROOT.length + 1).replace(/\\/g, "/"), name: lit[1] });
         }
       }
