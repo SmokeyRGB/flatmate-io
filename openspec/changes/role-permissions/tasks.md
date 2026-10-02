@@ -312,14 +312,14 @@ matrix row (no "administration or moderator" wording left). All in
 
 ## 7. Tests (database; expected red against dev until group 9)
 
-- [ ] 7.0 Every test that names `close_round` or `manage_settings` (`grep -rln close_round tests`: at least
+- [x] 7.0 Every test that names `close_round` or `manage_settings` (`grep -rln close_round tests`: at least
   `moderator-permissions`, `founding-resident-permission`, `room-round-authorization`,
   `organisation-tasks`, `navigation-access`, `membership-role-integrity`, the constants test) moves to
   `manage_rounds` (or `manage_round_participation` where it adds participants), or to
   `manage_voting_procedure`; tests that grant either to a plain member lose that case (residents
   hold no organising permission). History tests of
   0024/0027 keep their pinned literals.
-- [ ] 7.1 `tests/integration/policy/authorization-matrix.test.ts`: per identity **and casting** case,
+- [x] 7.1 `tests/integration/policy/authorization-matrix.test.ts`: per identity **and casting** case,
   record the expectation for three callers beside the existing resident refusal: **moderator**
   (allowed everywhere except `issuePasswordResetLink` and the settings mutators) and the household
   account (allowed for identity, rooms and settings; refused for every round and application
@@ -329,24 +329,24 @@ matrix row (no "administration or moderator" wording left). All in
   `PermissionDeniedError` and assert the denial's permission name. **Break:** give
   `issuePasswordResetLink` `manage_members` instead of `issue_password_reset_link` → the moderator
   column fails.
-- [ ] 7.2 `tests/integration/policy/resident-list-access.test.ts`: the two calls that pass a foreign
+- [x] 7.2 `tests/integration/policy/resident-list-access.test.ts`: the two calls that pass a foreign
   `accountId` with `hh.context` now use each caller's own context. Add the hardening case (design
   D4; not a visibility rule — who may see the list is unchanged): a call whose `accountId` argument
   is not the session's own account, e.g. a plain resident's session naming the moderator's account
   to borrow its rights → `PermissionDeniedError`, no rows.
   Assert the flags for household, moderator. **Break:** remove the mismatch refusal → the new case
   fails.
-- [ ] 7.3 `tests/integration/policy/settings-page-admin-guard.test.ts` (now testing
+- [x] 7.3 `tests/integration/policy/settings-page-admin-guard.test.ts` (now testing
   `getHouseholdSettings`): resident refused; moderator refused; a moderator granted
   `manage_voting_procedure` (household writes `permissions = permissions || 'manage_voting_procedure'`) succeeds;
   household succeeds. **Break:** check `issue_password_reset_link` instead of `manage_voting_procedure` → the
   granted-moderator case fails.
-- [ ] 7.4 `tests/integration/policy/navigation-access.test.ts`: the "member with any permission"
+- [x] 7.4 `tests/integration/policy/navigation-access.test.ts`: the "member with any permission"
   case goes (a plain resident holds no organising permission; its SQL-written transition state is
   7.7's); add "a moderator → organisation and membersList true", "the household → both true", "a
   plain resident → both false". **Break:** `membersList = organisation` → the plain-resident case
   still passes, so use `organisation = true` → the plain-resident case fails.
-- [ ] 7.5 `tests/integration/policy/join-code-isolation.test.ts`, `password-reset-link.test.ts`,
+- [x] 7.5 `tests/integration/policy/join-code-isolation.test.ts`, `password-reset-link.test.ts`,
   `member-role-appointment.test.ts`, `decidable-mutator-authorization-fixes.test.ts`,
   `resident-claim-flow.test.ts`, `member-removal-final.test.ts`, `organisation-tasks.test.ts`:
   swap the error class; keep every behaviour assertion. Add the audit's characterization gaps where
@@ -355,7 +355,7 @@ matrix row (no "administration or moderator" wording left). All in
   `triggerSubjectAccessExport`; moderator refused by `issuePasswordResetLink`; a moderator and the
   household both refused to target the administering membership (`CannotChangeAdminRoleError`); the `setMemberRole` no-op
   writes no event; a moderator's `listJoinCodeIssuances` hides a reset row the household sees.
-- [ ] 7.5a Voting (`tests/integration/policy/account-cannot-vote.test.ts` and F4's deliberation tests):
+- [x] 7.5a Voting (`tests/integration/policy/account-cannot-vote.test.ts` and F4's deliberation tests):
   household refused (unchanged); a moderator **without** a resident profile (the existing
   non-resident-moderator helper) refused `castVote` and given no deck; a resident and a resident
   moderator vote. Transition case, labelled as such: 0029's resident floor is still empty, so a live
@@ -369,7 +369,7 @@ matrix row (no "administration or moderator" wording left). All in
   **Break:** call the `vote` check before the transaction (an unlocked read) → the vote is recorded.
   (A held *move-out* would not do: `vote_guard` step 4 locks the profile and refuses anyway, so that
   variant is an invariant guard, not a regression test.)
-- [ ] 7.6 New `tests/integration/policy/member-administration-revocation.test.ts`, modelled on
+- [x] 7.6 New `tests/integration/policy/member-administration-revocation.test.ts`, modelled on
   `application-capture.test.ts` 6.8: inside a held, uncommitted `withSessionContext` as the
   household, demote moderator M (the real `setMemberRole` statement shape: role and permissions);
   start M's `setMovedOut` of a member X outside that callback chain (avoid
@@ -377,7 +377,7 @@ matrix row (no "administration or moderator" wording left). All in
   update); commit; assert `PermissionDeniedError` naming `manage_members`, X's profile still
   active, X's membership live, no `membership.revoked` event. **Break:** move `setMovedOut`'s check
   back before its transaction (`assertHasPermission`) → the move-out succeeds and the test fails.
-- [ ] 7.7 `tests/integration/raw-sql/membership-role-integrity.test.ts`: new cases per the
+- [x] 7.7 `tests/integration/raw-sql/membership-role-integrity.test.ts`: new cases per the
   `identity/permissions` delta: a moderator written with `issue_password_reset_link` → refused; a
   plain member with any of the five administration values → refused; a plain member with
   `manage_round_participation` or `manage_rounds` → refused; a plain member with
@@ -396,7 +396,7 @@ matrix row (no "administration or moderator" wording left). All in
   from schema.ts → argue instead (app_runtime cannot DROP a constraint; the CHECK cannot be
   disabled from the test): these are **invariant guards** run against the migrated catalog, and the
   constants test (1.4) carries the break.
-- [ ] 7.7a New `tests/integration/policy/organisation-access.test.ts`: (a) a plain resident:
+- [x] 7.7a New `tests/integration/policy/organisation-access.test.ts`: (a) a plain resident:
   `requireOrganisationAccess` false, and each `(org)` page's server component rendered with that
   session returns the access message (render the page function directly, as other page tests do;
   if none does, test the helper plus one page and say so); (b) a moderator: true; demote it, then
@@ -404,7 +404,7 @@ matrix row (no "administration or moderator" wording left). All in
   between; (c) the household: true, and the overview offers rooms, members, settings and not
   opening a round; the moderator's overview offers rooms, members, opening a round and not
   settings. **Break:** cache `getNavigationAccess` at module level (not per request) → (b) fails.
-- [ ] 7.8 New `tests/integration/raw-sql/role-permissions-backfill.test.ts`, modelled on
+- [x] 7.8 New `tests/integration/raw-sql/role-permissions-backfill.test.ts`, modelled on
   `reverse-permission-backfill.test.ts` but **not constraint-free**: create the temp copy, seed it,
   add the pre-0029 CHECKs with 0024/0027's literals (the frozen copies), then run every `0029`
   statement in file order with the table name rewritten (the `ADD CONSTRAINT`s included). Extend the
@@ -544,18 +544,18 @@ matrix row (no "administration or moderator" wording left). All in
 
 ## 9. Apply 0029 to dev, as late as possible
 
-- [ ] 9.0 Prerequisites, all done first: groups 1–8 complete, lints/`tsc`/unit tests green, and the
+- [x] 9.0 Prerequisites, all done first: groups 1–8 complete, lints/`tsc`/unit tests green, and the
   orchestrator's local `/code-review high` findings fixed. After 0029 only verify, the browser
   walkthrough (it needs the backfill: Demo-WG Alex gains `manage_members` only through it), archive,
   push and PR remain.
-- [ ] 9.1 Stop and tell the human, before applying, what `0029` does to branches without this change
+- [x] 9.1 Stop and tell the human, before applying, what `0029` does to branches without this change
   (any open WP branch): (1) no old-code **write** is refused on a test path, except an old-code
   demotion of a backfilled moderator (Demo-WG Alex); (2) but old-code **tests that assert a refusal
   0029 relaxes** fail on those branches' pre-push runs against dev, at least
   `membership-role-integrity.test.ts` "the household set is exact" (a missing `manage_settings` is
   now accepted), until they merge `main` with this change. Therefore apply 0029, verify, push and
   merge back-to-back, and tell the WP owners to merge `main` straight after. Wait for the go.
-- [ ] 9.2 Apply `drizzle/0029_role_permissions.sql` to `flatmate-io-dev` (Supabase MCP
+- [x] 9.2 Apply `drizzle/0029_role_permissions.sql` to `flatmate-io-dev` (Supabase MCP
   `apply_migration`, never production). Check as the owner through the MCP (never `app_runtime`,
   which RLS hides rows from):
   - `pg_get_constraintdef` of the seven touched constraints shows the D2 literals: household floor
