@@ -97,9 +97,12 @@ describe("Join route attempt limit (FR-2.28/AC-2.25/EC-2.14)", () => {
   });
 
   it("joinAttemptSourceHash never bypasses the limit when no IP is available", async () => {
-    // design.md Decision 3: a missing IP goes into ONE shared bucket, never an exemption. This is
-    // exactly why the bucket must be cleaned by THIS test — a real missing-IP visitor's bucket
-    // (the same key every other test using a null IP would hit) must not be left polluted.
+    // design.md Decision 3: a missing IP goes into ONE shared bucket, never an exemption.
+    // joinAttemptSourceHash(null) is a pure function of the secret, so this key cannot be made
+    // unique per run. The call still has to hit that shared key — that is the behaviour under
+    // test. It asserts only that the attempt is metered (a boolean), so it does not need the
+    // bucket to be empty and does not depend on the REST delete below. Other join tests send a
+    // per-run address (tests/helpers/join-client-ip.ts) and do not write this key.
     const sourceHash = joinAttemptSourceHash(null);
     sourceHashesToClean.push(sourceHash);
 

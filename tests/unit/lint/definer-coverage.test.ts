@@ -1,4 +1,4 @@
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -412,6 +412,52 @@ $$;`,
   });
 });
 
+describe("definer-coverage grants list (finding #2)", () => {
+  it("flags a SECURITY DEFINER function that is absent from KNOWN_DEFINERS", () => {
+    fixtureDir = mkdtempSync(join(tmpdir(), "flatmate-lint-"));
+    writeFixture(
+      "drizzle/0001_test.sql",
+      `CREATE FUNCTION grants_gap_fn(p_id uuid) RETURNS uuid
+LANGUAGE sql SECURITY DEFINER SET search_path = public STABLE AS $$
+  SELECT p_id
+$$;`,
+    );
+    writeFixture(
+      "tests/integration/raw-sql/grants-gap.test.ts",
+      `it("calls grants_gap_fn", () => { db.execute(sql\`SELECT grants_gap_fn(\${id})\`); });`,
+    );
+    writeFixture(
+      "tests/integration/schema/catalog-shape.test.ts",
+      `const KNOWN_DEFINERS = [\n  "some_other_fn",\n] as const;\n`,
+    );
+
+    expect(checkDefinerCoverageLint(fixtureDir)).toEqual([
+      { functionName: "grants_gap_fn", file: "0001_test.sql", rule: "missing-grants-coverage" },
+    ]);
+  });
+
+  it("passes a SECURITY DEFINER function that is listed in KNOWN_DEFINERS", () => {
+    fixtureDir = mkdtempSync(join(tmpdir(), "flatmate-lint-"));
+    writeFixture(
+      "drizzle/0001_test.sql",
+      `CREATE FUNCTION grants_gap_fn(p_id uuid) RETURNS uuid
+LANGUAGE sql SECURITY DEFINER SET search_path = public STABLE AS $$
+  SELECT p_id
+$$;`,
+    );
+    writeFixture(
+      "tests/integration/raw-sql/grants-gap.test.ts",
+      `it("calls grants_gap_fn", () => { db.execute(sql\`SELECT grants_gap_fn(\${id})\`); });`,
+    );
+    writeFixture(
+      "tests/integration/schema/catalog-shape.test.ts",
+      `const KNOWN_DEFINERS = [\n  "grants_gap_fn",\n] as const;\n`,
+    );
+
+    expect(checkDefinerCoverageLint(fixtureDir)).toHaveLength(0);
+  });
+});
+
 // Run against the REAL repo, not a fixture: this is the honest "does the lint see today's
 // database" check. As of this commit it must fail for exactly resolve_account_household (0005,
 // no raw-sql test names it) and record_join_attempt (0014, only tested under
@@ -421,6 +467,7 @@ $$;`,
 describe("definer-coverage lint against the real repo", () => {
   it("has no violations (resolve_account_household and record_join_attempt are now covered)", () => {
     const rootDir = join(__dirname, "..", "..", "..");
+    expect(existsSync(join(rootDir, "tests", "integration", "schema", "catalog-shape.test.ts"))).toBe(true);
     const violations = checkDefinerCoverageLint(rootDir);
     expect(violations).toEqual([]);
   });

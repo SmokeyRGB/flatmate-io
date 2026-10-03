@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { getClientIp } from "@/app/(auth)/join/[code]/request-ip";
+import { JOIN_TEST_CLIENT_IP_HEADER } from "../../helpers/join-client-ip";
 
 // Second review of PR #17: the first version read x-forwarded-for's LEFTMOST entry, which the
 // caller supplies. Rotating it gave a fresh rate-limit bucket per request and bypassed FR-2.28
@@ -8,7 +9,9 @@ import { getClientIp } from "@/app/(auth)/join/[code]/request-ip";
 const VAR = "JOIN_ATTEMPT_TRUSTED_IP_HEADER";
 
 afterEach(() => {
-  delete process.env[VAR];
+  // The suite sets this (tests/setup.ts). These cases clear or replace it themselves; put the
+  // suite value back so a later file in the same worker does not inherit "unset".
+  process.env[VAR] = JOIN_TEST_CLIENT_IP_HEADER;
 });
 
 describe("Join route client-address trust (FR-2.28)", () => {

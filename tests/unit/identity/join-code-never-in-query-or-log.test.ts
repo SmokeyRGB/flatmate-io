@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { JoinError, type JoinErrorCode } from "@/modules/identity/auth";
 import { buildJoinUrl } from "@/modules/identity/repository";
 import { de } from "@/ui/strings";
+import { joinTestHeaders } from "../../helpers/join-client-ip";
 
 // actions.ts pulls in session-cookie.ts (server-only + next/headers) and next/navigation via its
 // import chain — none of that runs before the deterministic refusal paths below fire, but it must
@@ -10,7 +11,7 @@ import { de } from "@/ui/strings";
 vi.mock("server-only", () => ({}));
 vi.mock("next/headers", () => ({
   cookies: vi.fn(async () => ({ get: () => undefined, set: () => {}, delete: () => {} })),
-  headers: vi.fn(async () => new Headers()),
+  headers: vi.fn(async () => joinTestHeaders()),
 }));
 vi.mock("next/navigation", () => ({ redirect: vi.fn() }));
 
