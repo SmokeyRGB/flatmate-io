@@ -218,6 +218,13 @@
       "when": 1790933294183,
       "tag": "0031_auto_join_open_rounds_lock",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1790863115553,
+      "tag": "0030_revoke_anon_authenticated",
+      "breakpoints": true
     }
   ]
 }

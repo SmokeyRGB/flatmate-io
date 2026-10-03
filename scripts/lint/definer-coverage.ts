@@ -1,7 +1,7 @@
 // M3 (P1): every `SECURITY DEFINER` function runs PAST RLS and, for this project, several answer
 // an unauthenticated caller (resolve_join_code/claim_join_code, resolve_account_household,
 // record_join_attempt) — the #17 cross-household leak in resolve_join_code/claim_join_code (fixed
-// in 0b07396) is exactly the shape this exists to catch earlier. Two requirements, both mechanical:
+// in 0b07396) is exactly the shape this exists to catch earlier. Three requirements, all mechanical:
 //   (a) the function's own definition sets `SET search_path` (an unset search_path on a SECURITY
 //       DEFINER function is a well-known hijack vector — a caller-controlled search_path can make
 //       the function resolve an unqualified name to an attacker's own object instead of the
@@ -15,6 +15,10 @@
 //       extractSqlTemplateContents below. "Called by name" means called from inside an actual
 //       sql`...` tagged template (PR #19 review: the old check matched `name(` anywhere in the
 //       file, so a test's own title or a JS-only call could satisfy it without ever reaching SQL).
+//   (c) the function's name is quoted in KNOWN_DEFINERS in
+//       tests/integration/schema/catalog-shape.test.ts, so a new SECURITY DEFINER function cannot
+//       land without the live grants catalog test knowing about it (finding #2). The rule runs
+//       only when that file is present.
 //
 // "Latest definition of a name wins": drizzle/*.sql is scanned in file order (numeric prefix), and
 // a later `DROP FUNCTION` with no following `CREATE FUNCTION` of the same name removes it from
@@ -42,7 +46,7 @@ import { splitSqlStatements } from "./sql-statements";
 export interface DefinerViolation {
   functionName: string;
   file: string;
-  rule: "missing-search-path" | "missing-raw-sql-test";
+  rule: "missing-search-path" | "missing-raw-sql-test" | "missing-grants-coverage";
 }
 
 interface DefinerState {
@@ -242,6 +246,25 @@ function extractSqlTemplateContents(source: string): string {
   return parts.join("\n");
 }
 
+// Names quoted inside `const KNOWN_DEFINERS = [ ... ]` in the live catalog test. null when that
+// file is absent: fixture directories in the unit tests don't carry it, and applying the rule
+// there would flag every fixture function. The real repository always has the file; the unit
+// test against the repo asserts that, so deleting the file does not silently retire the rule.
+function knownDefiners(rootDir: string): Set<string> | null {
+  const file = join(rootDir, "tests", "integration", "schema", "catalog-shape.test.ts");
+  let text: string;
+  try {
+    text = readFileSync(file, "utf8");
+  } catch {
+    return null;
+  }
+  const block = /const KNOWN_DEFINERS = \[([\s\S]*?)\]/.exec(text);
+  const names = new Set<string>();
+  if (!block) return names;
+  for (const match of block[1].matchAll(/"([a-z0-9_]+)"/g)) names.add(match[1]);
+  return names;
+}
+
 function rawSqlTestSources(rawSqlDir: string): string {
   let combined = "";
   let files: string[] = [];
@@ -274,6 +297,15 @@ export function checkDefinerCoverageLint(rootDir: string): DefinerViolation[] {
     const calledRe = new RegExp(`\\b${name}\\s*\\(`);
     if (!calledRe.test(rawSqlSource)) {
       violations.push({ functionName: name, file: info.file, rule: "missing-raw-sql-test" });
+    }
+  }
+
+  const known = knownDefiners(rootDir);
+  if (known) {
+    for (const [name, info] of definerFunctions) {
+      if (!known.has(name)) {
+        violations.push({ functionName: name, file: info.file, rule: "missing-grants-coverage" });
+      }
     }
   }
 
