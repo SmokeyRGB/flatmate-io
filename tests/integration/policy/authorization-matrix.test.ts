@@ -8,7 +8,7 @@ import { VoteError } from "@/modules/deliberation/repository";
 import { insertTestRound } from "../../helpers/applications";
 import { claimPlainMember, insertApplicationAt, setupPipeline } from "../../helpers/pipeline";
 import * as identityRepo from "@/modules/identity/repository";
-import { PermissionDeniedError, ResidentListActionDeniedError } from "@/modules/identity/repository";
+import { PermissionDeniedError } from "@/modules/identity/repository";
 import { eq } from "drizzle-orm";
 import { withSessionContext, type SessionContext } from "@/db/session-context";
 import { application } from "@/modules/casting/schema";
@@ -150,7 +150,7 @@ const NOT_APPLICABLE_IDENTITY: Record<string, string> = {
   recordJoinAttempt:
     "pre-session bootstrap — the third deliberate RLS-bootstrap exception; a stranger presenting " +
     "a code has no session, and rate limiting must run before any code lookup (AC-2.25).",
-  assertAccountCanVote: "assertion helper, not itself a mutation",
+  assertAccountCanVoteTx: "assertion helper, not itself a mutation (castVote's in-transaction check of the stored vote permission)",
   assertHasPermission: "assertion helper — the permission primitive other functions build on",
   membershipHoldsPermission: "pure helper — no SessionContext, no DB access",
   assertHasPermissionTx: "assertion helper — the in-transaction permission primitive",
@@ -161,8 +161,8 @@ const NOT_APPLICABLE_IDENTITY: Record<string, string> = {
   getHousehold: "read-only",
   getHouseholdSettings: "read-only",
   resolveSessionContext: "pre-session bootstrap — reconstructs a SessionContext from a cookie's session id, before any session exists",
-  getResidentList: "read-only (already enforces its own admin/moderator gate inline)",
-  assertIsAdministration: "assertion helper",
+  getResidentList:
+    "read; checks the member-administration permissions inline; visibility tested in resident-list-access.test.ts",
   getCurrentHouseholdMembers: "read-only",
   generateJoinCode: "pure helper — no SessionContext, no DB access",
   buildJoinUrl: "pure helper — no SessionContext, no DB access",
@@ -172,7 +172,8 @@ const NOT_APPLICABLE_IDENTITY: Record<string, string> = {
     "Tx primitive with an explicit documented no-auth contract (own comment: 'THIS FUNCTION " +
     "PERFORMS NO AUTHORIZATION' — the one legitimate caller, registerHousehold, mints the " +
     "founding link before any Membership row exists to authorize against).",
-  listJoinCodeIssuances: "read-only (already enforces its own admin/moderator gate inline)",
+  listJoinCodeIssuances:
+    "read; checks manage_join_codes inline; visibility tested in join-code-isolation.test.ts",
   assertHasResidentProfile: "pure sync assertion helper — no DB access",
   // start-screen design.md Decision 4: read-only; decides visibility only, never authorization —
   // tested in tests/integration/policy/navigation-access.test.ts.
@@ -208,6 +209,17 @@ function residentContext(
   resident: { accountId: string; profileId: string },
 ): SessionContext {
   return { accountId: resident.accountId, householdId: hh.householdId, profileId: resident.profileId };
+}
+
+// F3 change 2b: every refusal is one PermissionDeniedError naming the missing permission. A refusal
+// reached by the wrong path would look identical otherwise, so a case asserts WHICH permission.
+async function expectDenied(promise: Promise<unknown>, permission: string) {
+  const err = await promise.then(
+    () => undefined,
+    (e: unknown) => e,
+  );
+  expect(err).toBeInstanceOf(PermissionDeniedError);
+  expect((err as PermissionDeniedError).message).toContain(permission);
 }
 
 describe("authorization matrix (M6): every exported casting/identity mutator decides its authorization", () => {
@@ -468,6 +480,113 @@ describe("authorization matrix (M6): every exported casting/identity mutator dec
     });
   });
 
+
+  // F3 change 2b (design D1, task 7.1): the other two callers of the casting mutators. The household
+  // account runs no rounds and captures no application (03-PRD.md §4.0.1, S-50/U-20), but manages
+  // rooms and the voting procedure; a moderator runs rounds, participants and applications and
+  // manages rooms, but holds no `manage_voting_procedure` (matrix ⬜, never granted here).
+  describe("casting/repository.ts mutators: the household column and the moderator column", () => {
+    let hh: TestHousehold;
+    let adminActor: { accountId: string; profileId: null };
+    let resident: { profileId: string; accountId: string; displayName: string };
+    let moderator: { context: SessionContext; accountId: string; profileId: string };
+    let moderatorActor: { accountId: string; profileId: string };
+
+    beforeAll(async () => {
+      hh = await registerSharedHousehold();
+      adminActor = { accountId: hh.accountId, profileId: null };
+      resident = await claim(hh, "Resident1", []);
+      moderator = await createTestModerator(hh);
+      moderatorActor = { accountId: moderator.accountId, profileId: moderator.profileId };
+    });
+
+    afterAll(async () => {
+      await cleanupAll(resident ? deleteTestAccount(resident.accountId) : undefined, hh?.cleanup());
+    });
+
+    // Household column: rooms and settings allowed ...
+    it("the household account may manage rooms and the voting procedure", async () => {
+      const renamed = await castingRepo.createRoom(hh.context, "Room H", adminActor);
+      await castingRepo.renameRoom(hh.context, renamed.id, "Room H2", adminActor);
+      const moved = await castingRepo.createRoom(hh.context, "Room H5", adminActor);
+      await castingRepo.transitionRoomStatus(hh.context, moved.id, "open", adminActor);
+      const removed = await castingRepo.createRoom(hh.context, "Room H6", adminActor);
+      await castingRepo.removeRoom(hh.context, removed.id, adminActor);
+      await castingRepo.updateHouseholdSettingsWithProcedureLock(hh.context, { quorumShare: "0.6" }, adminActor);
+    });
+
+    // ... and every round and application mutator refused.
+    it("the household account is refused every round and application mutator", async () => {
+      const room = await castingRepo.createRoom(hh.context, "Room H3", adminActor);
+      const round = await castingRepo.createAndOpenRound(moderator.context, "Round", [room.id], moderatorActor);
+      const { id } = await castingRepo.captureApplication(moderator.context, {
+        roundId: round.id,
+        applicantName: "Testbewerbung Matrix",
+        collectedFrom: "data_subject",
+      });
+      const draftRoom = await castingRepo.createRoom(hh.context, "Room H4", adminActor);
+      await expectDenied(castingRepo.createRound(hh.context, "Round", [draftRoom.id], adminActor), "manage_rounds");
+      await expectDenied(castingRepo.createAndOpenRound(hh.context, "Round", [draftRoom.id], adminActor), "manage_rounds");
+      await expectDenied(castingRepo.openRound(hh.context, round.id, adminActor), "manage_rounds");
+      await expectDenied(
+        castingRepo.addResidentToRound(hh.context, round.id, resident.profileId, adminActor),
+        "manage_round_participation",
+      );
+      // The application mutators refuse a profile-less session before any permission check or query
+      // (S-50, ProfileRequiredError), which is the household account's refusal here.
+      await expect(
+        castingRepo.captureApplication(hh.context, { roundId: round.id, applicantName: "X", collectedFrom: "data_subject" }),
+      ).rejects.toThrow(castingRepo.ProfileRequiredError);
+      await expect(castingRepo.transitionApplication(hh.context, id, "screened")).rejects.toThrow(
+        castingRepo.ProfileRequiredError,
+      );
+      await expect(
+        castingRepo.updateApplication(hh.context, {
+          roundId: round.id,
+          applicationId: id,
+          baseline: "not-a-real-baseline",
+          applicantName: "Geändert",
+          collectedFrom: "data_subject",
+        }),
+      ).rejects.toThrow(castingRepo.ProfileRequiredError);
+    });
+
+    // Moderator column: rooms, rounds, participants and applications allowed ...
+    it("a moderator may manage rooms, run a round, add a participant and move an application", async () => {
+      const room = await castingRepo.createRoom(moderator.context, "Room M", moderatorActor);
+      await castingRepo.renameRoom(moderator.context, room.id, "Room M2", moderatorActor);
+      const moved = await castingRepo.createRoom(moderator.context, "Room M5", moderatorActor);
+      await castingRepo.transitionRoomStatus(moderator.context, moved.id, "open", moderatorActor);
+      const draft = await castingRepo.createRound(moderator.context, "Draft", [room.id], moderatorActor);
+      await castingRepo.openRound(moderator.context, draft.id, moderatorActor);
+      const room2 = await castingRepo.createRoom(moderator.context, "Room M3", moderatorActor);
+      const round = await castingRepo.createAndOpenRound(moderator.context, "Round", [room2.id], moderatorActor);
+      await castingRepo.addResidentToRound(moderator.context, round.id, resident.profileId, moderatorActor);
+      const { id } = await castingRepo.captureApplication(moderator.context, {
+        roundId: round.id,
+        applicantName: "Testbewerbung Matrix",
+        collectedFrom: "data_subject",
+      });
+      await castingRepo.transitionApplication(moderator.context, id, "screened");
+      const removable = await castingRepo.createRoom(moderator.context, "Room M6", moderatorActor);
+      await castingRepo.removeRoom(moderator.context, removable.id, moderatorActor);
+    });
+
+    // ... but not the voting procedure (no individual grant exists here).
+    it("a moderator is refused the voting-procedure mutators (matrix ⬜, not granted)", async () => {
+      await expectDenied(
+        castingRepo.updateHouseholdSettingsWithProcedureLock(moderator.context, { quorumShare: "0.6" }, moderatorActor),
+        "manage_voting_procedure",
+      );
+      const room = await castingRepo.createRoom(hh.context, "Room M4", adminActor);
+      const round = await castingRepo.createAndOpenRound(moderator.context, "Round", [room.id], moderatorActor);
+      await expectDenied(
+        castingRepo.forceChangeSettingWhileRoundOpen(moderator.context, "quorumShare", "0.6", round.id, moderatorActor),
+        "manage_voting_procedure",
+      );
+    });
+  });
+
   describe("identity/repository.ts mutators refuse a plain resident", () => {
     let hh: TestHousehold;
     let resident: { profileId: string; accountId: string; displayName: string };
@@ -491,86 +610,82 @@ describe("authorization matrix (M6): every exported casting/identity mutator dec
       );
     });
 
+    // F3 change 2b: one denial class, naming the missing permission. A refusal reached by the wrong
+    // path would look identical otherwise, so each case asserts WHICH permission was missing.
     it("createResidentProfile", async () => {
-      await expect(
-        identityRepo.createResidentProfile(residentCtx, "Nobody", residentActor),
-      ).rejects.toThrow(ResidentListActionDeniedError);
+      await expectDenied(identityRepo.createResidentProfile(residentCtx, "Nobody", residentActor), "create_resident_profile");
     });
 
     it("createResidentProfile refuses a resident's own session spoofed with the admin's accountId", async () => {
       const spoofedActor = { accountId: hh.accountId, profileId: null };
-      await expect(
-        identityRepo.createResidentProfile(residentCtx, "Nobody", spoofedActor),
-      ).rejects.toThrow(ResidentListActionDeniedError);
+      await expectDenied(identityRepo.createResidentProfile(residentCtx, "Nobody", spoofedActor), "create_resident_profile");
     });
 
     it("transitionResidentProfileStatus", async () => {
       const adminActor = { accountId: hh.accountId, profileId: null };
       const target = await identityRepo.createResidentProfile(hh.context, "Target", adminActor);
-      await expect(
+      await expectDenied(
         identityRepo.transitionResidentProfileStatus(residentCtx, target.id, "moved_out", residentActor),
-      ).rejects.toThrow(ResidentListActionDeniedError);
+        "manage_members",
+      );
     });
 
     it("removeMember", async () => {
       const target = await claim(hh, "Resident2", extraAccountIds);
-      await expect(
+      await expectDenied(
         identityRepo.removeMember(residentCtx, resident.accountId, target.accountId, target.displayName),
-      ).rejects.toThrow(ResidentListActionDeniedError);
+        "manage_members",
+      );
     });
 
     it("setMovedOut", async () => {
       const target = await claim(hh, "Resident3", extraAccountIds);
-      await expect(
-        identityRepo.setMovedOut(residentCtx, resident.accountId, target.accountId),
-      ).rejects.toThrow(ResidentListActionDeniedError);
+      await expectDenied(identityRepo.setMovedOut(residentCtx, resident.accountId, target.accountId), "manage_members");
     });
 
     it("reactivateMember", async () => {
       const target = await claim(hh, "Resident4", extraAccountIds);
-      await expect(
-        identityRepo.reactivateMember(residentCtx, resident.accountId, target.accountId),
-      ).rejects.toThrow(ResidentListActionDeniedError);
+      await expectDenied(identityRepo.reactivateMember(residentCtx, resident.accountId, target.accountId), "manage_members");
     });
 
     it("issueJoinCode", async () => {
-      await expect(
+      await expectDenied(
         identityRepo.issueJoinCode(residentCtx, resident.accountId, { validDays: 7, maxUses: 1 }),
-      ).rejects.toThrow(ResidentListActionDeniedError);
+        "manage_join_codes",
+      );
     });
 
     it("extendJoinCode", async () => {
       const issuance = await identityRepo.issueJoinCode(hh.context, hh.accountId, { validDays: 7, maxUses: 1 });
-      await expect(
-        identityRepo.extendJoinCode(residentCtx, resident.accountId, issuance.id),
-      ).rejects.toThrow(ResidentListActionDeniedError);
+      await expectDenied(identityRepo.extendJoinCode(residentCtx, resident.accountId, issuance.id), "manage_join_codes");
     });
 
     it("deleteJoinCode", async () => {
       const issuance = await identityRepo.issueJoinCode(hh.context, hh.accountId, { validDays: 7, maxUses: 1 });
-      await expect(
-        identityRepo.deleteJoinCode(residentCtx, resident.accountId, issuance.id),
-      ).rejects.toThrow(ResidentListActionDeniedError);
+      await expectDenied(identityRepo.deleteJoinCode(residentCtx, resident.accountId, issuance.id), "manage_join_codes");
     });
 
     it("setMemberRole", async () => {
       const target = await claim(hh, "Resident5", extraAccountIds);
-      await expect(
+      await expectDenied(
         identityRepo.setMemberRole(residentCtx, resident.accountId, target.accountId, "moderator"),
-      ).rejects.toThrow(ResidentListActionDeniedError);
+        "appoint_moderator",
+      );
     });
 
     it("setMemberRole refuses a resident's own session spoofed with the admin's accountId", async () => {
       const target = await claim(hh, "Resident6", extraAccountIds);
-      await expect(
+      await expectDenied(
         identityRepo.setMemberRole(residentCtx, hh.accountId, target.accountId, "moderator"),
-      ).rejects.toThrow(ResidentListActionDeniedError);
+        "appoint_moderator",
+      );
     });
 
     it("triggerSubjectAccessExport", async () => {
-      await expect(
+      await expectDenied(
         identityRepo.triggerSubjectAccessExport(residentCtx, resident.accountId, "some-application-id"),
-      ).rejects.toThrow(ResidentListActionDeniedError);
+        "export_subject_access",
+      );
     });
 
     it("revokeSession", async () => {
@@ -581,23 +696,121 @@ describe("authorization matrix (M6): every exported casting/identity mutator dec
     });
 
     // resident-settings design.md Decision 6 (O-16, proposal Assumption 5): the household account
-    // ONLY may issue a reset link — a plain resident AND a moderator are both refused, unlike the
-    // resident-list actions above (U-30 parity), which a moderator may perform.
+    // ONLY may issue a reset link. A plain resident is refused here; the moderator's refusal is in
+    // the moderator column below.
     it("issuePasswordResetLink refuses a plain resident", async () => {
       const target = await claim(hh, "ResidentResetTarget1", extraAccountIds);
-      await expect(
+      await expectDenied(
         identityRepo.issuePasswordResetLink(residentCtx, resident.accountId, target.profileId),
-      ).rejects.toThrow(ResidentListActionDeniedError);
+        "issue_password_reset_link",
+      );
+    });
+  });
+
+  // F3 change 2b (design D1, task 7.1): the matrix's other two callers. A moderator may do every
+  // member-administration action the household account may, including creating a profile and
+  // appointing or demoting moderators (human decision, 2026-10-01), but not issue a reset link; the
+  // household account may do all of it. Each "allowed" case calls the real function and asserts the
+  // outcome that proves it ran (a returned row, or the stored state afterwards).
+  describe("identity/repository.ts mutators: the moderator column and the household column", () => {
+    let hh: TestHousehold;
+    let moderator: { context: SessionContext; accountId: string; profileId: string };
+    let moderatorActor: { accountId: string; profileId: string };
+    const extraAccountIds: string[] = [];
+
+    beforeAll(async () => {
+      hh = await registerSharedHousehold();
+      moderator = await createTestModerator(hh);
+      moderatorActor = { accountId: moderator.accountId, profileId: moderator.profileId };
     });
 
-    it("issuePasswordResetLink refuses a moderator", async () => {
-      const moderator = await claim(hh, "ModeratorResetIssuer", extraAccountIds);
-      await identityRepo.setMemberRole(hh.context, hh.accountId, moderator.accountId, "moderator");
-      const moderatorCtx = residentContext(hh, moderator);
-      const target = await claim(hh, "ResidentResetTarget2", extraAccountIds);
+    afterAll(async () => {
+      await cleanupAll(...extraAccountIds.map(deleteTestAccount), hh?.cleanup());
+    });
+
+    it("a moderator may createResidentProfile (a prepared profile for a personal join link)", async () => {
+      const profile = await identityRepo.createResidentProfile(moderator.context, "ByModerator", moderatorActor);
+      expect(profile.status).toBe("prepared");
+    });
+
+    it("a moderator may transitionResidentProfileStatus on a prepared profile (not refused for permission)", async () => {
+      const adminActor = { accountId: hh.accountId, profileId: null };
+      const target = await identityRepo.createResidentProfile(hh.context, "PreparedTarget", adminActor);
+      const updated = await identityRepo.transitionResidentProfileStatus(moderator.context, target.id, "moved_out", moderatorActor);
+      expect(updated.status).toBe("moved_out");
+    });
+
+    it("a moderator may removeMember", async () => {
+      const target = await claim(hh, "RemoveTarget", extraAccountIds);
+      await identityRepo.removeMember(moderator.context, moderator.accountId, target.accountId, target.displayName);
+      const list = await identityRepo.getResidentList(hh.context, hh.accountId);
+      expect(list.members.map((m) => m.id)).not.toContain(target.profileId);
+    });
+
+    it("a moderator may setMovedOut and reactivateMember", async () => {
+      const target = await claim(hh, "MoveOutTarget", extraAccountIds);
+      await identityRepo.setMovedOut(moderator.context, moderator.accountId, target.accountId);
+      const movedOut = (await identityRepo.getResidentList(hh.context, hh.accountId)).members.find((m) => m.id === target.profileId);
+      expect(movedOut?.status).toBe("moved_out");
+      await identityRepo.reactivateMember(moderator.context, moderator.accountId, target.accountId);
+      const back = (await identityRepo.getResidentList(hh.context, hh.accountId)).members.find((m) => m.id === target.profileId);
+      expect(back?.status).toBe("active");
+    });
+
+    it("a moderator may issueJoinCode, extendJoinCode and deleteJoinCode", async () => {
+      const issuance = await identityRepo.issueJoinCode(moderator.context, moderator.accountId, { validDays: 7, maxUses: 1 });
+      const extended = await identityRepo.extendJoinCode(moderator.context, moderator.accountId, issuance.id);
+      expect(extended.expiresAt.getTime()).toBeGreaterThan(issuance.expiresAt.getTime());
+      await identityRepo.deleteJoinCode(moderator.context, moderator.accountId, issuance.id);
+    });
+
+    it("a moderator may appoint a member, demote another moderator and demote itself", async () => {
+      const member = await claim(hh, "AppointTarget", extraAccountIds);
+      await identityRepo.setMemberRole(moderator.context, moderator.accountId, member.accountId, "moderator");
+      // another moderator is demoted by this moderator ...
+      await identityRepo.setMemberRole(moderator.context, moderator.accountId, member.accountId, "member");
+      // ... and a moderator demotes itself (a separate one, so the shared moderator stays)
+      const selfDemoting = await createTestModerator(hh, "SelfDemoting");
+      await identityRepo.setMemberRole(selfDemoting.context, selfDemoting.accountId, selfDemoting.accountId, "member");
+      await expectDenied(
+        identityRepo.setMovedOut(selfDemoting.context, selfDemoting.accountId, member.accountId),
+        "manage_members",
+      );
+    });
+
+    it("a moderator may triggerSubjectAccessExport", async () => {
+      const result = await identityRepo.triggerSubjectAccessExport(moderator.context, moderator.accountId, "some-application-id");
+      expect(result.exportId).toContain("export-");
+    });
+
+    it("a moderator is refused issuePasswordResetLink (household only)", async () => {
+      const target = await claim(hh, "ModResetTarget", extraAccountIds);
+      await expectDenied(
+        identityRepo.issuePasswordResetLink(moderator.context, moderator.accountId, target.profileId),
+        "issue_password_reset_link",
+      );
+    });
+
+    it("neither the household account nor a moderator may change the administering membership's role", async () => {
       await expect(
-        identityRepo.issuePasswordResetLink(moderatorCtx, moderator.accountId, target.profileId),
-      ).rejects.toThrow(ResidentListActionDeniedError);
+        identityRepo.setMemberRole(hh.context, hh.accountId, hh.accountId, "moderator"),
+      ).rejects.toThrow(identityRepo.CannotChangeAdminRoleError);
+      await expect(
+        identityRepo.setMemberRole(moderator.context, moderator.accountId, hh.accountId, "member"),
+      ).rejects.toThrow(identityRepo.CannotChangeAdminRoleError);
+    });
+
+    it("the household account may do all of it, including issuePasswordResetLink", async () => {
+      const adminActor = { accountId: hh.accountId, profileId: null };
+      const created = await identityRepo.createResidentProfile(hh.context, "ByHousehold", adminActor);
+      expect(created.status).toBe("prepared");
+      const target = await claim(hh, "HhResetTarget", extraAccountIds);
+      const link = await identityRepo.issuePasswordResetLink(hh.context, hh.accountId, target.profileId);
+      expect(link.purpose).toBe("password_reset");
+      const issuance = await identityRepo.issueJoinCode(hh.context, hh.accountId, { validDays: 7, maxUses: 1 });
+      expect(issuance.code).toBeTruthy();
+      const exported = await identityRepo.triggerSubjectAccessExport(hh.context, hh.accountId, "some-application-id");
+      expect(exported.exportId).toContain("export-");
     });
   });
 });

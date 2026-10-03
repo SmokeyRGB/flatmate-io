@@ -25,6 +25,11 @@
 > Zugriff, K-19/U-22) · **S-11** von „Feinschliff"-Screen auf „zweiter Durchlauf" umformuliert ·
 > §6 um eine Beobachtungsmetrik zum Moderationsaufwand sowie eine Umformulierung ergänzt · §10 um
 > zwei UI/UX-Prinzipien ergänzt.*
+> V0.5.1 — *Änderung ggü. V0.5 (2026-10-02, menschliche Entscheidung vom 2026-10-01 — „Bewohnende
+> stimmen ab und nehmen am Casting teil, sonst nichts"): **S-04** und der Absatz „Systemrollen" in
+> §3 sprechen nicht mehr von einzeln vergebbaren Berechtigungen (Bewerber anlegen, Status ändern,
+> Runde schließen, Termine bestätigen) für Bewohnende, sondern von Berechtigungen, die einzeln nur an
+> die Moderation vergeben werden können. Folgt in `03-PRD.md` §4.0.1 (V0.6.1).*
 > V0.4 — *Änderung ggü. V0.3: Die Begründung der Sendepuffer-Ausnahme in **S-30**
 > und §7 korrigiert — sie stand auf „kein fremdes Datum betroffen", was falsch ist: eine `Vote`
 > ist `application_id` plus Wert und damit eine Beurteilung **über eine dritte Person**. Sie
@@ -99,7 +104,8 @@ dort AGG § 19 und der EU AI Act anders greifen — siehe §7 und `06-Compliance
 **Systemrollen (Details in `03-PRD.md` §4.0.1):** Haushalts-Account · Moderator ·
 Bewohnender · ehemaliger Bewohnender · Bewerbender ohne Konto. Die Rollen entstehen nicht
 aus einer Hierarchie, sondern aus orthogonalen `Membership`-Attributen (`is_resident`,
-`role`) plus einzeln vergebbaren Berechtigungen.
+`role`) plus Berechtigungen, die einzeln nur an die Moderation vergeben werden können (geändert
+2026-10-01, menschliche Entscheidung: Bewohnende stimmen ab und nehmen am Casting teil, mehr nicht).
 
 **Betreiber-Kunde:** Der Betrieb liegt beim Vorhaben selbst (nicht self-hosted). Damit ist
 der **Haushalt der Verantwortliche im Sinne der DSGVO und Flatmate.io der
@@ -280,7 +286,7 @@ zurückführen lassen muss. Die Phasenzuordnung steht in §5.4.
 | **S-01** `Household`-Registrierung (E-Mail + Passwort, Hinweis auf gemeinsam genutzte Adresse); Haushalts-`Account` verwaltet und **stimmt nicht ab** | Organisationen über Haushalten, SSO, Eigentumsübertragung als eigener Mechanismus |
 | **S-02** `ResidentProfile` aus dem Haushalts-Account heraus anlegen; die Identität einer Sitzung steht mit der Anmeldung fest (ADR-013) — der Weg zwischen Verwaltung und Bewohner-Profil führt über Abmelden und neue Anmeldung | Kontextwechsel innerhalb einer Sitzung · Mehrere Haushalte pro `Account` in einer Oberfläche |
 | **S-03** **Ein** Beitrittscode/-Link für den ganzen Haushalt; Ein-Schritt-Registrierung mit **nur Name und Passwort als Pflichtfelder** — `Account.email` ist beim Beitritt für Resident-Accounts **optional** und später im Profil nachpflegbar (analog zum bestehenden Präzedenzfall „Passkey wird nie während der Registrierung angeboten", `03-PRD.md`); Passwort primär und universell; Passkey als optionaler, abschaltbarer Aufsatz; E-Mail-Verifikation, falls eine Adresse hinterlegt ist, nachgelagert und nicht abstimmungsblockierend | Einladung pro Person, Magic-Link-Login (verworfen: nicht gerätegebunden), SMS-Verifikation, E-Mail-Pflichtfeld im Beitrittsformular |
-| **S-04** `Membership` mit orthogonalen `is_resident` / `role` plus einzeln vergebbare Berechtigungen (Bewerber anlegen, Status ändern, Runde schließen, Termine bestätigen) | Rollenhierarchie, frei definierbare Rollen, Berechtigungsvorlagen |
+| **S-04** `Membership` mit orthogonalen `is_resident` / `role` plus Berechtigungen, die einzeln nur an die Moderation vergeben werden können; Bewohnende stimmen ab und nehmen am Casting teil (geändert 2026-10-01, menschliche Entscheidung) | Rollenhierarchie, frei definierbare Rollen, Berechtigungsvorlagen |
 | **S-05** Struktureller Duplikatsschutz — von den ursprünglich vier Mechanismen tragen nach dem Wegfall der für Bewohnende sichtbaren Bewohnerliste und ihres Entfernen-Rechts (K-19/U-22, `07-Screen-Inventar.md` §7–8) nur noch zwei: Beitritte im `ActivityEvent`-Feed, Quorum gegen die Bewohnerzahl. Die Bewohnerliste (Namen, Beitrittsdatum, Kontakt, Status; entfernen/`moved_out`/reaktivieren/Code) bleibt der Verwaltung **und dem Moderator voll** vorbehalten (Parität, **U-30**, präzisiert U-22); eine separate Teilnehmendenliste (nur Namen der Rundenteilnehmenden, keine Handlungen) bleibt allen Bewohnenden sichtbar. **Zusätzlich (U-30, 2026-09-17):** Bewohnende erhalten eine eigene, reduzierte „Wer wohnt hier"-Ansicht (nur aktive Mitglieder, keine Handlungen) — ein Teil des Sichtbarkeits-Schutzes kehrt damit zurück, ohne das Entfernen-Recht für Bewohnende wiederherzustellen. Die Absicherung des Einladungslinks (**S-49**) bleibt Voraussetzung dieses Schutzes, nicht nur Ergänzung | Geräte-Fingerprinting (§ 25 TDDDG), Identitätsprüfung, Entfernen-Recht für Bewohnende |
 | **S-06** `CastingRound` mit mehreren `Room`s, eigener Zustandsmaschine und `RoundParticipation`-Snapshot der Teilnehmenden beim Start | Mehrere gleichzeitig laufende Runden pro Haushalt als beworbener Anwendungsfall (technisch nicht ausgeschlossen) |
 | **S-07** `Room` als eigene Entität mit eigenem Status — „3 Zimmer, eines vergeben, Runde läuft weiter" | Zimmerpläne, Grundrisse, Miethöhen, Mietverträge |

@@ -6,6 +6,7 @@ import {
   createResidentProfile,
   setMemberRole,
 } from "@/modules/identity/repository";
+import { RESIDENT_PERMISSIONS } from "@/modules/identity/schema";
 import {
   cleanupAll,
   deleteTestAccount,
@@ -28,12 +29,13 @@ afterEach(async () => {
   hh = undefined;
 });
 
-// Human decision, 2026-09-22 (docs/domain/identity.md §2.1's close_round note): close_round is a
+// Human decision, 2026-09-22 (docs/domain/identity.md §2.1's Rolle-Vorbelegung box; the permission was
+// called close_round until F3 change 2b renamed it manage_rounds): manage_rounds is a
 // role default, the same shape as manage_rooms — held by household_admin and moderator, not
 // inferred from being the first claimed resident membership. This replaces the old rule this file
-// used to test (the FIRST claimed resident profile got close_round automatically).
-describe("close_round is a role default (identity/permissions capability), not a founding grant", () => {
-  it("gives the first AND the second claimed resident membership no permissions at all", async () => {
+// used to test (the FIRST claimed resident profile got manage_rounds automatically).
+describe("manage_rounds is a role default (identity/permissions capability), not a founding grant", () => {
+  it("gives the first AND the second claimed resident membership the resident set (`vote`) and nothing else", async () => {
     hh = await registerTestHousehold();
     const actor = { accountId: hh.accountId, profileId: null };
 
@@ -44,8 +46,8 @@ describe("close_round is a role default (identity/permissions capability), not a
       "test-password-not-real-1234",
     );
     firstAccountId = firstAcc;
-    expect(firstMembership.permissions).not.toContain("close_round");
-    expect(firstMembership.permissions).toEqual([]);
+    expect(firstMembership.permissions).not.toContain("manage_rounds");
+    expect(firstMembership.permissions).toEqual([...RESIDENT_PERMISSIONS]);
 
     const second = await createResidentProfile(hh.context, "SecondResident", actor);
     const { accountId: secondAcc, membership: secondMembership } = await claimResidentProfile(
@@ -54,11 +56,11 @@ describe("close_round is a role default (identity/permissions capability), not a
       "test-password-not-real-1234",
     );
     secondAccountId = secondAcc;
-    expect(secondMembership.permissions).not.toContain("close_round");
-    expect(secondMembership.permissions).toEqual([]);
+    expect(secondMembership.permissions).not.toContain("manage_rounds");
+    expect(secondMembership.permissions).toEqual([...RESIDENT_PERMISSIONS]);
   });
 
-  it("a plain member cannot close_round, but appointing it moderator grants close_round with no individual grant", async () => {
+  it("a plain member cannot manage_rounds, but appointing it moderator grants manage_rounds with no individual grant", async () => {
     hh = await registerTestHousehold();
     const actor = { accountId: hh.accountId, profileId: null };
 
@@ -69,22 +71,22 @@ describe("close_round is a role default (identity/permissions capability), not a
       "test-password-not-real-1234",
     );
     firstAccountId = accountId;
-    expect(memberMembership.permissions).toEqual([]);
+    expect(memberMembership.permissions).toEqual([...RESIDENT_PERMISSIONS]);
 
     // PR #19 review: assertHasPermission now derives authorization from the authenticated
     // session — exercise it with the resident's OWN SessionContext, not the admin's hh.context
     // paired with the resident's accountId (that combination is refused as a session/actor
-    // mismatch, not for lacking close_round, which is what this test means to show).
+    // mismatch, not for lacking manage_rounds, which is what this test means to show).
     const residentContext = { accountId, householdId: hh.householdId, profileId: profile.id };
 
-    // A plain member: close_round is refused, and nothing in its own permissions array grants it.
-    await expect(assertHasPermission(residentContext, accountId, "close_round")).rejects.toThrow(
+    // A plain member: manage_rounds is refused, and nothing in its own permissions array grants it.
+    await expect(assertHasPermission(residentContext, accountId, "manage_rounds")).rejects.toThrow(
       PermissionDeniedError,
     );
 
     // Appointed moderator: setMemberRole stores the moderator's set (MODERATOR_PERMISSIONS) on the
-    // membership, and close_round passes because it is stored there (design D3: no role is read).
+    // membership, and manage_rounds passes because it is stored there (design D3: no role is read).
     await setMemberRole(hh.context, hh.accountId, accountId, "moderator");
-    await expect(assertHasPermission(residentContext, accountId, "close_round")).resolves.toBeUndefined();
+    await expect(assertHasPermission(residentContext, accountId, "manage_rounds")).resolves.toBeUndefined();
   });
 });

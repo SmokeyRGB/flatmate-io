@@ -182,6 +182,13 @@ export const de = {
     identityHousehold: (householdName: string) => `${householdName} (Verwaltung)`,
     identityHouseholdFallback: "Haushaltsverwaltung",
     identityResidentFallback: "Bewohner:in",
+    // role-permissions design D9: the one message every organisation page shows a caller whose
+    // stored permissions grant no organisation action (a plain resident, or a moderator demoted
+    // since the page was last loaded), with the way back to Start.
+    accessDenied: {
+      heading: "Organisation",
+      body: "Dieser Bereich ist für Verwaltung und Moderation.",
+    },
     dashboard: {
       heading: "Organisation",
       activeRoundEyebrow: "Aktuelle Runde",
@@ -190,7 +197,7 @@ export const de = {
       openFirstRoundBody: "Noch läuft nichts — eröffne eine Runde, sobald du Zimmer zum Besetzen hast.",
       openNewRound: "Neue Runde eröffnen",
       openAnotherRound: "Weitere Runde eröffnen",
-      // D13 (application-capture): the household account and any session without close_round is
+      // D13 (application-capture): the household account and any session without manage_rounds is
       // not offered the way to open a round; runs of the round are the moderation's (S-50/U-20).
       noRoundYetHeading: "Noch keine Runde",
       noRoundYetBody: "Casting-Runden eröffnet die Moderation der WG.",
@@ -576,7 +583,7 @@ export const de = {
   },
   settings: {
     heading: "Haushaltseinstellungen",
-    accessDeniedBody: "Diese Seite ist nur für die Verwaltung.",
+    accessDeniedBody: "Das Abstimmungsverfahren legt die Verwaltung fest.",
     lockedWhileRoundOpen: (roundTitle: string) =>
       `Solange „${roundTitle}" läuft, bleiben diese Einstellungen unverändert. Schließe die ` +
       `Runde, um sie hier zu ändern.`,

@@ -21,7 +21,7 @@ vi.mock("@/modules/identity/repository", async () => {
   return {
     ...actual,
     assertHasPermission: vi.fn(async () => {
-      throw new actual.PermissionDeniedError("close_round");
+      throw new actual.PermissionDeniedError("manage_rounds");
     }),
   };
 });
@@ -34,11 +34,11 @@ vi.mock("@/modules/casting/repository", () => ({
 const { createAndOpenRoundAction } = await import("@/app/(org)/rounds/new/actions");
 import type { CreateRoundFormState } from "@/app/(org)/rounds/new/actions";
 
-// rounds-new-permission-check-outside-try: a signed-in user without close_round used to hit an
+// rounds-new-permission-check-outside-try: a signed-in user without manage_rounds used to hit an
 // unhandled thrown PermissionDeniedError (assertHasPermission ran above the try block), instead
 // of the inline state.error every other refusal on this form returns.
-describe("createAndOpenRoundAction close_round permission handling", () => {
-  it("returns an inline error instead of throwing when close_round is missing", async () => {
+describe("createAndOpenRoundAction manage_rounds permission handling", () => {
+  it("returns an inline error instead of throwing when manage_rounds is missing", async () => {
     const prevState: CreateRoundFormState = { error: null };
     const formData = new FormData();
     formData.set("title", "New round");

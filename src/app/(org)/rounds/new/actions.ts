@@ -24,16 +24,16 @@ export async function createAndOpenRoundAction(
 
   const actor = { accountId: current.context.accountId, profileId: current.context.profileId };
 
-  // rounds-new-permission-check-outside-try: the close_round check used to sit above this try
+  // rounds-new-permission-check-outside-try: the manage_rounds check used to sit above this try
   // block, so a signed-in user without it hit an unhandled server-action error instead of the
   // inline state.error every other refusal on this form uses. It's folded in here alongside the
-  // existing RoundOpenPreconditionError mapping — no change to who holds close_round.
+  // existing RoundOpenPreconditionError mapping — no change to who holds manage_rounds.
   //
   // rounds-new-orphan-draft-atomicity: create + open now run in one transaction (repository
   // layer) — a precondition failure below rolls back the draft insert too, instead of leaving an
   // orphan draft round behind for every failed submission.
   try {
-    await assertHasPermission(current.context, current.context.accountId, "close_round");
+    await assertHasPermission(current.context, current.context.accountId, "manage_rounds");
     await createAndOpenRound(current.context, title, roomIds, actor);
   } catch (err) {
     if (err instanceof RoundOpenPreconditionError) {

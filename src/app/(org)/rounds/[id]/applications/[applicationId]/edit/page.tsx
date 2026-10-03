@@ -6,6 +6,8 @@ import { formatDateDe, isDeadlinePassed, oneMonthAfter } from "@/modules/casting
 import { getOrganisationApplication } from "@/modules/casting/repository";
 import { assertHasPermission, getHousehold, PermissionDeniedError } from "@/modules/identity/repository";
 import { getCurrentSession } from "@/modules/identity/session-cookie";
+import { OrganisationAccessDenied } from "@/app/(org)/organisation-access-denied";
+import { requireOrganisationAccess } from "@/app/(org)/organisation-access";
 import { de } from "@/ui/strings";
 import { LinkPendingHint } from "@/ui/link-pending-hint";
 import { CaptureForm } from "../../new/capture-form";
@@ -26,6 +28,11 @@ export default async function EditApplicationPage({
   const { id, applicationId } = await params;
   const current = await getCurrentSession();
   if (!current) redirect("/sign-in");
+
+  // role-permissions design D9: every page of the organisation area first checks the caller's
+  // stored permissions on this request (a demoted moderator loses the area on reload); the page's
+  // own narrower check below stays.
+  if (!(await requireOrganisationAccess(current))) return <OrganisationAccessDenied />;
 
   const back = (
     <Link href={`/rounds/${id}/applications/${applicationId}`} className="back-link">

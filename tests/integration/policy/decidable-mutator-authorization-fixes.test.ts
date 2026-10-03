@@ -5,7 +5,6 @@ import { claimResidentProfile, signIn } from "@/modules/identity/auth";
 import {
   createResidentProfile,
   PermissionDeniedError,
-  ResidentListActionDeniedError,
   transitionResidentProfileStatus,
   revokeSession,
 } from "@/modules/identity/repository";
@@ -21,7 +20,7 @@ import {
 // casting/identity repository.ts exports for M6's authorization matrix:
 //   1. revokeSession accepted ANY sessionId under RLS's household-only scoping — no check that it
 //      belonged to the caller's own account.
-//   2. createResidentProfile's `if (actor.accountId)` skipped assertIsAdministration entirely for
+//   2. createResidentProfile's `if (actor.accountId)` skipped its administration check entirely for
 //      a null accountId, instead of refusing.
 //   3. transitionResidentProfileStatus had no authorization check anywhere in its call chain.
 // transitionApplication (casting/repository.ts) was the one gap NOT fixed here — no authorization
@@ -110,12 +109,12 @@ describe("revokeSession refuses to revoke another account's session (G-C fix 1)"
 });
 
 describe("createResidentProfile refuses a null-accountId actor (G-C fix 2)", () => {
-  it("refuses with ResidentListActionDeniedError and creates nothing", async () => {
+  it("refuses with PermissionDeniedError and creates nothing", async () => {
     hh = await registerTestHousehold();
 
     await expect(
       createResidentProfile(hh.context, "Nobody", { accountId: null, profileId: null }),
-    ).rejects.toThrow(ResidentListActionDeniedError);
+    ).rejects.toThrow(PermissionDeniedError);
   });
 
   it("the legitimate path (administration, a real accountId) still works", async () => {
@@ -150,7 +149,7 @@ describe("transitionResidentProfileStatus requires administration or moderator (
         "moved_out",
         { accountId: resident.accountId, profileId: resident.profileId },
       ),
-    ).rejects.toThrow(ResidentListActionDeniedError);
+    ).rejects.toThrow(PermissionDeniedError);
   });
 
   it("refuses a resident's own session spoofed with the admin's accountId (PR #19 review)", async () => {
@@ -169,7 +168,7 @@ describe("transitionResidentProfileStatus requires administration or moderator (
         "moved_out",
         { accountId: hh.accountId, profileId: null },
       ),
-    ).rejects.toThrow(ResidentListActionDeniedError);
+    ).rejects.toThrow(PermissionDeniedError);
   });
 
   it("refuses a null-accountId actor", async () => {
@@ -184,7 +183,7 @@ describe("transitionResidentProfileStatus requires administration or moderator (
         accountId: null,
         profileId: null,
       }),
-    ).rejects.toThrow(ResidentListActionDeniedError);
+    ).rejects.toThrow(PermissionDeniedError);
   });
 
   it("the legitimate path (administration) still works — display-name-uniqueness.test.ts's own shape", async () => {

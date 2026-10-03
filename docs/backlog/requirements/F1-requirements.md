@@ -53,12 +53,12 @@ roles · parallel rounds offered in the UI · anything about applications, votes
 
 - **FR-1.1** The system shall register a household from an email address and a password. Both are required.
 - **FR-1.2** The registration screen shall display a notice that the email address will be shared with the household's residents, before submission.
-- **FR-1.3** The system shall allow the household account to create resident profiles. Each profile has a display name.
+- **FR-1.3** The system shall allow the household account **and a moderator** to create resident profiles. Each profile has a display name. *(Amended 2026-10-01, human decision: profile creation is part of running a casting.)*
 - **FR-1.4** A resident profile's display name shall be unique within the household among profiles that are neither `moved_out` nor `removed`. *(Amended 2026-09-22: extended from "not `moved_out`" to also exclude `removed`, so a removed member's name is free again.)*
 - **FR-1.5** The household account shall be able to create a resident profile, including one intended for the person operating it. It shall **never occupy** that profile itself — whoever uses it signs in separately with `(household, display name) + password`. Source: ADR-013.
 - **FR-1.6** The acting identity of a session shall be fixed at sign-in and shall not be writable afterwards. Moving between administration and a resident identity shall require signing out and signing in again. The interface shall name the signed-in identity rather than offer a switch. Source: ADR-013.
 - **FR-1.7** The household account shall not be able to cast a vote.
-- **FR-1.8** Membership shall carry voting eligibility and a role as **independent** attributes, plus individually grantable permissions (create applicant, change status, close round, confirm appointments).
+- **FR-1.8** Membership shall carry voting eligibility and a role as **independent** attributes, plus permissions grantable individually to a moderator only; residents vote and take part *(amended 2026-10-01)*.
 
 ### Resident list (administration)
 
@@ -201,7 +201,7 @@ Given I am a resident, when I open the household members view, then I see the di
 | **EC-1.4** | Opening a round with exactly one eligible resident | Permitted. Quorum of `ceil(0.5 × 1)` = 1 is satisfiable |
 | **EC-1.5** | A second round is opened while one is already open | Permitted at the data level, **not offered in the UI**: one round is marked active, others are reachable only through a round list, and any round view shows exactly one round |
 | **EC-1.6** | A room is removed while a round covering it is open | Refused while the round is open; the room may be set `not_available` instead |
-| **EC-1.7** | The last moderator becomes unavailable | Administration may **create** a resident profile and appoint it as moderator — it never occupies that profile itself (ADR-013); whoever uses it signs in separately. Result: a named actor, never direct access to deliberation content |
+| **EC-1.7** | The last moderator becomes unavailable | Administration may **create** a resident profile and appoint it as moderator — it never occupies that profile itself (ADR-013); whoever uses it signs in separately. Result: a named actor, never direct access to deliberation content. *(Amended 2026-10-01: a moderator may do the same; administration keeps the fallback when no moderator is left.)* |
 | **EC-1.8** | A resident is made ineligible to vote mid-round | Their round-participation entry records it; already-cast votes are unaffected by this feature (F5 governs their arithmetic) |
 | **EC-1.9** | Two moderators open the same `draft` round simultaneously | Exactly one opening takes effect; exactly one set of snapshot entries and frozen rules exists |
 | **EC-1.10** | Household registers with an address already used by another household | Permitted. Households are not deduplicated by email |
@@ -242,7 +242,7 @@ score, and the participant snapshot feeds every quorum display.
 1. **Who may open a round** is expressed as a grantable permission (FR-1.8) but the default
    assignment is not specified anywhere in the spec chain. Recommend: the household account's own
    resident profile holds it initially, and it is grantable from there. **Resolved (human decision,
-   2026-09-22):** superseded by a role default instead of this recommendation — `close_round` is
+   2026-09-22):** superseded by a role default instead of this recommendation — `manage_rounds` (named `close_round` until 2026-10-01) is
    now held by every `household_admin` and every `moderator` membership, the same shape as
    `manage_rooms`. See `docs/domain/identity.md` §2.1 and `docs/review-log.md`
    §Offene-Punkte-Register.

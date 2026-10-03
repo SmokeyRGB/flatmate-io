@@ -128,7 +128,7 @@ describe("castVote refusals (AC-4.13, FR-4.15)", () => {
     expect(err.code).toBe("not_found");
   });
 
-  it("a stale context after setMovedOut is refused as not_eligible via assertAccountCanVote", async () => {
+  it("a stale context after setMovedOut is refused as not_eligible via the in-transaction vote check (assertAccountCanVoteTx)", async () => {
     const { s, voter } = await fixture();
     const app = await insertApplicationAt(s, "new");
     await setMovedOut(s.hh.context, s.hh.accountId, voter.accountId);

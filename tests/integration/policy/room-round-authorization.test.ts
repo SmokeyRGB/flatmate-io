@@ -52,11 +52,11 @@ describe("Room and round mutations require their documented permission", () => {
     await expect(removeRoom(residentContext, room.id, residentActor)).rejects.toThrow(PermissionDeniedError);
   });
 
-  it("refuses a plain resident (no close_round) on every round-lifecycle mutation", async () => {
+  it("refuses a plain resident (no manage_rounds) on every round-lifecycle mutation", async () => {
     hh = await registerTestHousehold();
     const adminActor = { accountId: hh.accountId, profileId: null };
     const room = await createRoom(hh.context, "Room A", adminActor);
-    // close_round is part of the moderator's stored set only (docs/domain/identity.md §2.1; the
+    // manage_rounds is part of the moderator's stored set only (docs/domain/identity.md §2.1; the
     // household account has none, 03-PRD.md §4.0.1) — no claimed resident membership gets it, first
     // or otherwise. The round is therefore created by a moderator (design D13). Two plain residents
     // are claimed here only to keep this test's shape close to the room-mutation test above it.

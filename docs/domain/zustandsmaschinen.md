@@ -133,14 +133,14 @@ Fünf Zustände. Bewusst dünn — Begründung siehe §2.2.
 
 | Von | Nach | Wer darf | Was protokolliert / bewirkt wird |
 |---|---|---|---|
-| — | `draft` | `manage_settings` | `round.created`; Zimmer wählbar, keine Bewerbungen sichtbar |
-| `draft` | `open` | `close_round` bzw. `manage_settings` | `round.opened`; **friert `settings_snapshot` ein**, **snapshottet die Teilnehmenden** aus den aktiven Bewohnenden in `RoundParticipation` (`source = snapshot_at_open`) |
-| `open` | `paused` | `manage_settings` | `round.paused`; Lesezugriff bleibt, Stimmabgabe gesperrt. Für den realen Fall „wir warten drei Wochen auf Rückmeldungen" |
-| `paused` | `open` | `manage_settings` | `round.resumed` |
-| `open` | `closed` | `close_round` | `round.closed`; setzt `closed_at` → **Startpunkt der Aufbewahrungsfrist**; friert `quorum_denominator_frozen` ein; Stimmen und Vetos werden schreibgeschützt |
-| `closed` | `open` | `close_round` **+ Begründungsfeld** | `round.reopened`; **`settings_snapshot` bleibt das alte**, damit die Bewertung derselben Runde nicht nachträglich das Verfahren wechselt; `retention_until` wird neu berechnet |
-| `closed` | `archived` | `close_round`, **oder System** bei Fristablauf | `round.archived`; Vorwarnung 14 Tage vorher |
-| `archived` | `closed` | `close_round` | nur solange nicht gelöscht |
+| — | `draft` | `manage_rounds` | `round.created`; Zimmer wählbar, keine Bewerbungen sichtbar |
+| `draft` | `open` | `manage_rounds` | `round.opened`; **friert `settings_snapshot` ein**, **snapshottet die Teilnehmenden** aus den aktiven Bewohnenden in `RoundParticipation` (`source = snapshot_at_open`) |
+| `open` | `paused` | `manage_rounds` | `round.paused`; Lesezugriff bleibt, Stimmabgabe gesperrt. Für den realen Fall „wir warten drei Wochen auf Rückmeldungen" |
+| `paused` | `open` | `manage_rounds` | `round.resumed` |
+| `open` | `closed` | `manage_rounds` | `round.closed`; setzt `closed_at` → **Startpunkt der Aufbewahrungsfrist**; friert `quorum_denominator_frozen` ein; Stimmen und Vetos werden schreibgeschützt |
+| `closed` | `open` | `manage_rounds` **+ Begründungsfeld** | `round.reopened`; **`settings_snapshot` bleibt das alte**, damit die Bewertung derselben Runde nicht nachträglich das Verfahren wechselt; `retention_until` wird neu berechnet |
+| `closed` | `archived` | `manage_rounds`, **oder System** bei Fristablauf | `round.archived`; Vorwarnung 14 Tage vorher |
+| `archived` | `closed` | `manage_rounds` | nur solange nicht gelöscht |
 
 **Regel-Sperre (Invariante I-7, hier konkret):** Solange eine Runde `open` oder `paused` ist, sind
 Änderungen an Skalengewichten, Quorum, Veto-Budget und Anonymitätsregel **blockiert**. Der
