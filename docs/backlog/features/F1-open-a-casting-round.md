@@ -87,9 +87,9 @@ in the UI — technically permitted, deliberately not surfaced.
   something.
 - As a moderator, I want the **voting rules frozen when the round opens**, so that the ranking
   cannot be recomputed under different rules afterwards.
-- As a moderator, I want **changes to the voting procedure blocked while a round is open**, or
-  loudly logged if they happen through an administrative path, so that no result is disputable
-  after the fact.
+- As a moderator, I want a **change to the voting procedure to apply only to rounds opened
+  afterwards** *(amended 2026-10-05; was: blocked while a round is open)*, so that no result is
+  disputable after the fact and the household can still correct its settings while a round runs.
 
 ---
 

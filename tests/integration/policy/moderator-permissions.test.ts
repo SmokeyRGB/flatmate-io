@@ -15,6 +15,8 @@ import {
 import {
   HOUSEHOLD_PERMISSIONS,
   MODERATOR_PERMISSIONS,
+  PERMISSIONS,
+  RESIDENT_PERMISSIONS,
   membership,
 } from "@/modules/identity/schema";
 import {
@@ -23,7 +25,7 @@ import {
   createRoom,
   createRound,
   openRound,
-  updateHouseholdSettingsWithProcedureLock,
+  updateHouseholdSettings,
 } from "@/modules/casting/repository";
 import {
   cleanupAll,
@@ -78,19 +80,19 @@ const sorted = (v: readonly string[]) => [...v].sort();
 // should simply map to permissions; they shouldn't be a separate workaround for permissions /
 // Backdoor for ignoring permissions."
 describe("moderator and household permissions are stored, and only the stored list decides", () => {
-  it("appointing a moderator stores all four permissions, and it may open a round, manage a room and capture", async () => {
+  it("appointing a moderator stores the moderator set beside the resident set, and it may open a round, manage a room and capture", async () => {
     hh = await registerTestHousehold();
     const member = await claim(hh, "Appointee");
-    expect((await storedRow(hh, member.accountId)).permissions).toEqual([]);
+    expect((await storedRow(hh, member.accountId)).permissions).toEqual([...RESIDENT_PERMISSIONS]);
 
     await setMemberRole(hh.context, hh.accountId, member.accountId, "moderator");
     const stored = await storedRow(hh, member.accountId);
     expect(stored.role).toBe("moderator");
-    expect(sorted(stored.permissions)).toEqual(sorted(MODERATOR_PERMISSIONS));
+    expect(sorted(stored.permissions)).toEqual(sorted([...MODERATOR_PERMISSIONS, ...RESIDENT_PERMISSIONS]));
 
     const actor = actorOf(member);
     const room = await createRoom(member.context, "Room A", actor); // manage_rooms
-    const round = await createAndOpenRound(member.context, "Round", [room.id], actor); // close_round
+    const round = await createAndOpenRound(member.context, "Round", [room.id], actor); // manage_rounds
     const captured = await captureApplication(member.context, {
       roundId: round.id,
       applicantName: "Testbewerbung Moderator",
@@ -99,7 +101,7 @@ describe("moderator and household permissions are stored, and only the stored li
     expect(captured.id).toBeTruthy();
   });
 
-  it("demoting to member removes the four, refuses each action, and keeps the resident set", async () => {
+  it("demoting to member removes the moderator set, refuses each action, and leaves exactly the resident set", async () => {
     hh = await registerTestHousehold();
     const moderator = await createTestModerator(hh);
     const actor = actorOf(moderator);
@@ -110,6 +112,8 @@ describe("moderator and household permissions are stored, and only the stored li
     const stored = await storedRow(hh, moderator.accountId);
     expect(stored.role).toBe("member");
     for (const permission of MODERATOR_PERMISSIONS) expect(stored.permissions).not.toContain(permission);
+    // F3 change 2b: a demoted member holds exactly the resident set, nothing else.
+    expect(stored.permissions).toEqual([...RESIDENT_PERMISSIONS]);
 
     await expect(createRoom(moderator.context, "Room B", actor)).rejects.toThrow(PermissionDeniedError);
     await expect(createRound(moderator.context, "Round 2", [room.id], actor)).rejects.toThrow(PermissionDeniedError);
@@ -123,50 +127,41 @@ describe("moderator and household permissions are stored, and only the stored li
     ).rejects.toThrow(PermissionDeniedError);
   });
 
-  it("a member holds nothing; a member granted create_application holds it with its role still member", async () => {
+  // F3 change 2b (human decision, 2026-10-01): residents only vote and take part in the casting. The
+  // old case "a member granted create_application captures" is gone: no permission is holdable by a
+  // plain resident any more (the matrix's ⬜ remains only for the moderator).
+  it("a plain member holds only the resident set: every other permission check is refused", async () => {
     hh = await registerTestHousehold();
-    const moderator = await createTestModerator(hh);
-    const modActor = actorOf(moderator);
-    const room = await createRoom(moderator.context, "Room A", modActor);
-    const round = await createAndOpenRound(moderator.context, "Round", [room.id], modActor);
     const member = await claim(hh, "PlainMember");
-
-    await expect(assertHasPermission(member.context, member.accountId, "create_application")).rejects.toThrow(
-      PermissionDeniedError,
-    );
-
-    // The matrix's ⬜ column: an individual grant. No function writes one, so this is the row write
-    // the real thing would produce (same pattern as organisation-tasks.test.ts).
-    await withSessionContext(hh.context, (tx) =>
-      tx.update(membership).set({ permissions: ["create_application"] }).where(eq(membership.accountId, member.accountId)),
-    );
-    await expect(assertHasPermission(member.context, member.accountId, "create_application")).resolves.toBeUndefined();
     expect((await storedRow(hh, member.accountId)).role).toBe("member");
 
-    const captured = await captureApplication(member.context, {
-      roundId: round.id,
-      applicantName: "Testbewerbung Granted",
-      collectedFrom: "data_subject",
-    });
-    expect(captured.id).toBeTruthy();
+    for (const permission of Object.keys(PERMISSIONS)) {
+      if ((RESIDENT_PERMISSIONS as readonly string[]).includes(permission)) {
+        await expect(assertHasPermission(member.context, member.accountId, permission)).resolves.toBeUndefined();
+      } else {
+        await expect(assertHasPermission(member.context, member.accountId, permission)).rejects.toThrow(
+          PermissionDeniedError,
+        );
+      }
+    }
   });
 
-  it("a moderator is not granted manage_settings: a settings change is refused (the matrix's ⬜ stays a grant)", async () => {
+  it("a moderator is not granted manage_voting_procedure: a settings change is refused (the matrix's ⬜ stays a grant)", async () => {
     hh = await registerTestHousehold();
     const moderator = await createTestModerator(hh);
     await expect(
-      updateHouseholdSettingsWithProcedureLock(moderator.context, { quorumShare: "0.6" }, actorOf(moderator)),
+      updateHouseholdSettings(moderator.context, { quorumShare: "0.6" }, actorOf(moderator)),
     ).rejects.toThrow(PermissionDeniedError);
   });
 
   it("the role alone grants nothing: membershipHoldsPermission reads only the stored list", () => {
     const moderatorWithNothing = { role: "moderator", permissions: [] as string[], revokedAt: null };
     const householdWithNothing = { role: "household_admin", permissions: [] as string[], revokedAt: null };
-    expect(membershipHoldsPermission(moderatorWithNothing, "close_round")).toBe(false);
-    expect(membershipHoldsPermission(householdWithNothing, "manage_settings")).toBe(false);
+    expect(membershipHoldsPermission(moderatorWithNothing, "manage_rounds")).toBe(false);
+    expect(membershipHoldsPermission(householdWithNothing, "manage_voting_procedure")).toBe(false);
     // and a revoked row holds nothing whatever it stores
-    expect(membershipHoldsPermission({ permissions: ["close_round"], revokedAt: new Date() }, "close_round")).toBe(false);
-    expect(membershipHoldsPermission({ permissions: ["close_round"], revokedAt: null }, "close_round")).toBe(true);
+    expect(membershipHoldsPermission({ permissions: ["manage_rounds"], revokedAt: new Date() }, "manage_rounds")).toBe(false);
+    expect(membershipHoldsPermission({ permissions: ["manage_rounds"], revokedAt: null }, "manage_rounds")).toBe(true);
   });
 
   it("moving a moderator out: revoked, role member, no permission; reactivating restores the resident set only", async () => {
@@ -183,14 +178,14 @@ describe("moderator and household permissions are stored, and only the stored li
     const back = await storedRow(hh, moderator.accountId);
     expect(back.revokedAt).toBeNull();
     expect(back.role).toBe("member");
-    expect(back.permissions).toEqual([]); // the resident set (empty in this change), none of the moderator's
-    await expect(assertHasPermission(moderator.context, moderator.accountId, "close_round")).rejects.toThrow(
+    expect(back.permissions).toEqual([...RESIDENT_PERMISSIONS]); // the resident set (`vote`), none of the moderator's
+    await expect(assertHasPermission(moderator.context, moderator.accountId, "manage_rounds")).rejects.toThrow(
       PermissionDeniedError,
     );
 
     // Appointed again, visibly, it holds the set again.
     await setMemberRole(hh.context, hh.accountId, moderator.accountId, "moderator");
-    await expect(assertHasPermission(moderator.context, moderator.accountId, "close_round")).resolves.toBeUndefined();
+    await expect(assertHasPermission(moderator.context, moderator.accountId, "manage_rounds")).resolves.toBeUndefined();
   });
 
   it("the same after a hard removal (the removal tier)", async () => {
@@ -219,10 +214,13 @@ describe("moderator and household permissions are stored, and only the stored li
       PermissionDeniedError,
     );
     // ... and it does not run rounds (03-PRD.md §4.0.1, S-50/U-20 — design D13).
-    await expect(assertHasPermission(hh.context, hh.accountId, "close_round")).rejects.toThrow(PermissionDeniedError);
+    for (const permission of ["manage_rounds", "manage_round_participation", "reverse_application_state"]) {
+      await expect(assertHasPermission(hh.context, hh.accountId, permission)).rejects.toThrow(PermissionDeniedError);
+    }
     // It does keep what the matrix gives it.
     await expect(assertHasPermission(hh.context, hh.accountId, "manage_rooms")).resolves.toBeUndefined();
-    await expect(assertHasPermission(hh.context, hh.accountId, "manage_settings")).resolves.toBeUndefined();
+    await expect(assertHasPermission(hh.context, hh.accountId, "manage_voting_procedure")).resolves.toBeUndefined();
+    await expect(assertHasPermission(hh.context, hh.accountId, "issue_password_reset_link")).resolves.toBeUndefined();
   });
 
   // Deliberate breaks (tasks 2.6):

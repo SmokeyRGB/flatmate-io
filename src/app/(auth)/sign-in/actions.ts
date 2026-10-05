@@ -17,7 +17,7 @@ export async function signInAction(
   formData: FormData,
 ): Promise<SignInFormState> {
   const mode = String(formData.get("mode") ?? "household");
-  let landingPath: "/dashboard" | "/settings";
+  let landingPath: "/dashboard" | "/organization";
 
   try {
     const result =

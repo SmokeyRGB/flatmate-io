@@ -1,7 +1,7 @@
 "use client";
 
 import { Trash2, TriangleAlert } from "lucide-react";
-import { useActionState, useEffect, useRef, useState } from "react";
+import { useActionState, useEffect, useId, useRef, useState } from "react";
 import { de } from "@/ui/strings";
 import { SubmitButton } from "@/ui/submit-button";
 import { removeMemberAction, type RemoveMemberFormState } from "./actions";
@@ -19,6 +19,7 @@ export function RemoveMemberForm({ accountId, displayName }: { accountId: string
   const [state, formAction] = useActionState(removeMemberAction, initialState);
   const [typedName, setTypedName] = useState("");
   const dialogRef = useRef<HTMLDialogElement>(null);
+  const headingId = useId();
 
   // `removeMember` now performs the `status: "removed"` transition (U-27, final) — the row
   // itself unmounts on a successful submission, since getResidentList excludes `removed` members
@@ -46,8 +47,8 @@ export function RemoveMemberForm({ accountId, displayName }: { accountId: string
 
       {/* Resetting on `close` covers both the Cancel button below and the native Escape-dismiss
           gesture (which fires `close` too) — one handler, no separate case needed. */}
-      <dialog ref={dialogRef} className="dialog" onClose={() => setTypedName("")}>
-        <h2 className="font-serif text-lg font-semibold">{t.dialogHeading(displayName)}</h2>
+      <dialog ref={dialogRef} className="dialog" aria-labelledby={headingId} onClose={() => setTypedName("")}>
+        <h2 id={headingId} className="font-serif text-lg font-semibold">{t.dialogHeading(displayName)}</h2>
         <p className="mt-1 text-sm text-muted-foreground">{t.consequence}</p>
 
         <div className="callout callout-caution mt-3">

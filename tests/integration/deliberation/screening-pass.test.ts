@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import { afterEach, describe, expect, it } from "vitest";
 import { withSessionContext } from "@/db/session-context";
-import { listVoteCandidatesTx, forceChangeSettingWhileRoundOpen, ProfileRequiredError } from "@/modules/casting/repository";
+import { listVoteCandidatesTx, updateHouseholdSettings, ProfileRequiredError } from "@/modules/casting/repository";
 import { castingRound } from "@/modules/casting/schema";
 import { castVote, getAwaitingVoteCounts, getScreeningPass } from "@/modules/deliberation/repository";
 import { vote } from "@/modules/deliberation/schema";
@@ -110,14 +110,12 @@ describe("getScreeningPass: the deck (AC-4.1, AC-4.2, AC-4.3)", () => {
 });
 
 describe("getScreeningPass: the frozen weights (AC-4.9, EC-4.11)", () => {
-  it("AC-4.9: a weight changed through the audited override after opening is not shown", async () => {
+  it("AC-4.9: a weight changed after opening is not shown", async () => {
     const { s, voter } = await fixture();
     await insertApplicationAt(s, "new");
-    await forceChangeSettingWhileRoundOpen(
+    await updateHouseholdSettings(
       s.hh.context,
-      "scaleWeights",
-      { no: 0, rather_not: 1, good: 4, definitely: 5 },
-      s.roundId,
+      { scaleWeights: { no: 0, rather_not: 1, good: 4, definitely: 5 } },
       { accountId: s.hh.accountId, profileId: null },
     );
     const pass = await deckOf(s, voter.context, s.roundId);
@@ -171,7 +169,9 @@ describe("getScreeningPass: eligibility (FR-4.15, EC-4.3, V-2)", () => {
     await insertApplicationAt(s, "new");
     await setMovedOut(s.hh.context, s.hh.accountId, voter.accountId);
     expect(await getScreeningPass(voter.context, s.roundId)).toEqual({ kind: "refused", reason: "not_eligible" });
-    expect(await getScreeningPass(voter.context, null)).toEqual({ kind: "empty" });
+    // role-permissions: the moved-out membership holds no `vote` any more, so the pass refuses
+    // before it looks for a round (it used to fall through to "empty"). Either way no card leaves.
+    expect(await getScreeningPass(voter.context, null)).toEqual({ kind: "refused", reason: "not_eligible" });
     expect((await getAwaitingVoteCounts(voter.context)).size).toBe(0);
     // The candidates port itself, called directly: no card data reaches the caller.
     const leaked = await withSessionContext(voter.context, (tx) =>

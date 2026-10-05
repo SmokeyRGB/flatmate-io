@@ -40,7 +40,7 @@ Order follows `02-SRD.md` §5.4's v0.1 row exactly, group by group.
 | **S-01** | `Household` registration (email + password); the household account administers and never votes | F1 | FR-1.1, FR-1.2, FR-1.7; AC-1.1, AC-1.2, AC-1.5 | ✅ |
 | **S-02** | `ResidentProfile` creation; one fixed identity per session, separate sign-ins for administration and resident (ADR-013) | F1 | FR-1.3–FR-1.6; AC-1.3, AC-1.4, AC-1.6 | ✅ |
 | **S-03** | One join code/link for the whole household; one-step registration with only name + password required | F2 | FR-2.1, FR-2.9–FR-2.19; AC-2.1–AC-2.6, AC-2.17 | ✅ |
-| **S-04** | `Membership` with orthogonal `is_resident` / `role` plus individually grantable permissions | F1 | FR-1.8; AC-1.5, AC-1.20, AC-1.21 (the `create_application` permission itself is exercised by AC-3.5 in F3, and `change_application_state` by FR-3.24 / AC-3.21) | ✅ |
+| **S-04** | `Membership` with orthogonal `is_resident` / `role` plus permissions grantable individually to a moderator only (amended 2026-10-01) | F1 | FR-1.8; AC-1.5, AC-1.20, AC-1.21 (the `create_application` permission itself is exercised by AC-3.5 in F3, and `change_application_state` by FR-3.24 / AC-3.21) | ✅ |
 | **S-05** | Two lists with different rights: participant list (names only, all residents) and resident list (administration full, moderator read-only, others not at all); only two of the four original duplicate-protection mechanisms survive | F1 | **Half A:** FR-1.19, AC-1.18 · **Half B:** FR-1.25–FR-1.30, AC-1.20–AC-1.23 · dependency in **C-1.10** | ✅² |
 | **S-49** | Join code gets an expiry, a usage cap, and a share-page warning | F2 | FR-2.1–FR-2.8; AC-2.7, AC-2.8, AC-2.9, AC-2.18 | ✅ |
 | **S-50** | An account without an active `ResidentProfile` reaches household administration only | F1 | FR-1.23, FR-1.24; AC-1.16, AC-1.17 | ✅ |
@@ -56,7 +56,7 @@ Order follows `02-SRD.md` §5.4's v0.1 row exactly, group by group.
 | **S-48** | Exactly one precedence rule decides which pending resident task is shown first | F2 | FR-2.20–FR-2.25; AC-2.12–AC-2.16 | ✅ |
 | **S-16** | Copy-paste text on marking a candidate `invited`, as an aid for the household — never sent by the app | F5 | FR-5.24–FR-5.28; AC-5.21–AC-5.23 | ✅ |
 | **S-27** (append-only log only) | `ActivityEvent` feed, append-only, every event naming the account **and** the acting profile | F0 | FR-0.13–FR-0.15; AC-0.11 | ✅¹ |
-| **S-35** | Rule lock: changing the voting procedure while a round is open is blocked and logged | F1 | FR-1.21, FR-1.22; AC-1.13–AC-1.15 | ✅ |
+| **S-35** | Rule lock, relaxed 2026-10-05: changing the voting procedure while a round is open is allowed and reaches only later rounds; an open round keeps its snapshot | F1 | FR-1.21 (amended), FR-1.22 (withdrawn); AC-1.13, AC-1.15 (amended), AC-1.14 (withdrawn) | ✅ |
 | **S-33** (manual deletion only) | Manual deletion of a **single** `Application`, available at any time. Deleting a whole round is **not** in v0.1 — `02-SRD.md` §5.4 carves out only "die Handlöschung", and no packet specifies it | F3 | FR-3.17–FR-3.20; AC-3.15–AC-3.18 | ✅ |
 
 **¹ S-15 and S-27 — gap found here, then closed in the packet.** `F0-requirements.md` §4 states

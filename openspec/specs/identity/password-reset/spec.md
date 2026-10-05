@@ -9,11 +9,13 @@ presented as a security boundary.
 ### Requirement: The administration can issue a reset link for an active profile without an email
 
 The household account SHALL be able to issue a password-reset link for an active resident profile
-of its own household, provided that profile's account has no email address. No other identity
-SHALL be able to issue one. A reset link SHALL be single-use and SHALL expire like any join link.
-Sources: O-16 (`domain/identity.md` §2.1, amended by this change: *„Die Verwaltung
-(`Membership.is_resident = false`, `manage_members`)"*); PRD §4.1.1 K-18; `resident-settings`
-proposal Assumption 5.
+of its own household, provided that profile's account has no email address. The right to issue one
+SHALL be the stored permission `issue_password_reset_link`, which only the household set contains
+and which the database refuses on every other membership (`identity/permissions`), so no other
+identity SHALL be able to issue one. A reset link SHALL be single-use and SHALL expire like any
+join link. Sources: O-16 (`domain/identity.md` §2.1: *„Die Verwaltung … kann für ein aktives
+`ResidentProfile` ohne `email` einen einmal verwendbaren Link ausstellen"*); PRD §4.1.1 K-18;
+`resident-settings` proposal Assumption 5; F3 change 2b (`role-permissions`).
 
 #### Scenario: Issuing a reset link
 - **WHEN** the household account issues a reset link for an active profile whose account has no

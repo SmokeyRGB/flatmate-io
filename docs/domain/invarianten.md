@@ -140,8 +140,8 @@ Klarstellung in §2.1: die Trennung ist Klarheit, keine Härtung.
 >
 > **Sichtbar** ist die Runde in Identität und Lebenszyklus: Existenz, `title`, `status`, `room_ids`,
 > `opened_at`, `closed_at`, `phase_deadline_at` und die Aufbewahrungsfelder. Das ist die Grundlage
-> für Bildschirm **O17**, für die Durchsetzung von **S-35** („nicht während laufender Runde") und
-> für `Room → not_available`.
+> für Bildschirm **O17** und für `Room → not_available`. (Die Durchsetzung von **S-35** gehörte
+> bis 2026-10-05 dazu; die Lockerung hat diesen Grund entfallen lassen, die beiden anderen tragen.)
 >
 > **Unsichtbar** bleibt alles, was aus `Application` abgeleitet ist — **ausdrücklich einschließlich
 > Zahlen**: Bewerbungszahl, abgegebene Stimmen, Beteiligung, Quorum-Anzeige, Score, Rangliste,

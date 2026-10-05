@@ -12,7 +12,7 @@ import {
   type JoinHouseholdResult,
 } from "@/modules/identity/auth";
 import {
-  ResidentListActionDeniedError,
+  PermissionDeniedError,
   ResidentProfileNotEligibleForResetError,
   createResidentProfile,
   issuePasswordResetLink,
@@ -92,7 +92,7 @@ describe("issuePasswordResetLink (design.md Decision 6)", () => {
     expect(link.residentProfileId).toBe(resident.profileId);
   });
 
-  it("issuing as a moderator is refused (assert ResidentListActionDeniedError)", async () => {
+  it("issuing as a moderator is refused (assert PermissionDeniedError)", async () => {
     hh = await registerTestHousehold();
     const moderator = await claimResident(hh, "ModeratorIssuer");
     await setMemberRole(hh.context, hh.accountId, moderator.accountId, "moderator");
@@ -105,7 +105,7 @@ describe("issuePasswordResetLink (design.md Decision 6)", () => {
 
     await expect(
       issuePasswordResetLink(moderatorCtx, moderator.accountId, resident.profileId),
-    ).rejects.toThrow(ResidentListActionDeniedError);
+    ).rejects.toThrow(PermissionDeniedError);
   });
 
   it("issuing for a prepared, a moved-out, or an already-emailed profile is refused (assert the class)", async () => {
@@ -589,9 +589,11 @@ describe("redeemPasswordReset (design.md Decision 5)", () => {
       await tx.select().from(membership).where(eq(membership.residentProfileId, resident.profileId)).for("update");
       markLocked();
       await rawTxGate;
+      // The real revocation's shape (revokeMembershipForProfileTx): role member, no permissions; a
+      // revoked row holding `vote` is refused by membership_revoked_holds_nothing (role-permissions).
       await tx
         .update(membership)
-        .set({ revokedAt: new Date() })
+        .set({ revokedAt: new Date(), role: "member", permissions: [] })
         .where(eq(membership.residentProfileId, resident.profileId));
       await tx
         .update(session)

@@ -64,7 +64,10 @@ async function membershipRowFor(hh: TestHousehold, accountId: string) {
 async function simulateOldBugRemoval(hh: TestHousehold, profileId: string, membershipId: string): Promise<void> {
   await withSessionContext(hh.context, async (tx) => {
     await tx.execute(sql`UPDATE resident_profile SET status = 'moved_out' WHERE id = ${profileId}::uuid`);
-    await tx.execute(sql`UPDATE membership SET revoked_at = now() WHERE id = ${membershipId}::uuid`);
+    // The real revocation's shape: role member, no permissions (membership_revoked_holds_nothing).
+    await tx.execute(
+      sql`UPDATE membership SET revoked_at = now(), role = 'member', permissions = '{}'::text[] WHERE id = ${membershipId}::uuid`,
+    );
     await tx.insert(activityEvent).values({
       householdId: hh.householdId,
       eventType: "membership.removed_as_intruder",

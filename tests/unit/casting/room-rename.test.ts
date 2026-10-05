@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import { afterEach, describe, expect, it } from "vitest";
 import { withSessionContext } from "@/db/session-context";
-import { createRoom, renameRoom, transitionRoomStatus } from "@/modules/casting/repository";
+import { createRoom, listRooms, renameRoom, transitionRoomStatus } from "@/modules/casting/repository";
 import { castingRound } from "@/modules/casting/schema";
 import { activityEvent } from "@/modules/audit/schema";
 import { registerTestHousehold, type TestHousehold } from "../../helpers/identity";
@@ -43,5 +43,24 @@ describe("Room renaming", () => {
     );
     const renameEvents = events.filter((e) => e.eventType === "room.renamed");
     expect(renameEvents).toHaveLength(1);
+  });
+
+  // Walkthrough 2026-10-05: "Zimmer 1" and "Zimmer 2" swapped places after a rename, because
+  // listRooms had no ORDER BY and an UPDATE moves the row in Postgres heap order.
+  it("keeps listRooms order (creation order) after renaming the first room", async () => {
+    hh = await registerTestHousehold();
+    const h = hh;
+    const actor = { accountId: h.accountId, profileId: null };
+
+    const first = await createRoom(h.context, "Zimmer 1", actor);
+    const second = await createRoom(h.context, "Zimmer 2", actor);
+    const third = await createRoom(h.context, "Zimmer 3", actor);
+    expect((await listRooms(h.context)).map((r) => r.id)).toEqual([first.id, second.id, third.id]);
+
+    await renameRoom(h.context, first.id, "Zimmer 1a", actor);
+    expect((await listRooms(h.context)).map((r) => r.id)).toEqual([first.id, second.id, third.id]);
+
+    await renameRoom(h.context, second.id, "Zimmer 2a", actor);
+    expect((await listRooms(h.context)).map((r) => r.id)).toEqual([first.id, second.id, third.id]);
   });
 });

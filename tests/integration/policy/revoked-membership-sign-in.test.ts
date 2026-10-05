@@ -195,9 +195,11 @@ describe("signIn's membership check does not race a concurrent revocation (Copil
     // Stand-in for a concurrent removal's revokeMembershipForProfileTx: takes the row lock via a
     // plain UPDATE and holds the transaction open (uncommitted) until this test releases it.
     const rawTxPromise = withSessionContext(hh.context, async (tx) => {
+      // The real revocation's shape (revokeMembershipForProfileTx): role member, no permissions; a
+      // revoked row holding `vote` is refused by membership_revoked_holds_nothing (role-permissions).
       await tx
         .update(membership)
-        .set({ revokedAt: new Date() })
+        .set({ revokedAt: new Date(), role: "member", permissions: [] })
         .where(eq(membership.accountId, profile.accountId));
       markUpdateApplied();
       await rawTxGate;

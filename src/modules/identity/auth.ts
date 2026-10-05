@@ -214,7 +214,7 @@ export async function registerHousehold(email: string, password: string, name: s
       // itself — proposal.md's 2026-09-21 register decision: FR-2.4's founding-link usage-count
       // prefill ("expected resident count") is not built in v0.1 (nobody collects that number), so
       // the founding link takes the same default any other issued link would: 7 days, max 1 use.
-      await issueJoinCodeTx(tx, householdId, accountId, { validDays: 7, maxUses: 1 });
+      await issueJoinCodeTx(tx, householdId, accountId, null, { validDays: 7, maxUses: 1 });
 
       await tx.insert(account).values({
         id: accountId,
@@ -407,9 +407,9 @@ export async function claimResidentProfile(
       await tx.insert(account).values({ id: accountId, householdId: context.householdId });
 
       // Human decision, 2026-09-22: no permission is inferred from being first, or from anything
-      // else about how a membership came about (docs/domain/identity.md §2.1's close_round note).
-      // A claiming resident occupies the resident role, so it stores RESIDENT_PERMISSIONS (empty
-      // in this change; F4 adds `vote`). Moderator rights come only from an appointment
+      // else about how a membership came about (docs/domain/identity.md §2.1's Rolle-Vorbelegung box).
+      // A claiming resident occupies the resident role, so it stores RESIDENT_PERMISSIONS (`vote`,
+      // the resident set, F3 change 2b). Moderator rights come only from an appointment
       // (setMemberRole), never from how a membership came about.
       const [membershipRow] = await tx
         .insert(membership)

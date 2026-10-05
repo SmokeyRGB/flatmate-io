@@ -7,8 +7,9 @@ import {
   deleteJoinCode,
   extendJoinCode,
   issueJoinCode,
+  issuePasswordResetLink,
   listJoinCodeIssuances,
-  ResidentListActionDeniedError,
+  PermissionDeniedError,
   setMemberRole,
 } from "@/modules/identity/repository";
 import { joinCodeIssuance } from "@/modules/identity/schema";
@@ -112,15 +113,15 @@ describe("Join code moderator boundary (FR-1.27/U-30)", () => {
     // A plain member is refused by all four actions.
     await expect(
       issueJoinCode(memberContext, memberAccountId, { validDays: 7, maxUses: 1 }),
-    ).rejects.toThrow(ResidentListActionDeniedError);
+    ).rejects.toThrow(PermissionDeniedError);
     await expect(listJoinCodeIssuances(memberContext, memberAccountId)).rejects.toThrow(
-      ResidentListActionDeniedError,
+      PermissionDeniedError,
     );
     await expect(extendJoinCode(memberContext, memberAccountId, asAdminLink.id)).rejects.toThrow(
-      ResidentListActionDeniedError,
+      PermissionDeniedError,
     );
     await expect(deleteJoinCode(memberContext, memberAccountId, asAdminLink.id)).rejects.toThrow(
-      ResidentListActionDeniedError,
+      PermissionDeniedError,
     );
   });
 
@@ -142,6 +143,44 @@ describe("Join code moderator boundary (FR-1.27/U-30)", () => {
 
     await expect(
       issueJoinCode(memberContext, hhA.accountId, { validDays: 7, maxUses: 1 }),
-    ).rejects.toThrow(ResidentListActionDeniedError);
+    ).rejects.toThrow(PermissionDeniedError);
+  });
+});
+
+// F3 change 2b (identity/member-administration, "Reset links are read back only by those who may
+// issue them"): a reset row's code lets whoever reads it take over the named profile, so only the
+// holder of issue_password_reset_link (the household account) sees it. A moderator holds
+// manage_join_codes and so lists the household's other links, none of its reset links.
+describe("a moderator's join-link list hides the reset links the household account sees", () => {
+  it("lists the join link for both, the reset link for the household account only", async () => {
+    hhA = await registerTestHousehold();
+    const actor = { accountId: hhA.accountId, profileId: null };
+    const modProfile = await createResidentProfile(hhA.context, "Moderator", actor);
+    const { accountId: modAccountId } = await claimResidentProfile(
+      hhA.context,
+      modProfile.id,
+      "test-password-not-real-1234",
+    );
+    accountIds.push(modAccountId);
+    await setMemberRole(hhA.context, hhA.accountId, modAccountId, "moderator");
+    const target = await createResidentProfile(hhA.context, "ResetTarget", actor);
+    const { accountId: targetAccountId } = await claimResidentProfile(
+      hhA.context,
+      target.id,
+      "test-password-not-real-1234",
+    );
+    accountIds.push(targetAccountId);
+
+    const joinLink = await issueJoinCode(hhA.context, hhA.accountId, { validDays: 7, maxUses: 1 });
+    const resetLink = await issuePasswordResetLink(hhA.context, hhA.accountId, target.id);
+    const modContext = { accountId: modAccountId, householdId: hhA.householdId, profileId: modProfile.id };
+
+    const asHousehold = (await listJoinCodeIssuances(hhA.context, hhA.accountId)).map((i) => i.id);
+    expect(asHousehold).toContain(joinLink.id);
+    expect(asHousehold).toContain(resetLink.id);
+
+    const asModerator = (await listJoinCodeIssuances(modContext, modAccountId)).map((i) => i.id);
+    expect(asModerator).toContain(joinLink.id);
+    expect(asModerator).not.toContain(resetLink.id);
   });
 });

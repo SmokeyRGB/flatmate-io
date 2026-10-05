@@ -87,7 +87,7 @@ ab und neu an — es gibt keinen Wechsel innerhalb einer Sitzung.
 > **Passwort-Reset ohne E-Mail — ein bewusster Tauschhandel, kein Versehen (O-16, §10.2; vormals
 > Plan-O-A).** Ohne
 > `email` gibt es **keine Wiederherstellung durch die Person selbst**. Auflösung: Die Verwaltung
-> (`Membership.is_resident = false`, `manage_members`) kann für ein aktives `ResidentProfile` ohne
+> (`Membership.is_resident = false`, `issue_password_reset_link`) kann für ein aktives `ResidentProfile` ohne
 > `email` einen **einmal verwendbaren Link** ausstellen, über den die Person selbst ein neues
 > Passwort setzt — und verschafft sich damit, solange der Link nicht eingelöst ist, Zugang zu
 > diesem Profil, einschließlich seiner Stimmen. Das ist der Preis dafür, dass ein Beitritt ohne
@@ -385,8 +385,8 @@ eigenem Zähler und eigenem Lebensende.
 #### `HouseholdSettings` — Verfahrensregeln des Haushalts
 
 1:1 zum `Household`. Bewusst **eine** Entität statt verstreuter Flags: das Abstimmungsverfahren ist
-ein zusammenhängender Vertrag, dessen Änderung während einer laufenden Runde gesperrt bzw. laut
-protokolliert wird (Regel-Sperre, §3.2).
+ein zusammenhängender Vertrag, dessen Änderung während einer laufenden Runde erlaubt ist und nur
+auf später eröffnete Runden wirkt (Regel-Sperre gelockert 2026-10-05, `zustandsmaschinen.md` I-7).
 
 | Feld | Typ | Klasse | Erläuterung |
 |---|---|:--:|---|
@@ -433,7 +433,7 @@ Stimmen aber einer Person zurechenbar bleiben müssen.
 | `id` | `uuid` | ⚙️ | |
 | `household_id` | `uuid` | ⚙️ | |
 | `display_name` | `text` | 🟠 | Anzeigename im Feed („Jonas hat Lea eingeladen"). **Seit O-12 (§2.1) zusätzlich die Anmeldekennung** für Resident-Accounts ohne E-Mail — deshalb **eindeutig pro Haushalt unter Profilen, die weder `moved_out` noch `removed` sind**, nicht mehr nur Beschriftung |
-| `status` | `enum(prepared, active, moved_out, removed)` | ⚙️ | `prepared` = vom Haushalts-Account angelegt, noch von keinem Account übernommen. `removed` ist U-27's harter Entfernen-Schritt: endgültig, kein Übergang führt heraus, in der Datenbank per Trigger erzwungen (Menschliche Entscheidung, 2026-09-22) |
+| `status` | `enum(prepared, active, moved_out, removed)` | ⚙️ | `prepared` = vom Haushalts-Account angelegt, noch von keinem Account übernommen. Ein `prepared`-Profil kann von Verwaltung oder Moderation (`manage_members`) gelöscht werden: Übergang `prepared → removed` (Menschliche Entscheidung, 2026-10-05) — es hat keine `Membership`, also gibt es nichts zu entziehen; an das Profil gebundene Links werden mit gelöscht, der Name wird frei. `removed` ist U-27's harter Entfernen-Schritt: endgültig, kein Übergang führt heraus, in der Datenbank per Trigger erzwungen (Menschliche Entscheidung, 2026-09-22) |
 | `moved_in_on` | `date?` | 🟠 | |
 | `moved_out_on` | `date?` | 🟠 | setzt `status = moved_out` → **sofortiger Zugriffsentzug** (V-3) |
 | `room_id` | `uuid?` | ⚙️ | aktuell bewohntes Zimmer |
@@ -441,7 +441,7 @@ Stimmen aber einer Person zurechenbar bleiben müssen.
 
 **Warum `prepared` ein eigener Zustand ist — und warum das seit ADR-013 wichtiger wird, nicht
 weniger wichtig:** Der Haushalts-Account **legt Bewohner-Profile an, besetzt sie aber nie.** Er kann
-ein Profil anlegen und direkt zum Moderator ernennen; wer es benutzt, meldet sich mit einem eigenen
+ein Profil anlegen und direkt zum Moderator ernennen — seit 2026-10-01 auch die Moderation; wer es benutzt, meldet sich mit einem eigenen
 Resident-Account an. „Profil ohne verknüpften Account" ist damit nicht mehr der Randfall, sondern
 der **reguläre Zwischenzustand** jedes so angelegten Profils. Ohne `prepared` müsste man ihn
 implizit erschließen — genau die Art impliziten Zustands, die ADR-002 abschaffen will.
@@ -465,18 +465,32 @@ die sie nicht passen — der Vermieter-Fall (Objekt ohne eigenes Bewohner-Profil
 | `resident_profile_id` | `uuid?` | ⚙️ | gesetzt, wenn dieser Account als Bewohner-Profil handelt; `null` = Haushalts-Account. Seit ADR-013 entscheidet dieses Feld zugleich den Account-Typ — ein Account mit `is_resident = false` trägt hier dauerhaft `null` |
 | `is_resident` | `bool` | ⚙️ | **Stimmberechtigung.** Der Haushalts-Account hat `false` und **kann nicht abstimmen** |
 | `role` | `enum(household_admin, moderator, member)` | 🟠 | orthogonal zu `is_resident`. **In V0.2 von ⚙️ auf 🟠 umklassifiziert** — siehe Kasten |
-| `permissions` | `text[]` | 🟠 | **einzeln vergebbar**, Werte siehe unten. Ebenfalls 🟠 |
+| `permissions` | `text[]` | 🟠 | **einzeln vergebbar nur an die Moderation** (⬜), Werte siehe unten. Ebenfalls 🟠 |
 | `notification_event_mask` | `jsonb?` | ⚙️ | persönliche Ebene; überschreibt die Haushalts-Ebene |
 | `joined_via_issuance_id` | `uuid?` | ⚙️ | **welcher ausgestellte Link verwendet wurde** — speist den Feed und beantwortet auf O16 „wer hat sich über diesen Link registriert". *(Geändert 2026-09-21, O-18: hieß `joined_via_code` und trug den Code als Text. Ein Verweis statt einer Kopie — sonst trüge diese Zeile den Code selbst, was Auflage 2/3 unterläuft. `null` bei Mitgliedschaften, die nicht über einen Link entstanden sind: Gründung und von der Verwaltung angelegte Profile)* |
 | `joined_at` | `timestamptz` | ⚙️ | Beitritte erscheinen im Aktivitäts-Feed (struktureller Duplikatsschutz). Zweiter Zweck: ein von `became_resident_id` unabhängiges Kriterium für moderierende Sichtbarkeit, z. B. Zugriff auf die Rundenhistorie zu Auditzwecken |
 | `revoked_at` | `timestamptz?` | ⚙️ | **Korrigiert (U-22):** nicht mehr „jedes Mitglied kann entfernen" — das galt für den durch E-06 vorausgesetzten strukturellen Schutz, der mit der getrennten Bewohnerliste entfällt (§10.2). Setzbar nur über `manage_members`; die genaue Rechteabstufung zwischen Verwaltung und Moderator ist Sache der Rechtematrix in `03-PRD.md` |
 
 Vergebbare Werte in `permissions` (Vorschlag, erweiterbar):
-`create_application` · `change_application_state` · `close_round` · `confirm_appointment` ·
-`manage_rooms` · `manage_settings` · `manage_members` · `extend_retention` · `delete_data` ·
-`export_subject_access`.
+`create_application` · `change_application_state` · `manage_rounds` · `confirm_appointment` ·
+`manage_rooms` · `manage_voting_procedure` *(seit 2026-10-01; `manage_settings` war zu breit: alle
+gebauten Einstellungen sind das Abstimmungsverfahren. Haushalts-Einstellungen wie Name,
+Kontaktadresse oder Freigabe der Datenschutzseite bekommen ein eigenes Recht, wenn sie gebaut
+werden.)* · `manage_members` · `extend_retention` · `delete_data` ·
+`export_subject_access` · `manage_join_codes` · `create_resident_profile` · `appoint_moderator` ·
+`manage_round_participation` · `issue_password_reset_link` · `vote`.
 
-Nur im Rechtebündel einer Rolle, nie einzeln vergebbar: `reverse_application_state` (Moderation).
+`vote` ist das Rechtebündel der Bewohnenden: Wer ein Bewohner-Profil hat, darf abstimmen — die
+Moderation nur, wenn sie zugleich bewohnt (`03-PRD.md` §4.0.1, „✅ wenn `is_resident`"); ob in einer
+Runde, entscheidet weiterhin die `RoundParticipation`.
+
+Wer ein Recht überhaupt halten darf, steht je Recht fest: nur die Moderation — `manage_rounds`,
+`manage_round_participation`, `create_application`, `change_application_state`,
+`reverse_application_state`; nur der Haushalt — `issue_password_reset_link`; nur Bewohnende —
+`vote`; Haushalt und Moderation — `manage_voting_procedure`, `manage_rooms`, `manage_join_codes`,
+`create_resident_profile`, `appoint_moderator`, `manage_members`, `export_subject_access`. Die
+Datenbank verweigert jedes Recht jeder anderen Mitgliedschaft. Einzeln vergebbar (⬜) ist nur ein
+Recht, das die Rechtematrix der Moderation mit ⬜ gibt (heute `manage_voting_procedure`).
 
 > **`manage_rooms` ist neu (P-O-10, 2026-09-14)** und trägt die **Verfügbarkeit** eines Zimmers:
 > anlegen, `planned → open`, `on_hold`, `not_available` (`zustandsmaschinen.md` §3.3). Vorbelegt bei
@@ -507,6 +521,11 @@ Nur im Rechtebündel einer Rolle, nie einzeln vergebbar: `reverse_application_st
 > kein Vorlagensystem — der **dritte** wäre es. Bevor ein weiteres Recht auf diese Weise vorbelegt
 > wird, muss **S-04**s Ausschluss von `Berechtigungsvorlagen` (`02-SRD.md` §5.3) neu aufgemacht
 > werden, statt ein weiteres Mal gedehnt zu werden.
+>
+> *(Seit 2026-10-01 heißt das Recht `manage_rounds`: es trägt Anlegen, Öffnen, Schließen und
+> Wiedereröffnen einer Runde, wie die Zeile der Rechtematrix. `RoundParticipation` hinzufügen /
+> entfernen ist ein eigenes Recht, `manage_round_participation`, weil es eine eigene Zeile der
+> Rechtematrix ist und so für sich verhandelbar bleibt.)*
 
 > **`create_application` und `change_application_state` sind die dritte und vierte
 > Rolle-Vorbelegung (menschliche Entscheidung, 2026-09-28, F3-Vorprüfung) — und S-04 wurde dafür,
@@ -523,8 +542,8 @@ Nur im Rechtebündel einer Rolle, nie einzeln vergebbar: `reverse_application_st
 > die jemand im Haushalt benennt, zusammenstellt oder ändert. Hier legt die Spezifikation vier
 > feste Vorbelegungen je Rolle fest *(seit 2026-09-29 fünf für die Moderation: dazu kommt
 > `reverse_application_state`, und nur dort)*, und jede davon steht bereits in der Rechtematrix; niemand im
-> Haushalt kann ein Bündel definieren. Beide Rechte bleiben außerdem **einzeln vergebbar**, ohne
-> dass das Profil Moderator wird (die Rechtematrix: Bewohnender ⬜).
+> Haushalt kann ein Bündel definieren. *(Geändert 2026-10-01: nicht mehr an Bewohnende vergebbar —
+> Bewohnende stimmen ab und nehmen am Casting teil.)*
 >
 > **Was ausdrücklich kein vergebbares Recht ist** *(geändert 2026-09-29, F3-Planung)*: Einen
 > Zustand **zurücknehmen** ist das Recht `reverse_application_state`. Es steht nur im
@@ -551,6 +570,13 @@ Nur im Rechtebündel einer Rolle, nie einzeln vergebbar: `reverse_application_st
 > Nutzende selbst zusammenstellen können. *(Vorher: „Eine **fünfte** Rolle-Vorbelegung, oder …" —
 > die Zählung hätte F5 für `confirm_appointment` eine S-04-Entscheidung abverlangt, die die Matrix
 > mit Vorrang 3 längst getroffen hat.)*
+
+> **Ein Recht je Zeile der Rechtematrix, keine Rollenprüfung (menschliche Entscheidungen,
+> 2026-09-28/29 und 2026-10-01).** Jede gebaute Handlung prüft genau ein Recht, nie die Rolle,
+> und jedes Recht entspricht einer Zeile der Rechtematrix (`03-PRD.md` §4.0.1). So bleibt
+> verhandelbar, welche Rolle welches Recht trägt: Eine Verschiebung ändert die Matrix, das
+> Rechtebündel und eine Migration, aber keine Prüfung im Code. Kein Vorlagensystem im Sinne von
+> S-04 — jedes Bündel ist eine ✅-Spalte der Matrix.
 
 > **`role` und `permissions` sind 🟠, nicht ⚙️** — entschieden in der Querprüfung gegen
 > `06-Compliance-Anhang.md` (O-9 Grenzfall 1), **gegen** den ursprünglichen Vorschlag dieses

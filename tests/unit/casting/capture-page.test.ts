@@ -41,6 +41,9 @@ vi.mock("@/modules/identity/repository", async () => {
   );
   return {
     ...actual,
+    // the organisation-area check (role-permissions design D9) passes here; this file tests the
+    // page's own narrower states (organisation-access.test.ts covers the area check)
+    getNavigationAccess: vi.fn(async () => ({ organisation: true, membersList: false, rooms: false, settings: false })),
     getHousehold: vi.fn(async () => ({ name: "Testhaushalt" })),
     assertHasPermission: vi.fn(async (_ctx: unknown, _accountId: string, permission: string) => {
       if (permission !== "create_application" || !state.holdsCreateApplication) {

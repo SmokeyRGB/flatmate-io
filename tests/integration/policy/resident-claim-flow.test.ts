@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import { withSessionContext } from "@/db/session-context";
 import { joinHousehold } from "@/modules/identity/auth";
 import {
-  ResidentListActionDeniedError,
+  PermissionDeniedError,
   createResidentProfile,
   issueJoinCode,
 } from "@/modules/identity/repository";
@@ -60,7 +60,7 @@ describe("Resident profile creation and claim, via a bound link (Convergence T08
     // with the resident's accountId, which is now refused as a spoofed session regardless of role.
     await expect(
       createResidentProfile(residentContext, "AttemptedByResident", residentActor),
-    ).rejects.toThrow(ResidentListActionDeniedError);
+    ).rejects.toThrow(PermissionDeniedError);
   });
 
   it("claims exactly the named profile — its own display name, never a name the visitor chose", async () => {

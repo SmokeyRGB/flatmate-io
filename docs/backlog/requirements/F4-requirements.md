@@ -99,7 +99,7 @@ Given a card, when the rating options are enumerated, then exactly four exist, w
 Given a card, when it is displayed, then the weight of each rating is available on the screen without leaving it. *(V1.1: aligned with PRD §4.1.4, "abrufbar … ohne ihn zu verlassen". The weights sit one tap away, behind a small „(?)" pop-over, and the numbers are not on the buttons (human decision Q-3, 2026-09-30). P-3 holds, because the formula stays on the screen.)*
 
 **AC-4.9 — Displayed weights come from the round's frozen rules**
-Given a round opened while "Like" was worth 3, when the household later changes "Like" to 4, then the pass in that round still displays and applies 3. *(V1.1: the household's weights are procedure-locked while a round is open, so this is exercised through the audited override `forceChangeSettingWhileRoundOpen`.)*
+Given a round opened while "Like" was worth 3, when the household later changes "Like" to 4, then the pass in that round still displays and applies 3. *(V1.1; amended 2026-10-05: the weights can now be changed while a round is open — FR-1.21 — so this is exercised by an ordinary settings change after opening.)*
 
 **AC-4.10 — One rating per applicant**
 Given I have rated an applicant "Like", when I rate the same applicant "No", then exactly one rating exists for me on that applicant and its value is "No".

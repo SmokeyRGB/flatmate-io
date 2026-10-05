@@ -8,7 +8,13 @@ import {
   type RoundStatus,
   type VoteCandidate,
 } from "@/modules/casting/repository";
-import { HouseholdAccountCannotVoteError, assertAccountCanVote } from "@/modules/identity/repository";
+import {
+  HouseholdAccountCannotVoteError,
+  PermissionDeniedError,
+  assertAccountCanVoteTx,
+  assertHasPermissionTx,
+  assertHoldsAnyPermissionTx,
+} from "@/modules/identity/repository";
 import { parseScaleWeights, type ScaleWeights } from "./scale-weights";
 import { vote } from "./schema";
 import { VOTE_VALUES, type VoteValue } from "./vote-values";
@@ -142,11 +148,21 @@ async function awaitingVoteTx(
 
 // T-5 per open round the viewer may vote in. A profile-less context gets an empty map with no
 // query (start spec, "No application-derived number for the household account"). A round missing
-// from the map counts 0.
+// from the map counts 0. Matrix row „Vote abgeben / ändern": the stored `vote` permission is
+// checked first inside this transaction (F3 change 2b, design D11); a caller that does not hold it
+// gets the same empty map as the household account, not an error.
 export async function getAwaitingVoteCounts(context: SessionContext): Promise<Map<string, number>> {
   const counts = new Map<string, number>();
   if (context.profileId === null) return counts;
   return withSessionContext(context, async (tx) => {
+    try {
+      // A count read: no row lock (identity's rule for a read that returns nothing an ended
+      // membership could not see), so Start does not hold the caller's membership row.
+      await assertHoldsAnyPermissionTx(tx, context, ["vote"], { lock: false });
+    } catch (err) {
+      if (err instanceof PermissionDeniedError) return counts;
+      throw err;
+    }
     const rounds = (await listVoterRoundsTx(tx, context)).filter((r) => r.status === "open");
     if (rounds.length === 0) return counts;
     const awaiting = await awaitingVoteTx(
@@ -177,9 +193,18 @@ export type ScreeningPass =
 
 // The screen's state, decided in one transaction (design D4). `roundId` null picks the newest open
 // round that still awaits the viewer. Nothing about the pass is stored; the client holds the deck.
+// Matrix row „Vote abgeben / ändern": the stored `vote` permission is checked first inside the
+// transaction (F3 change 2b, design D11), on top of the participation the reads below already
+// require; a caller without it gets the `not_eligible` refusal the screen already renders.
 export async function getScreeningPass(context: SessionContext, roundId: string | null): Promise<ScreeningPass> {
   if (context.profileId === null) throw new ProfileRequiredError("getScreeningPass");
   return withSessionContext(context, async (tx): Promise<ScreeningPass> => {
+    try {
+      await assertHasPermissionTx(tx, context, "vote");
+    } catch (err) {
+      if (err instanceof PermissionDeniedError) return { kind: "refused", reason: "not_eligible" };
+      throw err;
+    }
     let round;
     if (roundId === null) {
       const open = (await listVoterRoundsTx(tx, context)).filter((r) => r.status === "open");
@@ -239,17 +264,22 @@ export async function castVote(
   ) {
     throw new VoteError("invalid_input");
   }
-  // FR-1.7: outside the transaction, never nested. A stale context (a member who moved out or was
-  // removed while the session lived) has no live membership and lands here.
+  // FR-1.7: the stored `vote` permission, checked first INSIDE the insert's transaction with the
+  // caller's membership locked FOR SHARE (F3 change 2b, design D11): a move-out or a stripped
+  // `vote` committed first is seen, and one in flight is waited for. A stale context (a member who
+  // moved out or was removed while the session lived) has no live membership and lands here. The
+  // household account and a moderator without a resident profile hold no `vote`. Lock order:
+  // membership first, then the trigger's profile/round locks (identity/repository.ts,
+  // revokeMembershipForProfileTx).
   try {
-    await assertAccountCanVote(context, context.accountId);
-  } catch (err) {
-    if (err instanceof HouseholdAccountCannotVoteError) throw new VoteError("not_eligible");
-    throw err;
-  }
-  try {
-    await withSessionContext(context, (tx) =>
-      tx
+    await withSessionContext(context, async (tx) => {
+      try {
+        await assertAccountCanVoteTx(tx, context);
+      } catch (err) {
+        if (err instanceof HouseholdAccountCannotVoteError) throw new VoteError("not_eligible");
+        throw err;
+      }
+      await tx
         .insert(vote)
         .values({
           householdId: context.householdId,
@@ -262,9 +292,10 @@ export async function castVote(
         .onConflictDoUpdate({
           target: [vote.applicationId, vote.residentProfileId, vote.stage],
           set: { value: value as VoteValue, withdrawnAt: null },
-        }),
-    );
+        });
+    });
   } catch (err) {
+    if (err instanceof VoteError) throw err;
     throw toVoteError(err);
   }
 }

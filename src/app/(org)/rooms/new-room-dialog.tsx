@@ -1,7 +1,7 @@
 "use client";
 
 import { Plus, X } from "lucide-react";
-import { useActionState, useEffect, useRef, useState } from "react";
+import { useActionState, useEffect, useId, useRef, useState } from "react";
 import { de } from "@/ui/strings";
 import { SubmitButton } from "@/ui/submit-button";
 import { createRoomAction, type CreateRoomFormState } from "./actions";
@@ -14,6 +14,7 @@ const t = de.rooms.create;
 // list. Each attribute gets its own labelled row in NewRoomForm's fields stack.
 export function NewRoomDialog() {
   const dialogRef = useRef<HTMLDialogElement>(null);
+  const headingId = useId();
   // Each opening mounts a fresh NewRoomForm (key below), so its input, its useActionState result
   // and any submission still in flight all belong to that opening alone: an error from an earlier
   // opening can't show again, and a late success from one can't close the next.
@@ -33,10 +34,10 @@ export function NewRoomDialog() {
         <Plus className="size-4" /> {de.rooms.addSubmit}
       </button>
 
-      <dialog ref={dialogRef} className="dialog" aria-labelledby="new-room-heading">
+      <dialog ref={dialogRef} className="dialog" aria-labelledby={headingId}>
         {/* 09-Design-System.md's non-destructive dialog: a top-right × beside the heading. */}
         <div className="flex items-start justify-between gap-4">
-          <h2 id="new-room-heading" className="font-serif text-lg font-semibold">
+          <h2 id={headingId} className="font-serif text-lg font-semibold">
             {t.heading}
           </h2>
           <button

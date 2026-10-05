@@ -4,6 +4,8 @@ import { redirect } from "next/navigation";
 import { listRooms } from "@/modules/casting/repository";
 import { assertHasPermission, PermissionDeniedError } from "@/modules/identity/repository";
 import { getCurrentSession } from "@/modules/identity/session-cookie";
+import { OrganisationAccessDenied } from "@/app/(org)/organisation-access-denied";
+import { requireOrganisationAccess } from "@/app/(org)/organisation-access";
 import { de } from "@/ui/strings";
 import { LinkPendingHint } from "@/ui/link-pending-hint";
 import { RoundForm } from "./round-form";
@@ -15,12 +17,17 @@ export default async function NewRoundPage() {
   const current = await getCurrentSession();
   if (!current) redirect("/sign-in");
 
+  // role-permissions design D9: every page of the organisation area first checks the caller's
+  // stored permissions on this request (a demoted moderator loses the area on reload); the page's
+  // own narrower check below stays.
+  if (!(await requireOrganisationAccess(current))) return <OrganisationAccessDenied />;
+
   // rounds-new-page-missing-permission-guard: this page had no authorization check at all, only
   // an authentication one — any signed-in resident could reach and see the create/open form even
-  // without close_round (the permission the sibling server action already enforces). Mirrors the
+  // without manage_rounds (the permission the sibling server action already enforces). Mirrors the
   // settings page's guard-and-render-message pattern, checked before any data load.
   try {
-    await assertHasPermission(current.context, current.context.accountId, "close_round");
+    await assertHasPermission(current.context, current.context.accountId, "manage_rounds");
   } catch (err) {
     if (err instanceof PermissionDeniedError) {
       return (
