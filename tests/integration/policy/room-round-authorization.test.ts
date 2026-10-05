@@ -28,7 +28,7 @@ afterEach(async () => {
 
 // G-C (speckit-analyze finding C1): room/round mutations had no authorization check of their own,
 // relying entirely on the calling Server Action — same bug class already fixed once for
-// updateHouseholdSettingsWithProcedureLock (see procedure-lock.test.ts's own regression test).
+// updateHouseholdSettings (see settings-while-round-open.test.ts's own regression test).
 describe("Room and round mutations require their documented permission", () => {
   it("refuses a plain resident (no manage_rooms) on every room mutation", async () => {
     hh = await registerTestHousehold();

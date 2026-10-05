@@ -10,7 +10,7 @@ import {
   roundParticipationSourceEnum,
 } from "@/modules/casting/schema";
 import { CORRECTABLE_FIELDS } from "@/modules/casting/application-changes";
-import { LOCKED_SETTINGS_FIELDS } from "@/modules/casting/settings-fields";
+import { VOTING_PROCEDURE_FIELDS } from "@/modules/casting/settings-fields";
 import { membershipRoleEnum, residentProfileStatusEnum } from "@/modules/identity/schema";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -113,8 +113,8 @@ const PAYLOAD_VALUE_RULES: Readonly<Record<string, Readonly<Record<string, Value
   "room.status_changed": { fromStatus: oneOf(roomStatuses), toStatus: oneOf(roomStatuses) },
   "casting_round.opened": { participantCount: count },
   "casting_round.participant_added": { source: oneOf(roundParticipationSourceEnum.enumValues) },
-  "household_settings.changed": { field: commaListOf(LOCKED_SETTINGS_FIELDS) },
-  "household_settings.changed_while_round_open": { field: oneOf(LOCKED_SETTINGS_FIELDS), roundId: uuidValue },
+  "household_settings.changed": { field: commaListOf(VOTING_PROCEDURE_FIELDS) },
+  "household_settings.changed_while_round_open": { field: oneOf(VOTING_PROCEDURE_FIELDS), roundId: uuidValue },
   "membership.role_changed": { fromRole: oneOf(roles), toRole: oneOf(roles) },
 };
 

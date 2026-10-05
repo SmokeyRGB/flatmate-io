@@ -311,7 +311,7 @@ export const householdSettings = pgTable(
   "household_settings",
   {
     householdId: uuid("household_id").primaryKey(),
-    // The four fields FR-1.21's procedure lock governs — locked while any round is `open`.
+    // The four voting-procedure fields (FR-1.21). A change reaches only rounds opened afterwards: an open round keeps its settings_snapshot (FR-1.15).
     scaleWeights: jsonb("scale_weights")
       .notNull()
       .default({ no: 0, rather_not: 1, good: 3, definitely: 5 }),

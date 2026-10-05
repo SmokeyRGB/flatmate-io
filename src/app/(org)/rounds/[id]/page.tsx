@@ -1,10 +1,9 @@
-import { ArrowLeft, TriangleAlert } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import {
   getRoundForSession,
   getRoundParticipants,
-  hasProcedureChangedNotice,
   listOrganisationApplications,
 } from "@/modules/casting/repository";
 import {
@@ -18,9 +17,8 @@ import { LinkPendingHint } from "@/ui/link-pending-hint";
 import { ApplicationsSection, type ApplicationsView } from "./applications-section";
 import { SavedToast } from "./saved-toast";
 
-// Convergence T084/T085: the round-detail screen FR-1.19 (participant names) and FR-1.22 (the
-// "procedure changed" notice) both need — `getRoundParticipants`/`hasProcedureChangedNotice`
-// existed and were tested at the repository layer, but no route ever called either.
+// Convergence T084/T085: the round-detail screen FR-1.19 (participant names) needs —
+// `getRoundParticipants` existed and was tested at the repository layer, but no route ever called it.
 export default async function RoundDetailPage({
   params,
   searchParams,
@@ -78,11 +76,10 @@ export default async function RoundDetailPage({
     }
   }
 
-  // Three independent reads, run together (code review): each is its own transaction, never one
+  // Two independent reads, run together (code review): each is its own transaction, never one
   // nested in another (NestedSessionContextError).
-  const [participants, procedureChanged, section] = await Promise.all([
+  const [participants, section] = await Promise.all([
     getRoundParticipants(context, id),
-    hasProcedureChangedNotice(context, id),
     readSection(),
   ]);
 
@@ -109,13 +106,6 @@ export default async function RoundDetailPage({
 
         {section && <ApplicationsSection roundId={id} canCapture={canCapture} {...section} />}
       </div>
-
-      {procedureChanged && (
-        <div role="alert" className="callout callout-caution">
-          <TriangleAlert className="size-4" />
-          {de.rounds.detail.procedureChangedNotice}
-        </div>
-      )}
 
       {/* ADR-014/G-D15: a household-account session (no profile) never sees participant data —
           getRoundParticipants already refuses server-side; this also skips the empty section.

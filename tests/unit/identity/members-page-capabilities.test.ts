@@ -20,6 +20,7 @@ vi.mock("@/app/(org)/members/actions", () => ({
   setMemberRoleAction: vi.fn(),
   setMovedOutAction: vi.fn(),
   removeMemberAction: vi.fn(),
+  removePreparedProfileAction: vi.fn(),
   deleteJoinCodeAction: vi.fn(),
 }));
 
@@ -80,7 +81,7 @@ function render(flags: Flags): string {
 const CONTROLS = {
   canCreateProfile: [de.members.addResidentSubmit],
   canAppointModerator: [de.members.makeModerator, de.members.makeMember],
-  canManageMembers: [de.members.markMovedOut, de.common.reactivate, de.members.remove.buttonLabel],
+  canManageMembers: [de.members.markMovedOut, de.common.reactivate, de.members.remove.buttonLabel, de.members.deletePrepared],
   canManageJoinCodes: [de.members.joinCode.heading, de.members.joinCode.create.submit, de.members.joinCode.issueForProfile, de.members.joinCode.extend],
   canIssueResetLink: [de.members.joinCode.issueResetLink],
 } as const;
@@ -118,5 +119,69 @@ describe("the members screen offers each control exactly when its flag is set", 
 
   it("the badge describes the listed member, whatever the caller may do", () => {
     expect(render(NONE)).toContain(de.members.moderationBadge);
+  });
+
+  it("a prepared profile (no account) can be deleted by whoever holds manage_members", () => {
+    const html = render({ ...NONE, canManageMembers: true });
+    expect(html).toContain(de.members.deletePrepared);
+  });
+
+  // Removal is terminal, so the button only opens a confirmation dialog (like deleting a link).
+  it("deleting a prepared profile asks first, naming the profile", () => {
+    const html = render({ ...NONE, canManageMembers: true });
+    expect(html).toContain(de.members.deletePreparedDialog.heading);
+    expect(html).toContain(de.members.deletePreparedDialog.consequence("Vera Vorbereitet"));
+    expect(html).toContain(de.common.cancel);
+  });
+});
+
+// Walkthrough 2026-10-05: an old, already deleted reset link was shown on the row as if usable.
+describe("the reset link on a member row", () => {
+  type Issuance = Parameters<typeof MembersView>[0]["joinCodeIssuances"][number];
+  const resetIssuance = (over: Partial<Issuance>): Issuance => ({
+    ...liveIssuance,
+    id: "r1",
+    code: "74R2S-988RD",
+    residentProfileId: "p2",
+    purpose: "password_reset" as const,
+    ...over,
+  });
+  const renderWith = (issuances: Issuance[], list = members) =>
+    renderToStaticMarkup(
+      createElement(MembersView, {
+        residentList: { members: list, ...NONE, canIssueResetLink: true, leadWithJoinCode: false },
+        joinCodeIssuances: issuances,
+        host: "example.test",
+        now: NOW,
+      }),
+    );
+
+  it("shows a live reset link", () => {
+    expect(renderWith([resetIssuance({})])).toContain("74R2S-988RD");
+  });
+
+  it.each([
+    ["deleted", { deletedAt: new Date("2026-09-25T10:00:00Z") }],
+    ["expired", { expiresAt: new Date("2026-10-01T10:00:00Z") }],
+    ["used up", { uses: 1 }],
+  ])("does not reveal a %s reset link", (_name, over) => {
+    const html = renderWith([resetIssuance(over)]);
+    expect(html).not.toContain("74R2S-988RD");
+    expect(html).not.toContain(de.members.joinCode.resetLinkIssuedHeading);
+  });
+
+  it("a dead newer link does not hide an older live one", () => {
+    const html = renderWith([
+      resetIssuance({ id: "r2", code: "DEADD-DEADD", deletedAt: new Date("2026-10-02T10:00:00Z") }),
+      resetIssuance({ id: "r1" }),
+    ]);
+    expect(html).toContain("74R2S-988RD");
+    expect(html).not.toContain("DEADD-DEADD");
+  });
+
+  it("explains why a member with an email has no reset button", () => {
+    const withEmail = members.map((m) => (m.id === "p2" ? { ...m, hasEmail: true } : m));
+    const html = renderWith([], withEmail);
+    expect(html).toContain(de.members.joinCode.resetLinkNotNeeded);
   });
 });

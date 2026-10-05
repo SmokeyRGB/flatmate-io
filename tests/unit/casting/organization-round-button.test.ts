@@ -47,7 +47,7 @@ vi.mock("@/modules/identity/repository", async () => {
 const { default: OrganizationPage } = await import("@/app/(org)/organization/page");
 
 async function render() {
-  return renderToStaticMarkup(await OrganizationPage());
+  return renderToStaticMarkup(await OrganizationPage({ searchParams: Promise.resolve({}) }));
 }
 
 describe("O1: the way to open a round is offered only to a session holding manage_rounds", () => {

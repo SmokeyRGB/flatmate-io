@@ -56,7 +56,7 @@ Order follows `02-SRD.md` §5.4's v0.1 row exactly, group by group.
 | **S-48** | Exactly one precedence rule decides which pending resident task is shown first | F2 | FR-2.20–FR-2.25; AC-2.12–AC-2.16 | ✅ |
 | **S-16** | Copy-paste text on marking a candidate `invited`, as an aid for the household — never sent by the app | F5 | FR-5.24–FR-5.28; AC-5.21–AC-5.23 | ✅ |
 | **S-27** (append-only log only) | `ActivityEvent` feed, append-only, every event naming the account **and** the acting profile | F0 | FR-0.13–FR-0.15; AC-0.11 | ✅¹ |
-| **S-35** | Rule lock: changing the voting procedure while a round is open is blocked and logged | F1 | FR-1.21, FR-1.22; AC-1.13–AC-1.15 | ✅ |
+| **S-35** | Rule lock, relaxed 2026-10-05: changing the voting procedure while a round is open is allowed and reaches only later rounds; an open round keeps its snapshot | F1 | FR-1.21 (amended), FR-1.22 (withdrawn); AC-1.13, AC-1.15 (amended), AC-1.14 (withdrawn) | ✅ |
 | **S-33** (manual deletion only) | Manual deletion of a **single** `Application`, available at any time. Deleting a whole round is **not** in v0.1 — `02-SRD.md` §5.4 carves out only "die Handlöschung", and no packet specifies it | F3 | FR-3.17–FR-3.20; AC-3.15–AC-3.18 | ✅ |
 
 **¹ S-15 and S-27 — gap found here, then closed in the packet.** `F0-requirements.md` §4 states

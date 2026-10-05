@@ -12,7 +12,8 @@ import { SettingsForm } from "./settings-form";
 
 const t = de.settings;
 
-// Screen O20. The four procedure-lock-governed fields (FR-1.21) plus the two FR-1.24 exceptions
+// Screen O20. The four voting-procedure fields (FR-1.21: editable while a round runs, an open
+// round keeps its snapshot) plus the two FR-1.24 exceptions
 // administration keeps (retention, export) — F1 only wires the settings half; retention/export UI
 // is compliance-feature scope, out of this slice.
 //

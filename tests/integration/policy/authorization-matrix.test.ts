@@ -94,7 +94,6 @@ const NOT_APPLICABLE_CASTING: Record<string, string> = {
   getRoundForSession: "read-only",
   getRoundParticipants: "read-only",
   listRoundsForSession: "read-only",
-  hasProcedureChangedNotice: "read-only",
   // start-screen design.md Decision 4: read-only; G-D15 visibility tested in
   // tests/integration/policy/start-overview.test.ts.
   getStartOverview: "read-only",
@@ -463,21 +462,12 @@ describe("authorization matrix (M6): every exported casting/identity mutator dec
       expect(row.applicantName).toBe("Testbewerbung Matrix");
     });
 
-    it("updateHouseholdSettingsWithProcedureLock", async () => {
+    it("updateHouseholdSettings", async () => {
       await expect(
-        castingRepo.updateHouseholdSettingsWithProcedureLock(residentCtx, { quorumShare: "0.6" }, residentActor),
+        castingRepo.updateHouseholdSettings(residentCtx, { quorumShare: "0.6" }, residentActor),
       ).rejects.toThrow(PermissionDeniedError);
     });
 
-    it("forceChangeSettingWhileRoundOpen", async () => {
-      // openRoundTx (via createAndOpenRound) refuses to open with zero eligible residents
-      // (EC-1.3) — the shared resident (claimed in beforeAll) already satisfies that.
-      const room = await castingRepo.createRoom(hh.context, "Room A", adminActor);
-      const round = await castingRepo.createAndOpenRound(moderator.context, "Round", [room.id], moderatorActor);
-      await expect(
-        castingRepo.forceChangeSettingWhileRoundOpen(residentCtx, "quorumShare", "0.6", round.id, residentActor),
-      ).rejects.toThrow(PermissionDeniedError);
-    });
   });
 
 
@@ -512,7 +502,7 @@ describe("authorization matrix (M6): every exported casting/identity mutator dec
       await castingRepo.transitionRoomStatus(hh.context, moved.id, "open", adminActor);
       const removed = await castingRepo.createRoom(hh.context, "Room H6", adminActor);
       await castingRepo.removeRoom(hh.context, removed.id, adminActor);
-      await castingRepo.updateHouseholdSettingsWithProcedureLock(hh.context, { quorumShare: "0.6" }, adminActor);
+      await castingRepo.updateHouseholdSettings(hh.context, { quorumShare: "0.6" }, adminActor);
     });
 
     // ... and every round and application mutator refused.
@@ -573,15 +563,9 @@ describe("authorization matrix (M6): every exported casting/identity mutator dec
     });
 
     // ... but not the voting procedure (no individual grant exists here).
-    it("a moderator is refused the voting-procedure mutators (matrix ⬜, not granted)", async () => {
+    it("a moderator is refused the voting-procedure mutator (matrix ⬜, not granted)", async () => {
       await expectDenied(
-        castingRepo.updateHouseholdSettingsWithProcedureLock(moderator.context, { quorumShare: "0.6" }, moderatorActor),
-        "manage_voting_procedure",
-      );
-      const room = await castingRepo.createRoom(hh.context, "Room M4", adminActor);
-      const round = await castingRepo.createAndOpenRound(moderator.context, "Round", [room.id], moderatorActor);
-      await expectDenied(
-        castingRepo.forceChangeSettingWhileRoundOpen(moderator.context, "quorumShare", "0.6", round.id, moderatorActor),
+        castingRepo.updateHouseholdSettings(moderator.context, { quorumShare: "0.6" }, moderatorActor),
         "manage_voting_procedure",
       );
     });
@@ -636,6 +620,14 @@ describe("authorization matrix (M6): every exported casting/identity mutator dec
         identityRepo.removeMember(residentCtx, resident.accountId, target.accountId, target.displayName),
         "manage_members",
       );
+    });
+
+    it("removePreparedProfile", async () => {
+      const prepared = await identityRepo.createResidentProfile(hh.context, "PreparedForResident", {
+        accountId: hh.accountId,
+        profileId: null,
+      });
+      await expectDenied(identityRepo.removePreparedProfile(residentCtx, resident.accountId, prepared.id), "manage_members");
     });
 
     it("setMovedOut", async () => {
@@ -745,6 +737,21 @@ describe("authorization matrix (M6): every exported casting/identity mutator dec
       await identityRepo.removeMember(moderator.context, moderator.accountId, target.accountId, target.displayName);
       const list = await identityRepo.getResidentList(hh.context, hh.accountId);
       expect(list.members.map((m) => m.id)).not.toContain(target.profileId);
+    });
+
+    it("a moderator may removePreparedProfile (an unclaimed profile goes; a claimed one is refused)", async () => {
+      const adminActor = { accountId: hh.accountId, profileId: null };
+      const prepared = await identityRepo.createResidentProfile(hh.context, "PreparedToDelete", adminActor);
+      await identityRepo.removePreparedProfile(moderator.context, moderator.accountId, prepared.id);
+      const list = await identityRepo.getResidentList(hh.context, hh.accountId);
+      expect(list.members.map((m) => m.id)).not.toContain(prepared.id);
+      // the name is free again
+      await identityRepo.createResidentProfile(hh.context, "PreparedToDelete", adminActor);
+
+      const claimed = await claim(hh, "ClaimedNotDeletable", extraAccountIds);
+      await expect(
+        identityRepo.removePreparedProfile(moderator.context, moderator.accountId, claimed.profileId),
+      ).rejects.toThrow(identityRepo.ResidentProfileNotPreparedError);
     });
 
     it("a moderator may setMovedOut and reactivateMember", async () => {
@@ -862,8 +869,7 @@ const CASTING_CASE_NAMES = [
   "captureApplication",
   "transitionApplication",
   "updateApplication",
-  "updateHouseholdSettingsWithProcedureLock",
-  "forceChangeSettingWhileRoundOpen",
+  "updateHouseholdSettings",
 ];
 
 const DELIBERATION_CASE_NAMES = ["castVote"];
@@ -872,6 +878,7 @@ const IDENTITY_CASE_NAMES = [
   "createResidentProfile",
   "transitionResidentProfileStatus",
   "removeMember",
+  "removePreparedProfile",
   "setMovedOut",
   "reactivateMember",
   "issueJoinCode",

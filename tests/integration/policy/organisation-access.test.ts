@@ -91,7 +91,7 @@ const APPLICATION_ID = "44444444-4444-4444-4444-444444444444";
 // Every page of the area, rendered with the current session. rounds/[id] is deliberately absent: it
 // is exempt (FR-1.19 promises its participant list to every participating resident, pre-mortem H3).
 const PAGES: Record<string, () => Promise<unknown>> = {
-  organization: () => OrganizationPage(),
+  organization: () => OrganizationPage({ searchParams: Promise.resolve({}) }),
   members: () => MembersPage(),
   rooms: () => RoomsPage(),
   settings: () => SettingsPage({ searchParams: Promise.resolve({}) }),

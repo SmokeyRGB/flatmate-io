@@ -25,7 +25,7 @@ import {
   createRoom,
   createRound,
   openRound,
-  updateHouseholdSettingsWithProcedureLock,
+  updateHouseholdSettings,
 } from "@/modules/casting/repository";
 import {
   cleanupAll,
@@ -150,7 +150,7 @@ describe("moderator and household permissions are stored, and only the stored li
     hh = await registerTestHousehold();
     const moderator = await createTestModerator(hh);
     await expect(
-      updateHouseholdSettingsWithProcedureLock(moderator.context, { quorumShare: "0.6" }, actorOf(moderator)),
+      updateHouseholdSettings(moderator.context, { quorumShare: "0.6" }, actorOf(moderator)),
     ).rejects.toThrow(PermissionDeniedError);
   });
 

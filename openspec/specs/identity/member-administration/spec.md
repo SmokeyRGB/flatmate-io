@@ -46,6 +46,13 @@ box, permission list); the human decisions of 2026-09-28/29 and 2026-10-01.
   lists a join link
 - **THEN** it succeeds for both
 
+#### Scenario: A prepared profile can be deleted
+- **WHEN** the household account or a moderator deletes a prepared (never claimed) profile
+- **THEN** the profile becomes `removed` (`prepared -> removed`, final), leaves the resident list and frees its name
+- **AND** every live link bound to it is deleted, and the status change and each link deletion are recorded
+- **AND** a profile that is claimed, not prepared, or another household's is refused with the same error, nothing written
+- **AND** a claim racing the deletion is serialized on the profile row: exactly one wins, so a removed profile never gets an account
+
 #### Scenario: A plain resident is refused every member-administration action
 - **WHEN** a resident who is neither the household account nor a moderator attempts any action or
   read in the table

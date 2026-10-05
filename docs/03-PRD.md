@@ -188,7 +188,7 @@ sondern in *Art* des Zugriffs. Sie entstehen aus **orthogonalen `Membership`-Att
 | `Appointment` bestätigen | **❌** (S-50/U-20) | ✅ | ❌ | ❌ |
 | Anwesenheit einer einzelnen Person korrigieren (Ausnahmefall, U-23, S-51) | **❌** (S-50/U-20) | ⬜ | ❌ (Selbstauskunft: „ich kann doch nicht") | ❌ |
 | Aufbewahrung verlängern / kürzen / jetzt löschen | ✅ | ✅ (verlängern, löschen) | ❌ | ❌ |
-| Abstimmungsverfahren ändern | ✅ (**nicht während laufender Runde**, S-35 — Teil des Abschnitts „Haushalt") | ⬜ | ❌ | ❌ |
+| Abstimmungsverfahren ändern | ✅ (auch während laufender Runde; wirkt nur auf später eröffnete Runden, S-35 gelockert 2026-10-05 — Teil des Abschnitts „Haushalt") | ⬜ | ❌ | ❌ |
 | Persönliche Benachrichtigungseinstellungen | ✅ | ✅ | ✅ | ❌ |
 
 ✅ = immer · ⬜ = nur mit einzeln vergebener Berechtigung · ❌ = nie
@@ -1160,7 +1160,7 @@ aber **nie** auf dem primären-CTA-Platz und **nie** über einer Aufgabe mit ges
 | Neu eintretendes Profil | Sieht die Runde **inklusive Historie zu anderen Kandidaten** — Kontext ist nötig. Den heiklen Teil deckt die Selbst-Redaktion ab (§4.2.5) |
 | **Parallele Runden (Entscheidung zu SRD O-04)** | Technisch sind mehrere gleichzeitig offene `CastingRound`s je `Household` **erlaubt** — der Vermieter-Fall und Sonderlagen brauchen das. In v1 wird der Fall **in der Oberfläche nicht angeboten**: es gibt eine als „aktiv" markierte Runde, weitere sind nur über eine Rundenliste erreichbar, und der Rundenkopf zeigt immer genau eine Runde. Begründung: Ein Screening-Durchlauf über zwei Runden hinweg wäre nicht erklärbar, und der Beteiligungsstand hätte zwei Nenner |
 | Wiedereröffnung | `closed → open` ist erlaubt, auditiert und setzt die Aufbewahrungsuhr zurück; die Rücksetzung wird protokolliert |
-| Verfahrenssperre | Änderungen am Abstimmungsverfahren (Stufenwerte, Feinschliff-Schwelle, Quorum-Regel, Veto-Einstellungen) sind bei einer offenen Runde **blockiert**; erfolgt eine Änderung dennoch über einen Verwaltungsweg, wird sie als `ActivityEvent` **laut protokolliert** und in der Runde sichtbar vermerkt (E-25, S-35) |
+| Verfahrenssperre *(gelockert 2026-10-05, menschliche Entscheidung)* | Änderungen am Abstimmungsverfahren (Stufenwerte, Feinschliff-Schwelle, Quorum-Regel, Veto-Einstellungen) sind auch bei einer offenen Runde **erlaubt** und werden als `ActivityEvent` protokolliert. Sie wirken nur auf Runden, die danach eröffnet werden: eine offene Runde behält das `settings_snapshot`, das beim Öffnen eingefroren wurde (E-25, S-35). Der Verwaltungsweg und der Rundenvermerk entfallen |
 
 #### 4.2.3 Abstimmung und Score
 

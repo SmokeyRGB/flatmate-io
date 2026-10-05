@@ -19,7 +19,7 @@ that freezes both its voter list and its voting rules.
 
 **In scope:** household registration · resident profile creation · one fixed identity per session (ADR-013) ·
 membership and permissions · rooms with their own state · casting round with room selection,
-voter snapshot and frozen rules · procedure lock while a round is open · the administration
+voter snapshot and frozen rules · procedure changes while a round is open (allowed, the open round keeps its snapshot) · the administration
 boundary.
 
 **Out of scope:** room plans, floor plans, rent, tenancy agreements · organisations above
@@ -88,10 +88,10 @@ roles · parallel rounds offered in the UI · anything about applications, votes
 - **FR-1.19** All residents taking part in a round shall be able to see a list of the round's participants, showing names only.
 - **FR-1.20** The system shall record every casting-round and room state change as an append-only audit entry naming both the account and the acting profile.
 
-### Procedure lock
+### Procedure lock *(relaxed 2026-10-05)*
 
-- **FR-1.21** While any casting round of the household is `open`, the system shall reject changes to the rating weights, the favourite-budget factor, the quorum share and the hidden-results setting.
-- **FR-1.22** If such a change nevertheless occurs through an administrative path, the system shall record it as an audit entry and display it as a notice on the affected round.
+- **FR-1.21** *(Amended — human decision 2026-10-05; was: reject these changes while any round is `open`.)* The system shall accept changes to the rating weights, the favourite-budget factor, the quorum share and the hidden-results setting at any time, including while a casting round of the household is `open`. A change applies only to rounds opened afterwards; a round already `open` keeps the settings snapshot taken at `draft → open` (FR-1.15) and is scored, quorum-checked and displayed by it.
+- **FR-1.22** *(Withdrawn — human decision 2026-10-05.)* There is no longer a forbidden change that could "nevertheless occur through an administrative path", so neither the round notice nor the separate override path exists. Every settings change is recorded as an ordinary `household_settings.changed` audit entry.
 
 ### Administration boundary
 
@@ -138,14 +138,13 @@ Given an open round with 7 participants, when an eighth resident claims their pr
 **AC-1.12 — Post-snapshot addition is distinguishable** *(Revised 2026-09-17)*
 Given an open round, when a resident joins it after opening — automatically on claiming their profile, or by a moderator's manual correction — then that entry is marked `joined_after_open` or `added_manually` respectively, and never as part of the opening snapshot.
 
-**AC-1.13 — Procedure changes are blocked while open**
-Given a round in state `open`, when I attempt to change a rating weight, then the change is refused and the reason names the open round.
+**AC-1.13 — Procedure changes are accepted while a round is open** *(Amended — human decision 2026-10-05; was: blocked)*
+Given a round in state `open`, when I change a rating weight, the favourite-budget factor, the quorum share or the hidden-results setting, then the change is accepted and audited, and the open round's `settings_snapshot` is unchanged.
 
-**AC-1.14 — A procedure change through an administrative path is surfaced**
-Given a rating weight was changed while a round was open, when any resident views that round, then a notice states that the procedure was changed, and an audit entry exists.
+**AC-1.14 — *(Withdrawn — human decision 2026-10-05.)*** Replaced by AC-1.13 and AC-1.15: nothing is blocked, so there is no administrative path and no "procedure changed" notice on the round. The settings screen instead tells the person changing the rules, while a round is open, that the change applies to the next round and the running one keeps its rules.
 
-**AC-1.15 — Procedure changes are allowed when no round is open**
-Given all rounds are `draft`, `closed` or `archived`, when I change the quorum share, then the change is accepted.
+**AC-1.15 — A change reaches only rounds opened afterwards** *(Amended — human decision 2026-10-05; was: allowed when no round is open)*
+Given a round opened under quorum share 0.5, when I change the quorum share to 0.6 and then open a second round, then the first round's snapshot still holds 0.5 and the second round's snapshot holds 0.6. A change made when no round is open is accepted as before.
 
 **AC-1.16 — The administration boundary holds**
 Given I am acting without a resident profile, when I request a casting round's identity or lifecycle fields (existence, `title`, `status`, `room_ids`, timestamps, retention fields), then access is granted; when I request anything else — an application, a vote, a slot, an appointment, a casting note, or anything derived from `Application` including via a casting round (count, participation, score, ranking) — by any route, then access is refused.
@@ -250,8 +249,8 @@ score, and the participant snapshot feeds every quorum display.
    it — a room is a label here, not a scoring input — but it needs a decision rather than an
    assumption.
 
-**Too complex?** The procedure lock (FR-1.21/FR-1.22) is the one part that could be argued down.
-It exists because **E-25** and S-35 both require it, and because without it every ranking is
-retroactively disputable — which is the legitimacy problem the product is built to solve. Keep it,
-but note that FR-1.22's "administrative path" is only reachable at all because C-1.4 says the
-boundary is not a security boundary.
+**Too complex?** The procedure lock was argued down on 2026-10-05 (human decision; FR-1.21 amended,
+FR-1.22 withdrawn). The legitimacy that **E-25** and S-35 ask for — no ranking is retroactively
+disputable — now rests on the snapshot alone (FR-1.15, AC-1.9), which was always the mechanism that
+kept a running round's result stable. The lock also had no way to release: there is no close-round
+action yet, so after a household's first round the settings could never be changed again.

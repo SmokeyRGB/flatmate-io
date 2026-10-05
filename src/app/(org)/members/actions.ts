@@ -11,6 +11,7 @@ import {
   issuePasswordResetLink,
   reactivateMember,
   removeMember,
+  removePreparedProfile,
   setMemberRole,
   setMovedOut,
 } from "@/modules/identity/repository";
@@ -71,6 +72,16 @@ export async function removeMemberAction(
 
   revalidatePath("/members");
   return { error: null };
+}
+
+// A prepared profile has no account or membership; `manage_members` is checked in the repository.
+export async function removePreparedProfileAction(formData: FormData): Promise<void> {
+  const current = await getCurrentSession();
+  if (!current) throw new Error("Not signed in");
+  const residentProfileId = String(formData.get("residentProfileId") ?? "");
+  if (!residentProfileId) return;
+  await removePreparedProfile(current.context, current.context.accountId, residentProfileId);
+  revalidatePath("/members");
 }
 
 // FR-1.26 soft tier: the regular path for an actual move-out.

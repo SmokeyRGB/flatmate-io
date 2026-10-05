@@ -385,8 +385,8 @@ eigenem Zähler und eigenem Lebensende.
 #### `HouseholdSettings` — Verfahrensregeln des Haushalts
 
 1:1 zum `Household`. Bewusst **eine** Entität statt verstreuter Flags: das Abstimmungsverfahren ist
-ein zusammenhängender Vertrag, dessen Änderung während einer laufenden Runde gesperrt bzw. laut
-protokolliert wird (Regel-Sperre, §3.2).
+ein zusammenhängender Vertrag, dessen Änderung während einer laufenden Runde erlaubt ist und nur
+auf später eröffnete Runden wirkt (Regel-Sperre gelockert 2026-10-05, `zustandsmaschinen.md` I-7).
 
 | Feld | Typ | Klasse | Erläuterung |
 |---|---|:--:|---|
@@ -433,7 +433,7 @@ Stimmen aber einer Person zurechenbar bleiben müssen.
 | `id` | `uuid` | ⚙️ | |
 | `household_id` | `uuid` | ⚙️ | |
 | `display_name` | `text` | 🟠 | Anzeigename im Feed („Jonas hat Lea eingeladen"). **Seit O-12 (§2.1) zusätzlich die Anmeldekennung** für Resident-Accounts ohne E-Mail — deshalb **eindeutig pro Haushalt unter Profilen, die weder `moved_out` noch `removed` sind**, nicht mehr nur Beschriftung |
-| `status` | `enum(prepared, active, moved_out, removed)` | ⚙️ | `prepared` = vom Haushalts-Account angelegt, noch von keinem Account übernommen. `removed` ist U-27's harter Entfernen-Schritt: endgültig, kein Übergang führt heraus, in der Datenbank per Trigger erzwungen (Menschliche Entscheidung, 2026-09-22) |
+| `status` | `enum(prepared, active, moved_out, removed)` | ⚙️ | `prepared` = vom Haushalts-Account angelegt, noch von keinem Account übernommen. Ein `prepared`-Profil kann von Verwaltung oder Moderation (`manage_members`) gelöscht werden: Übergang `prepared → removed` (Menschliche Entscheidung, 2026-10-05) — es hat keine `Membership`, also gibt es nichts zu entziehen; an das Profil gebundene Links werden mit gelöscht, der Name wird frei. `removed` ist U-27's harter Entfernen-Schritt: endgültig, kein Übergang führt heraus, in der Datenbank per Trigger erzwungen (Menschliche Entscheidung, 2026-09-22) |
 | `moved_in_on` | `date?` | 🟠 | |
 | `moved_out_on` | `date?` | 🟠 | setzt `status = moved_out` → **sofortiger Zugriffsentzug** (V-3) |
 | `room_id` | `uuid?` | ⚙️ | aktuell bewohntes Zimmer |

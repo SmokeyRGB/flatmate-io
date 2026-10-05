@@ -6,9 +6,8 @@ export type ResidentProfileStatus = (typeof residentProfileStatusEnum.enumValues
 // not yet claimed) → `active` (a Resident-Account signed up against it) → `moved_out` (FR-1.26's
 // soft tier, `setMovedOut` — reversible) or `removed` (FR-1.26's hard tier, `removeMember` —
 // U-27's „endgültig", final: no row has `removed` as its `from`). `prepared` can also go straight
-// to `moved_out` (a profile created but never claimed, then removed from the household record; no
-// caller reaches `prepared -> removed`, since removal acts on a membership and a `prepared`
-// profile has none). `moved_out -> active` (added 2026-09-17, U-27/U-30): reactivateMember's
+// to `moved_out`, and to `removed` (a profile created but never claimed, deleted from the
+// household record by removePreparedProfile; there is no membership to revoke). `moved_out -> active` (added 2026-09-17, U-27/U-30): reactivateMember's
 // reverse of the soft tier only — `removed -> active` is deliberately undeclared, and a narrow DB
 // trigger (drizzle/0017) enforces the same refusal even against a direct update under
 // `app_runtime`. Same "declared table, no silent fallthrough" discipline as F0's Application
@@ -17,6 +16,7 @@ export type ResidentProfileStatus = (typeof residentProfileStatusEnum.enumValues
 export const TRANSITIONS: ReadonlyArray<readonly [ResidentProfileStatus, ResidentProfileStatus]> = [
   ["prepared", "active"],
   ["prepared", "moved_out"],
+  ["prepared", "removed"],
   ["active", "moved_out"],
   ["moved_out", "active"],
   ["active", "removed"],

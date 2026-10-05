@@ -117,7 +117,7 @@ Elf Zustände: sieben auf dem Hauptpfad, vier Seitenzustände.
 | I-4 | `offer_made` verlangt ein `assigned_room_id`, dessen `Room.status` auf `promised` steht |
 | I-5 | Eine Bewerbung im Zustand `moved_in` hat genau ein `ResidentProfile` und genau ein `Room` |
 | I-6 | Vetos können nach `Veto.locked_at` weder erzeugt noch geändert werden |
-| I-7 | Wechsel des Verfahrens (`HouseholdSettings.scale_weights`, Quorum, Veto-Regeln) ist bei einer Runde im Status `open` **gesperrt**; das `settings_snapshot` der Runde bleibt maßgeblich |
+| I-7 | Wechsel des Verfahrens (`HouseholdSettings.scale_weights`, Quorum, Veto-Regeln) ist **auch bei einer Runde im Status `open` erlaubt** *(gelockert 2026-10-05, menschliche Entscheidung; vorher: gesperrt)*; das `settings_snapshot` der Runde bleibt für diese Runde maßgeblich, ein Wechsel wirkt nur auf später eröffnete Runden |
 
 ### 3.2 `CastingRound`
 
@@ -142,11 +142,15 @@ Fünf Zustände. Bewusst dünn — Begründung siehe §2.2.
 | `closed` | `archived` | `manage_rounds`, **oder System** bei Fristablauf | `round.archived`; Vorwarnung 14 Tage vorher |
 | `archived` | `closed` | `manage_rounds` | nur solange nicht gelöscht |
 
-**Regel-Sperre (Invariante I-7, hier konkret):** Solange eine Runde `open` oder `paused` ist, sind
-Änderungen an Skalengewichten, Quorum, Veto-Budget und Anonymitätsregel **blockiert**. Der
-Vorschlag ist die harte Variante (blockieren) und nicht die weiche (erlauben und laut
-protokollieren), weil eine Verfahrensänderung mitten in einer Abstimmung die Legitimität des
-Ergebnisses zerstört (P-3) — und Legitimität ist hier das Produkt.
+**Regel-Sperre (Invariante I-7, hier konkret) — gelockert am 2026-10-05 (menschliche Entscheidung):**
+Änderungen an Skalengewichten, Quorum, Veto-Budget und Anonymitätsregel sind auch erlaubt, solange
+eine Runde `open` oder `paused` ist. Sie wirken nur auf Runden, die danach eröffnet werden; die
+laufende Runde rechnet weiter nach ihrem `settings_snapshot`, so bleibt ihr Ergebnis legitim (P-3).
+Die ursprüngliche Fassung war die harte Variante (blockieren). Sie ließ sich nicht wieder lösen,
+weil es noch keine Aktion „Runde schließen" gibt: Nach der ersten Runde eines Haushalts wäre das
+Verfahren für immer gesperrt gewesen. `04-Domaenenmodell.md` §8 hatte genau diese Lockerung
+vorweggenommen („Das gibt man auf, wenn sich in der Praxis zeigt, dass Haushalte während ihrer
+ersten Runde merken, dass die Voreinstellung nicht passt …").
 
 > **Das gibt man auf, wenn** sich in der Praxis zeigt, dass Haushalte während ihrer ersten Runde
 > merken, dass die Voreinstellung nicht passt, und dann die Runde abbrechen müssen. Weiche

@@ -20,6 +20,7 @@ import {
   setMovedOutAction,
 } from "./actions";
 import { DeleteJoinCodeForm } from "./delete-join-code-form";
+import { DeletePreparedProfileForm } from "./delete-prepared-profile-form";
 import { JoinCodeCopyButtons } from "./join-code-copy-buttons";
 import { RemoveMemberForm } from "./remove-member-form";
 
@@ -175,7 +176,10 @@ export function MembersView({
   for (const issuance of joinCodeIssuances) {
     if (!issuance.residentProfileId) continue;
     if (issuance.purpose === "password_reset") {
-      if (!resetIssuancesByProfile.has(issuance.residentProfileId)) {
+      // Only a LIVE reset link is revealed on the row: a deleted, expired or spent one must never
+      // be offered as copyable (it stays listed, labelled, in the collapsed dead-links section).
+      // The first live one wins, so a dead newer row cannot hide an older live one.
+      if (joinCodeState(issuance, now) === "live" && !resetIssuancesByProfile.has(issuance.residentProfileId)) {
         resetIssuancesByProfile.set(issuance.residentProfileId, issuance);
       }
       continue;
@@ -378,6 +382,9 @@ export function MembersView({
                         itself refuses everyone else, so the button is not even offered
                         (canIssueResetLink). Only while the gap it closes still exists: active,
                         live, and no email yet. */}
+                    {canIssueResetLink && m.status === "active" && m.hasEmail && (
+                      <p className="field-helper">{t.joinCode.resetLinkNotNeeded}</p>
+                    )}
                     {canIssueResetLink && m.status === "active" && !m.hasEmail && (
                       <form action={issuePasswordResetLinkAction}>
                         <input type="hidden" name="residentProfileId" value={m.id} />
@@ -417,6 +424,14 @@ export function MembersView({
                   <TriangleAlert className="size-4" />
                   <p>{t.joinCode.resetLinkIssuedCaution}</p>
                 </div>
+              </div>
+            )}
+
+            {/* A prepared profile has no account, so nothing is revoked: the household account or a
+                moderator (manage_members) may delete it from the household record. */}
+            {canManageMembers && !m.accountId && m.status === "prepared" && (
+              <div className="mt-3">
+                <DeletePreparedProfileForm residentProfileId={m.id} displayName={m.displayName} />
               </div>
             )}
 

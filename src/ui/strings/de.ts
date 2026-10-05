@@ -286,6 +286,7 @@ export const de = {
       // shown once a reset link is issued — never framed as protection.
       // Walkthrough fix 2026-09-24: a reset link is not an invitation, so it gets its own heading
       // instead of issuedForProfileHeading.
+      resetLinkNotNeeded: "Hat eine E-Mail-Adresse hinterlegt, ein Passwort-Link ist nicht nötig.",
       resetLinkIssuedHeading: "Ausgestellter Passwort-Link für dieses Profil:",
       resetLinkIssuedCaution: "Wer diesen Link öffnet, kann das Passwort dieser Person setzen.",
       // The link-history label for a reset row, replacing the invitation label (design.md
@@ -310,6 +311,14 @@ export const de = {
     // Verb form of the §8.6 status label (status.movedOut = „Ausgezogen") — this is the action
     // that sets it, not the status display.
     markMovedOut: "Ausgezogen markieren",
+    // A prepared profile (never claimed, no account) is deleted from the household record.
+    deletePrepared: "Profil löschen",
+    // Removal of a prepared profile is terminal (prepared -> removed), so it asks first, like a link.
+    deletePreparedDialog: {
+      heading: "Profil löschen?",
+      consequence: (displayName: string) =>
+        `Das Profil von ${displayName} wird gelöscht. Noch nicht verwendete Einladungen für dieses Profil werden mitgelöscht. Das kann nicht rückgängig gemacht werden.`,
+    },
     remove: {
       // §8.6: "Hartes Entfernen (U-27)" → „Entfernen".
       buttonLabel: "Entfernen",
@@ -362,7 +371,6 @@ export const de = {
       submitPending: "Wird eröffnet…",
     },
     detail: {
-      procedureChangedNotice: "Eine Abstimmungsregel wurde geändert, während diese Runde offen war.",
       participantsHeading: "Teilnehmende Mitbewohner:innen",
       // F3 change 2: shown only to a session holding create_application, for an open round.
       captureApplication: "Bewerbung erfassen",
@@ -584,18 +592,17 @@ export const de = {
   settings: {
     heading: "Haushaltseinstellungen",
     accessDeniedBody: "Das Abstimmungsverfahren legt die Verwaltung fest.",
-    lockedWhileRoundOpen: (roundTitle: string) =>
-      `Solange „${roundTitle}" läuft, bleiben diese Einstellungen unverändert. Schließe die ` +
-      `Runde, um sie hier zu ändern.`,
+    // FR-1.21 (relaxed 2026-10-05): editable while a round runs; the round keeps its own copy.
+    appliesToNextRound: (roundTitle: string) =>
+      `Änderungen gelten für Runden, die du danach eröffnest. „${roundTitle}" läuft weiter ` +
+      `mit den Regeln, mit denen sie eröffnet wurde.`,
     quorumShareLabel: "Quorum-Anteil",
     save: "Speichern",
     savePending: "Wird gespeichert…",
+    saved: "Gespeichert.",
     errors: {
-      // casting/repository.ts's ProcedureLockedError reaches this form via a generic `err
-      // instanceof Error` catch (settings/actions.ts) — not one of design.md Decision 4's coded
-      // classes, and its own message carries a raw round id and field names. Left uncoded (like
-      // PermissionDeniedError above), mapped to one generic text instead; see the implementation
-      // report for why this contradicts design.md's stated premise that no screen displays it.
+      // settings/actions.ts maps any thrown Error (e.g. PermissionDeniedError, whose message
+      // carries a raw permission slug) to this one generic text instead of passing it through.
       genericSaveFailure: "Diese Änderung konnte nicht gespeichert werden.",
     },
   },

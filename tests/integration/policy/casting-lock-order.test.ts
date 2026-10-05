@@ -8,12 +8,11 @@ import {
   createRoom,
   createRound,
   openRound,
-  ProcedureLockedError,
   removeRoom,
   RoomInUseByOpenRoundError,
   RoundOpenPreconditionError,
   transitionRoomStatus,
-  updateHouseholdSettingsWithProcedureLock,
+  updateHouseholdSettings,
 } from "@/modules/casting/repository";
 import { castingRound, room, roundParticipation } from "@/modules/casting/schema";
 import { castVote } from "@/modules/deliberation/repository";
@@ -163,7 +162,7 @@ describe("Casting lock order", () => {
     const { household, actor, moderator, modActor, round } = await draftRound();
 
     await expect(
-      updateHouseholdSettingsWithProcedureLock(household.context, { quorumShare: "0.6" }, actor),
+      updateHouseholdSettings(household.context, { quorumShare: "0.6" }, actor),
     ).resolves.toMatchObject({ quorumShare: "0.6" });
 
     const opened = await openRound(moderator.context, round.id, modActor);
@@ -204,7 +203,9 @@ describe("Casting lock order", () => {
 
   // Finding #3, writer side. The stand-in models openRoundTx: settings FOR SHARE, then the
   // round status written to open, uncommitted.
-  it("C2: a settings change waits for an in-flight opener and is refused", async () => {
+  // FR-1.21 relaxed (human decision 2026-10-05): the writer is no longer refused. It still has to
+  // wait for the opener, and then applies to the settings row only.
+  it("C2: a settings change waits for an in-flight opener and then succeeds", async () => {
     const { household, actor, round } = await draftRound();
     const hold = holdOpen(household.context, async (tx) => {
       await tx
@@ -220,7 +221,7 @@ describe("Casting lock order", () => {
     await untilHeld(hold);
 
     let settled = false;
-    const real = updateHouseholdSettingsWithProcedureLock(household.context, { quorumShare: "0.7" }, actor).finally(
+    const real = updateHouseholdSettings(household.context, { quorumShare: "0.7" }, actor).finally(
       () => {
         settled = true;
       },
@@ -235,10 +236,10 @@ describe("Casting lock order", () => {
       (err: unknown) => ({ ok: false as const, err }),
     );
     const result = outcome.ok ? outcome.value : outcome.err;
-    expect(result).toBeInstanceOf(ProcedureLockedError);
-    expect(result).toMatchObject({ openRoundId: round.id });
+    expect(outcome.ok).toBe(true);
+    expect(result).toMatchObject({ quorumShare: "0.7" });
     const live = await getHouseholdSettings(household.context);
-    expect(live?.quorumShare).toBe("0.5");
+    expect(live?.quorumShare).toBe("0.7");
     expect(settledBeforeRelease).toBe(false);
   });
 
@@ -337,7 +338,7 @@ describe("Casting lock order", () => {
     await untilHeld(hold);
 
     let settled = false;
-    const real = updateHouseholdSettingsWithProcedureLock(household.context, { quorumShare: "0.6" }, actor).finally(
+    const real = updateHouseholdSettings(household.context, { quorumShare: "0.6" }, actor).finally(
       () => {
         settled = true;
       },
@@ -398,33 +399,26 @@ describe("Casting lock order", () => {
   });
 
   // invariant guard; the pooler may serialise this by accident (CLAUDE.md hazards), C1-C4 are the regression tests.
-  it("C7: an opener and a settings writer cannot leave a snapshot that differs from live settings", async () => {
+  // Either order is legitimate now that an open round no longer blocks a settings change: the
+  // snapshot is the whole old value (opener first) or the whole new one (writer first), the round
+  // opens either way, and the live value ends at the new one.
+  it("C7: an opener and a settings writer both succeed and the snapshot is one whole settings state", async () => {
     const { household, actor, moderator, modActor, round } = await draftRound();
     const [opened, settingsWrite] = await Promise.allSettled([
       openRound(moderator.context, round.id, modActor),
-      updateHouseholdSettingsWithProcedureLock(household.context, { quorumShare: "0.7" }, actor),
+      updateHouseholdSettings(household.context, { quorumShare: "0.7" }, actor),
     ]);
 
+    expect(opened.status).toBe("fulfilled");
+    expect(settingsWrite.status).toBe("fulfilled");
     const [roundAfter] = await withSessionContext(household.context, (tx) =>
       tx.select().from(castingRound).where(eq(castingRound.id, round.id)),
     );
     const live = await getHouseholdSettings(household.context);
     const snapshotShare = (roundAfter?.settingsSnapshot as { quorumShare?: string } | null)?.quorumShare;
-    const writerRejected =
-      settingsWrite.status === "rejected" &&
-      settingsWrite.reason instanceof ProcedureLockedError &&
-      settingsWrite.reason.openRoundId === round.id;
-    const openerWon = roundAfter?.status === "open" && writerRejected && snapshotShare === live?.quorumShare;
-    const writerWon = settingsWrite.status === "fulfilled" && snapshotShare === live?.quorumShare;
-    if (!(openerWon || writerWon)) {
-      const openerDetail = opened.status === "rejected" ? String(opened.reason) : opened.status;
-      const writerDetail =
-        settingsWrite.status === "rejected" ? String(settingsWrite.reason) : settingsWrite.status;
-      expect.fail(
-        `invariant broken: opener ${openerDetail}; writer ${writerDetail}; snapshot ${snapshotShare}; live ${live?.quorumShare}`,
-      );
-    }
-    expect(openerWon || writerWon).toBe(true);
+    expect(roundAfter?.status).toBe("open");
+    expect(live?.quorumShare).toBe("0.7");
+    expect(["0.5", "0.7"]).toContain(snapshotShare);
   });
 
   // The stand-in is openRoundTx after its unlocked eligibility read: settings FOR SHARE,

@@ -913,6 +913,68 @@ export async function removeMember(
   });
 }
 
+export class ResidentProfileNotPreparedError extends Error {
+  constructor(residentProfileId: string) {
+    super(`ResidentProfile ${residentProfileId} is not a prepared profile of this household`);
+    this.name = "ResidentProfileNotPreparedError";
+  }
+}
+
+// Deletes a PREPARED profile (created, never claimed): prepared -> removed, final, name released.
+// Authorized by `manage_members`, checked first inside the write transaction. The profile row is
+// locked, and claiming's own conditional `prepared` UPDATE serializes against it: one of the two
+// sees a non-prepared row and refuses. Live links bound to the profile are deleted in the same
+// transaction (they would be refused at redemption anyway; this keeps O16 honest).
+export async function removePreparedProfile(
+  context: SessionContext,
+  actingAccountId: string,
+  residentProfileId: string,
+): Promise<void> {
+  if (actingAccountId !== context.accountId) throw new PermissionDeniedError("manage_members");
+  const actor: Actor = { accountId: actingAccountId, profileId: null };
+  await withSessionContext(context, async (tx) => {
+    await assertHasPermissionTx(tx, context, "manage_members");
+    const [profile] = await tx
+      .select({ id: residentProfile.id, status: residentProfile.status })
+      .from(residentProfile)
+      .where(
+        and(eq(residentProfile.id, residentProfileId), eq(residentProfile.householdId, context.householdId)),
+      )
+      .for("update");
+    const [claimed] = await tx
+      .select({ id: membership.id })
+      .from(membership)
+      .where(eq(membership.residentProfileId, residentProfileId));
+    if (!profile || profile.status !== "prepared" || claimed) {
+      throw new ResidentProfileNotPreparedError(residentProfileId);
+    }
+    await transitionResidentProfileStatusTx(tx, residentProfileId, "removed", actor);
+    // Same event deleteJoinCode writes, one per link: a link going dead is audited either way.
+    const deletedLinks = await tx
+      .update(joinCodeIssuance)
+      .set({ deletedAt: new Date() })
+      .where(
+        and(
+          eq(joinCodeIssuance.householdId, context.householdId),
+          eq(joinCodeIssuance.residentProfileId, residentProfileId),
+          isNull(joinCodeIssuance.deletedAt),
+        ),
+      )
+      .returning({ id: joinCodeIssuance.id });
+    for (const link of deletedLinks) {
+      await recordActivityEvent(tx, {
+        householdId: context.householdId,
+        eventType: "household.join_code_deleted",
+        subjectType: "join_code_issuance",
+        subjectId: link.id,
+        actorAccountId: actingAccountId,
+        actorProfileId: null,
+        payload: {},
+      });
+    }
+  });
+}
+
 // FR-1.26 soft tier ("moved_out"): the regular path for an actual move-out — votes/history stay
 // (once F3+ has any), only the access consequence (V-3) is immediate, same as the hard tier.
 // Authorized by `manage_members`, checked first inside the write transaction (design D4); a

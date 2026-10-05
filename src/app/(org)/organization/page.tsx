@@ -20,9 +20,15 @@ const t = de.org.dashboard;
 // are reachable only via the list below it, never surfaced as if several were simultaneously
 // live. F3 rebuilds this screen as the task list `O-organisation.md` O1 describes.
 //
-// The `already_member` note used to render here (EC-2.4) — it now lives on each identity's own
-// landing (design.md Decision 8): B1 for a resident, O20 for the household account.
-export default async function OrganizationPage() {
+// The `already_member` note (EC-2.4) renders on each identity's own landing (design.md Decision 8):
+// B1 for a resident, and here for the household account, whose landing moved from O20 to O1
+// (2026-10-05); O20 still renders it too.
+export default async function OrganizationPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ note?: string }>;
+}) {
+  const { note } = await searchParams;
   const current = await getCurrentSession();
   if (!current) redirect("/sign-in");
 
@@ -60,6 +66,11 @@ export default async function OrganizationPage() {
           <ArrowLeft className="size-4" /> {de.nav.start}
           <LinkPendingHint />
         </Link>
+      )}
+      {note === "already_member" && (
+        <div role="note" className="callout callout-info">
+          {de.join.alreadyMemberNote}
+        </div>
       )}
       <h1 className="font-serif text-2xl font-semibold">{t.heading}</h1>
 

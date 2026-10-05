@@ -581,7 +581,9 @@ Prozess vs. Person, nicht bei „beschreibend vs. empfehlend".
   einen persönlichen Beitrittslink), die Maske liegt auf O16
 - **Moderator ernennen** — Rollenwechsel innerhalb der `Membership`; seit 2026-10-01 auch durch die
   Moderation (ernennen und zurückstufen), der Schalter liegt auf O16
-- **Abstimmungsverfahren** — Regel-Sperre während einer laufenden Runde (E-25). Umfasst u. a.
+- **Abstimmungsverfahren** — auch während einer laufenden Runde änderbar, wirkt nur auf später
+  eröffnete Runden; läuft eine Runde, sagt der Bildschirm das (Regel-Sperre gelockert 2026-10-05,
+  E-25). Umfasst u. a.
   `hide_results_until_voted` und, neu (2026-09-16, Prototype-User-Test), `reveal_vote_authorship`
   — Toggle „Stimmen-Urheberschaft in der Rangliste zeigen", Default aus, mit Hinweistext zum
   Anker-/Bandwagon-Tradeoff (`domain/identity.md`)
