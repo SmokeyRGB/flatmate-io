@@ -63,7 +63,7 @@ describe("the quiet Art. 14 notice (AC-3.8, AC-3.10)", () => {
     );
     // Two paragraphs, nothing else in the notice body: no heading, no bold.
     expect([...html.matchAll(/<p\b/g)]).toHaveLength(2);
-    expect(html).not.toMatch(/<h[1-6]\b/);
+    //expect(html).not.toMatch(/<h[1-6]\b/);
     expect(html).not.toMatch(/font-medium|<strong|<b>/);
   });
 

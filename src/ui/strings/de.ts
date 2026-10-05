@@ -518,6 +518,7 @@ export const de = {
     notice: {
       // Two quiet lines (design D6): this one, then deadlineLine. Together they state both
       // deadlines of FR-3.11, the first message and the one-month date.
+      gdprNotice: "Datenschutz-Hinweis",
       informLine: "Die Person muss erfahren, dass ihr ihre Angaben gespeichert habt.",
       // 06-Compliance-Anhang.md §4.5, verbatim apart from its placeholders.
       deadlineLine: (name: string, date: string) =>
