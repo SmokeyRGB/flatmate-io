@@ -16,6 +16,17 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 
+// household-sign-in-code D1: the household sign-in code's shape, three groups of four over the join
+// code's alphabet. The SQL pattern is what the CHECK on `household` is built from (drizzle/0032
+// carries the same literal), so the repository's JS-side test and the schema test compare against
+// one definition.
+export const HOUSEHOLD_SIGN_IN_CODE_GROUP_LENGTH = 4;
+export const HOUSEHOLD_SIGN_IN_CODE_GROUPS = 3;
+export const HOUSEHOLD_SIGN_IN_CODE_PATTERN = `^${Array.from(
+  { length: HOUSEHOLD_SIGN_IN_CODE_GROUPS },
+  () => `[A-HJ-NP-Z2-9]{${HOUSEHOLD_SIGN_IN_CODE_GROUP_LENGTH}}`,
+).join("-")}$`;
+
 // Wrapped in (select ...): Supabase's RLS-performance guidance — otherwise Postgres re-evaluates
 // current_setting() per row instead of once per query (F0 precedent, casting/audit schema.ts).
 const HOUSEHOLD_MATCH = sql`household_id = (select current_setting('app.household_id', true)::uuid)`;
@@ -177,14 +188,23 @@ export const household = pgTable(
     contactEmail: text("contact_email").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     deletedAt: timestamp("deleted_at", { withTimezone: true }),
+    // household-sign-in-code D1/D2: what a resident types to name the household at sign-in (O-12).
+    // Not secret (C-1.4). The database default is the only generator, so every writer of this
+    // table (registration, helpers, seed, other branches on shared dev) gets one without naming it.
+    signInCode: text("sign_in_code").notNull().default(sql`household_sign_in_code_generate()`),
   },
-  () => [
+  (t) => [
     pgPolicy("household_is_own_household", {
       as: "permissive",
       for: "all",
       using: IS_OWN_HOUSEHOLD,
       withCheck: IS_OWN_HOUSEHOLD,
     }),
+    check(
+      "household_sign_in_code_shape",
+      sql`${t.signInCode} ~ ${sql.raw(`'${HOUSEHOLD_SIGN_IN_CODE_PATTERN}'`)}`,
+    ),
+    uniqueIndex("household_sign_in_code_key").on(t.signInCode),
   ],
 );
 

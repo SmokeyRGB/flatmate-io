@@ -11,6 +11,9 @@ type Tx = Parameters<Parameters<typeof withSessionContext>[1]>[0];
 import { recordActivityEvent } from "@/modules/audit/repository";
 import {
   account,
+  HOUSEHOLD_SIGN_IN_CODE_GROUP_LENGTH,
+  HOUSEHOLD_SIGN_IN_CODE_GROUPS,
+  HOUSEHOLD_SIGN_IN_CODE_PATTERN,
   household,
   householdSettings,
   joinCodeIssuance,
@@ -365,10 +368,53 @@ const JOIN_ATTEMPT_LIMIT = 20;
 // `record_join_attempt` (drizzle/0014_join_attempt.sql) prunes, records, counts and decides in one
 // call — every attempt is recorded, including refused ones (design.md Decision 3).
 export async function recordJoinAttempt(sourceHash: string): Promise<boolean> {
+  return recordAttempt(sourceHash, JOIN_ATTEMPT_WINDOW_SECONDS, JOIN_ATTEMPT_LIMIT);
+}
+
+// household-sign-in-code D5: the resident name sign-in's own bucket in record_join_attempt, keyed
+// by signInAttemptSourceHash (auth.ts). The join route's values with the same reasoning: a
+// seven-person household behind one NAT does not reach 20 attempts in 15 minutes.
+export const SIGN_IN_ATTEMPT_WINDOW_SECONDS = 15 * 60;
+export const SIGN_IN_ATTEMPT_LIMIT = 20;
+
+// Pre-session bootstrap, like recordJoinAttempt above: a visitor signing in has no session, and
+// the limit must run BEFORE any code lookup or password check. Same function, its own key prefix.
+export async function recordSignInAttempt(sourceHash: string): Promise<boolean> {
+  return recordAttempt(sourceHash, SIGN_IN_ATTEMPT_WINDOW_SECONDS, SIGN_IN_ATTEMPT_LIMIT);
+}
+
+// The one call into record_join_attempt that both buckets share; each caller brings its own key
+// prefix (auth.ts) and its own window and limit.
+async function recordAttempt(sourceHash: string, windowSeconds: number, limit: number): Promise<boolean> {
   const rows = await db.execute<{ record_join_attempt: boolean }>(
-    sql`SELECT record_join_attempt(${sourceHash}, ${JOIN_ATTEMPT_WINDOW_SECONDS}, ${JOIN_ATTEMPT_LIMIT})`,
+    sql`SELECT record_join_attempt(${sourceHash}, ${windowSeconds}, ${limit})`,
   );
   return rows[0]?.record_join_attempt ?? false;
+}
+
+// The FOURTH deliberate RLS-bootstrap exception (after resolveAccountHousehold, resolveJoinCode/
+// claimJoinCode and recordJoinAttempt): the household id has to be known before any session
+// exists, and `household`'s only policy keys on the id. resolve_household_sign_in_code
+// (drizzle/0033, applied by the human) is an exact match on one non-secret column, at most one row
+// by the unique index, deleted households excluded inside the function because RLS does not apply
+// there. The CALLER NEVER SEES THE RESULT: signInResidentByHouseholdCode only uses it to open the
+// bootstrap scan and refuses an unknown code exactly like a wrong password (design D3/D4).
+export async function resolveHouseholdSignInCode(code: string): Promise<string | null> {
+  const rows = await db.execute<{ resolve_household_sign_in_code: string | null }>(
+    sql`SELECT resolve_household_sign_in_code(${normalizeHouseholdSignInCode(code)})`,
+  );
+  return rows[0]?.resolve_household_sign_in_code ?? null;
+}
+
+// household-sign-in-code D7 (E1/O20): the own household's code, RLS-scoped by the caller's context.
+export async function getHouseholdSignInCode(context: SessionContext): Promise<string | null> {
+  return withSessionContext(context, async (tx) => {
+    const [row] = await tx
+      .select({ signInCode: household.signInCode })
+      .from(household)
+      .where(eq(household.id, context.householdId));
+    return row?.signInCode ?? null;
+  });
 }
 
 export class HouseholdAccountCannotVoteError extends Error {
@@ -631,15 +677,31 @@ export async function getHouseholdSettings(context: SessionContext) {
 // accountId isn't yet known when this bootstrap read runs, so a throwaway value is used for it —
 // no current RLS policy keys on app.account_id (only household_id and profile_id do), so this
 // does not weaken any isolation guarantee; it only satisfies withSessionContext's own shape.
+// household-sign-in-code D6: the same read also carries the two values the resident frame hands to
+// the device-memory writer (the session's own remember_me and its household's sign-in code), so the
+// layout needs no second transaction. The join keys on the session's own household_id, and
+// `household`'s RLS policy scopes it to the bootstrap context's household as well.
+export type ResolvedSession = {
+  context: SessionContext;
+  rememberMe: boolean;
+  householdSignInCode: string;
+};
+
 export async function resolveSessionContext(
   sessionId: string,
   householdId: string,
-): Promise<SessionContext | null> {
+): Promise<ResolvedSession | null> {
   const bootstrap: SessionContext = { accountId: randomUUID(), householdId, profileId: null };
   return withSessionContext(bootstrap, async (tx) => {
     const [row] = await tx
-      .select()
+      .select({
+        accountId: session.accountId,
+        actingProfileId: session.actingProfileId,
+        rememberMe: session.rememberMe,
+        householdSignInCode: household.signInCode,
+      })
       .from(session)
+      .innerJoin(household, eq(household.id, session.householdId))
       .where(
         and(
           eq(session.id, sessionId),
@@ -649,7 +711,11 @@ export async function resolveSessionContext(
         ),
       );
     if (!row) return null;
-    return { accountId: row.accountId, householdId, profileId: row.actingProfileId };
+    return {
+      context: { accountId: row.accountId, householdId, profileId: row.actingProfileId },
+      rememberMe: row.rememberMe,
+      householdSignInCode: row.householdSignInCode,
+    };
   });
 }
 
@@ -1008,6 +1074,37 @@ const JOIN_CODE_SHAPE = new RegExp(
 
 export function isWellFormedJoinCode(normalised: string): boolean {
   return JOIN_CODE_SHAPE.test(normalised);
+}
+
+// household-sign-in-code design D1: a shape of its own (three groups of four) over the SAME
+// alphabet, so each entry point rejects the other kind of code by shape alone, before any lookup.
+// The database generates the code (drizzle/0032's column default); these helpers only judge and
+// normalise what a person types. Not a secret (C-1.4): none of the join code's conditions apply.
+//
+// The group sizes and the SQL pattern live in schema.ts (the CHECK is built from them) and are
+// re-exported here; this file keeps the normalising and the JS-side shape test.
+export { HOUSEHOLD_SIGN_IN_CODE_GROUP_LENGTH, HOUSEHOLD_SIGN_IN_CODE_GROUPS, HOUSEHOLD_SIGN_IN_CODE_PATTERN };
+
+const HOUSEHOLD_SIGN_IN_CODE_SHAPE = new RegExp(
+  `^[${JOIN_CODE_ALPHABET}]{${HOUSEHOLD_SIGN_IN_CODE_GROUP_LENGTH}}(-[${JOIN_CODE_ALPHABET}]{${HOUSEHOLD_SIGN_IN_CODE_GROUP_LENGTH}}){${HOUSEHOLD_SIGN_IN_CODE_GROUPS - 1}}$`,
+);
+
+// Mirrors normalizeJoinCode: upper-case, strip whitespace and "-", re-insert the hyphens only when
+// exactly 12 characters remain. NEVER throws.
+export function normalizeHouseholdSignInCode(input: string): string {
+  const stripped = input.toUpperCase().replace(/[\s-]/g, "");
+  const length = HOUSEHOLD_SIGN_IN_CODE_GROUP_LENGTH;
+  if (stripped.length !== length * HOUSEHOLD_SIGN_IN_CODE_GROUPS) return stripped;
+  const groups: string[] = [];
+  for (let i = 0; i < HOUSEHOLD_SIGN_IN_CODE_GROUPS; i++) {
+    groups.push(stripped.slice(i * length, (i + 1) * length));
+  }
+  return groups.join("-");
+}
+
+// Callers pass the ALREADY-NORMALISED string, never raw input.
+export function isWellFormedHouseholdSignInCode(normalised: string): boolean {
+  return HOUSEHOLD_SIGN_IN_CODE_SHAPE.test(normalised);
 }
 
 const POSTGRES_UNIQUE_VIOLATION = "23505";

@@ -65,6 +65,11 @@ export async function registerHouseholdAction(
             return { error: de.auth.errors.signIn.noHousehold, fieldError: null };
           case "no_membership":
             return { error: de.auth.errors.signIn.noMembership, fieldError: null };
+          case "rate_limited":
+            // Never raised on this path (the household sign-in is not rate limited), but the
+            // switch is exhaustive on purpose. Same reasoning as provider_unavailable below.
+            console.error(sessionErr);
+            return { error: de.auth.errors.register.signupFailed, fieldError: null };
           case "provider_unavailable":
             // auth-provider-deadline design.md D9 (pre-mortem finding 14): undoRegisterHousehold
             // has already run above — the household is gone, so "try signing in again" would send

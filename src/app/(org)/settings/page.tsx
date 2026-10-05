@@ -2,7 +2,12 @@ import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { listRoundsForSession } from "@/modules/casting/repository";
-import { assertIsAdministration, getHouseholdSettings, ResidentListActionDeniedError } from "@/modules/identity/repository";
+import {
+  assertIsAdministration,
+  getHouseholdSettings,
+  getHouseholdSignInCode,
+  ResidentListActionDeniedError,
+} from "@/modules/identity/repository";
 import { getCurrentSession } from "@/modules/identity/session-cookie";
 import { de } from "@/ui/strings";
 import { LinkPendingHint } from "@/ui/link-pending-hint";
@@ -49,9 +54,10 @@ export default async function SettingsPage({
     throw err;
   }
 
-  const [settings, rounds] = await Promise.all([
+  const [settings, rounds, signInCode] = await Promise.all([
     getHouseholdSettings(current.context),
     listRoundsForSession(current.context),
+    getHouseholdSignInCode(current.context),
   ]);
   const openRound = (rounds as { status: string; title: string }[]).find((r) => r.status === "open");
 
@@ -67,6 +73,14 @@ export default async function SettingsPage({
         </div>
       )}
       <h1 className="font-serif text-2xl font-semibold">{t.heading}</h1>
+      {/* household-sign-in-code D7 (O20): the administration passes the code on. */}
+      {signInCode && (
+        <section className="card space-y-2">
+          <h2 className="font-serif text-lg font-semibold">{t.signInCode.heading}</h2>
+          <p className="font-mono text-lg tracking-wide">{signInCode}</p>
+          <p className="text-sm text-muted-foreground">{t.signInCode.hint}</p>
+        </section>
+      )}
       <SettingsForm quorumShare={settings?.quorumShare ?? "0.5"} openRoundTitle={openRound?.title ?? null} />
     </div>
   );

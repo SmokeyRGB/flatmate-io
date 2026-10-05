@@ -24,7 +24,7 @@ import {
   setSessionCookie,
 } from "@/modules/identity/session-cookie";
 import { de } from "@/ui/strings";
-import { getClientIp } from "./request-ip";
+import { getClientIp } from "@/app/request-ip";
 
 // design.md Decision 10: `refusal` names the ONE OTHER way-forward component this refusal needs
 // beside its inline message (join-ways-forward.tsx) — never a typed value (design.md constraint 5:

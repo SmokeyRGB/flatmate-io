@@ -83,6 +83,13 @@ ab und neu an — es gibt keinen Wechsel innerhalb einer Sitzung.
 > hinterlegt (Kasten oben) —, kann sich die Person zusätzlich mit dieser Adresse und ihrem Passwort
 > anmelden. Die Anmeldung über `(Household, display_name) + Passwort` bleibt daneben immer möglich;
 > das Passwort bleibt die universelle Methode (P-2).
+>
+> **Ergänzt 2026-10-05 — wie „der Haushalt" eingegeben wird.** „Der Haushalt" im Anmeldeformular ist
+> `Household.sign_in_code`, die **WG-Kennung**: von Hand eingetippt oder, solange das Gerät
+> „angemeldet bleiben" hält, vorbelegt. Das ist P-1 für die Anmeldung — wer nur über den
+> Beitrittslink hereinkam, hat die interne Id nie gesehen, und niemand tippt 36 Zeichen ab. Die
+> Kennung ist wie die Id keine Sicherheitsgrenze (C-1.4). Was das Gerät sich merkt, und warum das
+> ohne Einwilligung geht: [`06-Compliance-Anhang.md` §10.6](../06-Compliance-Anhang.md#106-haushaltskennung-im-gerätespeicher).
 
 > **Passwort-Reset ohne E-Mail — ein bewusster Tauschhandel, kein Versehen (O-16, §10.2; vormals
 > Plan-O-A).** Ohne
@@ -215,6 +222,7 @@ Neutral gegenüber WG, Wohnprojekt, Haus und Vermieter-Objekt. UI-Label in v1 du
 | `entity_label` | `enum(wg, wohnprojekt, haus, objekt)` | ⚙️ | in v1 fest `wg`, später pro Objekt wählbar |
 | `created_at` | `timestamptz` | ⚙️ | |
 | `deleted_at` | `timestamptz?` | ⚙️ | |
+| `sign_in_code` | `text` | ⚙️ | **Neu 2026-10-05.** Das, was eine Person bei der Anmeldung eintippt, um den Haushalt zu benennen (O-12, Kasten in §2.1): drei Gruppen zu je vier Zeichen aus dem Alphabet der Beitrittscodes (`ABCD-EFGH-JKLM`). **Eindeutig, nicht geheim, nicht rotierbar in v0.1** — „keine Sicherheitsgrenze, nur Zuordnung" (C-1.4). Trägt keine der Auflagen des Beitrittscodes, weil er für sich nichts freischaltet: Name und Passwort bleiben nötig |
 
 > **Geändert 2026-09-21 (O-18 aufgelöst) — fünf Felder haben diese Tabelle verlassen.**
 > `join_code`, `join_code_rotated_at`, `join_code_expires_at`, `join_code_max_uses` und

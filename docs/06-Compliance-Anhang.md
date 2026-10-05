@@ -1289,6 +1289,38 @@ Der Offline-Puffer für Stimmabgaben ist eine **benannte, begrenzte Ausnahme** v
 > weitere Fälle ausdehnen will, muss zeigen, dass der Puffer den Versand **nicht überleben kann** —
 > und nicht bloß, dass er es normalerweise nicht tut.
 
+### 10.6 Haushaltskennung im Gerätespeicher
+
+Die Anmeldung als Resident-Account ohne E-Mail braucht „den Haushalt" (O-12,
+[`domain/identity.md`](domain/identity.md) §2.1). Damit das Formular auf einem Gerät, das
+„angemeldet bleiben" hält, nicht leer bleibt (A2), legt die Anwendung die **WG-Kennung**
+(`Household.sign_in_code`) im lokalen Speicher des Browsers ab.
+
+| | |
+|---|---|
+| **Vorgang** | Speichern der WG-Kennung im lokalen Speicher des Browsers, **solange die Sitzung „angemeldet bleiben" trägt**; Entfernen, sobald die Person das Häkchen abwählt. Das Abmelden entfernt sie nicht |
+| **§ 25 TDDDG** | **einwilligungsfrei nach Abs. 2 Nr. 2** |
+| **Begründung** | § 25 Abs. 1 gilt für **jeden** Speichervorgang auf dem Gerät, nicht nur für Cookies. Abs. 2 Nr. 2 nimmt aus, was für einen **ausdrücklich gewünschten** Dienst **unbedingt erforderlich** ist. Der Dienst ist hier „dieses Gerät bleibt an meinem Haushalt angemeldet"; die Person verlangt ihn, indem sie das Häkchen setzt. Der Wert wird nur geschrieben, solange diese Wahl besteht, und entfernt, sobald sie zurückgenommen wird. Er ist die Eingabe, die die Person sonst selbst tippen würde — keine vom Gerät ausgelesene Information |
+| **Was gespeichert wird** | ausschließlich die Kennung. **Nie** ein Anzeigename, eine Konto- oder Profil-Id, eine E-Mail-Adresse, ein Sitzungstoken oder Bewerber-, Beratungs- oder Stimmdaten |
+| **Datenschutzklasse** | ⚙️ — die Kennung benennt einen Haushalt, keine Person (wie `JoinCodeIssuance.code`) |
+
+> **Das Cookie bleibt das einzige.** `03-PRD.md` §6.5 verlangt „Nur eine unbedingt erforderliche
+> Sitzungs-Cookie" — und das gilt **unverändert und wörtlich**: Für die WG-Kennung wird **kein
+> Cookie** gesetzt. Der Eintrag im lokalen Speicher ist **keine Umgehung** dieser Zeile, sondern
+> ein eigener Vorgang, der für sich nach Abs. 2 Nr. 2 einwilligungsfrei ist — und deshalb hier
+> steht statt stillschweigend neben [§10.1](#101-login-session-cookie-einwilligungsfrei).
+
+**Gemeinsam genutztes Gerät.** Auf die Prüffrage aus `GUARDRAILS.md` („Wem gehören diese Daten —
+und was passiert damit, wenn sich auf demselben Gerät als Nächstes jemand anderes anmeldet?"):
+Der Wert gehört dem **Haushalt**, nicht der Person, die ihn geschrieben hat. Die nächste Person
+am Gerät erbt eine Haushaltskennung — **nie** einen Namen, eine Sitzung oder eine Stimme. Wer sich
+an einem anderen Haushalt anmeldet, findet dessen Vorbelegung bearbeitbar vor und überschreibt
+sie mit der eigenen; wer das Häkchen abwählt, entfernt sie.
+
+**Verhältnis zu G-B6.** Die Kennung ist kein Anwendungsdatum im Sinne von `GUARDRAILS.md` G-B6: weder
+Bewerber-, Beratungs- noch Stimmdaten, ohne eigene Löschfrist, und dieselbe Zeichenfolge, die die
+Person ohnehin tippt. Sie ist deshalb **keine zweite Ausnahme** neben G-B7.
+
 ---
 
 ## 11 · TOM-Skizze

@@ -2,7 +2,7 @@ import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { JOIN_PASSWORD_MIN_LENGTH } from "@/modules/identity/auth";
-import { getOwnAccountEmail } from "@/modules/identity/repository";
+import { getHouseholdSignInCode, getOwnAccountEmail } from "@/modules/identity/repository";
 import { getCurrentSession } from "@/modules/identity/session-cookie";
 import { de } from "@/ui/strings";
 import { LinkPendingHint } from "@/ui/link-pending-hint";
@@ -40,7 +40,10 @@ export default async function AccountPage() {
     );
   }
 
-  const email = await getOwnAccountEmail(current.context);
+  const [email, signInCode] = await Promise.all([
+    getOwnAccountEmail(current.context),
+    getHouseholdSignInCode(current.context),
+  ]);
 
   return (
     <div className="mx-auto max-w-md space-y-6 p-6">
@@ -49,6 +52,17 @@ export default async function AccountPage() {
         <LinkPendingHint />
       </Link>
       <h1 className="font-serif text-2xl font-semibold">{t.heading}</h1>
+
+      {/* household-sign-in-code D7: the code a resident signs in with, next to their name. */}
+      {signInCode && (
+        <section className="card space-y-3">
+          <h2 className="font-serif text-lg font-semibold">{t.household.heading}</h2>
+          <p className="font-mono text-lg tracking-wide">
+            {signInCode}
+          </p>
+          <p className="text-sm text-muted-foreground">{t.household.hint}</p>
+        </section>
+      )}
 
       <section className="card space-y-3">
         <h2 className="font-serif text-lg font-semibold">{t.email.heading}</h2>

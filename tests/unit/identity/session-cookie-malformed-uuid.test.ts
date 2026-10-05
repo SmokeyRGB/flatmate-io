@@ -47,7 +47,11 @@ describe("getCurrentSession malformed cookie handling", () => {
   it("still resolves a well-formed cookie", async () => {
     const { getCurrentSession } = await import("@/modules/identity/session-cookie");
     cookieValue = `${validSessionId}.${validHouseholdId}`;
-    resolveSessionContext.mockResolvedValue({ accountId: "x", householdId: validHouseholdId, profileId: null });
+    resolveSessionContext.mockResolvedValue({
+      context: { accountId: "x", householdId: validHouseholdId, profileId: null },
+      rememberMe: true,
+      householdSignInCode: "ABCD-EFGH-JKLM",
+    });
 
     const result = await getCurrentSession();
     expect(resolveSessionContext).toHaveBeenCalledWith(validSessionId, validHouseholdId);

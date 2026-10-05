@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { getClientIp } from "@/app/(auth)/join/[code]/request-ip";
+import { getClientIp } from "@/app/request-ip";
 import { JOIN_TEST_CLIENT_IP_HEADER } from "../../helpers/join-client-ip";
 
 // Second review of PR #17: the first version read x-forwarded-for's LEFTMOST entry, which the
