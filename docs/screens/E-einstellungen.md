@@ -18,6 +18,8 @@
   Pitch ausdrücklich „Zugang wiederherstellen, falls du dein Passwort vergisst" (S-45), nie als
   Sperre formuliert
 - **Abschnitt Konto:** Passwort ändern, Passkey einrichten/entfernen
+- **Abschnitt „Deine WG":** die WG-Kennung des eigenen Haushalts (`Household.sign_in_code`) mit
+  einer Zeile, dass man sich mit ihr und seinem Namen anmeldet *(Ergänzt 2026-10-05)*
 - **Abmelden**
 
 > **Kasten — Passwort-Reset ist ein bewusster Tauschhandel (K-18).** Solange ein Resident-Profil

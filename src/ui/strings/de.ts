@@ -97,8 +97,11 @@ export const de = {
       tabHousehold: "Haushalt",
       tabResident: "Bewohner:in",
       emailLabel: "E-Mail",
-      householdLabel: "Haushalt",
-      householdPlaceholder: "wird nach dem Beitritt auf diesem Gerät gemerkt",
+      // household-sign-in-code D7: the household is named by its sign-in code, "WG-Kennung"
+      // (UI label "WG", domain/identity.md §2.1). Prefilled from the device while the resident
+      // keeps "angemeldet bleiben" (identity/device-memory).
+      householdLabel: "WG-Kennung",
+      householdPlaceholder: "z. B. ABCD-EFGH-JKLM",
       nameLabel: "Dein Name",
       passwordLabel: "Passwort",
       submit: "Anmelden",
@@ -156,10 +159,9 @@ export const de = {
         signupFailed: "Registrierung ist fehlgeschlagen. Bitte versuche es erneut.", // auth.ts:51
       },
       signIn: {
-        missingFields: "Haushalt und Name sind erforderlich.", // auth.ts:320
-        invalidHousehold: "Diese Haushalts-ID sieht ungültig aus.", // auth.ts:326
-        // auth.ts:349 ("No such resident in this household") and auth.ts:358 ("Invalid
-        // credentials") converge on this single text — design.md Decision 5 / proposal.md
+        missingFields: "Haushalt und Name sind erforderlich.", // signIn, resident branch
+        invalidHousehold: "Diese WG-Kennung sieht ungültig aus.", // signInResidentByHouseholdCode / signIn
+        // signIn's "No such resident in this household" and "Invalid credentials" converge on this single text — design.md Decision 5 / proposal.md
         // Assumption 6: telling the two apart would let an unauthenticated visitor learn whether
         // a display name exists in the household.
         invalidCredentials: "Diese Anmeldedaten sind ungültig.",
@@ -168,6 +170,9 @@ export const de = {
         // auth-provider-deadline design.md D10 (draft, awaiting human confirmation): the identity
         // provider's answer never arrived — never shown as "invalid credentials" (identity/sign-in).
         providerUnavailable: "Die Anmeldung ist gerade nicht möglich. Bitte versuche es gleich noch einmal.",
+        // household-sign-in-code D5 (03-PRD §6.5): says to wait, never that the credentials were
+        // wrong. Drafted for this change; the wording awaits the human's review.
+        tooManyAttempts: "Es gab zu viele Anmeldeversuche. Bitte warte einige Minuten und versuche es dann erneut.",
       },
       // Decision 6: a third-party (Supabase Auth) or genuinely unanticipated failure past the
       // point a domain error could describe it. The real message still reaches the log.
@@ -595,6 +600,11 @@ export const de = {
   settings: {
     heading: "Haushaltseinstellungen",
     accessDeniedBody: "Das Abstimmungsverfahren legt die Verwaltung fest.",
+    // household-sign-in-code D7 (O20): the code the administration passes on.
+    signInCode: {
+      heading: "WG-Kennung",
+      hint: "Bewohner:innen brauchen diese WG-Kennung, um sich mit ihrem Namen anzumelden.",
+    },
     // FR-1.21 (relaxed 2026-10-05): editable while a round runs; the round keeps its own copy.
     appliesToNextRound: (roundTitle: string) =>
       `Änderungen gelten für Runden, die du danach eröffnest. „${roundTitle}" läuft weiter ` +
@@ -902,6 +912,11 @@ export const de = {
     },
     signOut: {
       heading: "Abmelden",
+    },
+    // household-sign-in-code D7 (E1): "WG" is the UI label (domain/identity.md §2.1).
+    household: {
+      heading: "Deine WG",
+      hint: "Mit dieser WG-Kennung und deinem Namen meldest du dich an.",
     },
   },
   // start-screen: the shared error boundary for every `(resident)` screen — same reasoning as

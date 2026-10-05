@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { assertTrustedIpHeaderConfigured } from "@/app/(auth)/join/[code]/request-ip";
+import { assertTrustedIpHeaderConfigured } from "@/app/request-ip";
 
 describe("assertTrustedIpHeaderConfigured", () => {
   it("throws in production when the header is unset", () => {

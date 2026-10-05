@@ -15,9 +15,13 @@ import type { CurrentSession } from "./session-cookie";
 import {
   claimJoinCodeTx,
   isDisplayNameTaken,
+  isWellFormedHouseholdSignInCode,
   issueJoinCodeTx,
+  normalizeHouseholdSignInCode,
   readDatabaseClock,
+  recordSignInAttempt,
   resolveAccountHousehold,
+  resolveHouseholdSignInCode,
   resolveJoinCode,
   revokeSession,
 } from "./repository";
@@ -461,9 +465,24 @@ export function hashSessionToken(accessToken: string): string {
 // request funnels into ONE shared bucket rather than being exempted — failing open on a missing
 // header would make the limit optional for anyone who can omit it (design.md Decision 3).
 export function joinAttemptSourceHash(ip: string | null): string {
+  return attemptSourceHash(`join-attempt:${ip ?? "unknown"}`);
+}
+
+// The shared half of both rate-limit keys: the HMAC over a domain-separated, caller-built input.
+function attemptSourceHash(prefixedInput: string): string {
   const secret = process.env.SESSION_TOKEN_HASH_SECRET;
   if (!secret) throw new Error("SESSION_TOKEN_HASH_SECRET is not configured");
-  return createHmac("sha256", secret).update(`join-attempt:${ip ?? "unknown"}`).digest("hex");
+  return createHmac("sha256", secret).update(prefixedInput).digest("hex");
+}
+
+// household-sign-in-code D5: the resident name sign-in's rate-limit key, in its own bucket of
+// record_join_attempt. Same secret and domain-separation approach as joinAttemptSourceHash, with
+// its own prefix. The normalised code is IN the key: with no trusted IP header (dev, local) `ip`
+// is null for every visitor, and a source-only key would be one global bucket for every
+// household's name sign-in, so anyone could lock out every resident everywhere. With the code in
+// the key the bucket is per household (and per source where a trusted header exists).
+export function signInAttemptSourceHash(ip: string | null, normalisedCode: string): string {
+  return attemptSourceHash(`sign-in-attempt:${ip ?? "unknown"}:${normalisedCode}`);
 }
 
 // german-ui-vocabulary (design.md Decision 4). Six throw sites converge to five codes: Decision
@@ -482,7 +501,9 @@ export type SignInErrorCode =
   | "invalid_credentials"
   | "no_household"
   | "no_membership"
-  | "provider_unavailable";
+  | "provider_unavailable"
+  // household-sign-in-code D5: the resident name path is rate limited; says "wait", never "wrong".
+  | "rate_limited";
 
 export class SignInError extends Error {
   constructor(message: string, readonly code: SignInErrorCode) {
@@ -549,7 +570,7 @@ async function insertSessionTx(
 // join-by-link design.md Decision 5: `options.rememberMe` defaults to `true`, so registration and
 // the resident-claim flow (neither of which pass it) behave exactly as before — only the join
 // form's "stay signed in" checkbox (task group 8) actually threads a value through. Screen A2 (the
-// ordinary sign-in form) gets no checkbox in this change (proposal Assumption 8).
+// ordinary sign-in form) got its own checkbox in household-sign-in-code, passed in the same way.
 export async function signIn(
   input:
     | { kind: "household"; email: string; password: string }
@@ -565,9 +586,10 @@ export async function signIn(
   if (input.kind === "household" || input.kind === "resident_email") {
     email = input.email;
   } else {
-    // Blank fields reach here unvalidated from the resident sign-in form (no `required`,
-    // `noValidate`) — reject before householdId hits withSessionContext's assertUuid, whose plain
-    // Error isn't a SignInError and would otherwise surface as an unhandled crash.
+    // The resident sign-in form reaches here only through signInResidentByHouseholdCode, which has
+    // already validated the code and resolved the household. The checks stay as a guard for direct
+    // callers of this module: reject before householdId hits withSessionContext's assertUuid,
+    // whose plain Error isn't a SignInError and would otherwise surface as an unhandled crash.
     if (!input.householdId.trim() || !input.displayName.trim()) {
       throw new SignInError("Household and name are required", "missing_fields");
     }
@@ -752,6 +774,41 @@ export async function signIn(
       context: { accountId, householdId, profileId: actingProfileId },
     };
   });
+}
+
+// household-sign-in-code D4: the resident name path as the form uses it. The household is named by
+// its sign-in code (typed or prefilled from the device), never by its internal id.
+//   1. blank fields -> missing_fields;
+//   2. normalise; not well-formed -> invalid_household, with no lookup (a UUID, a join code or a
+//      name all land here, and the shape alone tells a visitor nothing about any household);
+//   3. rate limit (every attempt counts, refused or not) -> rate_limited, BEFORE any lookup;
+//   4. resolve the code; an unknown or deleted household becomes a random id, so the existing
+//      name scan finds nothing and signIn runs its throwaway lookup and `.invalid` password grant:
+//      the provider sees the same request sequence as for an unknown name (auth-provider-deadline
+//      D11), and the answer is the same invalid_credentials;
+//   5. signIn({ kind: "resident", householdId, ... }).
+// Steps 1-4 run before any provider call and outside any transaction, so no new provider-boundary
+// failure point exists. The limit lives here, not in the action, so a second caller cannot skip it.
+export async function signInResidentByHouseholdCode(
+  input: { householdCode: string; displayName: string; password: string },
+  options: { rememberMe?: boolean; sourceIp?: string | null } = {},
+): Promise<SignInResult> {
+  if (!input.householdCode.trim() || !input.displayName.trim()) {
+    throw new SignInError("Household and name are required", "missing_fields");
+  }
+  const code = normalizeHouseholdSignInCode(input.householdCode);
+  if (!isWellFormedHouseholdSignInCode(code)) {
+    throw new SignInError("Invalid household sign-in code", "invalid_household");
+  }
+
+  const allowed = await recordSignInAttempt(signInAttemptSourceHash(options.sourceIp ?? null, code));
+  if (!allowed) throw new SignInError("Too many sign-in attempts", "rate_limited");
+
+  const householdId = (await resolveHouseholdSignInCode(code)) ?? randomUUID();
+  return signIn(
+    { kind: "resident", householdId, displayName: input.displayName, password: input.password },
+    { rememberMe: options.rememberMe },
+  );
 }
 
 // german-ui-vocabulary (design.md Decision 4, this change's own Decision 4): a `code`

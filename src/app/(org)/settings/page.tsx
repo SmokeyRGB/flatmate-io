@@ -2,7 +2,11 @@ import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { listRoundsForSession } from "@/modules/casting/repository";
-import { getHouseholdSettings, PermissionDeniedError } from "@/modules/identity/repository";
+import {
+  getHouseholdSettings,
+  getHouseholdSignInCode,
+  PermissionDeniedError,
+} from "@/modules/identity/repository";
 import { getCurrentSession } from "@/modules/identity/session-cookie";
 import { de } from "@/ui/strings";
 import { LinkPendingHint } from "@/ui/link-pending-hint";
@@ -41,10 +45,14 @@ export default async function SettingsPage({
   // quorum share.
   let settings: Awaited<ReturnType<typeof getHouseholdSettings>>;
   let rounds: Awaited<ReturnType<typeof listRoundsForSession>>;
+  let signInCode: string | null;
   try {
-    [settings, rounds] = await Promise.all([
+    // household-sign-in-code D7: read with the settings, so the code shows only once
+    // getHouseholdSettings has let this session through.
+    [settings, rounds, signInCode] = await Promise.all([
       getHouseholdSettings(current.context),
       listRoundsForSession(current.context),
+      getHouseholdSignInCode(current.context),
     ]);
   } catch (err) {
     if (err instanceof PermissionDeniedError) {
@@ -75,6 +83,14 @@ export default async function SettingsPage({
         </div>
       )}
       <h1 className="font-serif text-2xl font-semibold">{t.heading}</h1>
+      {/* household-sign-in-code D7 (O20): the administration passes the code on. */}
+      {signInCode && (
+        <section className="card space-y-2">
+          <h2 className="font-serif text-lg font-semibold">{t.signInCode.heading}</h2>
+          <p className="font-mono text-lg tracking-wide">{signInCode}</p>
+          <p className="text-sm text-muted-foreground">{t.signInCode.hint}</p>
+        </section>
+      )}
       <SettingsForm quorumShare={settings?.quorumShare ?? "0.5"} openRoundTitle={openRound?.title ?? null} />
     </div>
   );

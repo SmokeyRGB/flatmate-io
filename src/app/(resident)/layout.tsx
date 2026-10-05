@@ -4,6 +4,7 @@ import { landingPathFor } from "@/app/landing";
 import { getCurrentSession } from "@/modules/identity/session-cookie";
 import { HeaderSkeleton } from "@/ui/skeletons";
 import { BottomNav } from "./bottom-nav";
+import { HouseholdCodeMemory } from "./household-code-memory";
 import { ResidentHeaderRight } from "./resident-header";
 
 // start-screen design.md Decision 1: the resident frame — everything B1, `/casting`,
@@ -38,6 +39,9 @@ export default async function ResidentLayout({ children }: { children: React.Rea
         </Suspense>
       </header>
       <main className="flex-1 pb-20 md:pb-6">{children}</main>
+      {/* household-sign-in-code D6: the device-memory writer; both values came with the session
+          read above, so it renders nothing and waits for nothing. */}
+      <HouseholdCodeMemory code={current.householdSignInCode} rememberMe={current.rememberMe} />
     </div>
   );
 }

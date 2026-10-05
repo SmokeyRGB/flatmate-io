@@ -1,7 +1,9 @@
 "use server";
 
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { SignInError, signIn } from "@/modules/identity/auth";
+import { getClientIp } from "@/app/request-ip";
+import { SignInError, signIn, signInResidentByHouseholdCode } from "@/modules/identity/auth";
 import { sessionCookieMaxAge, setSessionCookie } from "@/modules/identity/session-cookie";
 import { de } from "@/ui/strings";
 import { landingPathFor } from "@/app/landing";
@@ -17,22 +19,30 @@ export async function signInAction(
   formData: FormData,
 ): Promise<SignInFormState> {
   const mode = String(formData.get("mode") ?? "household");
+  // household-sign-in-code: "angemeldet bleiben" on both tabs, ticked by default in the form
+  // (identity/sign-in). An unticked checkbox posts nothing, so absence means cleared.
+  const rememberMe = formData.get("rememberMe") === "on";
   let landingPath: "/dashboard" | "/organization";
 
   try {
     const result =
       mode === "household" || mode === "resident_email"
-        ? await signIn({
-            kind: mode,
-            email: String(formData.get("email") ?? ""),
-            password: String(formData.get("password") ?? ""),
-          })
-        : await signIn({
-            kind: "resident",
-            householdId: String(formData.get("householdId") ?? ""),
-            displayName: String(formData.get("displayName") ?? ""),
-            password: String(formData.get("password") ?? ""),
-          });
+        ? await signIn(
+            {
+              kind: mode,
+              email: String(formData.get("email") ?? ""),
+              password: String(formData.get("password") ?? ""),
+            },
+            { rememberMe },
+          )
+        : await signInResidentByHouseholdCode(
+            {
+              householdCode: String(formData.get("householdCode") ?? ""),
+              displayName: String(formData.get("displayName") ?? ""),
+              password: String(formData.get("password") ?? ""),
+            },
+            { rememberMe, sourceIp: getClientIp(await headers()) },
+          );
 
     await setSessionCookie(
       result.session.id,
@@ -57,6 +67,8 @@ export async function signInAction(
           return { error: de.auth.errors.signIn.noMembership };
         case "provider_unavailable":
           return { error: de.auth.errors.signIn.providerUnavailable };
+        case "rate_limited":
+          return { error: de.auth.errors.signIn.tooManyAttempts };
         default: {
           const _exhaustive: never = code;
           return _exhaustive;

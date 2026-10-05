@@ -159,7 +159,10 @@ const NOT_APPLICABLE_IDENTITY: Record<string, string> = {
   getIdentityLabel: "read-only",
   getHousehold: "read-only",
   getHouseholdSettings: "read-only",
-  resolveSessionContext: "pre-session bootstrap — reconstructs a SessionContext from a cookie's session id, before any session exists",
+  resolveSessionContext:
+    "pre-session bootstrap — reconstructs a SessionContext from a cookie's session id, before any " +
+    "session exists; also returns that session's own remember_me and its household's sign-in code " +
+    "(tested in household-sign-in-code-visibility.test.ts)",
   getResidentList:
     "read; checks the member-administration permissions inline; visibility tested in resident-list-access.test.ts",
   getCurrentHouseholdMembers: "read-only",
@@ -167,6 +170,18 @@ const NOT_APPLICABLE_IDENTITY: Record<string, string> = {
   buildJoinUrl: "pure helper — no SessionContext, no DB access",
   normalizeJoinCode: "pure helper — no SessionContext, no DB access",
   isWellFormedJoinCode: "pure helper — no SessionContext, no DB access",
+  // household-sign-in-code (D1/D4/D5/D7).
+  normalizeHouseholdSignInCode: "pure helper — no SessionContext, no DB access",
+  isWellFormedHouseholdSignInCode: "pure helper — no SessionContext, no DB access",
+  resolveHouseholdSignInCode:
+    "pre-session bootstrap — the fourth deliberate RLS-bootstrap exception (resolve_household_sign_in_code, " +
+    "drizzle/0033); a visitor signing in has no session yet, and the caller never sees the result.",
+  recordSignInAttempt:
+    "pre-session bootstrap — the resident name sign-in's own bucket of record_join_attempt; a visitor " +
+    "signing in has no session, and the limit must run before any lookup.",
+  getHouseholdSignInCode:
+    "read-only, own household only (RLS-scoped under the caller's context); visibility tested in " +
+    "household-sign-in-code-visibility.test.ts",
   issueJoinCodeTx:
     "Tx primitive with an explicit documented no-auth contract (own comment: 'THIS FUNCTION " +
     "PERFORMS NO AUTHORIZATION' — the one legitimate caller, registerHousehold, mints the " +

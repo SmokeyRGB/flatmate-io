@@ -590,5 +590,7 @@ Prozess vs. Person, nicht bei „beschreibend vs. empfehlend".
   Anker-/Bandwagon-Tradeoff (`domain/identity.md`)
 - **Datenschutzseite freigeben** — `PublishedPrivacyNotice` (G-C9); vor Freigabe über keinen
   Codepfad erreichbar
+- **WG-Kennung anzeigen** — `Household.sign_in_code` mit einer Zeile, dass Bewohnende sie brauchen,
+  um sich mit ihrem Namen anzumelden; die Verwaltung gibt sie weiter *(Ergänzt 2026-10-05)*
 
 ---

@@ -33,6 +33,7 @@ const KNOWN_DEFINERS = [
   "resolve_join_code",
   "claim_join_code",
   "record_join_attempt",
+  "resolve_household_sign_in_code",
   "casting_round_keeps_applications",
 ] as const;
 

@@ -44,10 +44,18 @@ export interface CurrentSession {
   context: SessionContext;
 }
 
+// household-sign-in-code D6: what getCurrentSession's one read also carries, for the resident
+// frame's device-memory writer. A separate type so the many callers (and tests) that build a
+// CurrentSession by hand need not invent values they never use.
+export interface ReadSession extends CurrentSession {
+  rememberMe: boolean;
+  householdSignInCode: string;
+}
+
 // FR-1.6/AC-1.6: reads the fixed acting identity for the current request. Returns null if there is
 // no cookie, or the session it names is revoked/expired/gone — never partially trusts a stale
 // cookie.
-export async function getCurrentSession(): Promise<CurrentSession | null> {
+export async function getCurrentSession(): Promise<ReadSession | null> {
   const store = await cookies();
   const raw = store.get(COOKIE_NAME)?.value;
   if (!raw) return null;
@@ -62,7 +70,7 @@ export async function getCurrentSession(): Promise<CurrentSession | null> {
   // documented no-session path. Fail closed here, before it gets that far.
   if (!isUuid(sessionId) || !isUuid(householdId)) return null;
 
-  const context = await resolveSessionContext(sessionId, householdId);
-  if (!context) return null;
-  return { sessionId, context };
+  const resolved = await resolveSessionContext(sessionId, householdId);
+  if (!resolved) return null;
+  return { sessionId, ...resolved };
 }

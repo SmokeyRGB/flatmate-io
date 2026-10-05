@@ -42,7 +42,15 @@
 
 - Für Haushalts-Accounts: E-Mail + Passwort
 - Für Resident-Accounts ohne E-Mail: Haushalt + Anzeigename + Passwort (O-12, entschieden) — Feld
-  „Haushalt" vorbelegt, wenn das Gerät „angemeldet bleiben" hält
+  „Haushalt" vorbelegt, wenn das Gerät „angemeldet bleiben" hält. *(Ergänzt 2026-10-05: Das Feld
+  ist die **WG-Kennung** (`Household.sign_in_code`, `../domain/identity.md` §2.1), von Hand
+  eintippbar (P-1) und weiter bearbeitbar, wenn vorbelegt. Grund: Die Anmeldung nannte „Haushalt",
+  ohne dass jemand je einen Wert dafür gesehen hatte — wer per Link beigetreten war, stand nach
+  dem ersten Abmelden vor einem leeren Feld.)*
+- Kontrollkästchen „Auf diesem Gerät angemeldet bleiben", vorbelegt, **auf beiden Seiten** der
+  Anmeldung *(Ergänzt 2026-10-05)*. Es entscheidet über die Sitzungsdauer (O-13) und darüber, ob das
+  Gerät die WG-Kennung behält; solange die Wahl besteht, bleibt der Wert nach dem Abmelden stehen
+  und füllt das Feld wieder (`../06-Compliance-Anhang.md` §10.6)
 - Passkey als Alternative, wenn zuvor eingerichtet — setzt eine hinterlegte und bestätigte
   `Account.email` voraus (ADR-006, `../domain/identity.md`)
 

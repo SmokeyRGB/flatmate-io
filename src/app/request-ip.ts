@@ -1,5 +1,5 @@
 // design.md Decision 3 (FR-2.28): the join route's rate-limit key is an HMAC of the client's
-// address. Route-local: nothing outside this route needs to read a client address today.
+// address. Shared since household-sign-in-code D5: the resident name sign-in reads it too.
 //
 // *** A FORWARDING HEADER IS NOT AN IDENTITY UNLESS A PROXY GUARANTEES IT ***
 // The first version of this file read `x-forwarded-for` and took its LEFTMOST entry. That entry is

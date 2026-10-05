@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
+import { browserLocalStorage, readStoredHouseholdCode } from "@/app/household-code-storage";
 import { de } from "@/ui/strings";
 import { signInAction, type SignInFormState } from "./actions";
 import { PasswordInput } from "@/ui/password-input";
@@ -20,9 +21,32 @@ export function SignInForm() {
   // with an email may use it instead of household + name. The tab still decides the identity:
   // the server refuses a household account's address on this path (auth.ts `resident_email`).
   const [residentBy, setResidentBy] = useState<"name" | "email">("name");
+  // household-sign-in-code: the join form's `draft` pattern (join-by-link design.md Decision 4).
+  // React 19 resets the form after every action that does not throw, and that reset rewrites even a
+  // controlled checkbox's DOM state back to its default without React re-syncing it — seen in the
+  // 2026-10-05 walkthrough: a cleared "angemeldet bleiben" came back ticked after a refused attempt,
+  // so the retry would have created a long session and stored the code on the device against the
+  // person's choice (identity/device-memory: opt-in only). Rendering `defaultValue`/`defaultChecked`
+  // from `draft`, filled in the action wrapper before the dispatch, makes the reset restore what was
+  // just submitted. The password is never captured.
+  const [draft, setDraft] = useState({ householdCode: "", displayName: "", rememberMe: true });
   const submittedMode = mode === "resident" && residentBy === "email" ? "resident_email" : mode;
   const showEmail = mode === "household" || residentBy === "email";
   const [state, formAction] = useActionState(signInAction, initialState);
+
+  // household-sign-in-code D6: prefill the WG-Kennung from the device. Read in an effect after the
+  // field mounts, never during render, so server and client markup agree. The input stays
+  // uncontrolled and the effect writes the DOM value directly (no setState in an effect), so what
+  // the person types is what posts. Only an empty field is prefilled. Storage that is missing or
+  // throws leaves the field empty (P-2).
+  const householdCodeRef = useRef<HTMLInputElement>(null);
+  const showHouseholdCode = !showEmail;
+  useEffect(() => {
+    const input = householdCodeRef.current;
+    if (!showHouseholdCode || !input || input.value) return;
+    const stored = readStoredHouseholdCode(browserLocalStorage());
+    if (stored) input.value = stored;
+  }, [showHouseholdCode, state]); // `state`: React resets an uncontrolled form after each action
 
   return (
     <div className="space-y-6">
@@ -47,7 +71,17 @@ export function SignInForm() {
         </button>
       </div>
 
-      <form action={formAction} className="card space-y-4">
+      <form
+        action={(formData: FormData) => {
+          setDraft({
+            householdCode: String(formData.get("householdCode") ?? ""),
+            displayName: String(formData.get("displayName") ?? ""),
+            rememberMe: formData.get("rememberMe") === "on",
+          });
+          formAction(formData);
+        }}
+        className="card space-y-4"
+      >
         <input type="hidden" name="mode" value={submittedMode} />
 
         {showEmail ? (
@@ -60,15 +94,20 @@ export function SignInForm() {
         ) : (
           <>
             <div>
-              <label htmlFor="householdId" className="field-label">
+              <label htmlFor="householdCode" className="field-label">
                 {t.householdLabel}
               </label>
               <input
-                id="householdId"
-                name="householdId"
+                id="householdCode"
+                name="householdCode"
                 type="text"
                 required
+                ref={householdCodeRef}
+                defaultValue={draft.householdCode}
                 placeholder={t.householdPlaceholder}
+                autoCapitalize="characters"
+                autoComplete="off"
+                spellCheck={false}
                 className="field-input"
               />
             </div>
@@ -81,6 +120,7 @@ export function SignInForm() {
                 name="displayName"
                 type="text"
                 required
+                defaultValue={draft.displayName}
                 className="field-input"
               />
             </div>
@@ -92,6 +132,20 @@ export function SignInForm() {
             {t.passwordLabel}
           </label>
           <PasswordInput id="password" name="password" required autoComplete="current-password" />
+        </div>
+
+        {/* identity/sign-in: "angemeldet bleiben" on both tabs, ticked by default. One checkbox
+            outside the tab conditional, so it keeps its state when the tab or the way in changes. */}
+        <div className="flex items-center gap-2">
+          <input
+            id="rememberMe"
+            name="rememberMe"
+            type="checkbox"
+            defaultChecked={draft.rememberMe}
+          />
+          <label htmlFor="rememberMe" className="field-label">
+            {de.join.rememberMeLabel}
+          </label>
         </div>
 
         {mode === "resident" && (

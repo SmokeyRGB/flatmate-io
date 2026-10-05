@@ -267,6 +267,11 @@ Runtime-Cache mit Netzwerk-Fallback über Datenrouten, kein „Stale-While-Reval
 **Genau eine Ausnahme:** der Offline-Puffer für abgegebene Stimmen (**G-B7**). Sie gilt für
 ausgehende Transaktionsnutzlast, nicht für eingehende Daten — und für nichts sonst.
 
+Nicht unter diese Regel fällt die **WG-Kennung**, die der Browser mit „angemeldet bleiben" im
+lokalen Speicher hält (`06-Compliance-Anhang.md` §10.6): Sie ist kein Anwendungsdatum im Sinne
+dieser Regel — weder Bewerber-, Beratungs- noch Stimmdaten, sondern die Eingabe, die die Person
+sonst selbst tippen würde — und damit **keine zweite Ausnahme** neben G-B7.
+
 **Begründung.** Die Löschautomatik erreicht den Server, **nicht das Endgerät**. Läge eine
 `Application` im Cache von fünf Bewohnenden, wäre sie nach 180 Tagen serverseitig gelöscht und auf
 den Geräten weiterhin vorhanden — außerhalb der Reichweite jedes Löschjobs und ohne dass es

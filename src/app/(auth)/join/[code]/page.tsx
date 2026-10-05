@@ -8,7 +8,7 @@ import { de } from "@/ui/strings";
 import { JoinForm } from "./join-form";
 import { HandEntryWayBack, SignOutAndReturnForm } from "./join-ways-forward";
 import { decideJoinScreen } from "./join-screen-state";
-import { getClientIp } from "./request-ip";
+import { getClientIp } from "@/app/request-ip";
 import { ResetForm } from "./reset-form";
 
 const t = de.join;
