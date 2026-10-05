@@ -191,7 +191,7 @@
 
 ## 8. Verification
 
-- [ ] 8.1 `npm run verify` passes (eslint, tsc, the eight guardrail lints, check-refs, vitest).
+- [x] 8.1 (2026-10-05, after merging main with #50: 1360/1361; the one failure, provider-deadline-password, passes 4/4 alone — provider timing on shared dev) `npm run verify` passes (eslint, tsc, the eight guardrail lints, check-refs, vitest).
 - [x] 8.2 (2026-10-05: done on localhost against dev. Register → O20 shows the code → founding link → join with box ticked → localStorage holds exactly the code, no script-readable cookie → E1 shows it → sign out → A2 resident tab prefilled. Box cleared + wrong password: box came back ticked — React 19 form reset rewrites even a controlled checkbox; fixed with the join form's `draft` pattern in `sign-in-form.tsx`, re-walked: box stays cleared, code and name kept, correct password → 12 h session, localStorage empty.) Browser walkthrough via the preview tools (the human signs in inside the pane where a
       password is needed): join by link with the checkbox ticked → `/account` shows the code →
       sign out → the A2 resident tab is prefilled → sign in by name. Then clear the checkbox on
