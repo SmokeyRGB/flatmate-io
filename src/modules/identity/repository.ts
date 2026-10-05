@@ -19,6 +19,8 @@ import {
   joinCodeIssuance,
   MODERATOR_PERMISSIONS,
   membership,
+  PERMISSIONS,
+  type PermissionName,
   RESIDENT_PERMISSIONS,
   residentProfile,
   session,
@@ -71,23 +73,27 @@ export class DuplicateDisplayNameError extends Error {
   }
 }
 
-// FR-1.3/FR-1.5: the household account creates a resident profile but never occupies it — the
-// profile starts `prepared` (identity.md's "regulärer Zwischenzustand") until someone actually
-// signs up against it (auth.ts's claim step, out of F1's acceptance scope per plan.md's T023).
+// FR-1.3/FR-1.5 (amended 2026-10-01): the household account or a moderator creates a resident
+// profile but never occupies it — the profile starts `prepared` (identity.md's "regulärer
+// Zwischenzustand") until someone actually signs up against it (auth.ts's claim step, out of F1's
+// acceptance scope per plan.md's T023). Authorized by the stored permission
+// `create_resident_profile` (matrix row „ResidentProfile anlegen"), checked inside this write
+// transaction with the caller's membership locked FOR SHARE (design D4).
 export async function createResidentProfile(
   context: SessionContext,
   displayName: string,
   actor: Actor,
 ) {
   // G-C fix (2026-09-23 human decision): a null actor.accountId used to skip this check
-  // entirely instead of refusing — not exploitable by any current caller (the one production
-  // call site always passes a real account id), but a repository function's own authorization
-  // must hold regardless of what a future caller passes. Refused with the exact error
-  // assertIsAdministration itself throws for a real-but-unauthorized account, so a null actor is
-  // indistinguishable from "not administration", never a bypass.
-  if (!actor.accountId) throw new ResidentListActionDeniedError();
-  await assertIsAdministration(context, actor.accountId);
+  // entirely instead of refusing — a repository function's own authorization must hold
+  // regardless of what a future caller passes. A null or foreign actor id is refused with the same
+  // PermissionDeniedError as a missing permission, never a bypass (PR #19: authorization derives
+  // from the session's own account).
+  if (!actor.accountId || actor.accountId !== context.accountId) {
+    throw new PermissionDeniedError("create_resident_profile");
+  }
   return withSessionContext(context, async (tx) => {
+    await assertHasPermissionTx(tx, context, "create_resident_profile");
     if (await isDisplayNameTakenTx(tx, context.householdId, displayName)) {
       throw new DuplicateDisplayNameError(displayName);
     }
@@ -184,11 +190,14 @@ export async function transitionResidentProfileStatus(
   // G-C fix (2026-09-23 human decision): this export had NO authorization check at all — no
   // route calls it today (only display-name-uniqueness.test.ts, which needs it to move a
   // PREPARED profile with no account yet, so it cannot be replaced by setMovedOut), but it stays
-  // exported and must be guarded like its siblings removeMember/setMovedOut/reactivateMember, all
-  // of which gate on assertIsAdministrationOrModerator before touching anything.
-  if (!actor.accountId) throw new ResidentListActionDeniedError();
-  await assertIsAdministrationOrModerator(context, actor.accountId);
+  // exported and must be guarded like its siblings removeMember/setMovedOut/reactivateMember: by
+  // the stored permission `manage_members` (matrix row „Mitglied entfernen / auf moved_out
+  // setzen"), checked first inside the write transaction (design D4).
+  if (!actor.accountId || actor.accountId !== context.accountId) {
+    throw new PermissionDeniedError("manage_members");
+  }
   return withSessionContext(context, async (tx) => {
+    await assertHasPermissionTx(tx, context, "manage_members");
     // A claimed profile (one that has a membership row) moves out, is removed or comes back only
     // through the paths that also revoke or restore its membership. A status change alone would
     // leave a live membership acting for a moved-out person, or a revoked one for an active
@@ -425,15 +434,17 @@ export class HouseholdAccountCannotVoteError extends Error {
 }
 
 // FR-1.7/AC-1.5: the household account shall not be able to cast a vote — the authorization check
-// itself, not the Vote table. F4, called by deliberation's `castVote`, before anything is recorded. Refuses by every route that would eventually call it, because there is exactly one
-// such check, not one per route.
-export async function assertAccountCanVote(context: SessionContext, accountId: string): Promise<void> {
-  // PR #19 review: authorization derives from the authenticated session, not from whatever
-  // accountId a caller passes in — accountId must name the session's own account
-  // (context.accountId), never an id supplied independently of it.
-  if (accountId !== context.accountId) throw new HouseholdAccountCannotVoteError();
-  const membershipRow = await getMembershipForAccount(context, accountId);
-  if (!membershipRow || !membershipRow.isResident) {
+// itself, not the Vote table. Called by deliberation's `castVote` inside its insert transaction,
+// before anything is recorded. Refuses by every route that would eventually call it, because there
+// is exactly one such check, not one per route.
+//
+// Matrix row „Vote abgeben / ändern": the stored permission `vote`, the resident set (a moderator
+// who is also a resident holds it through that set; the household account and a moderator without
+// a resident profile hold none). It reads the caller's live membership FOR SHARE in `tx`, so a
+// move-out or a stripped `vote` committed first is seen and one in flight is waited for.
+export async function assertAccountCanVoteTx(tx: Tx, context: SessionContext): Promise<void> {
+  const row = await readLiveMembershipTx(tx, context, true);
+  if (!row || !membershipHoldsPermission(row, "vote")) {
     throw new HouseholdAccountCannotVoteError();
   }
 }
@@ -625,34 +636,43 @@ export async function getIdentityLabel(context: SessionContext): Promise<Identit
   });
 }
 
-// start-screen design.md Decision 4, proposal Assumptions 1 and 3: decides what the resident
-// frame's avatar menu and Start's moderation bridge SHOW, and decides nothing else — `/members`
-// and every action keep their own authorization checks (this function is not one of them). Goes
-// through getMembershipForAccount, so a revoked membership gives both `false` the same way every
-// other check in this file already does.
+/// The four permissions that open the members list and make a caller a member administrator
+// (design D1, "Reads"): any one of them shows the list and the navigation item, so a later
+// decision that takes every one of them from a role takes the list with them, with no read to edit.
+const MEMBER_ADMINISTRATION_PERMISSIONS = [
+  "manage_members",
+  "manage_join_codes",
+  "create_resident_profile",
+  "appoint_moderator",
+] as const;
+
+// start-screen design.md Decision 4 / role-permissions design D6, D9: decides what the resident
+// frame's avatar menu, Start's moderation bridge and the organisation overview SHOW, and — through
+// requireOrganisationAccess ((org)/organisation-access.ts) — whether an organisation page renders
+// at all. Every flag derives from the caller's STORED permissions, never a role. Goes through
+// getMembershipForAccount, so a revoked membership gives every flag `false` the same way every
+// other check in this file already does. An unlocked read: it returns navigation booleans, and
+// every action keeps its own in-transaction check.
+//
+// `organisation` = any stored permission outside the resident set, so `vote` alone never opens the
+// organisation area; a retired name or an unknown string never counts (design D6). Change 5 builds
+// the rest of the organisation guard on this same flag.
 export async function getNavigationAccess(
   context: SessionContext,
-): Promise<{ organisation: boolean; membersList: boolean }> {
+): Promise<{ organisation: boolean; membersList: boolean; rooms: boolean; settings: boolean }> {
   const membershipRow = await getMembershipForAccount(context, context.accountId);
-  if (!membershipRow) return { organisation: false, membersList: false };
+  if (!membershipRow) return { organisation: false, membersList: false, rooms: false, settings: false };
 
-  // proposal Assumption 3: "may act on organisation tasks" = household_admin/moderator, or any
-  // individually granted permission — the avatar menu's "Organisation" item uses the same test
-  // listOrganisationTasks' own count-vs-permission filter relies on (design.md Decision 4).
-  // Since application-capture the stored permissions hold the ROLE SETS too (design D3), so "any
-  // permission" no longer means "an individual grant": once the resident set is non-empty (F4's
-  // `vote`), every resident would qualify. Only a permission beyond the resident set counts.
-  // Change 5 replaces this whole rule with the organisation guard (moderator only).
-  const organisation =
-    membershipRow.role === "household_admin" ||
-    membershipRow.role === "moderator" ||
-    membershipRow.permissions.some((p) => !(RESIDENT_PERMISSIONS as readonly string[]).includes(p));
-
-  // proposal Assumption 1: "may see the members list" = the rule O1 applies today (O16's own
-  // access rule, U-30) — household_admin or moderator, not every permission holder.
-  const membersList = membershipRow.role === "household_admin" || membershipRow.role === "moderator";
-
-  return { organisation, membersList };
+  const organisation = (Object.keys(PERMISSIONS) as PermissionName[]).some(
+    (p) => !(RESIDENT_PERMISSIONS as readonly string[]).includes(p) && membershipHoldsPermission(membershipRow, p),
+  );
+  const membersList = MEMBER_ADMINISTRATION_PERMISSIONS.some((p) => membershipHoldsPermission(membershipRow, p));
+  return {
+    organisation,
+    membersList,
+    rooms: membershipHoldsPermission(membershipRow, "manage_rooms"),
+    settings: membershipHoldsPermission(membershipRow, "manage_voting_procedure"),
+  };
 }
 
 export async function getHousehold(context: SessionContext) {
@@ -662,7 +682,14 @@ export async function getHousehold(context: SessionContext) {
   });
 }
 
+// O20 (the voting-procedure settings screen as built today): authorized by the stored permission
+// `manage_voting_procedure` (matrix row „Abstimmungsverfahren ändern"; household ✅, moderator ⬜,
+// so a moderator sees it only when individually granted it). The check lives HERE, not in the
+// route: authorization is in the repository function (CLAUDE.md "A sibling entry"). It runs before
+// the read's own transaction, never inside it: assertHasPermission opens its own, and nesting
+// throws NestedSessionContextError. An unlocked read: the settings are what the holder may edit anyway.
 export async function getHouseholdSettings(context: SessionContext) {
+  await assertHasPermission(context, context.accountId, "manage_voting_procedure");
   return withSessionContext(context, async (tx) => {
     const [row] = await tx
       .select()
@@ -735,9 +762,31 @@ export type ResidentListEntry = {
   hasEmail: boolean;
 };
 
-// FR-1.25/FR-1.26/FR-1.27 (revised 2026-09-17, U-30)/FR-1.29: full parity for administration AND
-// a moderator — same rows, same actions (`canAct` is true for both) — refused entirely to anyone
-// else. Per FR-1.27's "not reachable at all — by any route" for a non-moderator, non-admin caller.
+export type ResidentListResult = {
+  members: ResidentListEntry[];
+  // One flag per permission-gated control the members screen offers (design D6), each derived from
+  // the caller's stored permissions on one locked read. The screen decides what to show from these
+  // alone; it never reads the caller's role.
+  canManageMembers: boolean;
+  canManageJoinCodes: boolean;
+  canCreateProfile: boolean;
+  canAppointModerator: boolean;
+  canIssueResetLink: boolean;
+  leadWithJoinCode: boolean;
+};
+
+// FR-1.25/FR-1.26/FR-1.27 (revised 2026-09-17, U-30; permission-based since F3 change 2b): the list
+// is returned to a caller holding ANY member-administration permission (manage_members,
+// manage_join_codes, create_resident_profile, appoint_moderator) — the household account and a
+// moderator today — and refused entirely to anyone else, per FR-1.27's "not reachable at all — by
+// any route". Who holds which is the Rechtematrix's decision, so a later move needs no edit here.
+//
+// Hardening (audit finding #1, the PR #19 hole): `accountId` must be the session's own account. A
+// caller used to be able to name another account's id and borrow its rights. It is refused with
+// the same denial as a missing permission, and the rows are never read. The check and the flags
+// come from ONE locked read of the caller's row (readLiveMembershipTx, FOR SHARE: the list returns
+// personal data), so a demotion committed first is seen and the rule stays in
+// membershipHoldsPermission alone.
 //
 // FR-1.25/FR-1.26 as amended 2026-09-22 (human decision): a REMOVED member is excluded here —
 // unlike moved_out, which stays listed with "Ausgezogen" and a reactivate action. The audit trail
@@ -745,15 +794,17 @@ export type ResidentListEntry = {
 export async function getResidentList(
   context: SessionContext,
   accountId: string,
-): Promise<{ members: ResidentListEntry[]; canAct: boolean; isAdmin: boolean; leadWithJoinCode: boolean }> {
-  const membershipRow = await getMembershipForAccount(context, accountId);
-  const isAdmin = membershipRow?.role === "household_admin";
-  const isModerator = membershipRow?.role === "moderator";
-  if (!isAdmin && !isModerator) {
-    throw new PermissionDeniedError("resident-list access requires administration or moderator");
+): Promise<ResidentListResult> {
+  if (accountId !== context.accountId) {
+    throw new PermissionDeniedError(MEMBER_ADMINISTRATION_PERMISSIONS.join(" | "));
   }
-
   return withSessionContext(context, async (tx) => {
+    const callerRow = await readLiveMembershipTx(tx, context, true);
+    if (!callerRow || !MEMBER_ADMINISTRATION_PERMISSIONS.some((p) => membershipHoldsPermission(callerRow, p))) {
+      throw new PermissionDeniedError(MEMBER_ADMINISTRATION_PERMISSIONS.join(" | "));
+    }
+    const canManageJoinCodes = membershipHoldsPermission(callerRow, "manage_join_codes");
+
     const rows = await tx
       .select({
         id: residentProfile.id,
@@ -782,44 +833,19 @@ export async function getResidentList(
       hasEmail: r.accountEmail !== null,
     }));
 
-    // AC-1.22/FR-1.29: administration is the only member -> lead with the join-code action
-    // instead of an empty list. "Only member" means no resident member exists yet.
-    const leadWithJoinCode = isAdmin && members.length === 0;
-
-    return { members, canAct: isAdmin || isModerator, isAdmin, leadWithJoinCode };
+    return {
+      members,
+      canManageMembers: membershipHoldsPermission(callerRow, "manage_members"),
+      canManageJoinCodes,
+      canCreateProfile: membershipHoldsPermission(callerRow, "create_resident_profile"),
+      canAppointModerator: membershipHoldsPermission(callerRow, "appoint_moderator"),
+      canIssueResetLink: membershipHoldsPermission(callerRow, "issue_password_reset_link"),
+      // AC-1.22/FR-1.29: no resident member exists yet -> lead with the join-link action instead of
+      // an empty list. A moderator always sees at least its own profile, so "no resident yet"
+      // needs no role (design D6).
+      leadWithJoinCode: canManageJoinCodes && members.length === 0,
+    };
   });
-}
-
-export class ResidentListActionDeniedError extends Error {
-  constructor() {
-    super("Only administration or a moderator may act on the resident list (FR-1.27)");
-    this.name = "ResidentListActionDeniedError";
-  }
-}
-
-// FR-1.27 (revised 2026-09-17, U-30): full parity for administration AND moderator — the same
-// actions, not a subset. `triggerSubjectAccessExport` below deliberately does NOT use this: FR-1.24
-// names that action as administration's specifically, unaffected by U-30's resident-list parity.
-async function assertIsAdministrationOrModerator(context: SessionContext, accountId: string): Promise<void> {
-  // PR #19 review: authorization derives from the authenticated session, not from whatever
-  // accountId a caller passes in — accountId must name the session's own account
-  // (context.accountId), never an id supplied independently of it.
-  if (accountId !== context.accountId) throw new ResidentListActionDeniedError();
-  const membershipRow = await getMembershipForAccount(context, accountId);
-  if (!membershipRow || (membershipRow.role !== "household_admin" && membershipRow.role !== "moderator")) {
-    throw new ResidentListActionDeniedError();
-  }
-}
-
-export async function assertIsAdministration(context: SessionContext, accountId: string): Promise<void> {
-  // PR #19 review: authorization derives from the authenticated session, not from whatever
-  // accountId a caller passes in — accountId must name the session's own account
-  // (context.accountId), never an id supplied independently of it.
-  if (accountId !== context.accountId) throw new ResidentListActionDeniedError();
-  const membershipRow = await getMembershipForAccount(context, accountId);
-  if (!membershipRow || membershipRow.role !== "household_admin") {
-    throw new ResidentListActionDeniedError();
-  }
 }
 
 // V-3 (docs/domain/invarianten.md §5.3): "moved_out" revokes access immediately — the Membership
@@ -840,6 +866,12 @@ export async function assertIsAdministration(context: SessionContext, accountId:
 // revocation timestamp untouched rather than overwriting it with a later one — the audit event is
 // still ALWAYS written, so `membership.removed_as_intruder` reliably distinguishes the hard tier
 // in the trail (FR-1.30) even when the SET itself was a no-op.
+//
+// LOCK ORDER (role-permissions pre-mortem M9): every in-transaction permission check takes
+// S(caller membership) first, and castVote does the same before the vote_guard trigger takes S on
+// the profile. So one order everywhere: membership, then profile, then round/participation
+// (drizzle/0028's trigger). The callers below therefore lock the TARGET membership FOR UPDATE
+// before they update the target's profile; the read here repeats it (same transaction, no cost).
 async function revokeMembershipForProfileTx(
   tx: Tx,
   context: SessionContext,
@@ -850,7 +882,8 @@ async function revokeMembershipForProfileTx(
   const [target] = await tx
     .select()
     .from(membership)
-    .where(eq(membership.residentProfileId, residentProfileId));
+    .where(eq(membership.residentProfileId, residentProfileId))
+    .for("update");
   if (!target) return; // profile was never claimed (still `prepared`) — nothing to revoke
 
   // Losing the resident status and the moderator role is part of the revocation (design D3):
@@ -889,7 +922,9 @@ export class DisplayNameConfirmationMismatchError extends Error {
 // FR-1.26/U-27 hard tier ("Entfernen"): final, requires typing the exact display name (not a
 // plain click), meant specifically for a person who joined falsely or maliciously via the join
 // code — not for real move-outs, which go through transitionResidentProfileStatus's `moved_out`
-// (the soft tier) instead. Full parity: administration or moderator (FR-1.27/U-30).
+// (the soft tier) instead. Authorized by the stored permission `manage_members` (matrix row
+// „Mitglied entfernen / auf moved_out setzen"; the household account and a moderator, FR-1.27/U-30),
+// checked first inside the write transaction with the caller's membership locked FOR SHARE.
 //
 // Sets ResidentProfile.status to `removed` (human decision, 2026-09-22): a fourth state, final —
 // `transitions.ts` declares no transition out of it, and drizzle/0017's trigger refuses one even
@@ -906,8 +941,8 @@ export async function removeMember(
   targetAccountId: string,
   confirmDisplayName: string,
 ): Promise<void> {
-  await assertIsAdministrationOrModerator(context, actingAccountId);
-  const actor: Actor = { accountId: actingAccountId, profileId: null };
+  if (actingAccountId !== context.accountId) throw new PermissionDeniedError("manage_members");
+  const actor: Actor = { accountId: actingAccountId, profileId: context.profileId };
 
   // speckit-bug-fix identity-moveout-session-revocation-not-atomic: the lookup/confirmation
   // check, the status transition, and the membership/session revocation now share one
@@ -915,7 +950,14 @@ export async function removeMember(
   // (e.g. while revoking the session) could leave a `removed` profile with a still-usable
   // session, violating V-3.
   await withSessionContext(context, async (tx) => {
-    const [row] = await tx.select().from(membership).where(eq(membership.accountId, targetAccountId));
+    await assertHasPermissionTx(tx, context, "manage_members");
+    // Target membership FOR UPDATE before the profile is touched: membership, then profile (see
+    // revokeMembershipForProfileTx's lock order).
+    const [row] = await tx
+      .select()
+      .from(membership)
+      .where(eq(membership.accountId, targetAccountId))
+      .for("update");
     if (!row) throw new Error(`Membership not found for account ${targetAccountId}`);
     if (!row.residentProfileId) throw new Error("Cannot remove an account with no resident profile");
 
@@ -937,21 +979,90 @@ export async function removeMember(
   });
 }
 
+export class ResidentProfileNotPreparedError extends Error {
+  constructor(residentProfileId: string) {
+    super(`ResidentProfile ${residentProfileId} is not a prepared profile of this household`);
+    this.name = "ResidentProfileNotPreparedError";
+  }
+}
+
+// Deletes a PREPARED profile (created, never claimed): prepared -> removed, final, name released.
+// Authorized by `manage_members`, checked first inside the write transaction. The profile row is
+// locked, and claiming's own conditional `prepared` UPDATE serializes against it: one of the two
+// sees a non-prepared row and refuses. Live links bound to the profile are deleted in the same
+// transaction (they would be refused at redemption anyway; this keeps O16 honest).
+export async function removePreparedProfile(
+  context: SessionContext,
+  actingAccountId: string,
+  residentProfileId: string,
+): Promise<void> {
+  if (actingAccountId !== context.accountId) throw new PermissionDeniedError("manage_members");
+  const actor: Actor = { accountId: actingAccountId, profileId: context.profileId };
+  await withSessionContext(context, async (tx) => {
+    await assertHasPermissionTx(tx, context, "manage_members");
+    const [profile] = await tx
+      .select({ id: residentProfile.id, status: residentProfile.status })
+      .from(residentProfile)
+      .where(
+        and(eq(residentProfile.id, residentProfileId), eq(residentProfile.householdId, context.householdId)),
+      )
+      .for("update");
+    const [claimed] = await tx
+      .select({ id: membership.id })
+      .from(membership)
+      .where(eq(membership.residentProfileId, residentProfileId));
+    if (!profile || profile.status !== "prepared" || claimed) {
+      throw new ResidentProfileNotPreparedError(residentProfileId);
+    }
+    await transitionResidentProfileStatusTx(tx, residentProfileId, "removed", actor);
+    // Same event deleteJoinCode writes, one per link: a link going dead is audited either way.
+    const deletedLinks = await tx
+      .update(joinCodeIssuance)
+      .set({ deletedAt: new Date() })
+      .where(
+        and(
+          eq(joinCodeIssuance.householdId, context.householdId),
+          eq(joinCodeIssuance.residentProfileId, residentProfileId),
+          isNull(joinCodeIssuance.deletedAt),
+        ),
+      )
+      .returning({ id: joinCodeIssuance.id });
+    for (const link of deletedLinks) {
+      await recordActivityEvent(tx, {
+        householdId: context.householdId,
+        eventType: "household.join_code_deleted",
+        subjectType: "join_code_issuance",
+        subjectId: link.id,
+        actorAccountId: actingAccountId,
+        actorProfileId: context.profileId,
+        payload: {},
+      });
+    }
+  });
+}
+
 // FR-1.26 soft tier ("moved_out"): the regular path for an actual move-out — votes/history stay
 // (once F3+ has any), only the access consequence (V-3) is immediate, same as the hard tier.
+// Authorized by `manage_members`, checked first inside the write transaction (design D4); a
+// demotion or removal of the caller that commits first is seen, and one in flight is waited for.
 export async function setMovedOut(
   context: SessionContext,
   actingAccountId: string,
   targetAccountId: string,
 ): Promise<void> {
-  await assertIsAdministrationOrModerator(context, actingAccountId);
-  const actor: Actor = { accountId: actingAccountId, profileId: null };
+  if (actingAccountId !== context.accountId) throw new PermissionDeniedError("manage_members");
+  const actor: Actor = { accountId: actingAccountId, profileId: context.profileId };
 
   // speckit-bug-fix identity-moveout-session-revocation-not-atomic: one shared transaction — see
   // removeMember above for why (V-3 requires the status change and the revocation to commit or
   // roll back together).
   await withSessionContext(context, async (tx) => {
-    const [row] = await tx.select().from(membership).where(eq(membership.accountId, targetAccountId));
+    await assertHasPermissionTx(tx, context, "manage_members");
+    const [row] = await tx
+      .select()
+      .from(membership)
+      .where(eq(membership.accountId, targetAccountId))
+      .for("update");
     if (!row) throw new Error(`Membership not found for account ${targetAccountId}`);
     if (!row.residentProfileId) throw new Error("Cannot set moved_out on an account with no resident profile");
 
@@ -968,16 +1079,23 @@ export async function setMovedOut(
 // replacing the previous two-part standalone-transition-then-separate-transaction split), that
 // throw rolls back everything: the membership stays revoked, no "reactivated" event is written,
 // and the caller sees the same error a raw removed -> active attempt would produce.
+// Authorized by `manage_members`, checked first inside the write transaction (design D4).
 export async function reactivateMember(
   context: SessionContext,
   actingAccountId: string,
   targetAccountId: string,
 ): Promise<void> {
-  await assertIsAdministrationOrModerator(context, actingAccountId);
-  const actor: Actor = { accountId: actingAccountId, profileId: null };
+  if (actingAccountId !== context.accountId) throw new PermissionDeniedError("manage_members");
+  const actor: Actor = { accountId: actingAccountId, profileId: context.profileId };
 
   await withSessionContext(context, async (tx) => {
-    const [target] = await tx.select().from(membership).where(eq(membership.accountId, targetAccountId));
+    await assertHasPermissionTx(tx, context, "manage_members");
+    // Target membership FOR UPDATE before its profile changes: the same lock order as the revoke paths.
+    const [target] = await tx
+      .select()
+      .from(membership)
+      .where(eq(membership.accountId, targetAccountId))
+      .for("update");
     if (!target) throw new Error(`Membership not found for account ${targetAccountId}`);
 
     if (target.residentProfileId) {
@@ -997,7 +1115,7 @@ export async function reactivateMember(
       subjectType: "membership",
       subjectId: target.id,
       actorAccountId: actingAccountId,
-      actorProfileId: null,
+      actorProfileId: context.profileId,
       payload: {},
     });
   });
@@ -1144,9 +1262,9 @@ export class ResidentProfileNotEligibleForBindingError extends Error {
 
 // ⚠ THIS FUNCTION PERFORMS NO AUTHORIZATION. Do not call it from anything reachable by a request.
 //
-// Use `issueJoinCode` (below) for that — it is the entry point that runs
-// assertIsAdministrationOrModerator, and FR-1.27/U-30 give administration and moderation parity
-// over join links and nobody else any access at all. Calling this one from a route or a server
+// Use `issueJoinCode` (below) for that — it is the entry point that checks the stored permission
+// `manage_join_codes`, which only the household account and a moderator hold (FR-1.27/U-30), and
+// nobody else has any access at all. Calling this one from a route or a server
 // action is an authorization bypass (G-C), and it will look like perfectly ordinary code.
 //
 // The one legitimate caller is `registerHousehold` (auth.ts), and it is legitimate for a reason
@@ -1167,7 +1285,7 @@ export class ResidentProfileNotEligibleForBindingError extends Error {
 // founding link through the SAME code path — generation, the retry-on-collision loop, and the
 // audit write — inside its own already-open transaction, rather than reaching for the public
 // issueJoinCode function. That function opens its own transaction and requires an existing
-// Membership (assertIsAdministrationOrModerator), neither of which holds yet at the point in
+// Membership (to check `manage_join_codes` against), neither of which holds yet at the point in
 // registerHousehold's transaction where the founding link is created (the household_admin
 // Membership row hasn't been inserted yet, and a second nested withSessionContext transaction
 // would not see this transaction's uncommitted rows anyway). Uniqueness comes from the table's own
@@ -1187,6 +1305,9 @@ export async function issueJoinCodeTx(
   tx: Tx,
   householdId: string,
   actingAccountId: string,
+  // The acting session's profile (null only when the household account acts), written to the audit
+  // event as actor_profile_id. Required, so no caller can forget it.
+  actingProfileId: string | null,
   options: IssueJoinCodeOptions,
 ): Promise<typeof joinCodeIssuance.$inferSelect> {
   const expiresAt = new Date(Date.now() + options.validDays * 24 * 60 * 60 * 1000);
@@ -1244,7 +1365,7 @@ export async function issueJoinCodeTx(
         subjectType: "join_code_issuance",
         subjectId: row.id,
         actorAccountId: actingAccountId,
-        actorProfileId: null,
+        actorProfileId: actingProfileId,
         payload: {},
       });
 
@@ -1261,16 +1382,19 @@ export async function issueJoinCodeTx(
 
 // FR-2.1/FR-2.3/FR-2.4/FR-2.26/FR-1.27 (U-30 parity): mints and stores a new link — issuing never
 // edits an existing one (design.md Decision 6: "ein ausgestellter Link ... wird nachträglich nicht
-// umgeschrieben").
+// umgeschrieben"). Authorized by the stored permission `manage_join_codes` (matrix row
+// „Beitrittscode erzeugen / löschen"), checked first inside the transaction that inserts the link
+// (design D4); issueJoinCodeTx itself stays ungated for registerHousehold.
 export async function issueJoinCode(
   context: SessionContext,
   actingAccountId: string,
   options: PublicIssueJoinCodeOptions,
 ): Promise<typeof joinCodeIssuance.$inferSelect> {
-  await assertIsAdministrationOrModerator(context, actingAccountId);
-  return withSessionContext(context, (tx) =>
-    issueJoinCodeTx(tx, context.householdId, actingAccountId, options),
-  );
+  if (actingAccountId !== context.accountId) throw new PermissionDeniedError("manage_join_codes");
+  return withSessionContext(context, async (tx) => {
+    await assertHasPermissionTx(tx, context, "manage_join_codes");
+    return issueJoinCodeTx(tx, context.householdId, actingAccountId, context.profileId, options);
+  });
 }
 
 export class ResidentProfileNotEligibleForResetError extends Error {
@@ -1301,9 +1425,13 @@ export async function issuePasswordResetLink(
   actingAccountId: string,
   residentProfileId: string,
 ): Promise<typeof joinCodeIssuance.$inferSelect> {
-  await assertIsAdministration(context, actingAccountId);
+  if (actingAccountId !== context.accountId) throw new PermissionDeniedError("issue_password_reset_link");
 
   return withSessionContext(context, async (tx) => {
+    // The stored household-only permission `issue_password_reset_link` (the O-16 box,
+    // domain/identity.md §2.1): the database refuses it on every other membership, so no moderator
+    // can hold it. Checked first, inside this transaction, caller's membership FOR SHARE.
+    await assertHasPermissionTx(tx, context, "issue_password_reset_link");
     const [row] = await tx
       .select({ accountEmail: account.email })
       .from(residentProfile)
@@ -1323,7 +1451,7 @@ export async function issuePasswordResetLink(
       throw new ResidentProfileNotEligibleForResetError(residentProfileId);
     }
 
-    return issueJoinCodeTx(tx, context.householdId, actingAccountId, {
+    return issueJoinCodeTx(tx, context.householdId, actingAccountId, context.profileId, {
       validDays: PASSWORD_RESET_LINK_VALID_DAYS,
       maxUses: 1,
       residentProfileId,
@@ -1344,14 +1472,16 @@ const EXTEND_JOIN_CODE_MS = 7 * 24 * 60 * 60 * 1000;
 // O-15 ("mit einem Tippen verlängerbar"): one action, not a date field. Adds seven days to the
 // link's OWN current expiry (not to `now()`), so extending twice compounds correctly, and changes
 // nothing else about the link. Deliberately not audited (design.md Decision 5) — it changes no
-// one's access, only defers an expiry.
+// one's access, only defers an expiry. Authorized by `manage_join_codes`, checked first inside the
+// write transaction (design D4).
 export async function extendJoinCode(
   context: SessionContext,
   actingAccountId: string,
   issuanceId: string,
 ): Promise<typeof joinCodeIssuance.$inferSelect> {
-  await assertIsAdministrationOrModerator(context, actingAccountId);
+  if (actingAccountId !== context.accountId) throw new PermissionDeniedError("manage_join_codes");
   return withSessionContext(context, async (tx) => {
+    await assertHasPermissionTx(tx, context, "manage_join_codes");
     const [current] = await tx
       .select()
       .from(joinCodeIssuance)
@@ -1372,14 +1502,16 @@ export async function extendJoinCode(
 // refused, via resolve_join_code/claim_join_code's own `deleted_at IS NULL` clause), leaves the
 // household's other links usable, and leaves memberships already created through it untouched —
 // this only ever sets deleted_at, never deletes the row or touches membership. Deleting every live
-// link achieves what rotating the old single code used to (design.md Decision 5).
+// link achieves what rotating the old single code used to (design.md Decision 5). Authorized by
+// `manage_join_codes`, checked first inside the write transaction (design D4).
 export async function deleteJoinCode(
   context: SessionContext,
   actingAccountId: string,
   issuanceId: string,
 ): Promise<void> {
-  await assertIsAdministrationOrModerator(context, actingAccountId);
+  if (actingAccountId !== context.accountId) throw new PermissionDeniedError("manage_join_codes");
   await withSessionContext(context, async (tx) => {
+    await assertHasPermissionTx(tx, context, "manage_join_codes");
     const [current] = await tx
       .select()
       .from(joinCodeIssuance)
@@ -1394,7 +1526,7 @@ export async function deleteJoinCode(
       subjectType: "join_code_issuance",
       subjectId: issuanceId,
       actorAccountId: actingAccountId,
-      actorProfileId: null,
+      actorProfileId: context.profileId,
       payload: {},
     });
   });
@@ -1418,7 +1550,8 @@ export type JoinCodeIssuanceWithJoiners = (typeof joinCodeIssuance.$inferSelect)
 
 // FR-2.29: O16 lists live AND dead links, most recent first — a dead link is never hidden, only
 // marked (design.md's "Dead links are never cleaned up, by design"). FR-1.27/U-30 parity: refused
-// entirely to anyone but administration or a moderator.
+// entirely to a caller without the stored permission `manage_join_codes` (the household account and
+// a moderator today).
 //
 // AC-2.26 (join-by-link): extended to also name each link's joiners, joining `membership` on
 // `joined_via_issuance_id` and `resident_profile` for the display name. Two queries rather than
@@ -1428,19 +1561,23 @@ export async function listJoinCodeIssuances(
   context: SessionContext,
   actingAccountId: string,
 ): Promise<JoinCodeIssuanceWithJoiners[]> {
-  await assertIsAdministrationOrModerator(context, actingAccountId);
-
-  // review fix (O-16): a password_reset row's code/url lets whoever reads it take over the named
-  // resident's profile (open the link, set their password) — only the household account
-  // (household_admin) may issue one (issuePasswordResetLink's own assertIsAdministration), and for
-  // the exact same reason only the household account may READ one back here. A moderator's own
-  // membership role, from the session's own account (context.accountId via getMembershipForAccount,
-  // never a caller-supplied flag), decides the filter — deleteJoinCode/extendJoinCode stay
-  // moderator-reachable regardless, since neither discloses the code.
-  const callerMembership = await getMembershipForAccount(context, actingAccountId);
-  const callerIsHouseholdAdmin = callerMembership?.role === "household_admin";
+  if (actingAccountId !== context.accountId) throw new PermissionDeniedError("manage_join_codes");
 
   return withSessionContext(context, async (tx) => {
+    // review fix (O-16): a password_reset row's code/url lets whoever reads it take over the named
+    // resident's profile (open the link, set their password) — only the holder of
+    // `issue_password_reset_link` (the household account; issuePasswordResetLink's own permission)
+    // may issue one, and for the exact same reason only that holder may READ one back here. The
+    // permission check and the filter come from ONE locked read of the caller's own row (the
+    // session's account, never a caller-supplied flag): the list returns codes, so it takes FOR
+    // SHARE. deleteJoinCode/extendJoinCode stay reachable with `manage_join_codes` alone, since
+    // neither discloses the code.
+    const callerRow = await readLiveMembershipTx(tx, context, true);
+    if (!callerRow || !membershipHoldsPermission(callerRow, "manage_join_codes")) {
+      throw new PermissionDeniedError("manage_join_codes");
+    }
+    const canSeeResetLinks = membershipHoldsPermission(callerRow, "issue_password_reset_link");
+
     const issuances = await tx
       .select()
       .from(joinCodeIssuance)
@@ -1479,7 +1616,7 @@ export async function listJoinCodeIssuances(
     }
 
     return issuances
-      .filter((issuance) => callerIsHouseholdAdmin || issuance.purpose !== "password_reset")
+      .filter((issuance) => canSeeResetLinks || issuance.purpose !== "password_reset")
       .map((issuance) => ({
         ...issuance,
         joinedResidentNames: namesByIssuance.get(issuance.id) ?? [],
@@ -1495,38 +1632,52 @@ export class CannotChangeAdminRoleError extends Error {
   }
 }
 
-// EC-1.7 (Convergence): "administration may create a resident profile and appoint it moderator" —
-// the appointment action that was never actually built. Administration-only, per EC-1.7's own
-// wording ("administration may... appoint"), not moderator-parity like the resident-list actions
-// FR-1.26 names. Toggles only between "member" and "moderator" — household_admin is the
-// registering account's own role (C-1.4) and is never reassigned by this action.
+// EC-1.7 (Convergence, amended 2026-10-01): "administration may create a resident profile and
+// appoint it moderator" — and, by human decision of 2026-10-01, so may a moderator (appointing more
+// moderators shares the organising load). Authorized by the stored permission `appoint_moderator`
+// (matrix row „Moderator ernennen / zurückstufen"), checked first inside this write transaction with
+// the caller's membership locked FOR SHARE (design D4). A moderator may demote other moderators and
+// itself; the administering membership is never a target. Toggles only between "member" and
+// "moderator" — household_admin is the registering account's own role (C-1.4) and is never
+// reassigned by this action.
 export async function setMemberRole(
   context: SessionContext,
   actingAccountId: string,
   targetAccountId: string,
   toRole: "member" | "moderator",
 ): Promise<void> {
-  await assertIsAdministration(context, actingAccountId);
+  if (actingAccountId !== context.accountId) throw new PermissionDeniedError("appoint_moderator");
 
   await withSessionContext(context, async (tx) => {
-    const [target] = await tx.select().from(membership).where(eq(membership.accountId, targetAccountId));
+    await assertHasPermissionTx(tx, context, "appoint_moderator");
+    // The target is read FOR UPDATE and only while live: a move-out that commits first must not be
+    // overwritten by a demotion that writes `vote` onto a revoked row (the UPDATE below also
+    // filters revoked_at IS NULL). A vanished live target takes the "not found" path, no write.
+    const [target] = await tx
+      .select()
+      .from(membership)
+      .where(and(eq(membership.accountId, targetAccountId), isNull(membership.revokedAt)))
+      .for("update");
     if (!target) throw new Error(`Membership not found for account ${targetAccountId}`);
+    // role-state-read: a clear refusal for the administering row, a target state not the caller's right; the household-only CHECK would refuse it too, but as a raw constraint error
     if (target.role === "household_admin") throw new CannotChangeAdminRoleError();
 
     const fromRole = target.role;
     if (fromRole === toRole) return;
 
-    // Appointment stores the moderator set, demotion removes it (design D3). Computed in SQL on
-    // the locked row. A permission in both the moderator and the resident set survives demotion:
-    // the difference is taken first, then the resident set is unioned back for a resident.
+    // Appointment stores the moderator set; demotion sets the row to EXACTLY the resident set
+    // (`vote` for a resident, none otherwise): under the matrix a member holds the resident set and
+    // nothing else, so no set difference is taken — it would leave an individually granted
+    // `manage_voting_procedure` or a retired name behind, which the administration CHECK refuses.
+    // Computed in SQL on the locked row (design D3, pre-mortem 11).
     const permissions =
       toRole === "moderator"
         ? sql`ARRAY(SELECT DISTINCT p FROM unnest(${membership.permissions} || ${permissionSet(MODERATOR_PERMISSIONS)}) AS p ORDER BY p)`
-        : sql`ARRAY(SELECT p FROM (SELECT p FROM unnest(${membership.permissions}) AS p EXCEPT SELECT p FROM unnest(${permissionSet(MODERATOR_PERMISSIONS)}) AS p) AS kept UNION SELECT p FROM unnest(CASE WHEN ${membership.isResident} THEN ${permissionSet(RESIDENT_PERMISSIONS)} ELSE '{}'::text[] END) AS p ORDER BY p)`;
+        : sql`CASE WHEN ${membership.isResident} THEN ${permissionSet(RESIDENT_PERMISSIONS)} ELSE '{}'::text[] END`;
     await tx
       .update(membership)
       .set({ role: toRole, permissions })
-      .where(eq(membership.id, target.id));
+      .where(and(eq(membership.id, target.id), isNull(membership.revokedAt)));
 
     await recordActivityEvent(tx, {
       householdId: context.householdId,
@@ -1534,7 +1685,7 @@ export async function setMemberRole(
       subjectType: "membership",
       subjectId: target.id,
       actorAccountId: actingAccountId,
-      actorProfileId: null,
+      actorProfileId: context.profileId,
       payload: { fromRole, toRole },
     });
   });
@@ -1553,12 +1704,18 @@ export function assertHasResidentProfile(context: SessionContext): void {
 // displayed to it. A stub — the export's actual content generation is compliance-feature scope,
 // out of F1's acceptance criteria; this only proves the interface shape (a caller gets a handle,
 // never the rendered content) that AC-1.17 requires.
+//
+// Authorized by the stored permission `export_subject_access` (matrix row „Datenauskunft
+// erzeugen"; household ✅ and moderator ✅, so a moderator may trigger it too). It uses
+// assertHasPermission (its own read, before the return) and not an in-transaction check: there is
+// no transaction and no write to serialize against. The moderator's „mit Einsicht" content arrives
+// with the real export (G-D6, v0.2).
 export async function triggerSubjectAccessExport(
   context: SessionContext,
   actingAccountId: string,
   applicationId: string,
 ): Promise<{ exportId: string }> {
-  await assertIsAdministration(context, actingAccountId);
+  await assertHasPermission(context, actingAccountId, "export_subject_access");
   return { exportId: `export-${applicationId}-${Date.now()}` };
 }
 

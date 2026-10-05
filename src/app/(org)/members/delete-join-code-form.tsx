@@ -1,7 +1,7 @@
 "use client";
 
 import { Trash2 } from "lucide-react";
-import { useRef } from "react";
+import { useId, useRef } from "react";
 import { de } from "@/ui/strings";
 import { SubmitButton } from "@/ui/submit-button";
 import { deleteJoinCodeAction } from "./actions";
@@ -15,6 +15,7 @@ const t = de.members.joinCode;
 // distinction the design system draws on purpose.
 export function DeleteJoinCodeForm({ issuanceId, code }: { issuanceId: string; code: string }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
+  const headingId = useId();
 
   return (
     <>
@@ -28,8 +29,8 @@ export function DeleteJoinCodeForm({ issuanceId, code }: { issuanceId: string; c
         <Trash2 className="size-4" /> {de.common.delete}
       </button>
 
-      <dialog ref={dialogRef} className="dialog">
-        <h2 className="font-serif text-lg font-semibold">{t.deleteDialog.heading}</h2>
+      <dialog ref={dialogRef} className="dialog" aria-labelledby={headingId}>
+        <h2 id={headingId} className="font-serif text-lg font-semibold">{t.deleteDialog.heading}</h2>
         <p className="mt-1 text-sm text-muted-foreground">{t.deleteDialog.consequence}</p>
 
         <form action={deleteJoinCodeAction} className="mt-4 flex items-center gap-4">

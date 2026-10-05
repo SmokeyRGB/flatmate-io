@@ -87,7 +87,9 @@ einer sachlichen Benennung anleiten.
 - **O17 wird baubar, und die Aufbewahrungspflicht bleibt, wo sie hingehört.** Eine Art.-5-Pflicht
   hängt nicht mehr daran, dass gerade jemand moderiert.
 - **S-35 wird durchsetzbar** statt nur formuliert: „nicht während laufender Runde" ist prüfbar,
-  wenn die Verwaltung eine laufende Runde erkennen kann.
+  wenn die Verwaltung eine laufende Runde erkennen kann. *(Nachtrag 2026-10-05: S-35 ist
+  gelockert und braucht die Rundensicht nicht mehr; O17 und `Room → not_available` tragen die
+  Entscheidung weiter.)*
 - **Prädikat und Scope-Zeile stimmen wieder überein.** Der Widerspruch zwischen
   `invarianten.md` §5.2 und S-50 war seit V0.6 unbemerkt — er ist jetzt aufgelöst, und zwar zugunsten
   der Seite, die bereits stimmte.

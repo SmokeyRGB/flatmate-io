@@ -46,6 +46,7 @@
 
 | Version | Datum | Autor | Änderung |
 |---------|-------|-------|----------|
+| V0.6.1 | 2026-10-02 | Samuel Zink (@SmokeyRGB) | **Rechtematrix §4.0.1, menschliche Entscheidungen vom 2026-10-01 (F3 change 2b, Rechte statt Rollenprüfung).** Moderation legt `ResidentProfile`s an (Zeile „`ResidentProfile` anlegen", Moderator ❌ → ✅, Bezeichnung „z. B. für einen persönlichen Beitrittslink") und ernennt oder stuft Moderator:innen zurück (Zeile „Moderator ernennen / Berechtigung vergeben" geteilt in „Moderator ernennen / zurückstufen" ✅ ✅ ❌ ❌ und „Berechtigung einzeln vergeben" ✅ ❌ ❌ ❌). Spalte „Bewohnender": jedes ⬜ → ❌ („Bewohnende stimmen ab und nehmen am Casting teil — sonst nichts"); in der Dimensionstabelle die drei Zeilen „Kann Status ändern / Runde schließen / Termine bestätigen" → Bewohnender „nein"; das Akzeptanzkriterium zur einzeln vergebbaren Berechtigung durchgestrichen; einzeln vergebbar (⬜) bleibt nur noch an die Moderation. |
 | V0.6 | 2026-09-02 | Samuel Zink (@SmokeyRGB) | **Zwei Änderungswellen nachgezogen, die seit V0.5 unverzeichnet waren.** **Welle 1 (Spec-Update 02.09.2026, ~1600 geänderte Zeilen, nie in dieser Historie erfasst):** Dieses Dokument enthielt bereits vor diesem Eintrag den Beitritt ohne E-Mail (S-03, §4.1.1), den automatischen `ApplicationInviteToken` bei `moved_in` (S-42, §4.1.7), die Notiz-Erinnerung `casting.note_reminder_due` nach `scheduled → interviewed` (S-46, §4.6.4) sowie die Kanalreihenfolge Push → E-Mail-Fallback → In-App (S-28, §6.2) — jetzt hier erstmals dokumentiert. **Welle 2 (UX-Nachzug aus `07-Screen-Inventar.md`, U-1…U-26, S-47…S-51):** §3 Design-Zeile verweist jetzt auf das Screen-Inventar · **§4.0.1 Rechtematrix, größter Einzeleingriff:** Haushalts-Account verliert Zugriff auf `CastingRound`, `RoundParticipation`, `Application` (anlegen/Status/löschen), `CastingNote`, `Slot`, `Appointment` und fremde `AvailabilityWindow`s; behält Zimmer, Mitglieder, Code, Aufbewahrung, Einstellungen und als einzige Ausnahmen Aufbewahrung sowie Datenauskunft-Export ohne Einsicht (S-50/U-20) · „Kontextwechsel" umbenannt in „Identitätswechsel", geschützter Test gegen Rechteausweitung über `acting_profile_id = null` ergänzt (U-21) · „Moderator scheidet aus" um den Zwischenschritt „Verwaltung legt sich selbst ein `ResidentProfile` an" erweitert · **§4.1.0** Navigationsmodell von 5 Tabs auf 2 Tabs (*Start · Casting*) + Kopfzeile (Glocke · Avatar) verkürzt, Kriterium „aktiver Kontext" auf wechselfähige Sitzungen verengt (U-2) · **§4.1.1** Kontrollkästchen „angemeldet bleiben" ergänzt, Kasten zum Passwort-Reset-Tauschhandel (K-18) · **§4.1.2** „Rundenkopf" grundlegend zu **„Start"** mit Aufgabenmodell umgebaut: genau ein primärer CTA, Sortierung nach Zeitdruck über `phase_deadline_at`, Moderations-Brücke, PWA-Band-Platzierung (U-1, U-9, S-48) · **§4.1.4/§4.1.6/§4.2.4** Terminologie des zuvor verwendeten Rundenzustands-Begriffs durch `Vote.stage` ersetzt, weil der alte Begriff einen nicht existierenden Rundenzustand suggerierte · **§4.1.5** Feinschliff-Screen durch zweiten Durchlauf im Screening-Kartenmuster ersetzt, eigene Vergleichsdarstellung entfällt (U-10, S-47) · **§4.1.9/§4.1.11** Bezug auf `AppointmentAttendance` ergänzt; Anwesenheit wird angenommen statt erfasst, „Ich kann doch nicht" als Selbstauskunft, Korrektur nur als Ausnahmefall — offener Punkt an `04-Domaenenmodell.md`, da die Einzelabsage dort noch nicht modelliert ist (U-23, S-51) · **§4.1.12** Ereignisklassen `outcome`/`process` getrennt (U-3/U-4) · **§4.1.13** Bewohnerliste in Teilnehmendenliste und Bewohnerliste getrennt (U-22), „Persönliche Einstellungen" und „Passwort/Passkey" zu einem Bildschirm „Einstellungen" verschmolzen (K-10), PWA-Band-Konflikt mit echten Aufgaben aufgelöst (U-19) · **§4.1.14** Plattformtabelle ans neue Navigationsmodell angeglichen · **§4.1.15 (neu)** Einladungstoken einlösen, Push-Berechtigung, PWA-Install-Band als Bildschirmkatalog-Einträge · **§4.3** Beitrittscode-Absicherung: Warnhinweis, Ablauf, Nutzungsgrenze (S-49/U-12, jetzt Voraussetzung statt Zugabe, da E-06 den strukturellen Schutz für Bewohnende verliert) · **§4.6** neue Inhaltsregel **C-10** — Oberflächentexte werbend über den Prozess, nie wertend über die Person (K-12/K-14/K-16) · **§7.1** v1-Scope um S-47…S-51 ergänzt · **§8** P-O-05 geschlossen (Screen-Inventar §2 löst es), zwei neue offene Punkte P-O-08 (Sitzungsdauer „angemeldet bleiben") und P-O-09 (wer setzt `phase_deadline_at`) |
 | V0.5 | 2026-08-19 | Samuel Zink (@SmokeyRGB) | Die verworfene Begründung der Sendepuffer-Ausnahme („kein fremdes Datum betroffen“) ist jetzt **als Bauform benannt** — „**Verworfene Begründung — bewusst dokumentiert, nicht gestrichen**“ in §6.2, mit Querverweis in §6.5. Zweck ausgeschrieben: Eine Entscheidung, die aus dem falschen Grund richtig ist, wird **per Analogie aus dem falschen Grund erweitert** — wer „kein fremdes Datum“ als tragendes Argument liest, hält als nächstes einen lokalen Notizentwurf für ebenso unproblematisch |
 | V0.4 | 2026-08-19 | Samuel Zink (@SmokeyRGB) | **Begründung der Sendepuffer-Ausnahme korrigiert** (§6.2, §6.5): Sie stand auf „kein fremdes Datum betroffen" — das ist falsch, weil eine `Vote` aus `application_id` plus Wert besteht und damit eine Beurteilung **über eine dritte Person** ist. Sie steht jetzt auf **„unabgeschlossene Transaktion"** (§ 25 TDDDG, ausdrücklich gewünschter Dienst) und ist an **vier erzwungene Eigenschaften** gebunden statt an die Erwartung „Sekunden bis Minuten": Höchstlebensdauer 7 Tage, keine Anzeigedaten, Verwerfen statt Wiederholen bei Ablehnung, Leerung bei Abmeldung. Acht neue Akzeptanzkriterien in §6.5. S-30 und §7 im SRD nachgezogen; Vermerk, dass die Ausnahme auch in ADR-011 stehen muss |
@@ -99,7 +100,7 @@ Risiken: `01-Problem-Framing.md` und `02-SRD.md`. Rechtliche Analyse:
 
 **Aktivierte optionale Sektion** — die fünf Gruppen unterscheiden sich nicht in Rangstufen,
 sondern in *Art* des Zugriffs. Sie entstehen aus **orthogonalen `Membership`-Attributen**
-(`is_resident`, `role`) plus einzeln vergebbaren Berechtigungen, nicht aus einer Hierarchie
+(`is_resident`, `role`) plus einzeln vergebbaren Berechtigungen — nur an die Moderation —, nicht aus einer Hierarchie
 (E-04, S-04).
 
 #### Abgrenzung der Gruppen
@@ -134,9 +135,9 @@ sondern in *Art* des Zugriffs. Sie entstehen aus **orthogonalen `Membership`-Att
 | Sieht Teilnehmendenliste (wer nimmt an der Runde teil) | **Nein** (S-50/U-20) | Ja | Ja | Nein | Nein |
 | Sieht Bewohnerliste (wer wohnt im Haushalt) | Ja, **voll** | Ja, **lesend** | **Nein** (U-22 — geändert gegenüber V0.5: bisher „Ja, Duplikatsschutz S-05"; die Duplikatsschutz-Begründung von S-05/E-06 wird in `02-SRD.md` nachgezogen) | Nein | Nein |
 | Zählt in Zähler und Nenner der Quorum-/Beteiligungsanzeige | nicht enthalten | ja, wenn `is_resident` | ja | **nein** — die Person fällt aus beiden heraus, ihre `Vote` bleibt aber im Score und wird markiert (§4.2.3) | — |
-| Kann Status ändern | **nein** (S-50/U-20 — geändert ggü. V0.5: bisher „ja") | ja | nur mit einzeln vergebener Berechtigung | nein | nein |
-| Kann Runde schließen | **nein** (S-50/U-20 — geändert ggü. V0.5: bisher „ja") | ja | nur mit Berechtigung | nein | nein |
-| Kann Termine bestätigen | **nein** (S-50/U-20 — geändert ggü. V0.5: bisher „ja") | ja | nur mit Berechtigung | nein | nein |
+| Kann Status ändern | **nein** (S-50/U-20 — geändert ggü. V0.5: bisher „ja") | ja | nein (geändert 2026-10-01: Bewohnende organisieren das Casting nicht) | nein | nein |
+| Kann Runde schließen | **nein** (S-50/U-20 — geändert ggü. V0.5: bisher „ja") | ja | nein (geändert 2026-10-01) | nein | nein |
+| Kann Termine bestätigen | **nein** (S-50/U-20 — geändert ggü. V0.5: bisher „ja") | ja | nein (geändert 2026-10-01) | nein | nein |
 | Erhält `Notification` | ja (Verwaltungsereignisse, Aufbewahrungs-Vorwarnung) | ja (alles) | ja (Digest-Standard) | **nein, ab `moved_out` sofort** | nein (v1) |
 | Erscheint im `ActivityEvent`-Feed als Urheber | **„Verwaltung"** (ehrlich, kein Personenname) | Personenname | Personenname | „ehemaliges Mitglied" | Kandidatenname im Sachbezug |
 
@@ -166,13 +167,14 @@ sondern in *Art* des Zugriffs. Sie entstehen aus **orthogonalen `Membership`-Att
 | `Room` anlegen · Verfügbarkeit ändern (`planned` · `open` · `on_hold` · `not_available`) — `manage_rooms`, vorbelegt bei Verwaltung **und** Moderation (P-O-10) | ✅ | ✅ | ❌ | ❌ |
 | `Room`-Status als **Folge einer Bewerbung** (`promised`, `occupied` und ihre Rückwege) | **❌** (S-50/U-20) | ✅ | ❌ | ❌ |
 | Beitrittscode erzeugen / löschen | ✅ | ✅ | ❌ | ❌ |
-| `ResidentProfile` anlegen (aus Verwaltungskontext) | ✅ | ❌ | ❌ | ❌ |
-| Moderator ernennen / Berechtigung vergeben | ✅ | ❌ | ❌ | ❌ |
+| `ResidentProfile` anlegen (z. B. für einen persönlichen Beitrittslink) | ✅ | ✅ | ❌ | ❌ |
+| Moderator ernennen / zurückstufen | ✅ | ✅ | ❌ | ❌ |
+| Berechtigung einzeln vergeben | ✅ | ❌ | ❌ | ❌ |
 | Mitglied entfernen / auf `moved_out` setzen | ✅ | ✅ | ❌ (**geändert, U-22** — bisher „✅, Duplikatsschutz S-05"; die Begründung von S-05/E-06 wird in `02-SRD.md` nachgezogen) | ❌ |
-| `CastingRound` anlegen / schließen / wiedereröffnen | **❌** (S-50/U-20) | ✅ | ⬜ | ❌ |
+| `CastingRound` anlegen / schließen / wiedereröffnen | **❌** (S-50/U-20) | ✅ | ❌ | ❌ |
 | `RoundParticipation` hinzufügen / entfernen | **❌** (S-50/U-20) | ✅ | ❌ | ❌ |
-| `Application` anlegen (Formular oder Einfügen) | **❌** (S-50/U-20) | ✅ | ⬜ | ❌ |
-| `Application.status` ändern (vorwärts) | **❌** (S-50/U-20) | ✅ | ⬜ | ❌ |
+| `Application` anlegen (Formular oder Einfügen) | **❌** (S-50/U-20) | ✅ | ❌ | ❌ |
+| `Application.status` ändern (vorwärts) | **❌** (S-50/U-20) | ✅ | ❌ | ❌ |
 | `Application.status` **zurücknehmen** | **❌** (S-50/U-20) | ✅ | ❌ | ❌ |
 | `Application` löschen | **❌** (S-50/U-20) | ✅ | ❌ | ❌ |
 | **Datenauskunft erzeugen** | ✅ — **Export ohne Einsicht**, einzige Ausnahme (S-50/U-20) | ✅, mit Einsicht | ❌ | ❌ |
@@ -180,16 +182,23 @@ sondern in *Art* des Zugriffs. Sie entstehen aus **orthogonalen `Membership`-Att
 | **`Veto` setzen / zurückziehen** | ❌ | ✅ (wenn `is_resident`) | ✅ | ❌ |
 | `CastingNote` anlegen / bearbeiten | **❌** (S-50/U-20) | ✅ | ✅ | ❌ |
 | Eigene `AvailabilityWindow` pflegen | ❌ (kein Bewohnender) | ✅ | ✅ | ❌ |
-| Fremde `AvailabilityWindow` pflegen (Bewerbende) | **❌** (S-50/U-20) | ✅ | ⬜ | ❌ |
+| Fremde `AvailabilityWindow` pflegen (Bewerbende) | **❌** (S-50/U-20) | ✅ | ❌ | ❌ |
 | `Slot` legen · „Vorschlag berechnen" | **❌** (S-50/U-20) | ✅ | ❌ | ❌ |
 | Auf `Slot` reagieren (👍 / „kann nicht") | ❌ | ✅ | ✅ | ❌ |
-| `Appointment` bestätigen | **❌** (S-50/U-20) | ✅ | ⬜ | ❌ |
+| `Appointment` bestätigen | **❌** (S-50/U-20) | ✅ | ❌ | ❌ |
 | Anwesenheit einer einzelnen Person korrigieren (Ausnahmefall, U-23, S-51) | **❌** (S-50/U-20) | ⬜ | ❌ (Selbstauskunft: „ich kann doch nicht") | ❌ |
 | Aufbewahrung verlängern / kürzen / jetzt löschen | ✅ | ✅ (verlängern, löschen) | ❌ | ❌ |
-| Abstimmungsverfahren ändern | ✅ (**nicht während laufender Runde**, S-35 — Teil des Abschnitts „Haushalt") | ⬜ | ❌ | ❌ |
+| Abstimmungsverfahren ändern | ✅ (auch während laufender Runde; wirkt nur auf später eröffnete Runden, S-35 gelockert 2026-10-05 — Teil des Abschnitts „Haushalt") | ⬜ | ❌ | ❌ |
 | Persönliche Benachrichtigungseinstellungen | ✅ | ✅ | ✅ | ❌ |
 
 ✅ = immer · ⬜ = nur mit einzeln vergebener Berechtigung · ❌ = nie
+
+> **Geändert 2026-10-01 (menschliche Entscheidung):** Die Moderation legt `ResidentProfile`s an und
+> ernennt oder stuft Moderator:innen zurück — beides gehört zur Organisation des Castings (ein Profil
+> für den persönlichen Beitrittslink, die Last der Moderation teilen). Passwort-Link und
+> Haushalts-Einstellungen bleiben beim Haushalts-Account. Bewohnende stimmen ab und nehmen am Casting
+> teil; Runden, Teilnehmende und Bewerbungen organisiert die Moderation. Einzeln vergebbar (⬜) sind
+> Rechte nur noch an die Moderation.
 
 #### Wechsel- und Herabstufungslogik
 
@@ -233,7 +242,7 @@ sondern in *Art* des Zugriffs. Sie entstehen aus **orthogonalen `Membership`-Att
 - [ ] Der **Score** einer `Application` ändert sich durch `moved_out` **nicht** — in offenen wie in abgeschlossenen Runden. Die Rangliste springt nicht
 - [ ] Eine `Vote` eines `moved_out`-Profils wird sichtbar als „ehemaliges Mitglied" gekennzeichnet („1 Stimme von einem ehemaligen Mitglied") und bleibt im Score berücksichtigt
 - [ ] Zieht die Person während einer **offenen** Runde aus, gilt dasselbe: Stimme bleibt gewertet, Person raus aus Zähler und Nenner
-- [ ] Eine Berechtigung (Bewerber anlegen, Status ändern, Runde schließen, Termine bestätigen) ist einzeln vergebbar, ohne dass das Profil Moderator wird
+- [ ] ~~Eine Berechtigung (Bewerber anlegen, Status ändern, Runde schließen, Termine bestätigen) ist einzeln vergebbar, ohne dass das Profil Moderator wird~~ *Geändert 2026-10-01: einzeln vergebbar nur an die Moderation; Bewohnende organisieren das Casting nicht.*
 - [ ] Die Ernennung zum Moderator entzieht kein Stimmrecht
 - [ ] **Geändert ggü. V0.5 (S-50/U-20):** Ist der einzige Moderator ausgezogen, bleibt der Haushalt handlungsfähig, aber **nicht unmittelbar** über den Haushalts-Account — dieser muss sich zuerst selbst ein `ResidentProfile` anlegen und einen Moderator ernennen (beides ohne fremde Hilfe möglich). Der Feed weist auf den fehlenden Moderator hin, solange dieser Zwischenschritt nicht erfolgt ist
 
@@ -1151,7 +1160,7 @@ aber **nie** auf dem primären-CTA-Platz und **nie** über einer Aufgabe mit ges
 | Neu eintretendes Profil | Sieht die Runde **inklusive Historie zu anderen Kandidaten** — Kontext ist nötig. Den heiklen Teil deckt die Selbst-Redaktion ab (§4.2.5) |
 | **Parallele Runden (Entscheidung zu SRD O-04)** | Technisch sind mehrere gleichzeitig offene `CastingRound`s je `Household` **erlaubt** — der Vermieter-Fall und Sonderlagen brauchen das. In v1 wird der Fall **in der Oberfläche nicht angeboten**: es gibt eine als „aktiv" markierte Runde, weitere sind nur über eine Rundenliste erreichbar, und der Rundenkopf zeigt immer genau eine Runde. Begründung: Ein Screening-Durchlauf über zwei Runden hinweg wäre nicht erklärbar, und der Beteiligungsstand hätte zwei Nenner |
 | Wiedereröffnung | `closed → open` ist erlaubt, auditiert und setzt die Aufbewahrungsuhr zurück; die Rücksetzung wird protokolliert |
-| Verfahrenssperre | Änderungen am Abstimmungsverfahren (Stufenwerte, Feinschliff-Schwelle, Quorum-Regel, Veto-Einstellungen) sind bei einer offenen Runde **blockiert**; erfolgt eine Änderung dennoch über einen Verwaltungsweg, wird sie als `ActivityEvent` **laut protokolliert** und in der Runde sichtbar vermerkt (E-25, S-35) |
+| Verfahrenssperre *(gelockert 2026-10-05, menschliche Entscheidung)* | Änderungen am Abstimmungsverfahren (Stufenwerte, Feinschliff-Schwelle, Quorum-Regel, Veto-Einstellungen) sind auch bei einer offenen Runde **erlaubt** und werden als `ActivityEvent` protokolliert. Sie wirken nur auf Runden, die danach eröffnet werden: eine offene Runde behält das `settings_snapshot`, das beim Öffnen eingefroren wurde (E-25, S-35). Der Verwaltungsweg und der Rundenvermerk entfallen |
 
 #### 4.2.3 Abstimmung und Score
 

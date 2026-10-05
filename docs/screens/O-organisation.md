@@ -106,8 +106,9 @@ Prozess vs. Person, nicht bei „beschreibend vs. empfehlend".
   „Die Angaben stammen nicht von der Person selbst (z. B. jemand hat sie euch empfohlen)"
   (`03-PRD.md` §4.1.3)
 - **Art.-14-Hinweis, noch vor dem Speichern** *(ergänzt 2026-09-28, geändert 2026-09-29,
-  Durchsicht)*: ist die Checkbox gesetzt, folgt als letzter Schritt ein kurzer, neutraler Hinweis
-  in zwei Zeilen: die Person muss erfahren, dass ihre Angaben gespeichert sind, und der Satz aus
+  Durchsicht; geändert 2026-10-05, menschliche Entscheidung)*: ist die Checkbox gesetzt, folgt als
+  letzter Schritt ein kurzer, neutraler Hinweis mit der kurzen Überschrift „Die Person informieren"
+  und zwei Zeilen: die Person muss erfahren, dass ihre Angaben gespeichert sind, und der Satz aus
   `06-Compliance-Anhang.md` §4.5 mit Frist und Datum. „Verstanden" speichert. „Beispieltext
   anzeigen" öffnet den Textbaustein *Variante Dritterhebung* (`06-Compliance-Anhang.md` §4.5),
   vor dem Kopieren änderbar, mit Kopieren-Knopf. **Keine Sende-Handlung** (S-16)
@@ -419,7 +420,7 @@ Prozess vs. Person, nicht bei „beschreibend vs. empfehlend".
 |---|---|---|
 | Zweck | Information — wer gehört zu dieser Runde | Verwaltung — wer gehört zum Haushalt |
 | Inhalt | nur Namen | Namen, Beitrittsdatum, Kontakt, Status |
-| Handlungen | keine | entfernen, `moved_out`, reaktivieren, Einladungslinks erzeugen/verlängern/löschen |
+| Handlungen | keine | entfernen, `moved_out`, reaktivieren, Einladungslinks erzeugen/verlängern/löschen, `ResidentProfile` anlegen, Moderator ernennen / zurückstufen (die beiden letzten für Verwaltung **und** Moderation, seit 2026-10-01) |
 | Verwaltung | — | voll |
 | Moderator | ja | **voll (Parität mit Verwaltung, U-30, 2026-09-17 — vormals lesend)** |
 | Bewohnende | ja | **nein, aber eigene reduzierte „Wer wohnt hier"-Ansicht (B5, U-30)** |
@@ -572,14 +573,18 @@ Prozess vs. Person, nicht bei „beschreibend vs. empfehlend".
 | | |
 |---|---|
 | **Zweck** | Die drei Account-exklusiven Dinge, die nicht an der Bewohnerlage hängen dürfen (§4.4) |
-| **Zugang** | Nur `household_admin`, unabhängig von `acting_profile_id` (§4.2) |
+| **Zugang** | Nur mit `manage_voting_procedure` (Haushalts-Account; einer Moderation nur als einzeln vergebenes Recht, ⬜), unabhängig von `acting_profile_id` (§4.2) |
 
 **Kernelemente**
 
 - **`ResidentProfile` anlegen** — der Weg, über den die Verwaltung handlungsfähig bleibt, wenn der
-  letzte Moderator auszieht (§4.3)
-- **Moderator ernennen** — Rollenwechsel innerhalb der `Membership`
-- **Abstimmungsverfahren** — Regel-Sperre während einer laufenden Runde (E-25). Umfasst u. a.
+  letzte Moderator auszieht (§4.3); seit 2026-10-01 legt auch die Moderation Profile an (z. B. für
+  einen persönlichen Beitrittslink), die Maske liegt auf O16
+- **Moderator ernennen** — Rollenwechsel innerhalb der `Membership`; seit 2026-10-01 auch durch die
+  Moderation (ernennen und zurückstufen), der Schalter liegt auf O16
+- **Abstimmungsverfahren** — auch während einer laufenden Runde änderbar, wirkt nur auf später
+  eröffnete Runden; läuft eine Runde, sagt der Bildschirm das (Regel-Sperre gelockert 2026-10-05,
+  E-25). Umfasst u. a.
   `hide_results_until_voted` und, neu (2026-09-16, Prototype-User-Test), `reveal_vote_authorship`
   — Toggle „Stimmen-Urheberschaft in der Rangliste zeigen", Default aus, mit Hinweistext zum
   Anker-/Bandwagon-Tradeoff (`domain/identity.md`)

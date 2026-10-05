@@ -19,11 +19,11 @@ describe("ResidentProfile status enum", () => {
 describe("ResidentProfile transitions", () => {
   const declaredPairs = new Set(TRANSITIONS.map(([from, to]) => `${from}->${to}`));
 
-  it("accepts every declared transition (prepared->active, prepared->moved_out, active->moved_out, moved_out->active, active->removed, moved_out->removed)", () => {
+  it("accepts every declared transition (prepared->active, prepared->moved_out, prepared->removed, active->moved_out, moved_out->active, active->removed, moved_out->removed)", () => {
     for (const [from, to] of TRANSITIONS) {
       expect(() => assertResidentProfileTransitionAllowed(from, to)).not.toThrow();
     }
-    expect(TRANSITIONS).toHaveLength(6);
+    expect(TRANSITIONS).toHaveLength(7);
   });
 
   it("throws for every (from, to) pair not in the transition table — e.g. prepared->prepared", () => {

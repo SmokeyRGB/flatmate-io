@@ -1,12 +1,13 @@
 "use client";
 
-import { Lock } from "lucide-react";
+import { Info } from "lucide-react";
 import { useActionState } from "react";
 import { de } from "@/ui/strings";
 import { SubmitButton } from "@/ui/submit-button";
+import { SuccessToast } from "@/ui/success-toast";
 import { updateSettingsAction, type SettingsFormState } from "./actions";
 
-const initialState: SettingsFormState = { error: null };
+const initialState: SettingsFormState = { error: null, saved: false };
 const t = de.settings;
 
 export function SettingsForm({
@@ -21,14 +22,16 @@ export function SettingsForm({
   return (
     <div className="space-y-4">
       {openRoundTitle && (
-        <div className="callout callout-caution">
-          <Lock className="size-4" />
-          {t.lockedWhileRoundOpen(openRoundTitle)}
+        <div role="note" className="callout callout-info">
+          <Info className="size-4" />
+          {t.appliesToNextRound(openRoundTitle)}
         </div>
       )}
 
+      <SuccessToast message={t.saved} trigger={state.saved && !state.error ? state : null} />
+
       <form action={formAction} className="card">
-        <fieldset disabled={Boolean(openRoundTitle)} className="space-y-4 disabled:opacity-60">
+        <fieldset className="space-y-4">
           <div>
             <label htmlFor="quorumShare" className="field-label">
               {t.quorumShareLabel}

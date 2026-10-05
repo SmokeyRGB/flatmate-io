@@ -3,14 +3,14 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { de } from "@/ui/strings";
 
 // Design D13 (application-capture): the household account runs no rounds (03-PRD.md §4.0.1,
-// S-50/U-20), so O1 offers "Runde eröffnen" only to a session that holds close_round. Same mock
+// S-50/U-20), so O1 offers "Runde eröffnen" only to a session that holds manage_rounds. Same mock
 // shape as new-round-page-permission-guard.test.ts.
 vi.mock("server-only", () => ({}));
 vi.mock("next/headers", () => ({ cookies: vi.fn() }));
 vi.mock("next/navigation", () => ({ redirect: vi.fn() }));
 
 const state = vi.hoisted(() => ({
-  holdsCloseRound: false,
+  holdsManageRounds: false,
   profileId: null as string | null,
   rounds: [] as { id: string; title: string; status: string }[],
 }));
@@ -35,9 +35,9 @@ vi.mock("@/modules/identity/repository", async () => {
   );
   return {
     ...actual,
-    getNavigationAccess: vi.fn(async () => ({ organisation: true, membersList: true })),
+    getNavigationAccess: vi.fn(async () => ({ organisation: true, membersList: true, rooms: true, settings: true })),
     assertHasPermission: vi.fn(async (_ctx: unknown, _accountId: string, permission: string) => {
-      if (permission !== "close_round" || !state.holdsCloseRound) {
+      if (permission !== "manage_rounds" || !state.holdsManageRounds) {
         throw new actual.PermissionDeniedError(permission);
       }
     }),
@@ -47,17 +47,17 @@ vi.mock("@/modules/identity/repository", async () => {
 const { default: OrganizationPage } = await import("@/app/(org)/organization/page");
 
 async function render() {
-  return renderToStaticMarkup(await OrganizationPage());
+  return renderToStaticMarkup(await OrganizationPage({ searchParams: Promise.resolve({}) }));
 }
 
-describe("O1: the way to open a round is offered only to a session holding close_round", () => {
+describe("O1: the way to open a round is offered only to a session holding manage_rounds", () => {
   beforeEach(() => {
-    state.holdsCloseRound = false;
+    state.holdsManageRounds = false;
     state.profileId = null;
     state.rounds = [];
   });
 
-  it("the household account (no close_round): no button, no link, and no promise of one", async () => {
+  it("the household account (no manage_rounds): no button, no link, and no promise of one", async () => {
     const html = await render();
     expect(html).not.toContain('href="/rounds/new"');
     expect(html).not.toContain(de.org.dashboard.openNewRound);
@@ -72,8 +72,8 @@ describe("O1: the way to open a round is offered only to a session holding close
     expect(html).not.toContain(de.org.dashboard.openAnotherRound);
   });
 
-  it("a moderator (close_round): the button is there", async () => {
-    state.holdsCloseRound = true;
+  it("a moderator (manage_rounds): the button is there", async () => {
+    state.holdsManageRounds = true;
     state.profileId = "44444444-4444-4444-4444-444444444444";
     const html = await render();
     expect(html).toContain('href="/rounds/new"');
@@ -81,7 +81,7 @@ describe("O1: the way to open a round is offered only to a session holding close
   });
 
   it("a moderator with a round already running: the 'another round' link is there", async () => {
-    state.holdsCloseRound = true;
+    state.holdsManageRounds = true;
     state.profileId = "44444444-4444-4444-4444-444444444444";
     state.rounds = [{ id: "33333333-3333-3333-3333-333333333333", title: "Herbst", status: "open" }];
     const html = await render();

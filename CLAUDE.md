@@ -26,7 +26,7 @@ npm run lint       # eslint
 npm test          # vitest run
 npx vitest run tests/unit/casting/room-transitions.test.ts   # single file
 npx vitest run -t "test name substring"                       # single test by name
-npm run verify     # the full gate: eslint + tsc + eight guardrail lints + check-refs, then vitest run
+npm run verify     # the full gate: eslint + tsc + nine guardrail lints + check-refs, then vitest run
 npm run seed:demo # tsx --env-file=.env.local scripts/seed-demo-household.ts
 ```
 
@@ -34,7 +34,7 @@ npm run seed:demo # tsx --env-file=.env.local scripts/seed-demo-household.ts
 before treating a change as done. It type-checks (`next typegen && tsc --noEmit`; vitest alone does
 not enforce strict mode). Both `eslint` and `tsc` ignore `.claude/**`: that directory holds tool
 state and worktree copies of the repository, never source (human approval 2026-09-26, G-G3). The
-eight hand-written guardrail lints under `scripts/lint/`, plus a ninth check that runs inside
+nine hand-written guardrail lints under `scripts/lint/`, plus a further check that runs inside
 vitest, are listed in `.claude/rules/guardrail-lints.md`.
 
 Husky's pre-commit hook runs `gitleaks protect --staged` (G-A1) — install gitleaks locally or the

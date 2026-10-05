@@ -4,10 +4,10 @@ import { describe, expect, it } from "vitest";
 import { landingPathFor } from "@/app/landing";
 
 describe("landingPathFor (start-screen design.md Decision 3)", () => {
-  it("(a) gives /settings for profileId: null and /dashboard otherwise", () => {
+  it("(a) gives /organization for profileId: null and /dashboard otherwise", () => {
     expect(
       landingPathFor({ accountId: "a", householdId: "h", profileId: null }),
-    ).toBe("/settings");
+    ).toBe("/organization");
     expect(
       landingPathFor({ accountId: "a", householdId: "h", profileId: "p" }),
     ).toBe("/dashboard");

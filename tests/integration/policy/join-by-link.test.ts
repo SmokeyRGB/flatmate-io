@@ -59,7 +59,8 @@ describe("joinHousehold — happy path (FR-2.18/FR-2.6/FR-2.19)", () => {
     );
     expect(membershipRow.isResident).toBe(true);
     expect(membershipRow.role).toBe("member");
-    expect(membershipRow.permissions).toEqual([]);
+    // A joiner holds exactly the resident set (role-permissions: `vote`), nothing else.
+    expect(membershipRow.permissions).toEqual(["vote"]);
     expect(membershipRow.joinedViaIssuanceId).toBe(link.id);
 
     // The link's count rose by exactly one.

@@ -844,7 +844,7 @@ Zwei Anwendungsfälle, an denen die Abbildung schon gearbeitet hat:
 | `Application.created_at`, `retention_until` | META | Fristenberechnung, 14-Tage-Vorwarnung | 6c (Art. 5 Abs. 1 lit. e) | H | mit dem Datensatz |
 | `Room.label`, `Room.status` | KONFIG | eigene Zustandsmaschine je Zimmer („3 Zimmer, eines vergeben, Runde läuft weiter") | 6b | H | bis Löschung des Haushalts |
 | `CastingRound.opened_at`, `closed_at` | META | Fristenstart, Rundensichtbarkeit | 6c, 6f | H | mit der Runde |
-| `CastingRound.settings_snapshot` | KONFIG | eingefrorene Verfahrensregeln der Runde (Regel-Sperre gegen Änderung während des Laufs) | 6f | H | mit der Runde |
+| `CastingRound.settings_snapshot` | KONFIG | eingefrorene Verfahrensregeln der Runde (die laufende Runde bleibt von späteren Änderungen am Verfahren unberührt; Regel-Sperre gelockert 2026-10-05) | 6f | H | mit der Runde |
 | `CastingRound.quorum_denominator_frozen` | META | eingefrorener Quorum-Nenner; hält abgeschlossene Runden gegen spätere Auszüge stabil | 6f | H | mit der Runde |
 | `CastingRound.retention_until` | META | Ablauf der Aufbewahrung | 6c | H | mit der Runde |
 | `CastingRound.retention_warned_at` | META | Beleg der 14-Tage-Vorwarnung — **keine stille Löschung** ([§5.5](#55-keine-stille-löschung)) | 6c | H | mit der Runde |
@@ -1360,7 +1360,7 @@ Umsetzung wird beim Repo-Aufsetzen konkretisiert und in `GUARDRAILS.md` maschine
 | Nachvollziehbarkeit | append-only `ActivityEvent`-Log (ADR-003), Account **und** handelndes Profil |
 | Zustandsintegrität | explizite Zustandsmaschine statt Boolean-Flags, Übergänge in einer Tabelle deklariert (ADR-002) |
 | Reversibilität (P-4) | Rückwärtsübergänge erlaubt **und auditiert** |
-| Regel-Sperre | Änderung des Abstimmungsverfahrens während einer laufenden Runde blockiert bzw. laut protokolliert |
+| Regel-Sperre | Änderung des Abstimmungsverfahrens während einer laufenden Runde erlaubt (gelockert 2026-10-05), wirkt nur auf später eröffnete Runden; die laufende Runde behält ihr `settings_snapshot` |
 | Eingabevalidierung | am Kontextrand; reiner Domänenkern ohne DB-Zugriff |
 
 ### 11.4 Verfügbarkeit und Belastbarkeit

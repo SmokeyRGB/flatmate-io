@@ -48,7 +48,6 @@ vi.mock("@/modules/casting/repository", async () => {
   return {
     getRoundForSession: vi.fn(async () => ({ id: ROUND_ID, title: "Herbstrunde", status: state.roundStatus })),
     getRoundParticipants: vi.fn(async () => []),
-    hasProcedureChangedNotice: vi.fn(async () => false),
     listOrganisationApplications: vi.fn(async () => {
       if (!state.holdsCreateApplication) throw new identity.PermissionDeniedError("create_application");
       if (state.listError) throw new Error("boom");

@@ -47,11 +47,13 @@ describe("castVote concurrency (EC-4.6)", () => {
     });
     await held.started;
     const second = castVote(voter.context, { roundId: s.roundId, applicationId: app.id, value: "no" });
-    expect(await settlesWithin(second, 2000)).toBe(false);
-
+    // Timing result first, release and await the held transaction, then assert (a failed
+    // assertion must not leave the uncommitted writer blocking afterEach cleanup).
+    const settledWhileHeld = await settlesWithin(second, 2000);
     held.release();
     await held.done;
     await second;
+    expect(settledWhileHeld).toBe(false);
 
     const rows = await readVotes(voter.context, app.id);
     expect(rows).toHaveLength(1);
@@ -87,11 +89,11 @@ describe("castVote concurrency (EC-4.6)", () => {
       () => ({ refused: null as null | ReturnType<typeof pgErrorOf> }),
       (err: unknown) => ({ refused: pgErrorOf(err) }),
     );
-    expect(await settlesWithin(attempt, 2000)).toBe(false);
-
+    const settledWhileHeld = await settlesWithin(attempt, 2000);
     held.release();
     await held.done;
     const outcome = await attempt;
+    expect(settledWhileHeld).toBe(false);
     expect(outcome.refused?.code).toBe("23514");
     expect(outcome.refused?.constraint_name).toBe("vote_voter_eligible");
   });

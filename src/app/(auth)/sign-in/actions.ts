@@ -22,7 +22,7 @@ export async function signInAction(
   // household-sign-in-code: "angemeldet bleiben" on both tabs, ticked by default in the form
   // (identity/sign-in). An unticked checkbox posts nothing, so absence means cleared.
   const rememberMe = formData.get("rememberMe") === "on";
-  let landingPath: "/dashboard" | "/settings";
+  let landingPath: "/dashboard" | "/organization";
 
   try {
     const result =

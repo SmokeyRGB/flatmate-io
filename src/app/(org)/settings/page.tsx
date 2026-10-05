@@ -3,19 +3,21 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { listRoundsForSession } from "@/modules/casting/repository";
 import {
-  assertIsAdministration,
   getHouseholdSettings,
   getHouseholdSignInCode,
-  ResidentListActionDeniedError,
+  PermissionDeniedError,
 } from "@/modules/identity/repository";
 import { getCurrentSession } from "@/modules/identity/session-cookie";
 import { de } from "@/ui/strings";
 import { LinkPendingHint } from "@/ui/link-pending-hint";
+import { OrganisationAccessDenied } from "../organisation-access-denied";
+import { requireOrganisationAccess } from "../organisation-access";
 import { SettingsForm } from "./settings-form";
 
 const t = de.settings;
 
-// Screen O20. The four procedure-lock-governed fields (FR-1.21) plus the two FR-1.24 exceptions
+// Screen O20. The four voting-procedure fields (FR-1.21: editable while a round runs, an open
+// round keeps its snapshot) plus the two FR-1.24 exceptions
 // administration keeps (retention, export) — F1 only wires the settings half; retention/export UI
 // is compliance-feature scope, out of this slice.
 //
@@ -32,14 +34,28 @@ export default async function SettingsPage({
   const current = await getCurrentSession();
   if (!current) redirect("/sign-in");
 
-  // O20's access rule (docs/screens/O-organisation.md) is `household_admin` only, "unabhängig von
-  // acting_profile_id" — unlike the mutation action's broader `manage_settings` permission. This
-  // read path had no check at all (Convergence finding), letting any signed-in resident see the
-  // quorum share. Mirrors the members page's own guard-and-render-message pattern below.
+  // role-permissions design D9: the organisation area check first, on this request.
+  if (!(await requireOrganisationAccess(current))) return <OrganisationAccessDenied />;
+
+  // O20's access rule (docs/screens/O-organisation.md) is the stored permission
+  // `manage_voting_procedure` (the household account; a moderator only as an individually granted
+  // right, ⬜), "unabhängig von acting_profile_id". The check lives in getHouseholdSettings itself
+  // (authorization in the repository, not the route); this page renders its refusal. This read
+  // path once had no check at all (Convergence finding), letting any signed-in resident see the
+  // quorum share.
+  let settings: Awaited<ReturnType<typeof getHouseholdSettings>>;
+  let rounds: Awaited<ReturnType<typeof listRoundsForSession>>;
+  let signInCode: string | null;
   try {
-    await assertIsAdministration(current.context, current.context.accountId);
+    // household-sign-in-code D7: read with the settings, so the code shows only once
+    // getHouseholdSettings has let this session through.
+    [settings, rounds, signInCode] = await Promise.all([
+      getHouseholdSettings(current.context),
+      listRoundsForSession(current.context),
+      getHouseholdSignInCode(current.context),
+    ]);
   } catch (err) {
-    if (err instanceof ResidentListActionDeniedError) {
+    if (err instanceof PermissionDeniedError) {
       return (
         <div className="mx-auto max-w-md space-y-4 p-6">
           <Link href="/organization" className="back-link">
@@ -53,12 +69,6 @@ export default async function SettingsPage({
     }
     throw err;
   }
-
-  const [settings, rounds, signInCode] = await Promise.all([
-    getHouseholdSettings(current.context),
-    listRoundsForSession(current.context),
-    getHouseholdSignInCode(current.context),
-  ]);
   const openRound = (rounds as { status: string; title: string }[]).find((r) => r.status === "open");
 
   return (

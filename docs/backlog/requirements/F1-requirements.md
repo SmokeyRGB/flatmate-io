@@ -19,7 +19,7 @@ that freezes both its voter list and its voting rules.
 
 **In scope:** household registration · resident profile creation · one fixed identity per session (ADR-013) ·
 membership and permissions · rooms with their own state · casting round with room selection,
-voter snapshot and frozen rules · procedure lock while a round is open · the administration
+voter snapshot and frozen rules · procedure changes while a round is open (allowed, the open round keeps its snapshot) · the administration
 boundary.
 
 **Out of scope:** room plans, floor plans, rent, tenancy agreements · organisations above
@@ -53,12 +53,12 @@ roles · parallel rounds offered in the UI · anything about applications, votes
 
 - **FR-1.1** The system shall register a household from an email address and a password. Both are required.
 - **FR-1.2** The registration screen shall display a notice that the email address will be shared with the household's residents, before submission.
-- **FR-1.3** The system shall allow the household account to create resident profiles. Each profile has a display name.
+- **FR-1.3** The system shall allow the household account **and a moderator** to create resident profiles. Each profile has a display name. *(Amended 2026-10-01, human decision: profile creation is part of running a casting.)*
 - **FR-1.4** A resident profile's display name shall be unique within the household among profiles that are neither `moved_out` nor `removed`. *(Amended 2026-09-22: extended from "not `moved_out`" to also exclude `removed`, so a removed member's name is free again.)*
 - **FR-1.5** The household account shall be able to create a resident profile, including one intended for the person operating it. It shall **never occupy** that profile itself — whoever uses it signs in separately with `(household, display name) + password`. Source: ADR-013.
 - **FR-1.6** The acting identity of a session shall be fixed at sign-in and shall not be writable afterwards. Moving between administration and a resident identity shall require signing out and signing in again. The interface shall name the signed-in identity rather than offer a switch. Source: ADR-013.
 - **FR-1.7** The household account shall not be able to cast a vote.
-- **FR-1.8** Membership shall carry voting eligibility and a role as **independent** attributes, plus individually grantable permissions (create applicant, change status, close round, confirm appointments).
+- **FR-1.8** Membership shall carry voting eligibility and a role as **independent** attributes, plus permissions grantable individually to a moderator only; residents vote and take part *(amended 2026-10-01)*.
 
 ### Resident list (administration)
 
@@ -88,10 +88,10 @@ roles · parallel rounds offered in the UI · anything about applications, votes
 - **FR-1.19** All residents taking part in a round shall be able to see a list of the round's participants, showing names only.
 - **FR-1.20** The system shall record every casting-round and room state change as an append-only audit entry naming both the account and the acting profile.
 
-### Procedure lock
+### Procedure lock *(relaxed 2026-10-05)*
 
-- **FR-1.21** While any casting round of the household is `open`, the system shall reject changes to the rating weights, the favourite-budget factor, the quorum share and the hidden-results setting.
-- **FR-1.22** If such a change nevertheless occurs through an administrative path, the system shall record it as an audit entry and display it as a notice on the affected round.
+- **FR-1.21** *(Amended — human decision 2026-10-05; was: reject these changes while any round is `open`.)* The system shall accept changes to the rating weights, the favourite-budget factor, the quorum share and the hidden-results setting at any time, including while a casting round of the household is `open`. A change applies only to rounds opened afterwards; a round already `open` keeps the settings snapshot taken at `draft → open` (FR-1.15) and is scored, quorum-checked and displayed by it.
+- **FR-1.22** *(Withdrawn — human decision 2026-10-05.)* There is no longer a forbidden change that could "nevertheless occur through an administrative path", so neither the round notice nor the separate override path exists. Every settings change is recorded as an ordinary `household_settings.changed` audit entry.
 
 ### Administration boundary
 
@@ -138,14 +138,13 @@ Given an open round with 7 participants, when an eighth resident claims their pr
 **AC-1.12 — Post-snapshot addition is distinguishable** *(Revised 2026-09-17)*
 Given an open round, when a resident joins it after opening — automatically on claiming their profile, or by a moderator's manual correction — then that entry is marked `joined_after_open` or `added_manually` respectively, and never as part of the opening snapshot.
 
-**AC-1.13 — Procedure changes are blocked while open**
-Given a round in state `open`, when I attempt to change a rating weight, then the change is refused and the reason names the open round.
+**AC-1.13 — Procedure changes are accepted while a round is open** *(Amended — human decision 2026-10-05; was: blocked)*
+Given a round in state `open`, when I change a rating weight, the favourite-budget factor, the quorum share or the hidden-results setting, then the change is accepted and audited, and the open round's `settings_snapshot` is unchanged.
 
-**AC-1.14 — A procedure change through an administrative path is surfaced**
-Given a rating weight was changed while a round was open, when any resident views that round, then a notice states that the procedure was changed, and an audit entry exists.
+**AC-1.14 — *(Withdrawn — human decision 2026-10-05.)*** Replaced by AC-1.13 and AC-1.15: nothing is blocked, so there is no administrative path and no "procedure changed" notice on the round. The settings screen instead tells the person changing the rules, while a round is open, that the change applies to the next round and the running one keeps its rules.
 
-**AC-1.15 — Procedure changes are allowed when no round is open**
-Given all rounds are `draft`, `closed` or `archived`, when I change the quorum share, then the change is accepted.
+**AC-1.15 — A change reaches only rounds opened afterwards** *(Amended — human decision 2026-10-05; was: allowed when no round is open)*
+Given a round opened under quorum share 0.5, when I change the quorum share to 0.6 and then open a second round, then the first round's snapshot still holds 0.5 and the second round's snapshot holds 0.6. A change made when no round is open is accepted as before.
 
 **AC-1.16 — The administration boundary holds**
 Given I am acting without a resident profile, when I request a casting round's identity or lifecycle fields (existence, `title`, `status`, `room_ids`, timestamps, retention fields), then access is granted; when I request anything else — an application, a vote, a slot, an appointment, a casting note, or anything derived from `Application` including via a casting round (count, participation, score, ranking) — by any route, then access is refused.
@@ -201,7 +200,7 @@ Given I am a resident, when I open the household members view, then I see the di
 | **EC-1.4** | Opening a round with exactly one eligible resident | Permitted. Quorum of `ceil(0.5 × 1)` = 1 is satisfiable |
 | **EC-1.5** | A second round is opened while one is already open | Permitted at the data level, **not offered in the UI**: one round is marked active, others are reachable only through a round list, and any round view shows exactly one round |
 | **EC-1.6** | A room is removed while a round covering it is open | Refused while the round is open; the room may be set `not_available` instead |
-| **EC-1.7** | The last moderator becomes unavailable | Administration may **create** a resident profile and appoint it as moderator — it never occupies that profile itself (ADR-013); whoever uses it signs in separately. Result: a named actor, never direct access to deliberation content |
+| **EC-1.7** | The last moderator becomes unavailable | Administration may **create** a resident profile and appoint it as moderator — it never occupies that profile itself (ADR-013); whoever uses it signs in separately. Result: a named actor, never direct access to deliberation content. *(Amended 2026-10-01: a moderator may do the same; administration keeps the fallback when no moderator is left.)* |
 | **EC-1.8** | A resident is made ineligible to vote mid-round | Their round-participation entry records it; already-cast votes are unaffected by this feature (F5 governs their arithmetic) |
 | **EC-1.9** | Two moderators open the same `draft` round simultaneously | Exactly one opening takes effect; exactly one set of snapshot entries and frozen rules exists |
 | **EC-1.10** | Household registers with an address already used by another household | Permitted. Households are not deduplicated by email |
@@ -242,7 +241,7 @@ score, and the participant snapshot feeds every quorum display.
 1. **Who may open a round** is expressed as a grantable permission (FR-1.8) but the default
    assignment is not specified anywhere in the spec chain. Recommend: the household account's own
    resident profile holds it initially, and it is grantable from there. **Resolved (human decision,
-   2026-09-22):** superseded by a role default instead of this recommendation — `close_round` is
+   2026-09-22):** superseded by a role default instead of this recommendation — `manage_rounds` (named `close_round` until 2026-10-01) is
    now held by every `household_admin` and every `moderator` membership, the same shape as
    `manage_rooms`. See `docs/domain/identity.md` §2.1 and `docs/review-log.md`
    §Offene-Punkte-Register.
@@ -250,8 +249,8 @@ score, and the participant snapshot feeds every quorum display.
    it — a room is a label here, not a scoring input — but it needs a decision rather than an
    assumption.
 
-**Too complex?** The procedure lock (FR-1.21/FR-1.22) is the one part that could be argued down.
-It exists because **E-25** and S-35 both require it, and because without it every ranking is
-retroactively disputable — which is the legitimacy problem the product is built to solve. Keep it,
-but note that FR-1.22's "administrative path" is only reachable at all because C-1.4 says the
-boundary is not a security boundary.
+**Too complex?** The procedure lock was argued down on 2026-10-05 (human decision; FR-1.21 amended,
+FR-1.22 withdrawn). The legitimacy that **E-25** and S-35 ask for — no ranking is retroactively
+disputable — now rests on the snapshot alone (FR-1.15, AC-1.9), which was always the mechanism that
+kept a running round's result stable. The lock also had no way to release: there is no close-round
+action yet, so after a household's first round the settings could never be changed again.

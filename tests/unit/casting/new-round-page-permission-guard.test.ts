@@ -16,7 +16,7 @@ vi.mock("@/modules/identity/session-cookie", () => ({
 }));
 
 const listRooms = vi.fn(async () => {
-  throw new Error("listRooms must not run when close_round is denied");
+  throw new Error("listRooms must not run when manage_rounds is denied");
 });
 vi.mock("@/modules/casting/repository", () => ({ listRooms }));
 
@@ -26,8 +26,10 @@ vi.mock("@/modules/identity/repository", async () => {
   );
   return {
     ...actual,
+    // the organisation-area check (design D9) passes; the page's own narrower check is under test
+    getNavigationAccess: vi.fn(async () => ({ organisation: true, membersList: false, rooms: false, settings: false })),
     assertHasPermission: vi.fn(async () => {
-      throw new actual.PermissionDeniedError("close_round");
+      throw new actual.PermissionDeniedError("manage_rounds");
     }),
   };
 });
@@ -35,10 +37,10 @@ vi.mock("@/modules/identity/repository", async () => {
 const { default: NewRoundPage } = await import("@/app/(org)/rounds/new/page");
 
 // rounds-new-page-missing-permission-guard: the page used to render the create/open form for any
-// signed-in session, with no close_round check at all. It must now render a denial instead of
+// signed-in session, with no manage_rounds check at all. It must now render a denial instead of
 // loading rooms / rendering the form.
-describe("NewRoundPage close_round permission guard", () => {
-  it("renders a denial and never loads rooms when close_round is missing", async () => {
+describe("NewRoundPage manage_rounds permission guard", () => {
+  it("renders a denial and never loads rooms when manage_rounds is missing", async () => {
     const element = await NewRoundPage();
     const html = renderToStaticMarkup(element);
 

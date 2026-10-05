@@ -6,7 +6,10 @@ import { claimResidentProfile } from "@/modules/identity/auth";
 import {
   createResidentProfile,
   getResidentList,
+  issueJoinCode,
   reactivateMember,
+  removePreparedProfile,
+  ResidentProfileNotPreparedError,
   removeMember,
   setMovedOut,
 } from "@/modules/identity/repository";
@@ -208,5 +211,41 @@ describe("Member removal is final (U-27, design.md Decision 1)", () => {
 
     const { members } = await getResidentList(hh.context, hh.accountId);
     expect(members.find((m) => m.id === profile.id)?.status).toBe("moved_out");
+  });
+});
+
+// A prepared profile (never claimed) is deleted prepared -> removed: audited, its bound links die
+// with it, and it can never be claimed afterwards.
+describe("Deleting a prepared profile", () => {
+  it("writes the status event, kills its bound link, and removes it from the list", async () => {
+    hh = await registerTestHousehold();
+    const actor = { accountId: hh.accountId, profileId: null };
+    const profile = await createResidentProfile(hh.context, "Unclaimed", actor);
+    const link = await issueJoinCode(hh.context, hh.accountId, {
+      validDays: 7,
+      maxUses: 1,
+      residentProfileId: profile.id,
+    });
+
+    await removePreparedProfile(hh.context, hh.accountId, profile.id);
+
+    const { members } = await getResidentList(hh.context, hh.accountId);
+    expect(members.find((m) => m.id === profile.id)).toBeUndefined();
+    const [row] = await withSessionContext(hh.context, (tx) =>
+      tx.select({ status: residentProfile.status }).from(residentProfile).where(eq(residentProfile.id, profile.id)),
+    );
+    expect(row.status).toBe("removed");
+    const statusEvents = await eventsFor(hh, "resident_profile.status_changed");
+    expect(
+      statusEvents.some(
+        (e) => e.subjectId === profile.id && (e.payload as { toStatus?: string }).toStatus === "removed",
+      ),
+    ).toBe(true);
+    const deletedLinkEvents = await eventsFor(hh, "household.join_code_deleted");
+    expect(deletedLinkEvents.some((e) => e.subjectId === link.id)).toBe(true);
+    await expect(claimResidentProfile(hh.context, profile.id, "test-password-not-real-1234")).rejects.toThrow();
+    await expect(removePreparedProfile(hh.context, hh.accountId, profile.id)).rejects.toThrow(
+      ResidentProfileNotPreparedError,
+    );
   });
 });

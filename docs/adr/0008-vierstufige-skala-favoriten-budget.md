@@ -89,6 +89,10 @@ denn seine Aufgabe ist, dass sieben Menschen eine gemeinsame Entscheidung akzept
 - **Regel-Sperre:** Änderungen am Verfahren während einer laufenden Runde sind **blockiert**, und die
   Runde rechnet nach ihrem `settings_snapshot`. Ein Verfahrenswechsel mitten in einer Abstimmung
   zerstört die Legitimität des Ergebnisses vollständig.
+  > **Nachtrag 2026-10-05 (menschliche Entscheidung):** Die Sperre ist aufgehoben. Eine Änderung
+  > während einer laufenden Runde ist erlaubt und wirkt nur auf später eröffnete Runden; die
+  > Legitimität sichert allein das `settings_snapshot`. Grund: Es gibt keine Aktion „Runde
+  > schließen", die Sperre ließ sich nach der ersten Runde nie mehr lösen.
 
 ### Konsequenzen
 

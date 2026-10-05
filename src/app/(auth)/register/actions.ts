@@ -112,5 +112,5 @@ export async function registerHouseholdAction(
   // start-screen design.md Decision 3: registration always yields the household account
   // (profileId null), whose landing is fixed — landingPathFor(...) would answer the same thing,
   // but this site knows its identity statically, so the literal is used directly.
-  redirect("/settings");
+  redirect("/organization");
 }

@@ -78,7 +78,7 @@ async function main() {
   const roomA = await createRoom(context, "Zimmer 1", adminActor);
   const roomB = await createRoom(context, "Zimmer 2", adminActor);
 
-  // The rooms stay with the household account (manage_rooms); the round is Alex's (close_round).
+  // The rooms stay with the household account (manage_rooms); the round is Alex's (manage_rounds).
   const alexContext = {
     accountId: moderatorAccountId,
     householdId: household.id,

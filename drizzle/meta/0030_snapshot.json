@@ -1445,15 +1445,27 @@
         },
         "membership_moderator_holds_role_permissions": {
           "name": "membership_moderator_holds_role_permissions",
-          "value": "revoked_at IS NOT NULL OR role <> 'moderator' OR permissions @> ARRAY['manage_rooms', 'close_round', 'create_application', 'change_application_state', 'reverse_application_state']::text[]"
+          "value": "revoked_at IS NOT NULL OR role <> 'moderator' OR permissions @> ARRAY['manage_rooms', 'create_application', 'change_application_state', 'reverse_application_state']::text[]"
         },
         "membership_moderator_only_permissions": {
           "name": "membership_moderator_only_permissions",
-          "value": "role = 'moderator' OR NOT (permissions && ARRAY['reverse_application_state']::text[])"
+          "value": "role = 'moderator' OR NOT (permissions && ARRAY['manage_rounds', 'manage_round_participation', 'reverse_application_state']::text[])"
+        },
+        "membership_household_only_permissions": {
+          "name": "membership_household_only_permissions",
+          "value": "role = 'household_admin' OR NOT (permissions && ARRAY['issue_password_reset_link']::text[])"
+        },
+        "membership_administration_permissions": {
+          "name": "membership_administration_permissions",
+          "value": "role IN ('household_admin', 'moderator') OR NOT (permissions && ARRAY['manage_voting_procedure', 'manage_join_codes', 'create_resident_profile', 'appoint_moderator', 'manage_members', 'export_subject_access']::text[])"
+        },
+        "membership_resident_only_permissions": {
+          "name": "membership_resident_only_permissions",
+          "value": "is_resident OR NOT (permissions && ARRAY['vote']::text[])"
         },
         "membership_household_admin_holds_role_permissions": {
           "name": "membership_household_admin_holds_role_permissions",
-          "value": "revoked_at IS NOT NULL OR role <> 'household_admin' OR (permissions @> ARRAY['manage_rooms', 'manage_settings']::text[] AND permissions <@ ARRAY['manage_rooms', 'manage_settings']::text[])"
+          "value": "revoked_at IS NOT NULL OR role <> 'household_admin' OR (permissions @> ARRAY['manage_rooms']::text[] AND permissions <@ ARRAY['manage_voting_procedure', 'manage_rooms', 'manage_join_codes', 'create_resident_profile', 'appoint_moderator', 'manage_members', 'export_subject_access', 'issue_password_reset_link', 'manage_settings']::text[])"
         },
         "membership_resident_holds_role_permissions": {
           "name": "membership_resident_holds_role_permissions",

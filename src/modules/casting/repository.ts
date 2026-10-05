@@ -1,7 +1,6 @@
 import { and, asc, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { isUuid, withSessionContext, type SessionContext } from "@/db/session-context";
 import { PayloadValidationError, recordActivityEvent } from "@/modules/audit/repository";
-import { activityEvent } from "@/modules/audit/schema";
 import {
   assertHasPermission,
   assertHasPermissionTx,
@@ -22,7 +21,7 @@ import {
   type CorrectableField,
 } from "./application-changes";
 import { application, castingRound, castingRoundStatusEnum, room, roundParticipation } from "./schema";
-import { LOCKED_SETTINGS_FIELDS, type LockedSettingsField } from "./settings-fields";
+import type { VotingProcedureField } from "./settings-fields";
 import { ruleFor, type ApplicationState } from "./transitions";
 import { assertF1RoomTransitionAllowed, type RoomStatus } from "./room-transitions";
 
@@ -536,7 +535,7 @@ export async function transitionApplication(
 
 // FR-1.9: create, rename, remove — the moderator's room CRUD (manage_rooms).
 // G-C (speckit-analyze finding C1): these four functions had no authorization check of their
-// own — same class of bug already found and fixed once for `manage_settings` above — relying
+// own — same class of bug already found and fixed once for `manage_voting_procedure` above — relying
 // entirely on src/app/(org)/rooms/actions.ts to have checked first. Self-enforcing here matches
 // identity/repository.ts's member-management functions, which are safe regardless of caller.
 export async function createRoom(context: SessionContext, label: string, actor: Actor) {
@@ -672,13 +671,21 @@ export async function removeRoom(context: SessionContext, roomId: string, actor:
 
 export async function listRooms(context: SessionContext) {
   return withSessionContext(context, (tx) =>
-    tx.select().from(room).where(and(eq(room.householdId, context.householdId), isNull(room.deletedAt))),
+    tx
+      .select()
+      .from(room)
+      .where(and(eq(room.householdId, context.householdId), isNull(room.deletedAt)))
+      // Stable order: without it Postgres returns heap order, and an UPDATE (rename) moves the
+      // row, so rooms swapped places after "Umbenennen" (walkthrough 2026-10-05).
+      .orderBy(room.createdAt, room.id),
   );
 }
 
 // FR-1.12: create a round in draft, selecting the rooms it covers.
-// FR-1.12: round-lifecycle actions (create/open/manual-add) are gated on `close_round`, the
-// permission `data-model.md` already documents for `draft → open` — same G-C fix as createRoom
+// FR-1.12: round-lifecycle actions are gated on `manage_rounds` (create/open; matrix row
+// „CastingRound anlegen / schließen / wiedereröffnen", which renamed the earlier gate
+// in F3 change 2b) and `manage_round_participation` (manual add; matrix row
+// „RoundParticipation hinzufügen / entfernen") — same G-C fix as createRoom
 // above (speckit-analyze finding C1): no internal check previously, relied entirely on the one
 // caller (src/app/(org)/rounds/new/actions.ts) to have checked first.
 async function insertDraftRoundTx(
@@ -708,7 +715,7 @@ async function insertDraftRoundTx(
 
 export async function createRound(context: SessionContext, title: string, roomIds: string[], actor: Actor) {
   if (!actor.accountId) throw new Error("createRound requires an actor accountId");
-  await assertHasPermission(context, actor.accountId, "close_round");
+  await assertHasPermission(context, actor.accountId, "manage_rounds");
   return withSessionContext(context, (tx) => insertDraftRoundTx(tx, context, title, roomIds, actor));
 }
 
@@ -732,7 +739,7 @@ export class RoundOpenPreconditionError extends Error {
 const LOCKED_ROOM_STATUSES: ReadonlySet<RoomStatus> = new Set(["occupied", "not_available"]);
 
 // FR-1.14/FR-1.15/FR-1.16: draft -> open takes an atomic snapshot of eligible residents into
-// RoundParticipation and freezes HouseholdSettings' four locked fields into settings_snapshot —
+// RoundParticipation and freezes HouseholdSettings' four voting-procedure fields into settings_snapshot —
 // both effects or neither, in one transaction. EC-1.1/EC-1.2/EC-1.3 preconditions checked first.
 // LOCK ORDER: membership (FOR SHARE) ->
 // household_settings -> casting_round -> room -> application. Settings come before the round
@@ -847,9 +854,9 @@ async function openRoundTx(tx: Tx, context: SessionContext, roundId: string, act
 
 export async function openRound(context: SessionContext, roundId: string, actor: Actor) {
   if (!actor.accountId) throw new Error("openRound requires an actor accountId");
-  if (actor.accountId !== context.accountId) throw new PermissionDeniedError("close_round");
+  if (actor.accountId !== context.accountId) throw new PermissionDeniedError("manage_rounds");
   return withSessionContext(context, async (tx) => {
-    await assertHasPermissionTx(tx, context, "close_round");
+    await assertHasPermissionTx(tx, context, "manage_rounds");
     return openRoundTx(tx, context, roundId, actor);
   });
 }
@@ -868,9 +875,9 @@ export async function createAndOpenRound(
   actor: Actor,
 ) {
   if (!actor.accountId) throw new Error("createAndOpenRound requires an actor accountId");
-  if (actor.accountId !== context.accountId) throw new PermissionDeniedError("close_round");
+  if (actor.accountId !== context.accountId) throw new PermissionDeniedError("manage_rounds");
   return withSessionContext(context, async (tx) => {
-    await assertHasPermissionTx(tx, context, "close_round");
+    await assertHasPermissionTx(tx, context, "manage_rounds");
     const round = await insertDraftRoundTx(tx, context, title, roomIds, actor);
     // The inserted row is new, so nobody else can lock it. Inserting it before openRoundTx
     // takes the household_settings lock is not a lock-order violation.
@@ -891,7 +898,7 @@ export async function addResidentToRound(
   actor: Actor,
 ) {
   if (!actor.accountId) throw new Error("addResidentToRound requires an actor accountId");
-  await assertHasPermission(context, actor.accountId, "close_round");
+  await assertHasPermission(context, actor.accountId, "manage_round_participation");
   return withSessionContext(context, async (tx) => {
     const [inserted] = await tx
       .insert(roundParticipation)
@@ -1158,48 +1165,37 @@ export async function listVoteCandidatesTx(
   }));
 }
 
-export class ProcedureLockedError extends Error {
-  constructor(public readonly openRoundId: string, field: string) {
-    super(`Cannot change ${field}: round ${openRoundId} is open (FR-1.21)`);
-    this.name = "ProcedureLockedError";
-  }
-}
-
-// FR-1.21/FR-1.22/invariant I-7: while any round is open, the four locked settings are refused,
-// naming the open round. Lives in the casting module (not identity/repository.ts), because
-// identity is the bounded-context root and may import nothing (kontextgrenzen.md §4) — the lock
-// itself is a casting-round invariant reaching into identity-owned data, and casting is already
-// permitted to import from identity, never the reverse.
-export async function updateHouseholdSettingsWithProcedureLock(
+// FR-1.21 (relaxed by human decision 2026-10-05): changing the voting-procedure settings is allowed
+// while a round is open. An open round keeps the settings snapshot it took at draft -> open
+// (FR-1.15, AC-1.9), so the change reaches only rounds opened afterwards and no running ranking is
+// altered (P-3). Lives in the casting module (not identity/repository.ts), because identity is the
+// bounded-context root and may import nothing (kontextgrenzen.md §4) — the snapshot is a
+// casting-round concern reaching into identity-owned data, and casting is already permitted to
+// import from identity, never the reverse.
+// LOCK ORDER: the settings row is locked FOR UPDATE here and FOR SHARE in `openRoundTx`, so an
+// opener sees either the whole old or the whole new settings, never a half-written change.
+export async function updateHouseholdSettings(
   context: SessionContext,
-  patch: Partial<Record<LockedSettingsField, unknown>>,
+  patch: Partial<Record<VotingProcedureField, unknown>>,
   actor: Actor,
 ) {
   // FR-1.8/G-C (Convergence): this had no authorization check at all — any signed-in account,
-  // including a plain resident with no granted permissions, could change household settings as
-  // long as no round was open. `manage_settings` is in the stored household set (identity/schema.ts,
-  // HOUSEHOLD_PERMISSIONS) and otherwise individually grantable; no role is read.
-  if (!actor.accountId) throw new Error("updateHouseholdSettingsWithProcedureLock requires an actor accountId");
-  if (actor.accountId !== context.accountId) throw new PermissionDeniedError("manage_settings");
+  // including a plain resident with no granted permissions, could change household settings.
+  // `manage_voting_procedure` (matrix row „Abstimmungsverfahren ändern";
+  // household ✅, moderator ⬜) is in the stored household set (identity/schema.ts,
+  // HOUSEHOLD_PERMISSIONS) and otherwise individually grantable to a moderator; no role is read.
+  if (!actor.accountId) throw new Error("updateHouseholdSettings requires an actor accountId");
+  if (actor.accountId !== context.accountId) throw new PermissionDeniedError("manage_voting_procedure");
 
   return withSessionContext(context, async (tx) => {
-    await assertHasPermissionTx(tx, context, "manage_settings");
+    await assertHasPermissionTx(tx, context, "manage_voting_procedure");
     const [settings] = await tx
       .select()
       .from(householdSettings)
       .where(eq(householdSettings.householdId, context.householdId))
       .for("update");
     if (!settings) throw new Error(`HouseholdSettings not found for household ${context.householdId}`);
-    const changedFields = Object.keys(patch) as LockedSettingsField[];
-    const [openRound] = await tx
-      .select({ id: castingRound.id })
-      .from(castingRound)
-      .where(and(eq(castingRound.householdId, context.householdId), eq(castingRound.status, "open")));
-
-    const lockedFieldChanged = changedFields.some((f) => LOCKED_SETTINGS_FIELDS.includes(f));
-    if (openRound && lockedFieldChanged) {
-      throw new ProcedureLockedError(openRound.id, changedFields.join(", "));
-    }
+    const changedFields = Object.keys(patch) as VotingProcedureField[];
 
     const columnPatch: Record<string, unknown> = {};
     if (patch.scaleWeights !== undefined) columnPatch.scaleWeights = patch.scaleWeights;
@@ -1226,38 +1222,6 @@ export async function updateHouseholdSettingsWithProcedureLock(
     });
 
     return updated;
-  });
-}
-
-// AC-1.14/FR-1.22: an administrative bypass path that still writes an ActivityEvent and marks the
-// round with a "procedure changed" notice — used only to exercise the guarded scenario where a
-// locked setting is changed anyway; not exposed to any normal UI action.
-export async function forceChangeSettingWhileRoundOpen(
-  context: SessionContext,
-  field: LockedSettingsField,
-  value: unknown,
-  openRoundId: string,
-  actor: Actor,
-) {
-  if (!actor.accountId) throw new Error("forceChangeSettingWhileRoundOpen requires an actor accountId");
-  const accountId = actor.accountId;
-  await assertHasPermission(context, accountId, "manage_settings");
-
-  return withSessionContext(context, async (tx) => {
-    await tx
-      .update(householdSettings)
-      .set({ [field]: value, updatedAt: new Date(), updatedByAccountId: accountId })
-      .where(eq(householdSettings.householdId, context.householdId));
-
-    await recordActivityEvent(tx, {
-      householdId: context.householdId,
-      eventType: "household_settings.changed_while_round_open",
-      subjectType: "casting_round",
-      subjectId: openRoundId,
-      actorAccountId: actor.accountId,
-      actorProfileId: actor.profileId,
-      payload: { field, roundId: openRoundId },
-    });
   });
 }
 
@@ -1305,13 +1269,13 @@ export interface OrganisationTask {
 
 // start-screen design.md Decision 4/Assumption 3 (tasks.md 3.2): a room open for letting and not
 // covered by any draft/open/paused round is v0.1's one organisation task. Returns `[]` for a
-// viewer who does not hold `close_round` — the permission `rounds/new`'s own action already
+// viewer who does not hold `manage_rounds` — the permission `rounds/new`'s own action already
 // requires — so the bridge's count never promises something the destination action would refuse.
 // Carries no application-derived value, so it is not a G-D15 read (design.md Decision 9's finding
 // is scoped to `application`, not `room`/`casting_round`).
 export async function listOrganisationTasks(context: SessionContext): Promise<OrganisationTask[]> {
   try {
-    await assertHasPermission(context, context.accountId, "close_round");
+    await assertHasPermission(context, context.accountId, "manage_rounds");
   } catch (err) {
     if (err instanceof PermissionDeniedError) return [];
     throw err;
@@ -1438,21 +1402,5 @@ export async function getStartOverview(context: SessionContext): Promise<StartOv
     }
 
     return { anyOpenRound, openRounds, standing };
-  });
-}
-
-// AC-1.14: has this round had a procedure change recorded against it while it was open?
-export async function hasProcedureChangedNotice(context: SessionContext, roundId: string): Promise<boolean> {
-  return withSessionContext(context, async (tx) => {
-    const rows = await tx
-      .select({ id: activityEvent.id })
-      .from(activityEvent)
-      .where(
-        and(
-          eq(activityEvent.eventType, "household_settings.changed_while_round_open"),
-          eq(activityEvent.subjectId, roundId),
-        ),
-      );
-    return rows.length > 0;
   });
 }

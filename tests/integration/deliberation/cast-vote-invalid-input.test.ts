@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 // F4 change 1 tasks 6.1 (D5 step order): malformed input is refused with `invalid_input` BEFORE any
-// query, including assertAccountCanVote's. Isolated in its own file because mocking
+// query, including the vote permission check's. Isolated in its own file because mocking
 // @/db/session-context would disturb the real-database cases of cast-vote.test.ts.
 const withSessionContextSpy = vi.fn();
 vi.mock("@/db/session-context", async (importOriginal) => {

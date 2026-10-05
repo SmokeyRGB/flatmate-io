@@ -131,7 +131,10 @@ describe("resolve_join_code / claim_join_code — the password_reset branch, raw
     // Revoked directly, without also moving the profile out of `active` — isolates the membership
     // predicate from the profile-status one (c) already covers.
     await withSessionContext(hhA.context, (tx) =>
-      tx.update(membership).set({ revokedAt: new Date() }).where(eq(membership.accountId, resident.accountId)),
+      tx
+        .update(membership)
+        .set({ revokedAt: new Date(), role: "member", permissions: [] }) // the real revocation's shape
+        .where(eq(membership.accountId, resident.accountId)),
     );
 
     const rows = await withSessionContext(hhA.context, (tx) =>
@@ -192,7 +195,9 @@ describe("resolve_join_code / claim_join_code — the password_reset branch, raw
     await insertResetIssuance(hhA, resident.profileId, code);
 
     await withSessionContext(hhA.context, (tx) =>
-      tx.execute(sql`UPDATE membership SET revoked_at = now() WHERE account_id = ${resident.accountId}`),
+      tx.execute(
+        sql`UPDATE membership SET revoked_at = now(), role = 'member', permissions = '{}'::text[] WHERE account_id = ${resident.accountId}`,
+      ),
     );
 
     let caught: unknown;
