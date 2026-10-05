@@ -516,9 +516,11 @@ export const de = {
     viewSaved: "Bewerbung ansehen",
     // The Art. 14 duty and text. `{Datum}` is one month after capture, on the Berlin calendar (A2).
     notice: {
-      // Two quiet lines (design D6): this one, then deadlineLine. Together they state both
-      // deadlines of FR-3.11, the first message and the one-month date.
-      gdprNotice: "Datenschutz-Hinweis",
+      // The notice's own short title. Distinct from the applicant notice's toggle („Datenschutz-Hinweis
+      // anzeigen"), which the detail page shows beside it. Human decision 2026-10-05.
+      thirdPartyNoticeTitle: "Die Person informieren",
+      // Two quiet lines under the title (design D6): this one, then deadlineLine. Together they state
+      // both deadlines of FR-3.11, the first message and the one-month date.
       informLine: "Die Person muss erfahren, dass ihr ihre Angaben gespeichert habt.",
       // 06-Compliance-Anhang.md §4.5, verbatim apart from its placeholders.
       deadlineLine: (name: string, date: string) =>

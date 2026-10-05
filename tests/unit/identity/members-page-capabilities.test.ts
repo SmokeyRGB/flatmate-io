@@ -185,3 +185,28 @@ describe("the reset link on a member row", () => {
     expect(html).toContain(de.members.joinCode.resetLinkNotNeeded);
   });
 });
+
+// A native <dialog> has no accessible name of its own: each one must point at its heading with
+// aria-labelledby, and that id must exist exactly once and carry text (PR #50 review).
+describe("every confirmation dialog on the members screen has an accessible name", () => {
+  const dialogs = (html: string) => [...html.matchAll(/<dialog\b([^>]*)>/g)].map((m) => m[1]);
+
+  it("delete-prepared, remove-member and delete-join-code: aria-labelledby resolves to a non-empty, unique heading", () => {
+    const html = render({ canManageMembers: true, canManageJoinCodes: true, canCreateProfile: true, canAppointModerator: true, canIssueResetLink: true });
+    const found = dialogs(html);
+    // one per prepared profile, per removable member and per live join code
+    expect(found.length).toBeGreaterThanOrEqual(3);
+    const names = new Set<string>();
+    for (const attrs of found) {
+      const labelledBy = /aria-labelledby="([^"]+)"/.exec(attrs)?.[1];
+      expect(labelledBy, `<dialog${attrs}> has no aria-labelledby`).toBeTruthy();
+      const heading = [...html.matchAll(new RegExp(`<h2[^>]* id="${labelledBy}"[^>]*>([^<]+)</h2>`, "g"))];
+      expect(heading, `id ${labelledBy} must label exactly one heading`).toHaveLength(1);
+      expect(heading[0][1].trim()).not.toBe("");
+      names.add(heading[0][1].trim());
+    }
+    expect(names).toContain(de.members.deletePreparedDialog.heading);
+    expect(names).toContain(de.members.joinCode.deleteDialog.heading);
+    expect(names).toContain(de.members.remove.dialogHeading("Max Mitglied"));
+  });
+});

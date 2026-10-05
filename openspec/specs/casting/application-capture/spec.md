@@ -189,6 +189,9 @@ source explicitly whether or not the box is ticked. Sources: FR-3.9, AC-3.6, `03
 
 When the checkbox is ticked, capture SHALL end with one more step before saving. It shows a short,
 neutral notice and nothing more:
+- the short heading „Die Person informieren", an `h2` in the page's outline, set in the normal
+  weight (human decision 2026-10-05; it differs on purpose from the „Datenschutz-Hinweis"
+  toggle of the applicant notice, which the application detail shows beside it);
 - that the person must learn that the household has their details;
 - the Compliance §4.5 line *„Am besten gleich mit deiner ersten Nachricht an {Name} schicken –
   spätestens bis {Datum}."*, which states both deadlines of FR-3.11, the first message and the

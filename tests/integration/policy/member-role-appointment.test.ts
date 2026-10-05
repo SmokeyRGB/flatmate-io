@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { withSessionContext } from "@/db/session-context";
 import { activityEvent } from "@/modules/audit/schema";
 import { claimResidentProfile } from "@/modules/identity/auth";
+import { membership } from "@/modules/identity/schema";
 import {
   CannotChangeAdminRoleError,
   createResidentProfile,
@@ -99,6 +100,15 @@ describe("Moderator appointment by a moderator (appoint_moderator)", () => {
     await setMemberRole(moderator.context, moderator.accountId, claimed.accountId, "member");
     // the moderator demotes itself; the household account can always appoint again (EC-1.7)
     await setMemberRole(moderator.context, moderator.accountId, moderator.accountId, "member");
+    // PR #50 review: the events name the acting session's profile (null means the household
+    // account acted), the self-demotion included. Full coverage: moderator-audit-attribution.test.ts.
+    const [{ id: selfMembershipId }] = await withSessionContext(hh.context, (tx) =>
+      tx.select({ id: membership.id }).from(membership).where(eq(membership.accountId, moderator.accountId)),
+    );
+    const selfEvents = await roleEvents(hh, selfMembershipId);
+    const byModerator = selfEvents.filter((e) => e.actorAccountId === moderator.accountId);
+    expect(byModerator).toHaveLength(1);
+    expect(byModerator[0].actorProfileId).toBe(moderator.profileId);
     await expect(
       setMemberRole(moderator.context, moderator.accountId, claimed.accountId, "moderator"),
     ).rejects.toThrow(PermissionDeniedError);

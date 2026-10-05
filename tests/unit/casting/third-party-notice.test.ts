@@ -52,7 +52,7 @@ describe("the quiet Art. 14 notice (AC-3.8, AC-3.10)", () => {
     expect(renderOpen()).not.toContain("callout-caution");
   });
 
-  it("is exactly two lines: the person must learn of it, and the Compliance line with the date", () => {
+  it("is a short title and two lines: the person must learn of it, and the Compliance line with the date", () => {
     const html = render();
     expect(html).toContain(escapeHtml(de.applications.notice.informLine));
     expect(html).toContain(escapeHtml(de.applications.notice.deadlineLine("Testbewerbung Lea", "15.10.2026")));
@@ -61,9 +61,12 @@ describe("the quiet Art. 14 notice (AC-3.8, AC-3.10)", () => {
     expect(de.applications.notice.deadlineLine("Lea", "15.10.2026")).toBe(
       "Am besten gleich mit deiner ersten Nachricht an Lea schicken – spätestens bis 15.10.2026.",
     );
-    // Two paragraphs, nothing else in the notice body: no heading, no bold.
+    // A title (human decision 2026-10-05), two paragraphs, nothing else in the notice body: exactly
+    // one heading, an h2 (both pages put the notice under their h1), and no bold.
+    expect([...html.matchAll(/<h[1-6]\b/g)]).toHaveLength(1);
+    expect(html).toMatch(/<h2\b[^>]*>Die Person informieren<\/h2>/);
+    expect(de.applications.notice.thirdPartyNoticeTitle).toBe("Die Person informieren");
     expect([...html.matchAll(/<p\b/g)]).toHaveLength(2);
-    //expect(html).not.toMatch(/<h[1-6]\b/);
     expect(html).not.toMatch(/font-medium|<strong|<b>/);
   });
 

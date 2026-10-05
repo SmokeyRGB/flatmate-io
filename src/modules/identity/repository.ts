@@ -876,7 +876,7 @@ export async function removeMember(
   confirmDisplayName: string,
 ): Promise<void> {
   if (actingAccountId !== context.accountId) throw new PermissionDeniedError("manage_members");
-  const actor: Actor = { accountId: actingAccountId, profileId: null };
+  const actor: Actor = { accountId: actingAccountId, profileId: context.profileId };
 
   // speckit-bug-fix identity-moveout-session-revocation-not-atomic: the lookup/confirmation
   // check, the status transition, and the membership/session revocation now share one
@@ -931,7 +931,7 @@ export async function removePreparedProfile(
   residentProfileId: string,
 ): Promise<void> {
   if (actingAccountId !== context.accountId) throw new PermissionDeniedError("manage_members");
-  const actor: Actor = { accountId: actingAccountId, profileId: null };
+  const actor: Actor = { accountId: actingAccountId, profileId: context.profileId };
   await withSessionContext(context, async (tx) => {
     await assertHasPermissionTx(tx, context, "manage_members");
     const [profile] = await tx
@@ -968,7 +968,7 @@ export async function removePreparedProfile(
         subjectType: "join_code_issuance",
         subjectId: link.id,
         actorAccountId: actingAccountId,
-        actorProfileId: null,
+        actorProfileId: context.profileId,
         payload: {},
       });
     }
@@ -985,7 +985,7 @@ export async function setMovedOut(
   targetAccountId: string,
 ): Promise<void> {
   if (actingAccountId !== context.accountId) throw new PermissionDeniedError("manage_members");
-  const actor: Actor = { accountId: actingAccountId, profileId: null };
+  const actor: Actor = { accountId: actingAccountId, profileId: context.profileId };
 
   // speckit-bug-fix identity-moveout-session-revocation-not-atomic: one shared transaction — see
   // removeMember above for why (V-3 requires the status change and the revocation to commit or
@@ -1020,7 +1020,7 @@ export async function reactivateMember(
   targetAccountId: string,
 ): Promise<void> {
   if (actingAccountId !== context.accountId) throw new PermissionDeniedError("manage_members");
-  const actor: Actor = { accountId: actingAccountId, profileId: null };
+  const actor: Actor = { accountId: actingAccountId, profileId: context.profileId };
 
   await withSessionContext(context, async (tx) => {
     await assertHasPermissionTx(tx, context, "manage_members");
@@ -1049,7 +1049,7 @@ export async function reactivateMember(
       subjectType: "membership",
       subjectId: target.id,
       actorAccountId: actingAccountId,
-      actorProfileId: null,
+      actorProfileId: context.profileId,
       payload: {},
     });
   });
@@ -1208,6 +1208,9 @@ export async function issueJoinCodeTx(
   tx: Tx,
   householdId: string,
   actingAccountId: string,
+  // The acting session's profile (null only when the household account acts), written to the audit
+  // event as actor_profile_id. Required, so no caller can forget it.
+  actingProfileId: string | null,
   options: IssueJoinCodeOptions,
 ): Promise<typeof joinCodeIssuance.$inferSelect> {
   const expiresAt = new Date(Date.now() + options.validDays * 24 * 60 * 60 * 1000);
@@ -1265,7 +1268,7 @@ export async function issueJoinCodeTx(
         subjectType: "join_code_issuance",
         subjectId: row.id,
         actorAccountId: actingAccountId,
-        actorProfileId: null,
+        actorProfileId: actingProfileId,
         payload: {},
       });
 
@@ -1293,7 +1296,7 @@ export async function issueJoinCode(
   if (actingAccountId !== context.accountId) throw new PermissionDeniedError("manage_join_codes");
   return withSessionContext(context, async (tx) => {
     await assertHasPermissionTx(tx, context, "manage_join_codes");
-    return issueJoinCodeTx(tx, context.householdId, actingAccountId, options);
+    return issueJoinCodeTx(tx, context.householdId, actingAccountId, context.profileId, options);
   });
 }
 
@@ -1351,7 +1354,7 @@ export async function issuePasswordResetLink(
       throw new ResidentProfileNotEligibleForResetError(residentProfileId);
     }
 
-    return issueJoinCodeTx(tx, context.householdId, actingAccountId, {
+    return issueJoinCodeTx(tx, context.householdId, actingAccountId, context.profileId, {
       validDays: PASSWORD_RESET_LINK_VALID_DAYS,
       maxUses: 1,
       residentProfileId,
@@ -1426,7 +1429,7 @@ export async function deleteJoinCode(
       subjectType: "join_code_issuance",
       subjectId: issuanceId,
       actorAccountId: actingAccountId,
-      actorProfileId: null,
+      actorProfileId: context.profileId,
       payload: {},
     });
   });
@@ -1585,7 +1588,7 @@ export async function setMemberRole(
       subjectType: "membership",
       subjectId: target.id,
       actorAccountId: actingAccountId,
-      actorProfileId: null,
+      actorProfileId: context.profileId,
       payload: { fromRole, toRole },
     });
   });

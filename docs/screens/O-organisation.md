@@ -106,8 +106,9 @@ Prozess vs. Person, nicht bei „beschreibend vs. empfehlend".
   „Die Angaben stammen nicht von der Person selbst (z. B. jemand hat sie euch empfohlen)"
   (`03-PRD.md` §4.1.3)
 - **Art.-14-Hinweis, noch vor dem Speichern** *(ergänzt 2026-09-28, geändert 2026-09-29,
-  Durchsicht)*: ist die Checkbox gesetzt, folgt als letzter Schritt ein kurzer, neutraler Hinweis
-  in zwei Zeilen: die Person muss erfahren, dass ihre Angaben gespeichert sind, und der Satz aus
+  Durchsicht; geändert 2026-10-05, menschliche Entscheidung)*: ist die Checkbox gesetzt, folgt als
+  letzter Schritt ein kurzer, neutraler Hinweis mit der kurzen Überschrift „Die Person informieren"
+  und zwei Zeilen: die Person muss erfahren, dass ihre Angaben gespeichert sind, und der Satz aus
   `06-Compliance-Anhang.md` §4.5 mit Frist und Datum. „Verstanden" speichert. „Beispieltext
   anzeigen" öffnet den Textbaustein *Variante Dritterhebung* (`06-Compliance-Anhang.md` §4.5),
   vor dem Kopieren änderbar, mit Kopieren-Knopf. **Keine Sende-Handlung** (S-16)

@@ -1,7 +1,7 @@
 "use client";
 
 import { Trash2 } from "lucide-react";
-import { useRef } from "react";
+import { useId, useRef } from "react";
 import { de } from "@/ui/strings";
 import { SubmitButton } from "@/ui/submit-button";
 import { removePreparedProfileAction } from "./actions";
@@ -18,6 +18,7 @@ export function DeletePreparedProfileForm({
   displayName: string;
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
+  const headingId = useId();
 
   return (
     <>
@@ -25,8 +26,8 @@ export function DeletePreparedProfileForm({
         <Trash2 className="size-4" /> {t.deletePrepared}
       </button>
 
-      <dialog ref={dialogRef} className="dialog">
-        <h2 className="font-serif text-lg font-semibold">{t.deletePreparedDialog.heading}</h2>
+      <dialog ref={dialogRef} className="dialog" aria-labelledby={headingId}>
+        <h2 id={headingId} className="font-serif text-lg font-semibold">{t.deletePreparedDialog.heading}</h2>
         <p className="mt-1 text-sm text-muted-foreground">{t.deletePreparedDialog.consequence(displayName)}</p>
 
         <form action={removePreparedProfileAction} className="mt-4 flex items-center gap-4">

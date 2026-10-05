@@ -214,7 +214,7 @@ export async function registerHousehold(email: string, password: string, name: s
       // itself — proposal.md's 2026-09-21 register decision: FR-2.4's founding-link usage-count
       // prefill ("expected resident count") is not built in v0.1 (nobody collects that number), so
       // the founding link takes the same default any other issued link would: 7 days, max 1 use.
-      await issueJoinCodeTx(tx, householdId, accountId, { validDays: 7, maxUses: 1 });
+      await issueJoinCodeTx(tx, householdId, accountId, null, { validDays: 7, maxUses: 1 });
 
       await tx.insert(account).values({
         id: accountId,

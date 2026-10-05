@@ -166,7 +166,7 @@ export function ThirdPartyNotice({
   // into a column (walkthrough finding: the paragraphs sat side by side and scrolled sideways).
   return (
     <div className="callout callout-info flex-col items-stretch gap-3">
-      <h6 className="text-lg font-semibold">{t.gdprNotice}</h6>
+      <h2 className="font-serif text-base">{t.thirdPartyNoticeTitle}</h2>
       <p className="text-sm">{t.informLine}</p>
       <p className="text-sm">
         {deadlinePassed

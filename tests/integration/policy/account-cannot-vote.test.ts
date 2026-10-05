@@ -113,10 +113,12 @@ describe("Only a membership holding vote can vote (FR-1.7, F3 change 2b)", () =>
       () => null as null | unknown,
       (e: unknown) => e,
     );
-    expect(await settlesWithin(attempt, 2000)).toBe(false);
-
+    // Capture the timing result, release and await the held transaction, and only then assert: a
+    // failed assertion must not leave the uncommitted UPDATE blocking afterEach cleanup.
+    const settledWhileHeld = await settlesWithin(attempt, 2000);
     held.release();
     await held.done;
+    expect(settledWhileHeld).toBe(false);
     const err = await attempt;
     expect(err).toBeInstanceOf(VoteError);
     expect((err as VoteError).code).toBe("not_eligible");
