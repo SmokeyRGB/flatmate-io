@@ -16,7 +16,7 @@ import {
 } from "react";
 import type { RoundStatus } from "@/modules/casting/repository";
 import type { ScreeningCard } from "@/modules/deliberation/repository";
-import type { ScaleWeights } from "@/modules/deliberation/scale-weights";
+import type { ScaleWeights } from "@/modules/deliberation/round-rules";
 import { VOTE_VALUES, type VoteValue } from "@/modules/deliberation/vote-values";
 import { SubmitButton } from "@/ui/submit-button";
 import { de } from "@/ui/strings";

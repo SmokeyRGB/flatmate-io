@@ -15,7 +15,7 @@ import {
   assertHasPermissionTx,
   assertHoldsAnyPermissionTx,
 } from "@/modules/identity/repository";
-import { parseScaleWeights, type ScaleWeights } from "./scale-weights";
+import { parseScaleWeights, type ScaleWeights } from "./round-rules";
 import { vote } from "./schema";
 import { VOTE_VALUES, type VoteValue } from "./vote-values";
 

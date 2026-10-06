@@ -39,7 +39,7 @@
 
 ## 1. Packet V1.1 and spec corrections (first commit, docs only)
 
-- [ ] 1.1 `docs/backlog/requirements/F5-requirements.md` → **V1.1 · 2026-10-05**. Each change whose
+- [x] 1.1 `docs/backlog/requirements/F5-requirements.md` → **V1.1 · 2026-10-05**. Each change whose
   meaning differs gets a one-line "(V1.1: …)" note:
   - **F-1:** FR-5.4, FR-5.6 and FR-5.15 read `round.settings_snapshot` keys `scaleWeights`,
     `quorumShare`, `hideResultsUntilVoted`.
@@ -71,12 +71,12 @@
     to `domain/rechenmodelle.md`.
   - **R-6:** add the top-N highlight as FR-5.13a with an AC.
   - Bump the header status line.
-- [ ] 1.2 `docs/02-SRD.md` S-32: amend per Q-6. „Die Stimme eines ehemaligen Mitglieds zählt nicht
+- [x] 1.2 `docs/02-SRD.md` S-32: amend per Q-6. „Die Stimme eines ehemaligen Mitglieds zählt nicht
   mehr — weder im Score noch in Zähler und Nenner; bei Reaktivierung zählt sie wieder" (human
   decision 2026-10-05). Keep the marker as v0.2. Leave the old reasoning as a dated
   „Vormals:"-note, so the change is traceable. The commit message records the human decision. If
   S-31's row names the own-application view, strike that part too (Q-9).
-- [ ] 1.3 `docs/03-PRD.md`:
+- [x] 1.3 `docs/03-PRD.md`:
   - §4.1.6: replace the separate „Warten auf Stimmen" section and its AC with Q-3's one-scoreboard
     shape. The AC „0/20/60/100" becomes „bei Standardgewichten" (F-25). „5 von 7" moves per
     application to the Einzelansicht (Q-5). The AC „Die verdeckte Darstellung nennt den Grund und
@@ -85,7 +85,7 @@
   - §4.2.3 and the line around l.1177: former members per Q-6.
   - §4.2.5: strike the own-application view (Q-9). The screen layer corrects the PRD by human
     decision.
-- [ ] 1.4 `docs/domain/invarianten.md`:
+- [x] 1.4 `docs/domain/invarianten.md`:
   - §5.3: `score_votes` counts only voters in the denominator, per Q-6/R-4. Amend the „Auszug
     während einer offenen Runde — entschieden" block with the human's decision and date, keeping
     the earlier reasoning visible as „vormals".
@@ -96,13 +96,13 @@
     session sees no ranking (V-2). Reword the predicate and detail 1 accordingly.
   - §5.1: add a note that `membership_account_id_unique` (0021) currently makes `redaction_subjects`
     a single profile, checked at runtime by the live-membership read (design D5).
-- [ ] 1.5 `docs/domain/rechenmodelle.md` §8.3:
+- [x] 1.5 `docs/domain/rechenmodelle.md` §8.3:
   - pending sort `(a.created_at, a.id)`, on the board's bottom rather than a separate section
     (Q-3);
   - define `round_half_up` (F-25);
   - former members per Q-6;
   - the top-N highlight with its tie rule (Q-15).
-- [ ] 1.6 `docs/screens/D-casting-tab.md`:
+- [x] 1.6 `docs/screens/D-casting-tab.md`:
   - D1: one scoreboard, progress ring, unscored rows at the bottom, hidden rows greyed below with
     eye-off and the one notice „Verdeckt — du hast hier nicht abgestimmt", top-N highlight,
     screen-level „(?)", and the empty state per design (human-approved 2026-10-06). The state
@@ -110,9 +110,9 @@
   - D2: distribution, arithmetic and „5 von 7" go here (changes 2 and 3).
   - D3: struck (Q-9). Fix D2's „Selbst-Redaktion greift" row.
   - Do **not** touch `07-Screen-Inventar.md` (frozen).
-- [ ] 1.7 `docs/domain/casting.md`: name the snapshot keys `scaleWeights`, `favoriteBudgetFactor`,
+- [x] 1.7 `docs/domain/casting.md`: name the snapshot keys `scaleWeights`, `favoriteBudgetFactor`,
   `hideResultsUntilVoted`, `quorumShare` (string from `numeric`) as stored (F-1).
-- [ ] 1.8 `docs/review-log.md` §Offene-Punkte-Register. Each human decision gets its text and date
+- [x] 1.8 `docs/review-log.md` §Offene-Punkte-Register. Each human decision gets its text and date
   here, so the citations in `openspec/` resolve inside the repo:
   - the decisions Q-2, Q-3, Q-5, Q-6, Q-7, Q-9, Q-10, Q-12, Q-15, R-4, R-6 and R-7 of 2026-10-05,
     one line each, as decided;
@@ -132,33 +132,33 @@
   - the Casting tab may later need sub-tabs by stage, because an application's standing is
     individual (one invited or moved in while others still wait, and later several voting rounds):
     each applicant would be shown under their own stage. Human idea 2026-10-06, open, no owner yet.
-- [ ] 1.9 Fix the ranges that name the struck IDs, in the same commit:
+- [x] 1.9 Fix the ranges that name the struck IDs, in the same commit:
   - `docs/COVERAGE.md` l.36 and l.84 („FR-5.29–FR-5.32; AC-5.24–AC-5.27");
   - `docs/backlog/stubs/EP-E-3-zu-und-abgaenge.md` l.30.
   Then `grep -rn "FR-5.3[12]\|AC-5.26\|US-5.10" docs/` shows only the struck entries themselves.
-- [ ] 1.10 Run `node tools/check-refs.ts` (all 7 rules), plus `node tools/check-refs.ts --scope docs`.
+- [x] 1.10 Run `node tools/check-refs.ts` (all 7 rules), plus `node tools/check-refs.ts --scope docs`.
   No line under `docs/` may point into `openspec/`. Commit as `docs(f5): packet V1.1 and chain
   amendments for the ranking (human decisions Q-2, Q-3, Q-6, Q-9, R-6, R-7)`.
 
 ## 2. Frozen-rules parser (design D2)
 
-- [ ] 2.1 Rename `src/modules/deliberation/scale-weights.ts` → `round-rules.ts` (`git mv`). Update
+- [x] 2.1 Rename `src/modules/deliberation/scale-weights.ts` → `round-rules.ts` (`git mv`). Update
   the imports in `deliberation/repository.ts` and `casting/screening/screening-deck.tsx` (type
   only).
-- [ ] 2.2 In `round-rules.ts`, add the exact-decimal reader used by D1:
+- [x] 2.2 In `round-rules.ts`, add the exact-decimal reader used by D1:
   - `toScaled(value): { units: bigint; scale: number } | null` reads a number via `String()`, or a
     string as given;
   - plain decimal only (`/^\d+(\.\d+)?$/`), any number of fraction digits, ≥ 0 by construction;
   - exponent notation, NaN, ±Infinity, a sign, whitespace or anything else gives `null`;
   - export a helper that brings several scaled values to one common scale (the largest `scale`),
     so D1 never adds values of different scales.
-- [ ] 2.3 `parseScaleWeights` additionally refuses when every weight is 0, or when any weight fails
+- [x] 2.3 `parseScaleWeights` additionally refuses when every weight is 0, or when any weight fails
   `toScaled`. `4.5` stays valid. The return type stays `ScaleWeights` (plain numbers, for the
   pass's popover). D1 re-reads them with `toScaled`.
-- [ ] 2.4 Add `parseRoundRules(snapshot: unknown)`. It returns `{ weights, quorumShare: { units,
+- [x] 2.4 Add `parseRoundRules(snapshot: unknown)`. It returns `{ weights, quorumShare: { units,
   scale }, hideResultsUntilVoted }`, or `null` when any of these holds: weights invalid; share not
   readable; share ≤ 0 or > 1; hide flag not a boolean; snapshot not an object.
-- [ ] 2.5 Move `tests/unit/deliberation/scale-weights.test.ts` → `round-rules.test.ts`, and add
+- [x] 2.5 Move `tests/unit/deliberation/scale-weights.test.ts` → `round-rules.test.ts`, and add
   cases:
   - all-zero weights;
   - `1e-7`;
@@ -166,7 +166,7 @@
   - share `"0.5"`, `"0.50"`, `0.5`, `"1"`, `"0"`, `"1.01"`, `"abc"`, `" 0.5"`, `null`;
   - hide flag `"true"`.
   Break: drop the max > 0 check; the all-zero case must fail.
-- [ ] 2.6 The pass now refuses all-zero weights (modified `screening-pass` spec). In
+- [x] 2.6 The pass now refuses all-zero weights (modified `screening-pass` spec). In
   `tests/integration/deliberation/screening-pass.test.ts`, add the "All weights zero" scenario by
   writing an all-zero `settings_snapshot.scaleWeights` (the existing malformed-snapshot case shows
   how), and assert `refused` with reason `rules_invalid`. Break: revert 2.3's check; the test must

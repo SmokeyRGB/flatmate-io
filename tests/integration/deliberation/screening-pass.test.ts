@@ -134,6 +134,19 @@ describe("getScreeningPass: the frozen weights (AC-4.9, EC-4.11)", () => {
     expect(await getScreeningPass(voter.context, s.roundId)).toEqual({ kind: "refused", reason: "rules_invalid" });
     expect(await getScreeningPass(voter.context, null)).toEqual({ kind: "refused", reason: "rules_invalid" });
   });
+
+  it("EC-5.6: all-zero frozen weights are refused like malformed ones, with no cards", async () => {
+    const { s, voter } = await fixture();
+    await insertApplicationAt(s, "new");
+    await withSessionContext(s.moderator.context, (tx) =>
+      tx
+        .update(castingRound)
+        .set({ settingsSnapshot: { scaleWeights: { no: 0, rather_not: 0, good: 0, definitely: 0 } } })
+        .where(eq(castingRound.id, s.roundId)),
+    );
+    expect(await getScreeningPass(voter.context, s.roundId)).toEqual({ kind: "refused", reason: "rules_invalid" });
+    expect(await getScreeningPass(voter.context, null)).toEqual({ kind: "refused", reason: "rules_invalid" });
+  });
 });
 
 describe("getScreeningPass: eligibility (FR-4.15, EC-4.3, V-2)", () => {
