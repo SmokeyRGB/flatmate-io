@@ -504,7 +504,7 @@ reason codes, not only lengths.
   `tests/unit/casting/ranking-board.test.ts`: the three headings appear only with rows; an invited
   row renders under „Eingeladen" with its ring; the highlight never on an invited row. Break: render
   invited rows inside „Punktwert"; the test must fail.
-- [ ] 10.5 Start (D11), `src/app/(resident)/dashboard/dashboard-view.ts` and its page and `de.ts`
+- [x] 10.5 Start (D11), `src/app/(resident)/dashboard/dashboard-view.ts` and its page and `de.ts`
   `start`: drop `phaseLabel` from the `phase` standing view (keep the "waiting for applications"
   sentence for a round without main-path applications), and add `allRated: boolean` when the
   standing round is one the viewer may vote in, its `stateCounts` hold ≥ 1 `new`/`screened`, and

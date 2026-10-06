@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildDashboardView, pendingVoteCount, shouldOpenScreening } from "@/app/(resident)/dashboard/dashboard-view";
+import { de } from "@/ui/strings";
 import type { StartOpenRound, StartOverview } from "@/modules/casting/repository";
 
 const NOW = new Date("2026-10-01T12:00:00Z");
@@ -109,8 +110,64 @@ describe("buildDashboardView (start-screen design.md Decision 10, tasks.md 7.4)"
     expect(view.primary).toBeNull();
     expect(view.standing).toEqual({
       kind: "phase",
-      phaseLabel: "Abstimmung Runde 1",
+      waiting: false,
+      allRated: false,
       distribution: [{ label: "2 in Sichtung", count: 2 }],
+    });
+  });
+
+  // Human decision 2026-10-06 (design D11): Start names no single phase, because each application
+  // has its own standing.
+  it("the standing names no phase, whatever the states are", () => {
+    const o = overview({
+      anyOpenRound: true,
+      openRounds: [round({ canVote: false })],
+      standing: { roundId: "r1", stateCounts: { new: 1, invited: 2 } },
+    });
+    const view = build(o);
+    expect(view.standing).not.toHaveProperty("phaseLabel");
+    for (const name of Object.values(de.start.phase)) {
+      if (name !== de.start.phase.waiting_for_applications) expect(JSON.stringify(view)).not.toContain(name);
+    }
+  });
+
+  it("a round with no main-path application reads as waiting for applications", () => {
+    const o = overview({
+      anyOpenRound: true,
+      openRounds: [round({ canVote: false })],
+      standing: { roundId: "r1", stateCounts: {} },
+    });
+    expect(build(o).standing).toMatchObject({ kind: "phase", waiting: true, allRated: false });
+  });
+
+  describe("the acknowledgement (design D11)", () => {
+    const standingOf = (stateCounts: Record<string, number>, canVote = true) =>
+      overview({
+        anyOpenRound: true,
+        openRounds: [round({ canVote })],
+        standing: { roundId: "r1", stateCounts },
+      });
+
+    it("last card rated: something is open for voting and nothing awaits the viewer", () => {
+      const view = build(standingOf({ new: 2, screened: 1 }), 0, false, NOW, { r1: 0 });
+      expect(view.primary).toBeNull();
+      expect(view.standing).toMatchObject({ kind: "phase", allRated: true });
+    });
+
+    it("nothing to rate yet: no new/screened application, no acknowledgement", () => {
+      const view = build(standingOf({ invited: 2 }), 0, false, NOW, { r1: 0 });
+      expect(view.standing).toMatchObject({ kind: "phase", allRated: false });
+    });
+
+    it("something still waits: the vote task shows and there is no standing to acknowledge in", () => {
+      const view = build(standingOf({ new: 2 }), 0, false, NOW, { r1: 2 });
+      expect(view.primary).not.toBeNull();
+      expect(view.standing).toBeNull();
+    });
+
+    it("a viewer who may not vote is not congratulated", () => {
+      const view = build(standingOf({ new: 2 }, false), 0, false, NOW, { r1: 0 });
+      expect(view.standing).toMatchObject({ kind: "phase", allRated: false });
     });
   });
 

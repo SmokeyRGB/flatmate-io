@@ -21,7 +21,15 @@ export interface DashboardTaskView {
 export type DashboardStandingView =
   | { kind: "noRound" }
   | { kind: "runningWithoutYou" }
-  | { kind: "phase"; phaseLabel: string; distribution: Array<{ label: string; count: number }> };
+  | {
+      kind: "phase";
+      // True when no main-path application exists: Start then says so in one sentence. No phase
+      // name is shown (human decision 2026-10-06): every application has its own standing.
+      waiting: boolean;
+      // The viewer rated everything open for voting (design D11).
+      allRated: boolean;
+      distribution: Array<{ label: string; count: number }>;
+    };
 
 export interface DashboardBridgeView {
   heading: string;
@@ -114,10 +122,17 @@ export function buildDashboardView(
       // spec.md "A round runs without the resident": no number derived from applications.
       standing = { kind: "runningWithoutYou" };
     } else {
+      const { roundId, stateCounts } = overview.standing;
+      // Design D11: acknowledged when the viewer may vote in the standing round, something in it
+      // is open for voting, and nothing awaits them. "Awaits" is deliberation's one count; the
+      // standing counts exclude the viewer's own application already.
+      const openForVoting = (stateCounts.new ?? 0) + (stateCounts.screened ?? 0) > 0;
+      const mayVote = overview.openRounds.some((r) => r.roundId === roundId && r.canVote);
       standing = {
         kind: "phase",
-        phaseLabel: de.start.phase[phaseOf(overview.standing.stateCounts)],
-        distribution: distributionOf(overview.standing.stateCounts).map((d) => ({
+        waiting: phaseOf(stateCounts) === "waiting_for_applications",
+        allRated: mayVote && openForVoting && (awaitingVotes.get(roundId) ?? 0) === 0,
+        distribution: distributionOf(stateCounts).map((d) => ({
           label: de.start.distribution[d.bucket](d.count),
           count: d.count,
         })),

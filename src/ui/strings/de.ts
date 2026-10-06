@@ -774,6 +774,9 @@ export const de = {
       interviewed: (n: number) => `${n} gecastet`,
       in_offer: (n: number) => `${n} in Zusage`,
     },
+    // B1's acknowledgement after the last open application is rated (human decision 2026-10-06;
+    // the exact wording stays open, P-O-04).
+    allRated: "Stark gemacht — du hast alle Bewerbungen bewertet!",
     noRoundSentence: "Gerade läuft keine Runde.",
     runningWithoutYouSentence: "Eine Runde läuft, aber (noch) ohne dich.",
     // U-5, `rahmenwerk.md` §2.3: the moderation bridge — visually distinct from the resident's own

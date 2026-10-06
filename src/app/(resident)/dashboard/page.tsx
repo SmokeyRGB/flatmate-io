@@ -74,7 +74,8 @@ export default async function DashboardPage({
           )}
           {view.standing?.kind === "phase" && (
             <>
-              <p className="text-lg font-semibold">{view.standing.phaseLabel}</p>
+              {view.standing.allRated && <p className="text-lg font-semibold">{de.start.allRated}</p>}
+              {view.standing.waiting && <p className="text-lg font-semibold">{de.start.phase.waiting_for_applications}</p>}
               {view.standing.distribution.length > 0 && (
                 <p className="text-sm text-muted-foreground">
                   {view.standing.distribution.map((d) => d.label).join(" · ")}
