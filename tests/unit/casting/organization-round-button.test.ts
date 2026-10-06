@@ -13,6 +13,8 @@ const state = vi.hoisted(() => ({
   holdsManageRounds: false,
   profileId: null as string | null,
   rounds: [] as { id: string; title: string; status: string }[],
+  // What listOrganisationTasks returns; the real one needs manage_rounds and no round at all.
+  firstRoundTask: false,
 }));
 
 vi.mock("@/modules/identity/session-cookie", () => ({
@@ -27,6 +29,7 @@ vi.mock("@/modules/identity/session-cookie", () => ({
 
 vi.mock("@/modules/casting/repository", () => ({
   listRoundsForSession: vi.fn(async () => state.rounds),
+  listOrganisationTasks: vi.fn(async () => (state.firstRoundTask ? [{ kind: "open_first_round" }] : [])),
 }));
 
 vi.mock("@/modules/identity/repository", async () => {
@@ -55,6 +58,7 @@ describe("O1: the way to open a round is offered only to a session holding manag
     state.holdsManageRounds = false;
     state.profileId = null;
     state.rounds = [];
+    state.firstRoundTask = false;
   });
 
   it("the household account (no manage_rounds): no button, no link, and no promise of one", async () => {
@@ -74,10 +78,32 @@ describe("O1: the way to open a round is offered only to a session holding manag
 
   it("a moderator (manage_rounds): the button is there", async () => {
     state.holdsManageRounds = true;
+    state.firstRoundTask = true;
     state.profileId = "44444444-4444-4444-4444-444444444444";
     const html = await render();
     expect(html).toContain('href="/rounds/new"');
     expect(html).toContain(de.org.dashboard.openNewRound);
+  });
+
+  it("the first-round task shows the featured card; without it a round-less caller sees noRoundYet", async () => {
+    state.holdsManageRounds = true;
+    state.firstRoundTask = true;
+    let html = await render();
+    expect(html).toContain(de.org.dashboard.openFirstRoundHeading);
+    expect(html).not.toContain(de.org.dashboard.noRoundYetHeading);
+
+    state.firstRoundTask = false;
+    html = await render();
+    expect(html).not.toContain(de.org.dashboard.openFirstRoundHeading);
+    expect(html).toContain(de.org.dashboard.noRoundYetHeading);
+  });
+
+  it("a round exists: the first-round card is hidden and the active round shows", async () => {
+    state.holdsManageRounds = true;
+    state.rounds = [{ id: "33333333-3333-3333-3333-333333333333", title: "Herbst", status: "open" }];
+    const html = await render();
+    expect(html).not.toContain(de.org.dashboard.openFirstRoundHeading);
+    expect(html).toContain("Herbst");
   });
 
   it("a moderator with a round already running: the 'another round' link is there", async () => {

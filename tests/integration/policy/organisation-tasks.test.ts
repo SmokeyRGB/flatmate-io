@@ -1,4 +1,6 @@
+import { sql } from "drizzle-orm";
 import { afterEach, describe, expect, it } from "vitest";
+import { withSessionContext } from "@/db/session-context";
 import { createResidentProfile, getNavigationAccess, setMemberRole } from "@/modules/identity/repository";
 import { claimResidentProfile } from "@/modules/identity/auth";
 import {
@@ -48,6 +50,29 @@ async function openRoom(household: TestHousehold, roomId: string) {
   await transitionRoomStatus(household.context, roomId, "open", adminActor());
 }
 
+// A household with at least one round, so listOrganisationTasks reports room tasks instead of
+// `open_first_round`. The round covers an extra open room of its own (a draft round keeps that room
+// from being a task), and leaves every other room uncovered.
+async function seedRoundElsewhere(
+  household: TestHousehold,
+  founder: { accountId: string; profileId: string; context: SessionContext },
+  status: "draft" | "closed" = "draft",
+) {
+  const extra = await createRoom(household.context, "Room covered elsewhere", adminActor());
+  await openRoom(household, extra.id);
+  const round = await createRound(founder.context, "Elsewhere", [extra.id], {
+    accountId: founder.accountId,
+    profileId: founder.profileId,
+  });
+  if (status === "closed") {
+    // No close function exists yet, so raw SQL like application-capture.test.ts.
+    await withSessionContext(household.context, (tx) =>
+      tx.execute(sql`UPDATE casting_round SET status = 'closed' WHERE id = ${round.id}::uuid`),
+    );
+  }
+  return extra;
+}
+
 describe("listOrganisationTasks (start-screen design.md Decision 4)", () => {
   it("(a) an open room covered by no round appears once, with its label", async () => {
     hh = await registerTestHousehold();
@@ -56,6 +81,7 @@ describe("listOrganisationTasks (start-screen design.md Decision 4)", () => {
     // Design D13: the household account holds no manage_rounds, so it gets no tasks. The
     // read moves to a moderator's context; the household's own [] is asserted in its own case (g).
     const moderator = await createTestModerator(hh);
+    await seedRoundElsewhere(hh, moderator);
 
     const tasks = await listOrganisationTasks(moderator.context);
     expect(tasks).toEqual([{ kind: "open_round_for_room", roomId: room.id, label: "Room A" }]);
@@ -77,8 +103,7 @@ describe("listOrganisationTasks (start-screen design.md Decision 4)", () => {
     await createRound(founder.context, "Draft round", [roomDraftCovered.id], founderActor);
 
     const tasks = await listOrganisationTasks(founder.context);
-    expect(tasks.map((t) => t.roomId)).not.toContain(roomOpenCovered.id);
-    expect(tasks.map((t) => t.roomId)).not.toContain(roomDraftCovered.id);
+    expect(tasks).toEqual([]);
   });
 
   it("(c) a planned room never appears", async () => {
@@ -87,8 +112,12 @@ describe("listOrganisationTasks (start-screen design.md Decision 4)", () => {
     const moderator = await createTestModerator(hh);
 
     // Read as a moderator (design D13): the household account's [] would make this vacuous.
-    const tasks = await listOrganisationTasks(moderator.context);
-    expect(tasks).toEqual([]);
+    // With no round at all the one task is the first round, whatever the rooms are.
+    expect(await listOrganisationTasks(moderator.context)).toEqual([{ kind: "open_first_round" }]);
+
+    // Once a round exists the planned room still yields nothing.
+    await seedRoundElsewhere(hh, moderator);
+    expect(await listOrganisationTasks(moderator.context)).toEqual([]);
   });
 
   it("(d) a plain member resident gets []", async () => {
@@ -111,7 +140,7 @@ describe("listOrganisationTasks (start-screen design.md Decision 4)", () => {
     const member = await claim(hh, "SomePermissions");
 
     const tasks = await listOrganisationTasks(member.context);
-    expect(tasks.map((t) => t.roomId)).not.toContain(room.id);
+    expect(tasks).toEqual([]);
 
     const access = await getNavigationAccess(member.context);
     expect(access.organisation).toBe(false);
@@ -125,7 +154,35 @@ describe("listOrganisationTasks (start-screen design.md Decision 4)", () => {
     await setMemberRole(hh.context, hh.accountId, moderator.accountId, "moderator");
 
     const tasks = await listOrganisationTasks(moderator.context);
-    expect(tasks.map((t) => t.roomId)).toContain(room.id);
+    // No round yet: the first round is the one task, and it replaces the room task.
+    expect(tasks).toEqual([{ kind: "open_first_round" }]);
+  });
+
+  it("(f2) a fresh household: a moderator gets exactly the first-round task", async () => {
+    hh = await registerTestHousehold();
+    const moderator = await createTestModerator(hh);
+
+    expect(await listOrganisationTasks(moderator.context)).toEqual([{ kind: "open_first_round" }]);
+  });
+
+  it("(f3) no round and an open uncovered room: only the first-round task, no room task", async () => {
+    hh = await registerTestHousehold();
+    const room = await createRoom(hh.context, "Room I", adminActor());
+    await openRoom(hh, room.id);
+    const moderator = await createTestModerator(hh);
+
+    const tasks = await listOrganisationTasks(moderator.context);
+    expect(tasks).toEqual([{ kind: "open_first_round" }]);
+  });
+
+  it("(f4) a household whose only round is closed: no first-round task, room tasks as before", async () => {
+    hh = await registerTestHousehold();
+    const moderator = await createTestModerator(hh);
+    // A closed round covers nothing, so the room it names is a task again.
+    const room = await seedRoundElsewhere(hh, moderator, "closed");
+
+    const tasks = await listOrganisationTasks(moderator.context);
+    expect(tasks).toEqual([{ kind: "open_round_for_room", roomId: room.id, label: "Room covered elsewhere" }]);
   });
 });
 

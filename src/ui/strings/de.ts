@@ -105,6 +105,13 @@ export const de = {
       // keeps "angemeldet bleiben" (identity/device-memory).
       householdLabel: "WG-Kennung",
       householdPlaceholder: "z. B. ABCD-EFGH-JKLM",
+      // "(?)" beside the field: a resident only sees the Kennung in their own settings (account
+      // page), so someone signing in on a new device has to ask a flatmate.
+      householdHelpToggle: "(?)",
+      householdHelpToggleLabel: "Was ist die WG-Kennung?",
+      householdHelpHeading: "Deine WG-Kennung",
+      householdHelpBody:
+        "Frag eine Mitbewohnerin oder einen Mitbewohner danach. Wer schon angemeldet ist, findet die Kennung unter Einstellungen.",
       nameLabel: "Dein Name",
       passwordLabel: "Passwort",
       submit: "Anmelden",
@@ -377,7 +384,10 @@ export const de = {
       titleLabel: "Rundentitel",
       titlePlaceholder: "z. B. Nachbesetzung Herbst",
       roomsLegend: "Zimmer dieser Runde",
-      noRoomsYet: "Noch keine Zimmer — lege zuerst eins auf der Zimmer-Seite an.",
+      // The notice is rendered in three parts so the middle one can be the link to the rooms page.
+      noRoomsYetBefore: "Noch keine Zimmer — lege zuerst eins auf der ",
+      noRoomsYetLink: "Zimmer-Seite",
+      noRoomsYetAfter: " an.",
       submit: "Runde eröffnen",
       submitPending: "Wird eröffnet…",
     },

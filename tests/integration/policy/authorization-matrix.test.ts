@@ -100,6 +100,9 @@ const NOT_APPLICABLE_CASTING: Record<string, string> = {
   // start-screen design.md Decision 4: read-only; carries no application-derived value (not a
   // G-D15 read), visibility tested in tests/integration/policy/organisation-tasks.test.ts.
   listOrganisationTasks: "read-only",
+  // A pure predicate over a room status (shared by openRoundTx and the new-round form): no DB
+  // access, no session, nothing to authorize.
+  isRoomOpenableForRound: "pure predicate; no DB access, no session",
   // application-capture design D5: read-only; the visibility rule is tested in
   // tests/integration/policy/organisation-application-visibility.test.ts.
   getOrganisationApplication:

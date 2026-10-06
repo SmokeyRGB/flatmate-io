@@ -66,7 +66,7 @@ roles · parallel rounds offered in the UI · anything about applications, votes
 - **FR-1.26** The resident list shall offer the actions: remove member, set `moved_out`, reactivate, and share or rotate the join code. **Two-tier removal (U-27, decided 2026-09-16, incorporated here 2026-09-17):** `moved_out` is the regular path for an actual move-out — votes and history are kept. "Remove" is final, requires **typing the exact display name** to confirm (not a plain click), and is meant specifically for a person who joined falsely or maliciously via the join code — not for real move-outs. *(Amended 2026-09-22: a removed member is not shown on the resident list at all — see FR-1.25 — and no action reactivates one.)*
 - **FR-1.27** *(Revised 2026-09-17)* The resident list and its actions shall be **fully available to administration and to a profile with moderator rights** (full parity — the same rows, the same actions), and **not reachable at all — by any route —** by a profile without moderator rights.
 - **FR-1.28** The resident list shall be a screen distinct from the round participant list (FR-1.19); neither shall link to the other's data.
-- **FR-1.29** When administration is the only member of the household, the resident-list screen shall lead with the join-code action instead of displaying an empty list.
+- **FR-1.29** When administration is the only member of the household, the resident-list screen shall lead with the "add resident" form (prepare a profile) instead of displaying an empty list, followed by the join-link section. *(Amended 2026-10-06, human decision after a walkthrough; was: lead with the join-code action. A link bound to a prepared profile needs that profile to exist, so the profile form comes first.)*
 - **FR-1.30** Every removal, `moved_out` and reactivation on the resident list shall be recorded as an append-only audit entry naming both the account and the acting profile.
 - **FR-1.31** *(New 2026-09-17, U-30)* Every resident (any profile with an active `ResidentProfile`, moderator rights or not) shall be able to see a read-only list of the household's **current** members — `status = active` only, no `moved_out` or `prepared` entries — showing display names only, no actions, no contact detail, no join dates. This is a screen distinct from both the administration resident list (FR-1.25–FR-1.30) and the round participant list (FR-1.19); none of the three shall link to either other's data. Purpose: lets a resident recognize and report — outside the app — a person who joined via the join code without actually living there.
 
@@ -164,8 +164,8 @@ Given a profile with moderator rights, when it opens the resident list, then the
 **AC-1.21 — No route reaches the resident list without moderator rights**
 Given a profile without moderator rights, when it requests the resident list by any route, then the request is refused.
 
-**AC-1.22 — The empty state leads with the join code**
-Given a household where administration is the only member, when administration opens the resident list, then the join-code action is shown and no empty list is displayed.
+**AC-1.22 — The empty state leads with the add-resident form** *(Amended 2026-10-06, human decision after a walkthrough; was: leads with the join code)*
+Given a household where administration is the only member, when administration opens the resident list, then the "add resident" form is shown first, the join-link section follows it, and no empty list is displayed.
 
 **AC-1.23 — Removal is attributable**
 Given a member is removed from the resident list, when I inspect the audit record, then it names both the account and the acting profile.

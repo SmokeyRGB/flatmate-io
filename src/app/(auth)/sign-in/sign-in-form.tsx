@@ -94,9 +94,26 @@ export function SignInForm() {
         ) : (
           <>
             <div>
-              <label htmlFor="householdCode" className="field-label">
-                {t.householdLabel}
-              </label>
+              <div className="flex items-center justify-between gap-2">
+                <label htmlFor="householdCode" className="field-label">
+                  {t.householdLabel}
+                </label>
+                {/* Same "(?)" popover as the deck and the ranking board (globals.css `.deck-help` /
+                    `.weights-popover`, anchor --help-trigger — one trigger per page, and this page
+                    has no other). A plain type="button", so it never submits the form. */}
+                <button
+                  type="button"
+                  className="deck-help"
+                  popoverTarget="household-code-help"
+                  aria-label={t.householdHelpToggleLabel}
+                >
+                  {t.householdHelpToggle}
+                </button>
+                <div id="household-code-help" popover="auto" className="weights-popover card">
+                  <p className="font-semibold">{t.householdHelpHeading}</p>
+                  <p className="mt-3 text-sm text-muted-foreground">{t.householdHelpBody}</p>
+                </div>
+              </div>
               <input
                 id="householdCode"
                 name="householdCode"

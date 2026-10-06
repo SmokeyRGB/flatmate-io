@@ -495,7 +495,7 @@ Prozess vs. Person, nicht bei „beschreibend vs. empfehlend".
 
 | Zustand | Verhalten |
 |---|---|
-| Leer (nur die Verwaltung ist Mitglied) | Beitrittscode prominent statt einer leeren Liste — dieselbe Handlung wie oben, kein Sonderbildschirm |
+| Leer (nur die Verwaltung ist Mitglied) | Statt einer leeren Liste steht die Maske „Bewohner:in hinzufügen" zuerst, darunter der Einladungslink-Abschnitt — ein an ein Profil gebundener Link braucht das Profil schon (Beobachtung im Rundgang, 2026-10-06). Dieselben Handlungen wie oben, kein Sonderbildschirm |
 
 > **Warum die drei Auflagen hier tragend sind, nicht nur ergänzend.** Mit der Trennung in zwei
 > Listen sehen reine Bewohnende die Bewohnerliste nicht mehr und können niemanden mehr entfernen —

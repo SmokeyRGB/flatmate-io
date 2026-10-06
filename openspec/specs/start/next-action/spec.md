@@ -194,18 +194,27 @@ A resident who may act on organisation tasks SHALL see, below their own tasks an
 from them, a single bridge into the organisation surface. It SHALL carry the number of open
 organisation tasks the viewer can carry out. When there are none, it SHALL say that everything is
 taken care of. A resident who may not act on organisation tasks SHALL not see it at all. Only work
-that moves the casting process forward counts as an organisation task. In this slice that is one
-task: a room that is open for letting and not covered by any draft, open or paused round. It is
-counted only for a viewer who holds the permission that creating a round requires. Resident work, such as voting, is never an
+that moves the casting process forward counts as an organisation task. For a viewer who holds the
+permission that creating a round requires (`manage_rounds`), the task list SHALL be exactly one
+"open the first round" task, and no room tasks, while the household has no round of any status.
+Once the household has any round, the list SHALL hold one task per room that is open for letting,
+not deleted, and not covered by any draft, open or paused round. For a viewer without that
+permission the list SHALL be empty. The bridge heading counts the tasks; when the first-round task
+is present its body is the organisation tab's own first-round text, and the organisation tab's
+featured first-round card reads the same list. Resident work, such as voting, is never an
 organisation task. Sources: `rahmenwerk.md` §2.3 (*„nur sichtbar für Profile mit Rechten, nie in die
 persönliche Liste gemischt"*), U-5; `screens/O-organisation.md` rules 1–3.
 
-#### Scenario: A free room with no round
-- **WHEN** a moderator views Start and a room is open with no round covering it
-- **THEN** the bridge shows one open task and leads to the organisation surface
+#### Scenario: A fresh household has one first-round task
+- **WHEN** a moderator views Start and the household has no round of any status
+- **THEN** the task list is exactly one first-round task, with no room tasks, the bridge counts one, and its body is the organisation tab's first-round text
+
+#### Scenario: A free room with no round covering it
+- **WHEN** a moderator views Start, the household already has a round, and an open, undeleted room is covered by no draft, open or paused round
+- **THEN** the bridge shows one open task for that room and leads to the organisation surface
 
 #### Scenario: Nothing to organise
-- **WHEN** a moderator views Start and no organisation task is open
+- **WHEN** a moderator views Start, the household already has a round, and no room is left uncovered
 - **THEN** the bridge says everything is taken care of
 
 #### Scenario: No rights, no bridge
