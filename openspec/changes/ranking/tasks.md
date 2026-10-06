@@ -482,7 +482,8 @@ reason codes, not only lengths.
     name (human decision 2026-10-06; `rahmenwerk.md` §3's phase stays for deadlines);
   - `docs/backlog/requirements/F5-requirements.md`: a V1.1 note on FR-5.16 (reveal once voting on
     the application is closed) and FR-5.10 (the „Eingeladen" group);
-  - `docs/review-log.md`: register rows for both decisions, and one for "`screened` hidden in v0.1,
+  - `docs/review-log.md`: register rows for both decisions, one for the reversed-invitation risk
+    (design Risks), and one for "`screened` hidden in v0.1,
     implemented with the invite change";
   - `node tools/check-refs.ts` and `--scope docs` clean.
 - [ ] 10.2 `src/modules/deliberation/repository.ts` `getRanking`: the reveal rule of D4 step 8 (state

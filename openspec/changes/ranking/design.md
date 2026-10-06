@@ -408,6 +408,12 @@ someone already invited.
 
 ## Risks / Trade-offs
 
+- **[A reversed invitation re-opens voting on a candidate whose score was revealed]** → D10 reveals
+  an `invited` candidate to everyone. A moderator can move it back (P-4), after which it is
+  votable again and a resident who had not voted has seen its score. Accepted (human decision
+  2026-10-06): reversal is a rare, deliberate step, and the hidden-results rule protects the normal
+  path. A register row names it (task 10.1) for the change that builds the reversal UI.
+
 - **[V-1 is not enforced in the database yet]** → Human decision Q-1. Change 4 must land before the
   first real household. The register row stays open with that gate.
 - **[The D5 equivalence depends on two unique indexes]** → D5 names them, and step 2's
