@@ -120,11 +120,13 @@ export const de = {
       // revoked in phase 1, link spent) — only the immediate sign-in afterwards failed, so this is
       // a note beside the ordinary form, not an error. Recreated exactly as in commit a95bbb9.
       passwordResetNote: "Dein neues Passwort ist gesetzt. Melde dich damit an.",
-      // auth-provider-deadline design.md D8/D10 (draft, awaiting human confirmation):
-      // redeemPasswordReset's `reset_outcome_unknown` — neither phase 2's write nor any check of
-      // it (nor phase 3's own sign-in) could be confirmed either way.
+      // auth-provider-deadline D8/D10: redeemPasswordReset's `reset_outcome_unknown` — neither
+      // phase 2's write nor any check of it (nor phase 3's own sign-in) could be confirmed either
+      // way. Wording by the human, 2026-10-06: where something failed, the text apologises, and it
+      // stays personal rather than corporate.
       passwordResetUnknownNote:
-        "Dein neues Passwort ist möglicherweise schon gesetzt. Versuche, dich damit anzumelden. " +
+        "Sorry, da ist etwas schiefgelaufen: Ob dein neues Passwort gespeichert wurde, lässt sich " +
+        "gerade nicht feststellen. Versuch dich damit anzumelden. " +
         "Klappt das nicht, bitte die Verwaltung um einen neuen Link.",
     },
     register: {
@@ -167,9 +169,10 @@ export const de = {
         invalidCredentials: "Diese Anmeldedaten sind ungültig.",
         noHousehold: "Dieses Konto ist keinem Haushalt zugeordnet.", // auth.ts:366
         noMembership: "Für dieses Konto besteht keine Mitgliedschaft.", // auth.ts:372
-        // auth-provider-deadline design.md D10 (draft, awaiting human confirmation): the identity
-        // provider's answer never arrived — never shown as "invalid credentials" (identity/sign-in).
-        providerUnavailable: "Die Anmeldung ist gerade nicht möglich. Bitte versuche es gleich noch einmal.",
+        // auth-provider-deadline D10: the identity provider's answer never arrived — never shown as
+        // "invalid credentials" (identity/sign-in). Wording by the human, 2026-10-06: apologetic
+        // and personal.
+        providerUnavailable: "Sorry, die Anmeldung klappt gerade nicht. Versuch es gleich noch einmal.",
         // household-sign-in-code D5 (03-PRD §6.5): says to wait, never that the credentials were
         // wrong. Drafted for this change; the wording awaits the human's review.
         tooManyAttempts: "Es gab zu viele Anmeldeversuche. Bitte warte einige Minuten und versuche es dann erneut.",
@@ -868,10 +871,11 @@ export const de = {
         // happened at all.
         changeIncomplete:
           "Die Änderung wurde möglicherweise nur teilweise übernommen. Bitte versuche es erneut.",
-        // auth-provider-deadline design.md D10 (draft, awaiting human confirmation): the identity
-        // provider's answer never arrived and could not be resolved — nothing was changed.
+        // auth-provider-deadline D10: the identity provider's answer never arrived and could not
+        // be resolved — nothing was changed. Wording by the human, 2026-10-06: apologetic and
+        // personal.
         providerUnavailable:
-          "Das ist gerade nicht möglich. Es wurde nichts geändert – bitte versuche es gleich noch einmal.",
+          "Sorry, das hat gerade nicht geklappt. Deine E-Mail-Adresse wurde nicht geändert – versuch es gleich noch einmal.",
       },
     },
     password: {
@@ -895,19 +899,21 @@ export const de = {
         // situation, changeResidentPassword's own compensating transaction also failed.
         changeIncomplete:
           "Die Änderung wurde möglicherweise nur teilweise übernommen. Bitte versuche es erneut.",
-        // auth-provider-deadline design.md D10 (draft, awaiting human confirmation).
+        // auth-provider-deadline D10: the current password could not be checked — nothing was
+        // changed. Wording by the human, 2026-10-06: apologetic and personal.
         providerUnavailable:
-          "Das ist gerade nicht möglich. Es wurde nichts geändert – bitte versuche es gleich noch einmal.",
+          "Sorry, das hat gerade nicht geklappt. Dein Passwort wurde nicht geändert – versuch es gleich noch einmal.",
         // D7's SAFE DIRECTION (pre-mortem findings 3/4): an unanswered write may still apply later,
         // after this lock releases — every other session already ended as a precaution, whatever
-        // is found afterwards.
+        // is found afterwards. The texts say so as "überall sonst abgemeldet", not "Sitzungen".
         unchangedSessionsEnded:
-          "Dein Passwort wurde nicht geändert – bitte versuche es gleich noch einmal. " +
-          "Deine anderen Anmeldungen wurden vorsichtshalber beendet.",
+          "Sorry, das hat nicht geklappt – dein Passwort ist unverändert. " +
+          "Zur Sicherheit wurdest du überall sonst abgemeldet. Versuch es gleich noch einmal.",
         uncertainSessionsEnded:
-          "Ob dein neues Passwort übernommen wurde, ließ sich nicht feststellen. Deine anderen " +
-          "Anmeldungen wurden vorsichtshalber beendet. Ändere es am besten gleich noch einmal – als " +
-          "aktuelles Passwort gilt das alte oder das neue.",
+          "Sorry, da ist etwas schiefgelaufen: Ob dein neues Passwort gespeichert wurde, lässt sich " +
+          "gerade nicht feststellen. Zur Sicherheit wurdest du überall sonst abgemeldet. Probier beim " +
+          "nächsten Anmelden erst das neue Passwort, dann das alte – und ändere es danach am besten " +
+          "noch einmal.",
       },
     },
     signOut: {
