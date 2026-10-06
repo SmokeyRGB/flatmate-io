@@ -416,7 +416,7 @@ reason codes, not only lengths.
 
 ## 9. Verify, demo reset, walkthrough
 
-- [ ] 9.1 `npm run verify` green (eslint, tsc, the nine lints, check-refs, the full suite on dev).
+- [x] 9.1 `npm run verify` green (eslint, tsc, the nine lints, check-refs, the full suite on dev).
   Report the counts.
 - [ ] 9.2 **Human hand-off (owner SQL):** the human runs `scripts/cleanup-demo-household.sql` in the
   Supabase SQL editor for `flatmate-io-dev`, or explicitly lets the agent run it through the
