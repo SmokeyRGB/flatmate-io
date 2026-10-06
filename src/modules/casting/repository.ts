@@ -1352,16 +1352,19 @@ export async function listRoundsForSession(context: SessionContext) {
 // The ONE definition of what is open for a moderator, read by Start's moderation bridge and by the
 // organisation tab's first-round card alike, so the two can never disagree.
 export type OrganisationTask =
-  // The household has no round at all, in any status. The first round is the moderator's next
-  // step, so it is the only task until one exists; room tasks start once the household has any
-  // round.
+  // The household has no round at all, in any status, and a first round can start: either it has
+  // no room yet (the form leads to the rooms page) or some room can be cast for. The first round is
+  // the moderator's next step, so it is the only task until one exists; room tasks start once the
+  // household has any round. When rooms exist but none can be cast for, there is no task.
   | { kind: "open_first_round" }
   // A room open for letting that no draft/open/paused round covers (start-screen design.md
   // Decision 4; the room-covered check is local to this function on purpose).
   | { kind: "open_round_for_room"; roomId: string; label: string };
 
 // start-screen design.md Decision 4/Assumption 3 (tasks.md 3.2): `open_first_round` when the
-// household has no `casting_round` row of any status, otherwise one `open_round_for_room` per room
+// household has no `casting_round` row of any status and either no undeleted room or at least one
+// that `isRoomOpenableForRound` accepts (rooms that are all occupied/not_available give `[]`, since
+// `/rounds/new` would refuse them), otherwise one `open_round_for_room` per room
 // open for letting and not covered by a draft/open/paused round. Returns `[]` for a viewer who
 // does not hold `manage_rounds` — the permission `rounds/new`'s own action already requires — so
 // the bridge's count never promises something the destination action would refuse.
@@ -1381,7 +1384,17 @@ export async function listOrganisationTasks(context: SessionContext): Promise<Or
           WHERE cr.household_id = ${context.householdId}::uuid
           LIMIT 1`,
     );
-    if (anyRound.length === 0) return [{ kind: "open_first_round" as const }];
+    if (anyRound.length === 0) {
+      const roomRows = await tx.execute<{ status: RoomStatus }>(
+        sql`SELECT room.status FROM room
+            WHERE room.household_id = ${context.householdId}::uuid
+              AND room.deleted_at IS NULL`,
+      );
+      const canStart =
+        roomRows.length === 0 ||
+        roomRows.some((r: { status: RoomStatus }) => isRoomOpenableForRound(r.status));
+      return canStart ? [{ kind: "open_first_round" as const }] : [];
+    }
 
     const rows = await tx.execute<{ id: string; label: string }>(
       sql`SELECT room.id, room.label

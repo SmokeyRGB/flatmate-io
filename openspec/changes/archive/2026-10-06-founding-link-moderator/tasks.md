@@ -115,7 +115,7 @@
 ## 7. Gate
 
 - [x] 7.1 `npm run verify` green. A single 60 s timeout on shared dev is re-run once; never raise a timeout.
-- [ ] 7.2 Browser walkthrough on the local dev server (synthetic data, `@example.test`). Take screenshots for the PR:
+- [ ] 7.2 (partial, 2026-10-06: register, founding card at 375 px and the join form for the household session checked in the browser; the submit-to-Start step is covered by integration tests only and is left for the human) Browser walkthrough on the local dev server (synthetic data, `@example.test`). Take screenshots for the PR:
   - register a test household and land on `/organization`, which shows the founding card;
   - click „Jetzt beitreten" while signed in as Verwaltung and join;
   - land on Start as moderator, with the moderation bridge showing the first round;
@@ -128,4 +128,4 @@
 - [x] 8.3 Re-apply the amended 0034 to `flatmate-io-dev` and confirm the CHECK definition and the trigger in the catalog.
 - [x] 8.4 R3: `MembersView` takes `callerIsHouseholdAccount`; moderators see caller-neutral copy. Unit test with a deliberate break.
 - [x] 8.5 `.claude/rules/implementation-hazards.md`: two lessons (a privilege-granting value needs its whole write boundary in the DB; identify a role by stored permissions, not session shape).
-- [ ] 8.6 `npm run verify` green, then push and re-request review.
+- [x] 8.6 `npm run verify` green, then push and re-request review.

@@ -32,21 +32,39 @@ there moderate without giving up their vote — both without a special case.
 
 ### Requirement: No permission is inferred from how a membership came about
 
-A membership's permissions SHALL NOT depend on the order in which it was created, on the join link
-it came through, or on anything else about its arrival. A newly created membership SHALL start with
-exactly the permissions its role confers and nothing else. Sources: FR-1.8; the human decision of
-2026-09-22 replacing the first-resident inference with a role default.
+A membership's permissions SHALL NOT depend on the order in which it was created, or on anything
+else about its arrival, with one named exception. A newly created membership SHALL start with
+exactly the permissions its role confers and nothing else.
+
+The exception is the household's **founding link**: the one link registration issues to the
+founder. A membership created by redeeming it SHALL carry the moderator role, so it holds the
+resident set and the moderator set. No other link confers anything, and no screen or function
+other than registration SHALL mark a link as a founding link. Sources: FR-1.8; the human decision
+of 2026-09-22 replacing the first-resident inference with a role default; the human decision of
+2026-10-06 tying the founder's moderator role to the founding link.
 
 A permission that appears because somebody happened to be first is one nobody chose to give and
-nobody can see was given.
+nobody can see was given. The founding link is different: registration hands it to the founder by
+name, its single use admits exactly one person, and the appointment it causes is recorded.
 
 #### Scenario: Being first confers nothing
-- **WHEN** the first resident membership in a household is created
+- **WHEN** the first resident membership in a household is created through any link other than
+  the founding link, or by claiming a prepared profile
 - **THEN** it holds exactly what its role confers, the same as the second and the tenth
 
 #### Scenario: Arriving by link confers nothing
-- **WHEN** a membership is created by redeeming a join link
-- **THEN** it holds no permission beyond its role's, whichever link was used
+- **WHEN** a membership is created by redeeming a join link that is not the founding link
+- **THEN** it holds no permission beyond the resident set, whichever link was used
+
+#### Scenario: The founding link makes its redeemer moderator
+- **WHEN** a membership is created by redeeming the household's founding link
+- **THEN** its role is moderator, and its stored permissions are the resident set plus the
+  moderator set, the same as a member appointed moderator
+
+#### Scenario: Only registration marks a founding link
+- **WHEN** a moderator or the household account issues a join link
+- **THEN** that link is not a founding link, and redeeming it creates a member with the resident
+  set
 
 ### Requirement: A revoked membership grants nothing
 
@@ -197,6 +215,8 @@ A membership SHALL receive a role's set in the same write that gives it the role
 it in the same write that takes the role away:
 - **Registration** creates the administering membership with the household set.
 - **Joining or claiming a profile** creates a resident membership with the resident set.
+- **Joining through the founding link** creates a resident membership with the moderator role, the
+  resident set and the moderator set.
 - **Appointment** as moderator adds the moderator set. **Demotion** to member removes it, and any
   retired permission with it. The resident set stays.
 - **Moving out or removal** revokes the membership. It loses its resident status and its moderator
@@ -213,11 +233,16 @@ yet and keeps its direct status change.
 An individual grant (the matrix's ⬜) is possible only to a moderator, for the permissions the
 matrix marks ⬜ in the moderator column. No screen or function grants one, so in practice every
 permission comes with a role. Sources: `03-PRD.md` §4.0.1; FR-1.8, FR-1.26 (removal tiers); the human
-decisions of 2026-09-29 and 2026-10-01.
+decisions of 2026-09-29, 2026-10-01 and 2026-10-06.
 
 #### Scenario: Joining or claiming stores the resident set
-- **WHEN** a resident joins by link or claims a prepared profile
+- **WHEN** a resident joins by a link other than the founding link, or claims a prepared profile
 - **THEN** the new membership's stored permissions are exactly `vote`
+
+#### Scenario: Joining through the founding link stores the moderator set
+- **WHEN** a resident joins through the household's founding link
+- **THEN** the new membership's role is moderator and its stored permissions are `vote` plus the
+  eleven moderator permissions, exactly what an appointment of a member stores
 
 #### Scenario: Registration stores the household set
 - **WHEN** a household is registered

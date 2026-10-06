@@ -175,6 +175,35 @@ describe("listOrganisationTasks (start-screen design.md Decision 4)", () => {
     expect(tasks).toEqual([{ kind: "open_first_round" }]);
   });
 
+  it("(f5) no round and every room occupied or not_available: no first-round task", async () => {
+    hh = await registerTestHousehold();
+    const moderator = await createTestModerator(hh);
+    const occupied = await createRoom(hh.context, "Room occupied", adminActor());
+    await openRoom(hh, occupied.id);
+    const unavailable = await createRoom(hh.context, "Room unavailable", adminActor());
+    await openRoom(hh, unavailable.id);
+    await transitionRoomStatus(hh.context, unavailable.id, "not_available", adminActor());
+    // No F1 transition reaches `occupied`, so raw SQL like seedRoundElsewhere's closed round.
+    await withSessionContext(hh.context, (tx) =>
+      tx.execute(sql`UPDATE room SET status = 'occupied' WHERE id = ${occupied.id}::uuid`),
+    );
+
+    expect(await listOrganisationTasks(moderator.context)).toEqual([]);
+  });
+
+  it("(f6) no round, one occupied room and one planned room: the first-round task", async () => {
+    hh = await registerTestHousehold();
+    const moderator = await createTestModerator(hh);
+    const occupied = await createRoom(hh.context, "Room occupied", adminActor());
+    await openRoom(hh, occupied.id);
+    await withSessionContext(hh.context, (tx) =>
+      tx.execute(sql`UPDATE room SET status = 'occupied' WHERE id = ${occupied.id}::uuid`),
+    );
+    await createRoom(hh.context, "Room planned", adminActor()); // stays 'planned'
+
+    expect(await listOrganisationTasks(moderator.context)).toEqual([{ kind: "open_first_round" }]);
+  });
+
   it("(f4) a household whose only round is closed: no first-round task, room tasks as before", async () => {
     hh = await registerTestHousehold();
     const moderator = await createTestModerator(hh);
