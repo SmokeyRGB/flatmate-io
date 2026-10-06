@@ -176,6 +176,8 @@ tables:
       # column — the drift ADR-010 warns about, caught by this change's own gate. Classified ⚙️ by
       # human decision 2026-09-28 (ADR-010: the classification is the human's call).
       purpose: { category: "⚙️", purpose: "Art des Links (join / password_reset) — resident-settings Decision 4; personenbezogen erst zusammen mit resident_profile_id, das 🟠 deklariert ist" }
+      # founding-link-moderator D1 (2026-10-06): marks the one link registration issues to the founder.
+      is_founding_link: { category: "⚙️" }
 
   # --- join-by-link (FR-2.28, 2026-09-22): the join route's attempt limit ---
   join_attempt:

@@ -1,5 +1,5 @@
 import { randomInt, randomUUID } from "node:crypto";
-import { and, desc, eq, gt, isNotNull, isNull, ne, notInArray, sql } from "drizzle-orm";
+import { and, desc, eq, gt, isNotNull, isNull, lt, ne, notInArray, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { withSessionContext, type SessionContext } from "@/db/session-context";
 
@@ -15,6 +15,7 @@ import {
   HOUSEHOLD_SIGN_IN_CODE_GROUPS,
   HOUSEHOLD_SIGN_IN_CODE_PATTERN,
   household,
+  HOUSEHOLD_ONLY_PERMISSIONS,
   householdSettings,
   joinCodeIssuance,
   MODERATOR_PERMISSIONS,
@@ -1227,8 +1228,21 @@ export function isWellFormedHouseholdSignInCode(normalised: string): boolean {
 
 const POSTGRES_UNIQUE_VIOLATION = "23505";
 
-function isUniqueViolation(err: unknown): boolean {
-  return typeof err === "object" && err !== null && "code" in err && (err as { code?: unknown }).code === POSTGRES_UNIQUE_VIOLATION;
+// The unique index on the code (schema.ts). founding-link-moderator D1: issueJoinCodeTx's retry
+// loop retries ONLY on this one; a hit on join_code_issuance_one_founding_link must surface, since
+// minting a fresh code can never cure it and the loop would otherwise spin forever in the caller's
+// transaction. The driver's error is on `cause` for a Drizzle-wrapped one, or the error itself.
+const JOIN_CODE_CODE_INDEX = "join_code_issuance_code_idx";
+
+function isJoinCodeCollision(err: unknown): boolean {
+  const candidates = [err, (err as { cause?: unknown } | null)?.cause];
+  return candidates.some(
+    (c) =>
+      typeof c === "object" &&
+      c !== null &&
+      (c as { code?: unknown }).code === POSTGRES_UNIQUE_VIOLATION &&
+      (c as { constraint_name?: unknown }).constraint_name === JOIN_CODE_CODE_INDEX,
+  );
 }
 
 export interface IssueJoinCodeOptions {
@@ -1244,12 +1258,17 @@ export interface IssueJoinCodeOptions {
   // issuePasswordResetLink below; issueJoinCode's own public options type (below) has no such
   // field at all, so a route can never mint a reset link by passing this in directly.
   purpose?: JoinCodePurpose;
+  // founding-link-moderator D1: internal-only, like `purpose`. Only registerHousehold passes it.
+  // It marks the link as the household's founding link and forces purpose 'join', maxUses 1 and no
+  // profile, the shape the founding_shape CHECK demands.
+  founding?: true;
 }
 
 // The public, route-reachable shape of IssueJoinCodeOptions — omits `purpose` entirely (D6:
 // "issueJoinCode's public options type stays without purpose"), so the only way to mint a
 // password-reset link is issuePasswordResetLink below, never issueJoinCode with a crafted option.
-export type PublicIssueJoinCodeOptions = Omit<IssueJoinCodeOptions, "purpose">;
+// Omits `founding` for the same reason: only registration marks a founding link.
+export type PublicIssueJoinCodeOptions = Omit<IssueJoinCodeOptions, "purpose" | "founding">;
 
 export class ResidentProfileNotEligibleForBindingError extends Error {
   constructor(residentProfileId: string) {
@@ -1311,7 +1330,8 @@ export async function issueJoinCodeTx(
   options: IssueJoinCodeOptions,
 ): Promise<typeof joinCodeIssuance.$inferSelect> {
   const expiresAt = new Date(Date.now() + options.validDays * 24 * 60 * 60 * 1000);
-  const purpose: JoinCodePurpose = options.purpose ?? "join";
+  const founding = options.founding === true;
+  const purpose: JoinCodePurpose = founding ? "join" : (options.purpose ?? "join");
 
   // join-by-link design.md Decision 13: a bound link names one prepared profile of THIS
   // household — verified here, before any row is written, rather than trusted from the caller.
@@ -1321,20 +1341,21 @@ export async function issueJoinCodeTx(
   // reason — nothing downstream of this function needs to tell them apart. A bound link is
   // ALWAYS single-use (spec.md "A link may name the person it was issued for": "SHALL carry a
   // maximum of one redemption"), regardless of what options.maxUses says.
-  let maxUses = options.maxUses;
-  if (options.residentProfileId) {
+  let maxUses = founding ? 1 : options.maxUses;
+  const residentProfileId = founding ? undefined : options.residentProfileId;
+  if (residentProfileId) {
     if (purpose === "join") {
       const [profile] = await tx
         .select({ id: residentProfile.id })
         .from(residentProfile)
         .where(
           and(
-            eq(residentProfile.id, options.residentProfileId),
+            eq(residentProfile.id, residentProfileId),
             eq(residentProfile.householdId, householdId),
             eq(residentProfile.status, "prepared"),
           ),
         );
-      if (!profile) throw new ResidentProfileNotEligibleForBindingError(options.residentProfileId);
+      if (!profile) throw new ResidentProfileNotEligibleForBindingError(residentProfileId);
     }
     maxUses = 1;
   }
@@ -1351,8 +1372,9 @@ export async function issueJoinCodeTx(
           expiresAt,
           maxUses,
           createdByAccountId: actingAccountId,
-          residentProfileId: options.residentProfileId ?? null,
+          residentProfileId: residentProfileId ?? null,
           purpose,
+          isFoundingLink: founding,
         })
         .returning();
       await tx.execute(sql`RELEASE SAVEPOINT join_code_issue`);
@@ -1371,7 +1393,7 @@ export async function issueJoinCodeTx(
 
       return row;
     } catch (err) {
-      if (isUniqueViolation(err)) {
+      if (isJoinCodeCollision(err)) {
         await tx.execute(sql`ROLLBACK TO SAVEPOINT join_code_issue`);
         continue; // collide -> mint a fresh code, retry
       }
@@ -1393,7 +1415,11 @@ export async function issueJoinCode(
   if (actingAccountId !== context.accountId) throw new PermissionDeniedError("manage_join_codes");
   return withSessionContext(context, async (tx) => {
     await assertHasPermissionTx(tx, context, "manage_join_codes");
-    return issueJoinCodeTx(tx, context.householdId, actingAccountId, context.profileId, options);
+    // The public type omits `founding`, but a cast can smuggle it in at runtime: strip it, so
+    // only registration ever marks a founding link (founding-link-moderator D1).
+    const publicOptions: IssueJoinCodeOptions = { ...(options as IssueJoinCodeOptions) };
+    delete publicOptions.founding;
+    return issueJoinCodeTx(tx, context.householdId, actingAccountId, context.profileId, publicOptions);
   });
 }
 
@@ -1622,6 +1648,68 @@ export async function listJoinCodeIssuances(
         joinedResidentNames: namesByIssuance.get(issuance.id) ?? [],
         hasRemovedJoiner: removedJoinerIssuances.has(issuance.id),
       }));
+  });
+}
+
+// founding-link-moderator D2: what an appointment stores, as one pure helper — the sorted,
+// deduplicated union of the permissions a membership already holds and the moderator set. The
+// founding join (auth.ts joinHousehold) stores it for a fresh resident; a test pins it against what
+// setMemberRole computes in SQL, so the two cannot drift. It lives here, not in schema.ts: the
+// data-inventory lint refuses a schema.ts that exports a function.
+export function appointedPermissions(base: readonly string[]): string[] {
+  return [...new Set([...base, ...MODERATOR_PERMISSIONS])].sort();
+}
+
+// founding-link-moderator R1: "the household account" is the live membership that holds the
+// household-only permissions, never "a session with no profile": the schema also allows a
+// non-resident moderator, whose session has no profile either. The database lets only
+// `household_admin` hold those permissions (membership_household_only_permissions) and
+// setMemberRole refuses to change that role, so the answer cannot change between a pre-Auth check
+// and the commit. Read-only, under the caller's own context; no role comparison.
+export async function isHouseholdAccount(context: SessionContext): Promise<boolean> {
+  return withSessionContext(context, async (tx) => {
+    const row = await readLiveMembershipTx(tx, context, false);
+    if (!row || row.isResident) return false;
+    return HOUSEHOLD_ONLY_PERMISSIONS.every((p) => row.permissions.includes(p));
+  });
+}
+
+// founding-link-moderator D3: is this issuance the household's founding link? Read-only, under the
+// caller's own context, with an explicit household_id predicate. The join page uses it to let the
+// household account see the form for its own founding link, and joinHousehold uses it before the
+// household session may redeem one. A missing or foreign row is false, never an error.
+export async function isFoundingLink(context: SessionContext, issuanceId: string): Promise<boolean> {
+  return withSessionContext(context, async (tx) => {
+    const [row] = await tx
+      .select({ isFoundingLink: joinCodeIssuance.isFoundingLink })
+      .from(joinCodeIssuance)
+      .where(and(eq(joinCodeIssuance.id, issuanceId), eq(joinCodeIssuance.householdId, context.householdId)));
+    return row?.isFoundingLink === true;
+  });
+}
+
+// founding-link-moderator D4: the join path of the household's founding link while it can still be
+// used (unused, not deleted, not expired), else null. The code is a secret, so a caller without
+// `manage_join_codes` gets null, not an error, and the read takes the membership FOR SHARE like
+// listJoinCodeIssuances does. The organisation screen offers the household account a one-click
+// join with it.
+export async function getLiveFoundingLinkPath(context: SessionContext): Promise<string | null> {
+  return withSessionContext(context, async (tx) => {
+    const callerRow = await readLiveMembershipTx(tx, context, true);
+    if (!callerRow || !membershipHoldsPermission(callerRow, "manage_join_codes")) return null;
+    const [row] = await tx
+      .select({ code: joinCodeIssuance.code })
+      .from(joinCodeIssuance)
+      .where(
+        and(
+          eq(joinCodeIssuance.householdId, context.householdId),
+          eq(joinCodeIssuance.isFoundingLink, true),
+          isNull(joinCodeIssuance.deletedAt),
+          gt(joinCodeIssuance.expiresAt, sql`now()`),
+          lt(joinCodeIssuance.uses, joinCodeIssuance.maxUses),
+        ),
+      );
+    return row ? buildJoinUrl(null, row.code) : null;
   });
 }
 

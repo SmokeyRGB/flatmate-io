@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { eq } from "drizzle-orm";
 import { afterEach, describe, expect, it } from "vitest";
 import { withSessionContext } from "@/db/session-context";
@@ -31,7 +32,7 @@ describe("Joining while already signed in (EC-2.4/EC-2.5)", () => {
       joinHousehold(
         link.code,
         { displayName: "Should Not Exist", password: "test-password-not-real-1234" },
-        { currentSession: hhA.context },
+        { currentSession: { sessionId: randomUUID(), context: hhA.context } },
       ),
     ).rejects.toMatchObject({ code: "already_member" });
 
@@ -48,7 +49,7 @@ describe("Joining while already signed in (EC-2.4/EC-2.5)", () => {
       joinHousehold(
         link.code,
         { displayName: "X", password: "test-password-not-real-1234" },
-        { currentSession: hhA.context },
+        { currentSession: { sessionId: randomUUID(), context: hhA.context } },
       ),
     ).rejects.toBeInstanceOf(JoinError);
   });
@@ -63,7 +64,7 @@ describe("Joining while already signed in (EC-2.4/EC-2.5)", () => {
       joinHousehold(
         linkA.code,
         { displayName: "X", password: "test-password-not-real-1234" },
-        { currentSession: hhB.context },
+        { currentSession: { sessionId: randomUUID(), context: hhB.context } },
       ),
     ).rejects.toMatchObject({ code: "other_household" });
   });

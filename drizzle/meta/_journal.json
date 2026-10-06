@@ -239,6 +239,13 @@
       "when": 1791220900000,
       "tag": "0033_resolve_household_sign_in_code",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1791292922776,
+      "tag": "0034_founding_link",
+      "breakpoints": true
     }
   ]
 }
