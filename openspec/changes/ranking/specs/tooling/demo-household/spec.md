@@ -20,7 +20,8 @@ After the presenting resident (a resident who cast none of the seeded votes, suc
 after claiming) completes the pass, whatever they rated, the scoreboard SHALL show:
 - at least three scored rows, because the other residents' votes on them already reach quorum;
 - at least one unscored row, because no one else voted on it;
-- one `invited` row hidden from the presenter, with the notice that they cannot vote on it.
+- one `invited` row under „Eingeladen", with its score (it left voting, so it is revealed to
+  everyone, human decision 2026-10-06).
 
 This SHALL hold also when the prepared profile is claimed before the pass, which adds one voter
 to the round.
@@ -37,7 +38,7 @@ G-B1.
 #### Scenario: The presenter's pass
 - **WHEN** the presenting resident signs in after the seed
 - **THEN** the Casting tab takes them to the pass with a full deck, and after the last card the
-  scoreboard shows scored, unscored and hidden rows as listed above
+  scoreboard shows the rows listed above
 
 ### Requirement: The cleanup removes every demo row
 

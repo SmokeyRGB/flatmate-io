@@ -455,18 +455,17 @@ reason codes, not only lengths.
 - [ ] 9.4 Walkthrough = pitch rehearsal (localhost, seed credentials, the browser pane):
   - sign in as Sam with the WG-Kennung; B1 shows the awaiting count, and Casting redirects to the
     pass;
-  - rate every card; the scoreboard shows rings in order, two highlighted rows, an unscored row at
-    the bottom, and the hidden `invited` row greyed with „Verdeckt — du hast hier nicht
-    abgestimmt";
+  - rate every card; Start then shows „Stark gemacht — du hast alle Bewerbungen bewertet!" and no
+    phase name; the scoreboard shows „Punktwert" (rings in order, two highlighted, one unscored row
+    at the bottom) and „Eingeladen" (the invited row with its score); „Verdeckt" stays empty;
   - check „(?)";
   - reduced motion (emulated) gives a static tint;
-  - as Alex, the shared rows have the same scores (the invited row is visible for Alex, and the
-    application nobody voted on is hidden for Alex);
+  - as Alex, the shared rows have the same scores; the application nobody voted on is under
+    „Verdeckt" for Alex (Alex has not rated it), the invited row under „Eingeladen";
   - the household account cannot reach `/casting`;
   - the dev log holds no applicant data.
   Screenshot the board.
-- [ ] 9.5 As Robin (already claimed by the human), rate and confirm the board shows all three row
-  kinds.
+- [ ] 9.5 As Robin (already claimed by the human), rate and confirm the same board.
 
 ## 10. Walkthrough changes (human, 2026-10-06; design D10, D11). Run before 9.1's re-run.
 
