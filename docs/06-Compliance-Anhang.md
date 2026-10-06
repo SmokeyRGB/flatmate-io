@@ -94,7 +94,7 @@ Ergebnisse hängen an ihr.
 | Technische und organisatorische Maßnahmen (Art. 32) | beide | [§11](#11--tom-skizze) |
 | Unterstützung bei Betroffenenrechten (Art. 28 Abs. 3 lit. e) | Flatmate.io | Feature **„Datenauskunft erzeugen"** pro `Application` ([§7.1](#71--art-15-auskunft)) |
 | Löschung nach Zweckerreichung (Art. 5 Abs. 1 lit. e) | `Household` weisungsbefugt, Flatmate.io vollzieht | Aufbewahrungsautomatik mit Vorwarnung ([§5](#5--speicherbegrenzung-und-löschkonzept)) |
-| Information der Bewerbenden (Art. 13) | **`Household`** | Copy-Paste-Textbaustein als *Hilfsmittel*, nicht als eigene Pflichterfüllung ([§4](#4--art-13-vs-art-14--korrigierte-abgrenzung)) |
+| Information der Bewerbenden (Art. 13) | **`Household`** | Copy-Paste-Textbaustein bei der Erfassung und in der Detailansicht als *Hilfsmittel*, nicht als eigene Pflichterfüllung; der Einladungstext trägt keinen Hinweis (§4.3) ([§4](#4--art-13-vs-art-14--korrigierte-abgrenzung)) |
 | Unterauftragsverarbeiter (Art. 28 Abs. 2 und 4) | Flatmate.io | **Supabase** (Datenbank-Hosting **und** Anmeldedienst, EU-Region — ADR-006), **AWS** (Solver-Dienst, Region `eu-central-1` — ADR-005, v1.1) sowie ein Transaktions-E-Mail-Dienst; vollständige Liste in der AVV, EU-Verarbeitung nach ADR-005/ADR-006 |
 | Meldung von Verletzungen (Art. 33 Abs. 2) | Flatmate.io meldet **an den `Household`**, dieser an die Aufsichtsbehörde | Prozess in [§11.5](#115--organisatorische-maßnahmen) |
 
@@ -350,8 +350,12 @@ Damit gilt **Art. 13** — Information zum Zeitpunkt der Erhebung, durch den `Ho
 ### 4.3 Konsequenz für den Copy-Paste-Textbaustein
 
 Beim Markieren einer `Application` als „Eingeladen" erzeugt die App einen Textbaustein für die
-Kontaktaufnahme, der den Datenschutzhinweis enthält (Verantwortlicher = die WG, Zweck =
-Zimmerbesetzung, Speicherdauer, Betroffenenrechte, Kontakt).
+Kontaktaufnahme. **Er enthält keinen Datenschutzhinweis** *(geändert 2026-10-06, Menschenentscheidung, F5 `candidate-invite`: Der Datenschutzhinweis steht schon bei der Erfassung und in der Bewerbung; im Einladungstext wäre er aufdringlich. Informieren ist Sache des Haushalts.)* Der Hinweis
+(Verantwortlicher = die WG, Zweck = Zimmerbesetzung, Speicherdauer, Betroffenenrechte, Kontakt)
+steht bei der Erfassung (Variante Dritterhebung mit Frist) und in der Detailansicht jeder
+`Application` (Kurzhinweis), jeweils im Wortlaut aus §4.5. Für eine Dritterhebung ist die
+Einladung oft die erste Mitteilung an die Person (Art. 14 Abs. 3 lit. b); dann informiert der
+Haushalt spätestens mit ihr, mit dem Text aus der Erfassung.
 
 Dieser Baustein ist ein **Hilfsmittel für den Haushalt**, **keine eigene Pflichterfüllung von
 Flatmate.io**. Die App darf ihn deshalb weder als „Pflicht erledigt" darstellen noch das Versenden
@@ -363,7 +367,7 @@ erzwingen; sie darf ihn anbieten und daran erinnern.
 > eingeladen werden. Deshalb bietet die Detailansicht **jeder** `Application` den Kurzhinweis aus
 > §4.5 zusätzlich an: eingeklappt, zum Kopieren, **ohne Pflicht, ohne Erinnerungsaufgabe, ohne
 > Nachverfolgung**. Informieren bleibt Sache des Haushalts; die App gibt Text und Anleitung, sie
-> erzwingt nichts. Der Baustein bei „Eingeladen" (S-16) bleibt unverändert.
+> erzwingt nichts. Der Baustein bei „Eingeladen" (S-16) ist seit 2026-10-06 eine reine Einladung ohne Hinweis (siehe oben).
 
 ### 4.4 Zwei Felder, zwei Achsen — `source` und `collected_from`
 

@@ -38,12 +38,15 @@ export function NoticeTextPanel({
   edited,
   onChange,
   onRegenerate,
+  linkHint = true,
 }: {
   panelId: string;
   text: string;
   edited: boolean;
   onChange: (text: string) => void;
   onRegenerate: () => void;
+  // The `[Link]` paragraph belongs to a privacy notice; the invitation text has no link in it.
+  linkHint?: boolean;
 }) {
   const [copied, setCopied] = useState(false);
 
@@ -70,7 +73,7 @@ export function NoticeTextPanel({
         value={text}
         onChange={(event) => onChange(event.target.value)}
       />
-      <p className="text-xs text-muted-foreground">{t.linkHint}</p>
+      {linkHint && <p className="text-xs text-muted-foreground">{t.linkHint}</p>}
       <div className="flex flex-wrap gap-2">
         <button type="button" onClick={copy} className="btn btn-secondary">
           {copied ? <Check className="size-4" /> : <Copy className="size-4" />}

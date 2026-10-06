@@ -3,7 +3,7 @@
 > **Feature:** [F5 — A ranking you can check, hidden until you have voted](../features/F5-ranking-hidden-until-you-vote.md)
 > **Band:** `v0.1` · **Scope lines:** S-12, S-13, S-14, S-16, S-31
 > **Screens:** D1 Ranking — "waiting for votes" ⚡ · D2 Candidate detail · ~~D3 My own application~~ (struck, V1.1, human decision Q-9)
-> **Status:** V1.1 · 2026-10-05 (V1.0 · 2026-09-08; the V1.1 corrections are marked "(V1.1: …)")
+> **Status:** V1.2 · 2026-10-06 (V1.1 · 2026-10-05, V1.0 · 2026-09-08; corrections are marked "(V1.1: …)" and "(V1.2: …)")
 >
 > **`requirements.md` only — what must be built, not how.** The formulas below are stated
 > verbatim because they are **required behaviour**, not implementation choices.
@@ -126,7 +126,7 @@ function quorum_reached(application, stage, round) -> bool
 ### 3.6 Marking a candidate invited
 
 - **FR-5.24** The system shall allow an account holding the change-status permission to move a candidate to `invited`.
-- **FR-5.25** On marking a candidate `invited`, the system shall provide a copy-paste text that includes the data-protection notice.
+- **FR-5.25** On marking a candidate `invited`, the system shall provide a copy-paste text. *(V1.2: without the data-protection notice. Human decision 2026-10-06: the notice is offered at capture and on the application's detail; repeating it in the invite text is "overly pushy", and informing the applicant is the household's responsibility.)*
 - **FR-5.26** The system shall not send that text, and shall offer no send action anywhere.
 - **FR-5.27** The state change shall be recorded as an append-only audit entry naming the account and the acting profile.
 - **FR-5.28** Marking a candidate `invited` shall not require quorum and shall not be blocked by its absence.
@@ -212,7 +212,7 @@ Given a candidate at quorum whose results are visible to me, when I open the can
 Given `reveal_vote_authorship` is enabled for the household, when I open a candidate detail that is not my own linked application, then each vote's rating is shown next to the name of the resident who cast it; given the same setting and a candidate that is my own linked application, then no vote, distribution or authorship is shown to me regardless of the setting.
 
 **AC-5.21 — Invited yields the text**
-Given I hold the change-status permission, when I mark a candidate `invited`, then a copy-paste text containing the data-protection notice is provided.
+Given I hold the change-status permission, when I mark a candidate `invited`, then a copy-paste text is provided. *(V1.2: it contains no data-protection notice, FR-5.25.)*
 
 **AC-5.22 — Nothing is sent**
 Given the copy-paste text is displayed, when I look for a send action anywhere in the flow, then none exists.

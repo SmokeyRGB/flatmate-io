@@ -993,6 +993,29 @@ export const de = {
       hint: "Mit dieser WG-Kennung und deinem Namen meldest du dich an.",
     },
   },
+  // F5 candidate-invite (design D4, Open Questions): „Einladen" on the scoreboard's rows and on the
+  // organisation's application detail. FIRST DRAFT of the copy (proposal A-4), for the human to edit
+  // after the walkthrough. The text panel is `applications.notice.*`, reused by reference.
+  invite: {
+    open: "Einladen",
+    openLabel: (name: string) => `${name} einladen`,
+    heading: (name: string) => `${name} einladen`,
+    intro:
+      "Hier ist ein Vorschlag für deine Nachricht. Du kannst ihn ändern und kopieren — Flatmate verschickt nichts.",
+    // The whole example text: the greeting and the invitation. No privacy notice (human decision 2026-10-06).
+    text: (v: { name: string }) =>
+      `Hey ${v.name}, wir würden dich gern kennenlernen! Wann hättest du in den nächsten Tagen Zeit für ein Treffen bei uns?`,
+    confirm: "Eingeladen!",
+    confirmHint: "Erst klicken, wenn du die Nachricht verschickt hast.",
+    // One calm sentence per action code (feedback_german_ui_error_tone: apologise, du-tone).
+    refusal: {
+      not_found: "Sorry, diese Bewerbung gibt es hier nicht mehr. Lade die Seite bitte neu.",
+      not_invitable: "Sorry, diese Bewerbung lässt sich gerade nicht einladen. Lade die Seite bitte neu.",
+      not_allowed: "Sorry, du darfst hier nicht einladen.",
+      no_session: "Sorry, du bist nicht mehr angemeldet. Melde dich bitte neu an.",
+      failed: "Sorry, das hat gerade nicht geklappt. Versuch es bitte noch einmal.",
+    },
+  },
   // start-screen: the shared error boundary for every `(resident)` screen — same reasoning as
   // `de.join.unexpectedError` (generic on purpose, G-A5: never the failure's own text).
   resident: {

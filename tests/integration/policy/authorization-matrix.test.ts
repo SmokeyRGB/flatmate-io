@@ -467,6 +467,25 @@ describe("authorization matrix (M6): every exported casting/identity mutator dec
       expect(row.state).toBe("new");
     });
 
+    // candidate-invite (FR-5.24): a plain resident is refused on the permission, before the row is
+    // read, and nothing is written. The finer cases are in invite-application.test.ts.
+    it("inviteApplication", async () => {
+      const room = await castingRepo.createRoom(hh.context, "Room A", adminActor);
+      const round = await castingRepo.createAndOpenRound(moderator.context, "Round", [room.id], moderatorActor);
+      const { id } = await castingRepo.captureApplication(moderator.context, {
+        roundId: round.id,
+        applicantName: "Testbewerbung Matrix",
+        collectedFrom: "data_subject",
+      });
+      await expect(castingRepo.inviteApplication(residentCtx, { roundId: round.id, applicationId: id })).rejects.toThrow(
+        PermissionDeniedError,
+      );
+      const [row] = await withSessionContext(moderator.context, (tx) =>
+        tx.select().from(application).where(eq(application.id, id)),
+      );
+      expect(row.state).toBe("new");
+    });
+
     it("updateApplication", async () => {
       const room = await castingRepo.createRoom(hh.context, "Room A", adminActor);
       const round = await castingRepo.createAndOpenRound(moderator.context, "Round", [room.id], moderatorActor);
@@ -559,6 +578,9 @@ describe("authorization matrix (M6): every exported casting/identity mutator dec
         castingRepo.ProfileRequiredError,
       );
       await expect(
+        castingRepo.inviteApplication(hh.context, { roundId: round.id, applicationId: id }),
+      ).rejects.toThrow(castingRepo.ProfileRequiredError);
+      await expect(
         castingRepo.updateApplication(hh.context, {
           roundId: round.id,
           applicationId: id,
@@ -586,6 +608,7 @@ describe("authorization matrix (M6): every exported casting/identity mutator dec
         collectedFrom: "data_subject",
       });
       await castingRepo.transitionApplication(moderator.context, id, "screened");
+      await castingRepo.inviteApplication(moderator.context, { roundId: round.id, applicationId: id });
       const removable = await castingRepo.createRoom(moderator.context, "Room M6", moderatorActor);
       await castingRepo.removeRoom(moderator.context, removable.id, moderatorActor);
     });
@@ -896,6 +919,7 @@ const CASTING_CASE_NAMES = [
   "addResidentToRound",
   "captureApplication",
   "transitionApplication",
+  "inviteApplication",
   "updateApplication",
   "updateHouseholdSettings",
 ];

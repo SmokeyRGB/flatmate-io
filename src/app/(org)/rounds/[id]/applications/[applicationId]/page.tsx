@@ -8,28 +8,19 @@ import {
   oneMonthAfter,
 } from "@/modules/casting/application-notice";
 import { getOrganisationApplication } from "@/modules/casting/repository";
-import { assertHasPermission, getHousehold, PermissionDeniedError } from "@/modules/identity/repository";
-import type { SessionContext } from "@/db/session-context";
+import { getHousehold, PermissionDeniedError } from "@/modules/identity/repository";
 import { getCurrentSession } from "@/modules/identity/session-cookie";
 import { OrganisationAccessDenied } from "@/app/(org)/organisation-access-denied";
 import { requireOrganisationAccess } from "@/app/(org)/organisation-access";
+import { holdsPermission } from "@/app/holds-permission";
 import { de } from "@/ui/strings";
 import { LinkPendingHint } from "@/ui/link-pending-hint";
 import { SavedToast } from "../../saved-toast";
+import { InviteDialog } from "../invite-dialog";
+import { INVITABLE_STATES, INVITE_PERMISSION, showInvite } from "../invite-text";
 import { ApplicantNotice, ThirdPartyNotice } from "../notice";
 
 const t = de.applications.detail;
-
-// A refusal is an answer here (false), never an error; anything else is rethrown.
-async function holdsCreateApplication(context: SessionContext): Promise<boolean> {
-  try {
-    await assertHasPermission(context, context.accountId, "create_application");
-    return true;
-  } catch (err) {
-    if (err instanceof PermissionDeniedError) return false;
-    throw err;
-  }
-}
 
 // The organisation's detail of one application (design D5): O5's first cut, which change 3
 // extends. Facts are shown as TEXT only: React escapes them and there is no
@@ -93,10 +84,16 @@ export default async function ApplicationDetailPage({
   // page and the repository refuse again on their own. Run together with the household read, which
   // is independent of it (code review).
   const context = current.context;
-  const [householdRow, canEdit] = await Promise.all([
+  // The same for „Einladen" (F5 candidate-invite): only a holder of change_application_state, and
+  // only while the application can still be invited.
+  const [householdRow, canEdit, canChangeState] = await Promise.all([
     thirdParty ? getHousehold(context) : Promise.resolve(null),
-    holdsCreateApplication(context),
+    holdsPermission(context, "create_application"),
+    // Read only when the state could be invited at all.
+    INVITABLE_STATES.includes(application.state) ? holdsPermission(context, INVITE_PERMISSION) : false,
   ]);
+
+  const invitable = showInvite(canChangeState, application.state);
 
   const fact = (label: string, value: string | number | null) => (
     <div>
@@ -115,11 +112,21 @@ export default async function ApplicationDetailPage({
 
       {updatedMessage && <SavedToast param="updated" message={updatedMessage} />}
 
-      {canEdit && (
-        <Link href={`/rounds/${id}/applications/${applicationId}/edit`} className="btn btn-secondary">
-          {de.applications.edit.editLink}
-          <LinkPendingHint />
-        </Link>
+      {/* The two actions on the application sit together at the top (human walkthrough 2026-10-06):
+          „Bearbeiten" for create_application, „Einladen" for change_application_state while the
+          application can still be invited. */}
+      {(canEdit || invitable) && (
+        <div className="flex flex-wrap items-center gap-2">
+          {canEdit && (
+            <Link href={`/rounds/${id}/applications/${applicationId}/edit`} className="btn btn-secondary">
+              {de.applications.edit.editLink}
+              <LinkPendingHint />
+            </Link>
+          )}
+          {invitable && (
+            <InviteDialog roundId={id} applicationId={application.id} applicantName={application.applicantName} />
+          )}
+        </div>
       )}
 
       <dl className="card space-y-3">

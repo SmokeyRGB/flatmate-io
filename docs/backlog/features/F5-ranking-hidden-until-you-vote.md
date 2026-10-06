@@ -171,7 +171,7 @@ saying why the rest is missing.
 
 ### The invite text (S-16)
 
-A **copy-paste aid for the household**, including the data-protection notice. The application
+A **copy-paste aid for the household**: the invitation, without the data-protection notice (human decision 2026-10-06; the notice is offered at capture and on the application's detail). The application
 never sends. `03-PRD.md` §3 and `02-SRD.md` §5.3 both keep *"Versand durch die Anwendung"* on the
 permanent out-of-scope list.
 
