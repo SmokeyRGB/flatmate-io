@@ -4,7 +4,7 @@ export type ScaleWeights = Record<VoteValue, number>;
 
 // An exact decimal: `units / 10^scale`. The ranking computes in BigInt on these, so that no
 // floating-point error moves a score across a .5 boundary or a quorum across a whole vote
-// (design D1: 0.1 × 30 is 3.0000000000000004 as a float, whose ceil is 4).
+// (0.07 × 100 is 7.000000000000001 as a float, whose ceil is 8).
 export interface Scaled {
   units: bigint;
   scale: number;

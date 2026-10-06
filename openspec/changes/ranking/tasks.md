@@ -174,7 +174,7 @@
 
 ## 3. Pure ranking module (design D1)
 
-- [ ] 3.1 Create `src/modules/deliberation/ranking.ts`, pure with no imports beyond
+- [x] 3.1 Create `src/modules/deliberation/ranking.ts`, pure with no imports beyond
   `vote-values.ts` and `round-rules.ts`.
   - `computeRanking({ weights, quorumShare, denominator, openRoomCount, candidates })` returns
     `{ scored, unscored }` as D1 describes.
@@ -186,7 +186,7 @@
   - `unscored` is ordered `createdAt, id`. Compare ids as strings; `createdAt` by `getTime()`.
   - An unscored row has **no** `score` key at all.
   - Header comment cites `rechenmodelle.md` §8.1/§8.3 and FR-5.1/5.6/5.11.
-- [ ] 3.2 Create `tests/unit/deliberation/ranking.test.ts`. One `it` per item:
+- [x] 3.2 Create `tests/unit/deliberation/ranking.test.ts`. One `it` per item:
   - AC-5.1 (55), AC-5.2 (100), AC-5.3 (0 is a score);
   - AC-5.4 / C-5.1: for an unscored row, `"score" in row` is false and `JSON.stringify(row)`
     contains no `score`;
