@@ -39,7 +39,16 @@ See proposal.md for why. The current state this design builds on (verified 2026-
 **Non-Goals:**
 - The `vote` SELECT policies (V-1/V-2 in the database). They are plan change 4, human decision Q-1.
 - A per-candidate breakdown, the distribution, authorship and „5 von 7" (plan change 2).
-- Any write. This change adds no write path and no lock.
+- Any write. This change adds no write path. Its one lock is the one every permission-checked read
+  takes: `assertHasPermissionTx` locks the caller's membership row `FOR SHARE` (identity's default,
+  `readLiveMembershipTx`), taken first, so the lock order is unchanged. A move-out's `FOR UPDATE`
+  waits for the read. `getRanking` returns names and scores, so the default lock is right; the
+  `{ lock: false }` opt-out is reserved for count reads like T-5.
+- The hidden-results hint (FR-5.19a) and a notice for hidden rows the viewer can still vote on. The
+  redirect to the pass (human decision Q-2) runs whenever anything in any open round awaits the
+  viewer, so on `/casting` the awaiting count is always 0 and every hidden row is one the viewer can
+  no longer vote on (R-7). Both would be dead code. FR-5.19a is met by the redirect itself: the
+  scoreboard is reachable only once nothing awaits the viewer (packet V1.1 note, task 1.1).
 - Closed and archived rounds. No path closes a round, and `quorum_denominator_frozen` has no
   writer (F-12). Both are refused with their state named.
 
@@ -60,13 +69,18 @@ and a tie at the N boundary.
 **Exact arithmetic.** Weights may be fractions and the quorum share is a decimal string, so plain
 floats can misround. Two examples: `0.1 × 30` gives `3.0000000000000004`, whose `ceil` is 4; and a
 54.5 can come out as 54.4999…. The module therefore turns each weight and the share into an exact
-scaled integer, read from its decimal string (`String(n)` for a number) with at most 6 fraction
-digits, and computes in `BigInt`:
+scaled integer, read from its decimal string (`String(n)` for a number, any number of fraction
+digits), brings all weights to **one common scale** (the largest fraction-digit count among them)
+before any sum, and computes in `BigInt`. The target is ES2017 (`tsconfig.json`), so the code
+uses `BigInt(10) ** BigInt(k)`, never `10n` literals, which `tsc` refuses (TS2737):
 - `score = floor((2·Σw·100 + n·max) / (2·n·max))`, which is x.5 rounded up for non-negative values;
 - `needed = ceil(p·d / q)` for a share of `p/q`.
 
-A value that cannot be read exactly (exponent notation, more than 6 fraction digits) counts as
-malformed: D2 refuses it. *Alternative:* floats with an epsilon. Rejected: the rounding would then
+A value that cannot be read exactly (exponent notation such as `1e-7`) counts as malformed: D2
+refuses it. There is no digit cap: BigInt has no limit, and a cap would make a share like
+`0.3333333`, which the settings form accepts unvalidated, freeze a round as permanently
+`rules_invalid`. A float such as `String(0.1 + 0.2)` = `"0.30000000000000004"` is read as exactly
+that decimal. *Alternative:* floats with an epsilon. Rejected: the rounding would then
 depend on how big an epsilon someone picked, which is exactly what P-3 rules out.
 
 `NO_SCORE` is not a number in the types. An unscored row simply has no `score` field, so a `0`
@@ -94,29 +108,47 @@ then refuse to work over a rule it never uses.
 
 ### D3 · Casting ports: widen one, add one
 
-**`listVoteCandidatesTx`** changes from `{ withCard: boolean }` to `{ fields: "ids" | "names" |
-"cards", states?: readonly ApplicationState[] }`:
-- `states` defaults to `["new", "screened"]`, so the deck and T-5 are unchanged.
+**`listVoteCandidatesTx`** changes from `{ withCard: boolean }` to `{ scope: "votable" | "board";
+fields: "ids" | "names" | "cards" }`:
+- `scope` is **closed**: `"votable"` means `new`/`screened` (the deck and T-5, unchanged) and
+  `"board"` means `new`/`screened`/`invited`. The state lists live inside casting. A free
+  `states` array was rejected: any later caller could then pull names of `rejected_by_household`,
+  `withdrawn` or `archived` applicants through a voter-gated port, reopening Q-4 and the
+  Art. 5(1)(c) argument without a design ever saying so.
 - Each row now also carries `state`, which is not personal.
-- `"names"` selects `applicant_name` only. The board needs nothing more (Art. 5(1)(c)).
+- `"names"` selects `applicant_name` only and returns it as a top-level `applicantName`.
+  `card` stays present only for `"cards"`, so `VoteCandidateCard` keeps meaning "the four card
+  columns were read".
+- `"board"` with `"cards"` is refused by the type (an overload or a union of option shapes): the
+  board never needs card columns of an `invited` applicant.
 
-The three existing call sites map `withCard: false/true` to `"ids"`/`"cards"`.
+Call sites to update: the three in `deliberation/repository.ts`, plus the tests that call the port
+directly (`screening-pass.test.ts` around l.178, 188, 192, 263, 277; `vote-household-account.test.ts`
+around l.64). The key-set assertion in `screening-pass.test.ts` (around l.265) gains `state`, on
+purpose.
 
-*Widening justified against the narrow original* (F4 design D2 justified the card columns as the
-voter-gated read of `new`/`screened`). Adding `invited` lets a voter see the **names** of applicants
-in their own round who were invited. That is the same round, under the same voter predicate, and
-D1 is defined as the round's applications (PRD §4.1.6). No contact, card or `collected_from`
-column is added. Side states stay excluded (Q-4).
+*Widening justified against the narrow original.* F4 design D2 justified the card columns as the
+voter-gated read of `new`/`screened`, and the comments at `casting/repository.ts` around l.55-57,
+76, 248 and the port's own header say so. The board scope lets a voter see the **names** of
+applicants in their own round who were invited. That is the same round, under the same voter
+predicate, and D1 is defined as the round's applications (PRD §4.1.6). It is the first
+resident-facing read of invited applicants' names. No contact, card or `collected_from` column is
+added. Side states stay excluded (Q-4). All four comments are rewritten to match.
 
 **New port `getRoundTallyBasisTx(tx, context, roundId) → { countedVoterIds: string[];
 openRoomCount: number } | null`.**
-- It returns `null`, after one query, when the viewer is not an active voting participant of that
-  round. That is the same self-guard as the other ports, so a caller that skipped the check leaks
-  nothing.
 - `countedVoterIds` is `invarianten.md` §5.3's denominator: participations of the round with
   `removed_at IS NULL` and `can_vote`, whose profile is `active`.
+- The port **guards by its own result**. It returns `null` when the viewer's profile is not in
+  `countedVoterIds`, which is exactly the active-voter predicate the other ports apply, so the
+  guard adds no query and no third copy of the predicate. It throws `ProfileRequiredError` for a
+  profile-less context and returns `null` for a non-UUID round id.
 - `openRoomCount` counts `room.id = ANY(round.room_ids)` with `status = 'open'` and
   `deleted_at IS NULL`. Every join carries `household_id`.
+- **DRY.** The active-voter condition (participation not removed, `can_vote`, profile `active`,
+  household-matched) is written once as a private SQL fragment in casting and used by
+  `listVoteCandidatesTx`'s `EXISTS` and by this port's query. `listVoterRoundsTx` keeps its Drizzle
+  join form; its predicate is the same, and it is the one the comments point to as the definition.
 
 *Why one port for two facts:* both are facts about one round, with one guard and one caller.
 Splitting them would repeat the guard. Deliberation may not join `round_participation` or `room`
@@ -134,30 +166,30 @@ itself (`kontextgrenzen.md` §4 rule 1).
    - without an id: the newest `open` or `paused` round. If there is none, the result is
      `{ kind: "none" }`.
 4. `parseRoundRules(snapshot)` runs. `null` gives `rules_invalid`.
-5. Candidates come from the port with `fields: "names"` and `states: new, screened, invited`.
-6. The basis comes from `getRoundTallyBasisTx`. `null` or an empty `countedVoterIds` gives
-   `rules_invalid` (EC-5.7). This cannot happen once step 3 passed, because the viewer is a counted
-   voter themselves, so it is asserted rather than handled.
+5. Candidates come from the port with `scope: "board", fields: "names"`.
+6. The basis comes from `getRoundTallyBasisTx`. `null` gives `refused: not_eligible`. That is
+   reachable: steps 3 and 6 are separate statements under READ COMMITTED, so a move-out of the
+   viewer committing between them makes the port return `null`. An empty `countedVoterIds` cannot
+   reach here (the port returns `null` when the viewer is not in it), so EC-5.7's "denominator
+   zero" is the same `not_eligible` refusal, never `rules_invalid` and never a throw.
 7. **One** `SELECT application_id, resident_profile_id, value FROM vote` reads every vote with
    household, round, `stage = 'invite'`, `withdrawn_at IS NULL` and the application among the
    candidates. From this one statement the read derives:
    - the viewer's own votes: rows with `resident_profile_id = context.profileId`;
    - the counted votes: rows whose voter is in `countedVoterIds`.
 8. Visibility per candidate (V-4): visible if `!hideResultsUntilVoted`, or if the viewer holds a
-   vote on it. A candidate that is not visible goes to `hidden` with `{ applicationId,
-   applicantName, state, canStillVote }`. `canStillVote` is true when `round.status === "open"`
-   and the state is `new`/`screened`, the conditions `vote_guard` adds for an already eligible
-   voter (R-7).
+   vote on it. A candidate that is not visible goes to `hidden` as `{ applicationId, applicantName,
+   state }`, ordered by `createdAt, id`, never by anything vote-derived. There is no
+   `canStillVote`: under the redirect every hidden row on `/casting` is one the viewer can no
+   longer vote on (Non-Goals), so one notice serves them all (R-7).
 9. D1's module runs over the **visible candidates only**. The sort is a total order on per-candidate
    keys, so restricting the input preserves the relative order. Ranking the visible set is
    therefore the same as ranking everything and dropping the hidden rows, and the highlight slots
    go to visible rows only (Q-15).
-10. `awaitingCount` comes from `awaitingVoteTx(tx, context, [roundId], { fields: "ids" })` when the
-    round is open (one definition, F-10), and is 0 otherwise.
 
 The result type is a union:
 - `{ kind: "board"; round: { id, title, status }; rules: { weights, needed, denominator };
-  openRoomCount; scored; unscored; hidden; awaitingCount }`;
+  openRoomCount; scored; unscored; hidden }`;
 - `{ kind: "none" }`;
 - `{ kind: "refused"; reason: "not_eligible" | "rules_invalid" }`;
 - `{ kind: "refused"; reason: "round_not_available"; status }`.
@@ -180,14 +212,22 @@ sign-in sets it from that membership. So for a resident session the set is exact
 `{context.profileId}`. For the household account the set is empty, and it is refused at step 1
 anyway.
 
+**The runtime check that makes this safe.** `invarianten.md` §5.1 warns against relying on a
+session field. `getRanking`'s own step 2 does not: `assertHasPermissionTx` goes through
+`readLiveMembershipTx` (`identity/repository.ts` around l.531-546), which returns nothing unless
+the account's membership is not revoked **and** its `resident_profile_id` equals
+`context.profileId`. A stale or mismatched context is therefore refused before any candidate is
+read. A test covers it (task 6.6).
+
 The candidate port's `became_resident_id IS DISTINCT FROM profileId` is therefore already
 account-wide, and **no code changes**. The packet's FR-5.29 wording is corrected in the docs commit
 (F-4).
 
 A test for an "earlier profile of the same account" cannot be built, because the unique index
 refuses it. The tests instead cover the viewer's profile across open/paused rounds and hide
-on/off. The applier confirms that no `src/` writer changes `membership.resident_profile_id` after
-insert, and stops if one does.
+on/off. The pre-mortem confirmed that no `src/` writer changes `membership.resident_profile_id`
+(membership updates set `revoked_at`, role and permissions only), and `session.acting_profile_id`
+is immutable by trigger (`drizzle/0006`).
 
 **If 0021's indexes are ever relaxed, this argument fails.** The design names them so a reviewer
 of such a migration finds this. The register row for V-1's database half (change 4) says so too.
@@ -196,7 +236,7 @@ of such a migration finds this. The register row for V-1's database half (change
 
 | Path | V-1 (own application) | V-2 (participant only) | V-4 (hidden until own vote) |
 |---|---|---|---|
-| `getRanking` | port predicate (D5) | `listVoterRoundsTx` + the port's self-guard + `getRoundTallyBasisTx` guard | step 8, by type |
+| `getRanking` | port predicate (D5); live-membership check in step 2 | step 2; `listVoterRoundsTx`; the candidate port's self-guard; `getRoundTallyBasisTx`'s own-result guard | step 8, by type |
 | `getScreeningPass` / T-5 | same port predicate | same | returns only the viewer's unrated candidates and no result |
 | Raw SQL as `app_runtime` | **open**: `vote` SELECT is household-wide (register row; change 4, Q-1) | **open**, same | **by design not RLS** (`invarianten.md` §5.5: V-4 is an aggregate rule) |
 | Server actions / routes | none new; the page calls only `getRanking` | — | — |
@@ -209,7 +249,10 @@ nobody is exposed meanwhile.
 
 ### D7 · The screen: a server component, no client JavaScript
 
-`/casting/page.tsx` keeps its redirect. It then reads `?round=` (a non-UUID or an array counts as
+`/casting/page.tsx` keeps its redirect unchanged, including for `?round=`: a resident with anything
+awaiting in **any** open round is sent to the pass even when the address names another round.
+That is Q-2's "vote first, then see results", and it is why the hint and the can-still-vote notice
+are not built (Non-Goals). The page then reads `?round=` (a non-UUID or an array counts as
 absent, as in the pass) and calls `getRanking`. The rendering lives in a new server component,
 `casting/ranking-board.tsx`, a pure function of the result, so render tests use
 `renderToStaticMarkup`:
@@ -220,12 +263,12 @@ absent, as in the pass) and calls `getRanking`. The rendering lives in a new ser
   `--card` through `background-position`. Under `prefers-reduced-motion: reduce` it is a static
   `--accent` tint. It moves no layout. The sr text is a visually hidden span on each leading row.
 - **Unscored rows** use the same row shape without the ring. **Hidden rows** sit under a separator,
-  muted, with lucide `EyeOff` (already a dependency) and the notice.
+  muted, with lucide `EyeOff` (already a dependency) and the one notice „Verdeckt — du hast hier
+  nicht abgestimmt".
 - **„(?)":** a native `popover` (as the deck does, so no JS). It reuses the weights list, which is
   **extracted** from `screening-deck.tsx` into `casting/weights-list.tsx` (DRY). It adds the formula
-  sentence and „{needed} von {denominator} Stimmen reichen".
-- **The hint** shows only when `awaitingCount > 0`, with „Jetzt bewerten" linking to
-  `/casting/screening?round=<id>`.
+  sentence and „{needed} von {denominator} Stimmen reichen". Its trigger is a `<button
+  type="button">`, as in the deck, so the `pending-feedback.ts` lint does not read it as a submit.
 - **States:**
   - `none` and an empty board render the same empty state;
   - `rules_invalid`, `not_eligible` and `round_not_available` render calm refusals, reusing the
@@ -249,14 +292,19 @@ a comment naming this change.
   Claiming Robin later auto-joins the open round (`drizzle/0031`), which makes the denominator 5
   and quorum 3.
 - **Rooms:** the household account moves both rooms `planned → open`, so N = 2.
-- **Applications:** about seven realistic synthetic applications (G-B1: invented names,
-  `@example.test`, the 030 23125 range), replacing the „Testbewerbung" set.
+- **Applications:** seven realistic synthetic applications (G-B1: invented names,
+  `@example.test`, the 030 23125 range), replacing the „Testbewerbung" set. Every application gets
+  either **zero** or **all three** other votes, never one or two: one or two other votes plus the
+  presenter's would sit exactly on the quorum line and flip between scored and unscored when Robin is
+  claimed (quorum 2 → 3).
 - **Votes, cast through `castVote` as Alex, Kim and Jule:**
-  - at least three applications get all three others' votes, with varied values. These are scored
-    for any presenter rating and either denominator, because 3 + 1 ≥ 3;
+  - five applications get all three others' votes, with varied values. These are scored for any
+    presenter rating and either denominator, because 3 + 1 ≥ 3;
   - one application gets no other vote, so it stays unscored after the presenter's single vote;
   - one further application gets the three others' votes and is then moved `new → screened →
-    invited` by Alex. The presenter never voted on it, so it is hidden with "cannot vote".
+    invited` by Alex. The presenter never voted on it, so it is hidden.
+- **The presenter is Sam (or Robin after claiming).** Alex, Kim and Jule voted on the invited row,
+  so for them it is visible, not hidden; Alex's view in the walkthrough checks shared scores only.
 - **Output:** the seed prints the WG-Kennung (`household.signInCode`, PR #51), the names, the links
   and a short "what to show" list. Counts only, no applicant data.
 
@@ -273,16 +321,22 @@ the board appears.
 - `test/guarded.manifest.json`: **G-D2 stays `pending`** (human decision 2026-10-06). `ranking.test.ts`
   tests its open-round half (moved-out voters leave the denominator). The closed-round half ("votes
   count on in closed rounds") needs a close path, and the human will implement it in the
-  finalization of F3. The test file's header says so.
-- `pending-feedback.ts`: `/casting` already has `loading.tsx`, and the board has no form.
+  finalization of F3. The test file's header says so, and says that `guarded-tests.ts` checks only
+  `implemented` entries: deleting this file turns nothing red until G-D2 is `implemented`.
+- `vote-household-account.test.ts` (registered for G-D15, which is `implemented`) gains two cases
+  in its own `vi.mock("@/db/session-context")` pattern: `getRanking` with a profile-less context
+  throws `ProfileRequiredError` with zero queries, and `getRoundTallyBasisTx` does the same.
+- `pending-feedback.ts`: `/casting` already has `loading.tsx`, the board has no form, and the
+  popover trigger is `type="button"`.
 - Data inventory: no column, so no change.
 
 ## Risks / Trade-offs
 
 - **[V-1 is not enforced in the database yet]** → Human decision Q-1. Change 4 must land before the
   first real household. The register row stays open with that gate.
-- **[The D5 equivalence depends on two unique indexes]** → D5 names them and asks the applier to
-  check for writers. Change 4's RLS function computes the real set either way.
+- **[The D5 equivalence depends on two unique indexes]** → D5 names them, and step 2's
+  live-membership check refuses a mismatched context at runtime. Change 4's RLS function computes
+  the real set either way.
 - **[A hidden row's `state` tells the viewer an application was invited]** → The state is not
   derived from votes, and invited applications are on O4 for moderators anyway. V-4 is about
   results, not existence (FR-5.18).
@@ -293,7 +347,11 @@ the board appears.
   würde ohne sichtbaren Anlass springen")]** → This is the human's decision (Q-6), recorded in the
   docs commit. The detail card's „x Stimmen entfernt …" note (change 2) is the visible reason that
   answers P-3.
-- **[Latency on dev]** → `getRanking` runs about seven statements on one connection. That is
+- **[A frozen share or weight nobody validated on write]** → `updateHouseholdSettings` and the
+  settings form accept any `quorum_share`. A bad value opened into a round makes that round
+  `rules_invalid` for good. Validating on write is plan change 5 (Q-7); a register row names it
+  (task 1.8).
+- **[Latency on dev]** → `getRanking` runs about six statements on one connection. That is
   comparable to `getScreeningPass` plus one vote query, with no nesting (one pooled connection per
   call chain).
 

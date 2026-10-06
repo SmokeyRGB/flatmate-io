@@ -163,8 +163,9 @@ with the right to vote in that round, whose profile is `active`, and who holds t
 permission. A round chosen by address that the viewer does not take part in, or a malformed
 address, SHALL get the same refusal, naming no title and no count. A round in `draft`, `closed`
 or `archived` SHALL be refused with its state named. A profile-less session (the household
-account) SHALL get no ranking value of any kind. Without an address, the newest round in which
-the viewer takes part SHALL be shown. Sources: V-2 (`invarianten.md` §5.2), G-D15, F-12 (no close
+account) SHALL get no ranking value of any kind. Without an address, the newest `open` or
+`paused` round in which the viewer takes part SHALL be shown, and when there is none, the empty
+state. Sources: V-2 (`invarianten.md` §5.2), G-D15, F-12 (no close
 path yet), plan decision "D1 on `/casting`".
 
 #### Scenario: Not a participant
@@ -209,12 +210,14 @@ While the round's frozen hide flag is on, a candidate's score, vote count, quoru
 and highlight SHALL be withheld from a viewer who holds no non-withdrawn `invite` vote on it. They
 SHALL be withheld before data reaches the client: the hidden entry SHALL carry no result field at
 all, not an empty one. A hidden candidate SHALL still be listed by name, below the scoreboard,
-greyed, with an eye-off mark. Its notice SHALL read „Verdeckt, bis du selbst abgestimmt hast"
-while the viewer can still vote on it. When the viewer can no longer vote on it (round not open,
-or the application no longer `new`/`screened`), the notice SHALL read „Verdeckt — du hast hier
-nicht abgestimmt". Casting a vote SHALL reveal that candidate on the next read, and withdrawing it
-SHALL hide it again. Votes at another stage SHALL reveal nothing. Sources: FR-5.15–5.19, C-5.9,
-EC-5.4, EC-5.10, F-7, F-8, V-4 (`invarianten.md` §5.4), human decisions Q-3 and R-7.
+greyed, with an eye-off mark and the notice „Verdeckt — du hast hier nicht abgestimmt", oldest
+application first and never in an order derived from votes. Casting a vote SHALL reveal that
+candidate on the next read, and withdrawing it SHALL hide it again. Votes at another stage SHALL
+reveal nothing. While anything in an open round awaits the viewer's vote, the Casting tab leads to
+the pass instead (capability `ui/resident-frame`), so on the screen a hidden row is always one the
+viewer can no longer vote on: the round is not open, or the application left `new`/`screened`.
+Sources: FR-5.15–5.19, FR-5.19a (V1.1: met by the redirect), C-5.9, EC-5.4, EC-5.10, F-7, F-8,
+V-4 (`invarianten.md` §5.4, amended V1.1), human decisions Q-2, Q-3 and R-7.
 
 #### Scenario: Not yet voted
 - **WHEN** hiding is on and the viewer has not voted on a candidate
@@ -223,8 +226,7 @@ EC-5.4, EC-5.10, F-7, F-8, V-4 (`invarianten.md` §5.4), human decisions Q-3 and
 
 #### Scenario: Requested directly
 - **WHEN** the data behind the scoreboard is requested directly under the same conditions
-- **THEN** the hidden entry holds only its id, name, state and whether the viewer can still vote
-  (AC-5.16)
+- **THEN** the hidden entry holds only its id, name and state (AC-5.16)
 
 #### Scenario: Voting reveals
 - **WHEN** the viewer then casts a vote on that candidate
@@ -244,7 +246,8 @@ EC-5.4, EC-5.10, F-7, F-8, V-4 (`invarianten.md` §5.4), human decisions Q-3 and
 
 #### Scenario: Can no longer vote
 - **WHEN** a candidate moved to `invited` before the viewer voted on it
-- **THEN** it stays hidden with the notice „Verdeckt — du hast hier nicht abgestimmt"
+- **THEN** it stays hidden with the notice „Verdeckt — du hast hier nicht abgestimmt", also after
+  every other vote of the viewer is cast
 
 #### Scenario: Hiding off
 - **WHEN** the round's frozen hide flag is off
@@ -294,8 +297,8 @@ static tint. With N = 0 nothing is highlighted. Sources: human decisions R-6 and
 - **WHEN** the round covers two `open` rooms and four rows are scored
 - **THEN** exactly the first two scored rows are highlighted
 
-#### Scenario: A room is promised
-- **WHEN** one of those rooms becomes `promised`
+#### Scenario: A room is put on hold
+- **WHEN** one of those rooms is put `on_hold`
 - **THEN** only the first scored row is highlighted on the next read
 
 #### Scenario: Fewer scored rows than rooms
@@ -318,22 +321,6 @@ Stufenwerte sind aus der Rangliste heraus einsehbar (P-3)"*), P-3, C-5.16.
 #### Scenario: Looking up the rules
 - **WHEN** the viewer taps „(?)" on the scoreboard
 - **THEN** the four frozen weights, the formula and the round's quorum threshold are shown
-
-### Requirement: The hidden-results hint is bound to the viewer's progress
-
-A screen-level hint SHALL appear above the scoreboard only while at least one application in the
-round awaits the viewer's vote, by the same definition the pass and Start use. It SHALL state how
-many, with one action into the pass. It SHALL disappear entirely once nothing awaits the viewer,
-and SHALL never be a static subtitle. Sources: FR-5.19a, AC-5.19a, F-10, `D-casting-tab.md` D1
-„Eigene Stimme fehlt".
-
-#### Scenario: Last vote cast
-- **WHEN** the viewer has just cast their last remaining vote in the round
-- **THEN** no hidden-results hint is shown anywhere on the scoreboard (AC-5.19a)
-
-#### Scenario: Something still waits
-- **WHEN** two applications of the round still await the viewer's vote
-- **THEN** the hint names 2 and offers „Jetzt bewerten" into the pass
 
 ### Requirement: The scoreboard has its four states
 

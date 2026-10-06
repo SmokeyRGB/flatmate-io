@@ -16,7 +16,8 @@ with no demo household, produce a household in which:
 - realistic synthetic applications exist;
 - the other residents' votes were cast through the same write path the app uses.
 
-After the presenting resident completes the pass, whatever they rated, the scoreboard SHALL show:
+After the presenting resident (a resident who cast none of the seeded votes, such as Sam, or Robin
+after claiming) completes the pass, whatever they rated, the scoreboard SHALL show:
 - at least three scored rows, because the other residents' votes on them already reach quorum;
 - at least one unscored row, because no one else voted on it;
 - one `invited` row hidden from the presenter, with the notice that they cannot vote on it.
