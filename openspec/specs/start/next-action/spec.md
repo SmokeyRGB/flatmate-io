@@ -135,16 +135,18 @@ after screening. Sources: human decision 2026-09-24, amending FR-2.22, AC-2.14 a
 ### Requirement: Nothing open means the round's standing, never a blank
 
 When the resident has no open task, Start SHALL show the round's standing in place of the task
-card, and SHALL never show an empty surface. The standing names the phase of the application that
-has progressed furthest along the main path. Side states do not count, and a round with no
-main-path application reads "Warten auf Bewerbungen". Beneath the phase SHALL be the actual
-distribution of applications by state. With no open round, Start SHALL say that no round is
-running. Sources: FR-2.23, AC-2.15, EC-2.3, EC-2.12; `screens/B-start.md` B1 (*„Rundenstand aus §3
-füllt die Fläche — nie leer"*); `rahmenwerk.md` §3.1.
+card, and SHALL never show an empty surface. The standing is the actual distribution of the
+round's applications by state; it SHALL not name a single phase for the round, because every
+application has its own standing (one may be invited while others are still being decided). Side
+states do not count, and a round with no main-path application reads "Warten auf Bewerbungen".
+With no open round, Start SHALL say that no round is running. Sources: FR-2.23, AC-2.15, EC-2.3,
+EC-2.12; `screens/B-start.md` B1 (*„Rundenstand aus §3 füllt die Fläche — nie leer"*);
+`rahmenwerk.md` §3.1; human decision 2026-10-06 (no phase label on Start).
 
 #### Scenario: Everything done
 - **WHEN** the resident has no open task and a round is open
-- **THEN** the round's phase and its distribution by state are displayed
+- **THEN** the round's distribution by state is displayed, and no phase name such as
+  „Terminfindung" is
 
 #### Scenario: No round
 - **WHEN** no round is open
@@ -157,7 +159,7 @@ füllt die Fläche — nie leer"*); `rahmenwerk.md` §3.1.
 
 #### Scenario: Only side states
 - **WHEN** every application of the open round is in a side state
-- **THEN** the phase reads as waiting for applications
+- **THEN** the standing reads as waiting for applications
 
 ### Requirement: The viewer's own past application is not counted
 
@@ -213,4 +215,29 @@ persönliche Liste gemischt"*), U-5; `screens/O-organisation.md` rules 1–3.
 #### Scenario: A count the viewer can act on
 - **WHEN** a resident holds a role that shows the bridge but lacks the permission to create a round
 - **THEN** the free room is not counted as their task
+
+### Requirement: Rating everything is acknowledged
+
+When the resident may vote in an open round, that round still has applications open for voting
+(`new`/`screened`, not the resident's own), and none of them awaits the resident's vote, Start
+SHALL lead the standing with a short acknowledgement that the resident has rated every
+application, worded about the resident's own part and never about an applicant. It SHALL not
+appear in any other empty state: not when the round has no application open for voting, not when
+the resident does not take part, and not for the household account. Sources: `screens/B-start.md`
+B1 (*„Entschieden (2026-09-15): der Moment nach der letzten eigenen Stimme wird anerkannt, nicht
+nur gemeldet."*), P-O-04 (wording open), human decision 2026-10-06.
+
+#### Scenario: Last card rated
+- **WHEN** the resident has rated every application open for voting in the round and returns to
+  Start
+- **THEN** the acknowledgement „Stark gemacht — du hast alle Bewerbungen bewertet!" leads the
+  standing
+
+#### Scenario: Nothing to rate yet
+- **WHEN** the round has no application in `new` or `screened` other than the resident's own
+- **THEN** no acknowledgement is shown, only the standing
+
+#### Scenario: Something still waits
+- **WHEN** an application still awaits the resident's vote
+- **THEN** the vote task is shown, and no acknowledgement
 
