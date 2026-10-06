@@ -382,7 +382,7 @@ The human walked the board and changed two things, replacing R-7's "hidden for g
   go to the first group, `invited` to the second, and calls `computeRanking` once per group. The
   first call gets N = `openRoomCount`, the second N = 0, so invited rows never take a highlight
   slot. The pure module is unchanged: it already ranks whatever set it is given. The board renders
-  „Punktwert", „Eingeladen", „Verdeckt" with headings and omits an empty group. The empty state
+  „Score", „Eingeladen", „Verdeckt" with headings and omits an empty group. The empty state
   is shown only when all three are empty.
 
 *Alternative:* one list with an "invited" label (the first version). Rejected by the human: an

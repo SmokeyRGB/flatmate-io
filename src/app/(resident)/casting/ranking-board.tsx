@@ -36,7 +36,12 @@ export function RankingBoard({ ranking }: { ranking: Ranking }) {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
-        <p className="min-w-0 truncate text-sm text-muted-foreground">{ranking.round.title}</p>
+        <div className="min-w-0">
+          <p className="truncate text-sm text-muted-foreground">{ranking.round.title}</p>
+          <p className="text-sm text-muted-foreground">
+            {t.openRooms(ranking.openRoomCount)}
+          </p>
+        </div>
         <RulesPopover ranking={ranking} />
       </div>
       {/* Only this group highlights (design D10): the repository sets `leading` here and nowhere else. */}
@@ -143,8 +148,8 @@ function RulesPopover({ ranking }: { ranking: BoardRanking }) {
       </button>
       <div id="ranking-rules-popover" popover="auto" className="weights-popover card">
         <p className="font-semibold">{t.rulesHeading}</p>
-        <WeightsList weights={ranking.rules.weights} />
         <p className="mt-3 text-sm text-muted-foreground">{t.formula}</p>
+        <WeightsList weights={ranking.rules.weights} />
         <p className="mt-2 text-sm">{t.quorumRule(ranking.rules.needed, ranking.rules.denominator)}</p>
       </div>
     </>

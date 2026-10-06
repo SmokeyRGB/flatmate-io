@@ -91,7 +91,13 @@ describe("RankingBoard rows", () => {
     expect(rowOf(markup, "Bea")).not.toContain("ranking-leading");
     expect(rowOf(markup, "Dora")).not.toContain("ranking-leading");
     expect(rowOf(markup, "Elsa")).not.toContain("ranking-leading");
-    expect(markup.match(/sr-only">Unter den 2 höchsten Punktwerten — 2 Zimmer frei</g)).toHaveLength(2);
+    expect(markup.split(`sr-only">${t.leadingLabel(2)}<`)).toHaveLength(3);
+  });
+
+  it("names the open rooms under the round title", async () => {
+    const markup = await render(board());
+    expect(markup).toContain(t.openRooms(2));
+    expect(markup.indexOf(t.openRooms(2))).toBeGreaterThan(markup.indexOf("Herbstrunde"));
   });
 
   it("with N = 0 nothing is highlighted and no highlight text appears", async () => {
@@ -105,7 +111,8 @@ describe("RankingBoard rows", () => {
       }),
     );
     expect(markup).not.toContain("ranking-leading");
-    expect(markup).not.toContain("Zimmer frei");
+    expect(markup).not.toContain(t.leadingLabel(0));
+    expect(markup).toContain(t.openRooms(0));
   });
 
   it("the three headings appear only with rows, and an invited row sits under \"Eingeladen\" with its ring, never highlighted", async () => {
@@ -157,7 +164,7 @@ describe("RankingBoard (?) pop-over", () => {
     expect(popover).toContain("Finde gut: 4 Punkte"); // the round's weight, not the default 3
     expect(popover).toContain(t.formula);
     expect(popover).toContain(t.quorumRule(2, 4));
-    expect(t.quorumRule(2, 4)).toBe("2 von 4 Stimmen reichen");
+    expect(t.quorumRule(2, 4)).toContain("2 von 4"); // the round's real threshold, numbers only
   });
 });
 

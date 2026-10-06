@@ -17,14 +17,14 @@
 - **Drei Gruppen** auf einer Rangliste (Menschenentscheidung Q-3, 2026-10-05, und Rundgang
   2026-10-06; vormals: eine Liste mit einem Etikett „Eingeladen" je Zeile). Eine Gruppe ohne Zeile
   erscheint nicht; der leere Zustand nur, wenn alle drei leer sind:
-  - **„Punktwert"** (Bewerbungen `new`/`screened`): Zeilen mit Quorum zuerst, jede mit einem
+  - **„Score"** (Bewerbungen `new`/`screened`): Zeilen mit Quorum zuerst, jede mit einem
     **Kreis-Fortschrittsring** (Score in der Mitte) und „aus x Stimmen"; kein Rangplatz, keine
     Verteilung (die steht in D2, Q-10).
     - Die ersten N Zeilen **dieser Gruppe**, N = Zahl der offenen Zimmer der Runde, tragen eine
       leise, langsam wandernde Hervorhebung (R-6/Q-15); bei reduzierter Bewegung eine statische
       Tönung. In den anderen Gruppen gibt es keine Hervorhebung.
     - Zeilen unter Quorum **unten**, älteste Bewerbung zuerst, ohne Score und ohne Ring, mit dem
-      Hinweis, der die echte Schwelle nennt („Noch kein Punktwert — für ein faires Bild braucht es
+      Hinweis, der die echte Schwelle nennt („Noch kein Score — für ein faires Bild braucht es
       mindestens {n} Stimmen (bisher {k}).").
   - **„Eingeladen"** (Bewerbungen `invited`, Menschenentscheidung 2026-10-06): dieselbe Zeile mit
     Ring, aber ohne Hervorhebung. Wer eingeladen ist, wird nicht mehr entschieden. Die Gruppe kann

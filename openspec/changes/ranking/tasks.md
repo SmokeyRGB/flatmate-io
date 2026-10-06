@@ -350,10 +350,10 @@ reason codes, not only lengths.
 - [x] 7.2 `src/ui/strings/de.ts` `casting`: replace `rankingBody` with the board's copy:
   - `scoreOf(n)` „aus {n} Stimmen" (singular „aus 1 Stimme");
   - `ringLabel(score, n)` „{score} von 100 Punkten, aus {n} Stimmen";
-  - `unscored(needed, n)` „Noch kein Punktwert — für ein faires Bild braucht es mindestens {needed}
+  - `unscored(needed, n)` „Noch kein Score — für ein faires Bild braucht es mindestens {needed}
     Stimmen (bisher {n})." (singular „1 Stimme" where it applies);
   - `hidden` „Verdeckt — du hast hier nicht abgestimmt" and `hiddenHeading`;
-  - `leadingLabel(n)` „Unter den {n} höchsten Punktwerten — {n} Zimmer frei" (singular for 1);
+  - `leadingLabel(n)` „Unter den {n} höchsten Scores — {n} Zimmer frei" (singular for 1);
   - `rulesHeading`, `formula` (mean of the weights ÷ highest weight × 100, x,5 rounded up),
     `quorumRule(needed, d)` „{needed} von {d} Stimmen reichen";
   - `stateLabel` reuses `de.status.application.invited`;
@@ -456,7 +456,7 @@ reason codes, not only lengths.
   - sign in as Sam with the WG-Kennung; B1 shows the awaiting count, and Casting redirects to the
     pass;
   - rate every card; Start then shows „Stark gemacht — du hast alle Bewerbungen bewertet!" and no
-    phase name; the scoreboard shows „Punktwert" (rings in order, two highlighted, one unscored row
+    phase name; the scoreboard shows „Score" (rings in order, two highlighted, one unscored row
     at the bottom) and „Eingeladen" (the invited row with its score); „Verdeckt" stays empty;
   - check „(?)";
   - reduced motion (emulated) gives a static tint;
@@ -474,8 +474,8 @@ reason codes, not only lengths.
     application has left `new`/`screened` (nobody can vote any more); a paused round reveals
     nothing. This replaces the R-7 wording of task 1.4 („bleiben verdeckt"), dated, human decision
     2026-10-06;
-  - `docs/screens/D-casting-tab.md` D1: three groups „Punktwert", „Eingeladen", „Verdeckt"; top-N
-    only in „Punktwert"; „Eingeladen" may become its own tab later;
+  - `docs/screens/D-casting-tab.md` D1: three groups „Score", „Eingeladen", „Verdeckt"; top-N
+    only in „Score"; „Eingeladen" may become its own tab later;
   - `docs/screens/B-start.md` B1: the acknowledgement is built (wording „Stark gemacht — du hast
     alle Bewerbungen bewertet!", P-O-04 open); Start shows the distribution without a single phase
     name (human decision 2026-10-06; `rahmenwerk.md` §3's phase stays for deadlines);
@@ -498,11 +498,11 @@ reason codes, not only lengths.
     the case must fail;
   - adjust every other case to the new shape, without weakening an assertion.
 - [x] 10.4 `src/app/(resident)/casting/ranking-board.tsx` and `de.ts` `casting`: headings
-  „Punktwert", „Eingeladen", „Verdeckt"; a group with no row is not rendered; the empty state only
+  „Score", „Eingeladen", „Verdeckt"; a group with no row is not rendered; the empty state only
   when all three are empty; drop the per-row invited label (the group says it). Update
   `tests/unit/casting/ranking-board.test.ts`: the three headings appear only with rows; an invited
   row renders under „Eingeladen" with its ring; the highlight never on an invited row. Break: render
-  invited rows inside „Punktwert"; the test must fail.
+  invited rows inside „Score"; the test must fail.
 - [x] 10.5 Start (D11), `src/app/(resident)/dashboard/dashboard-view.ts` and its page and `de.ts`
   `start`: drop `phaseLabel` from the `phase` standing view (keep the "waiting for applications"
   sentence for a round without main-path applications), and add `allRated: boolean` when the

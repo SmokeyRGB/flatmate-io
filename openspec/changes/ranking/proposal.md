@@ -55,7 +55,7 @@ D1 scoreboard on a re-seedable Demo-WG, with **no migration**.
   and one hidden `invited` row.
 - **G-D2's open-round half is tested** (former members leave the quorum denominator). The manifest entry stays `pending` until the closed-round half can be tested, which the human will do in the finalization of F3 (human decision 2026-10-06).
 
-- **Walkthrough changes (human, 2026-10-06):** the board shows three groups, „Punktwert", „Eingeladen"
+- **Walkthrough changes (human, 2026-10-06):** the board shows three groups, „Score", „Eingeladen"
   and „Verdeckt". An application that left `new`/`screened` is revealed to every participant, since
   nobody can vote on it any more. Start acknowledges having rated everything and names no single
   phase. The seed leaves no application in `screened`.

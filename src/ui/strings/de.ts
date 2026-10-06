@@ -742,7 +742,7 @@ export const de = {
   },
   whoLivesHere: {
     heading: "Wer hier wohnt",
-    strangerNotice: "Erkennst du jemanden auf dieser Liste nicht wieder, sag es einer moderierenden Person — außerhalb der App.",
+    strangerNotice: "Erkennst du jemanden auf dieser Liste nicht wieder, gib sofort einer moderierenden Person Bescheid.",
   },
   // start-screen (FR-2.20–2.24, `rahmenwerk.md` §2–§3): B1, the resident's Start screen.
   start: {
@@ -769,14 +769,14 @@ export const de = {
     },
     // design.md Decision 6: the four display buckets beneath the phase, non-zero only.
     distribution: {
-      in_screening: (n: number) => `${n} in Sichtung`,
-      in_scheduling: (n: number) => `${n} im Termin`,
+      in_screening: (n: number) => `Für ${n} wird noch abgestimmt`,
+      in_scheduling: (n: number) => `${n} eingeladen`,
       interviewed: (n: number) => `${n} gecastet`,
-      in_offer: (n: number) => `${n} in Zusage`,
+      in_offer: (n: number) => `${n} zugesagt`,
     },
     // B1's acknowledgement after the last open application is rated (human decision 2026-10-06;
     // the exact wording stays open, P-O-04).
-    allRated: "Stark gemacht — du hast alle Bewerbungen bewertet!",
+    allRated: "Stark gemacht — du hast für alle Bewerbungen gevotet!",
     noRoundSentence: "Gerade läuft keine Runde.",
     runningWithoutYouSentence: "Eine Runde läuft, aber (noch) ohne dich.",
     // U-5, `rahmenwerk.md` §2.3: the moderation bridge — visually distinct from the resident's own
@@ -801,20 +801,28 @@ export const de = {
     scoreOf: (n: number) => `aus ${n === 1 ? "1 Stimme" : `${n} Stimmen`}`,
     ringLabel: (score: number, n: number) => `${score} von 100 Punkten, aus ${n === 1 ? "1 Stimme" : `${n} Stimmen`}`,
     unscored: (needed: number, n: number) =>
-      `Noch kein Punktwert — für ein faires Bild braucht es mindestens ${needed === 1 ? "1 Stimme" : `${needed} Stimmen`} (bisher ${n}).`,
+      `Noch kein Score — für ein faires Bild braucht es mindestens ${needed === 1 ? "1 Stimme" : `${needed} Stimmen`} (bisher ${n}).`,
     hidden: "Verdeckt — du hast hier nicht abgestimmt",
     // The three groups of the board (design D10, human decision 2026-10-06).
-    scoredHeading: "Punktwert",
+    scoredHeading: "Score",
     invitedHeading: "Eingeladen",
     hiddenHeading: "Verdeckt",
+    // Under the round's title, so the highlight explains itself (human walkthrough 2026-10-06).
+    // N is the round's open rooms, the same N that decides how many rows are highlighted.
+    openRooms: (n: number) =>
+      n === 0
+        ? "Kein Zimmer frei in dieser Runde"
+        : n === 1
+          ? "1 Zimmer frei — der höchste Score ist hervorgehoben"
+          : `${n} Zimmer frei — die ${n} höchsten Scores sind hervorgehoben`,
     leadingLabel: (n: number) =>
-      n === 1 ? "Unter dem höchsten Punktwert — 1 Zimmer frei" : `Unter den ${n} höchsten Punktwerten — ${n} Zimmer frei`,
+      n === 1 ? "Unter dem höchsten Score — 1 Zimmer frei" : `Unter den ${n} höchsten Scores — ${n} Zimmer frei`,
     rulesToggle: "(?)",
     rulesToggleLabel: "So entsteht die Rangliste",
-    rulesHeading: "So wird gerechnet",
+    rulesHeading: "So wird der Score berechnet",
     formula:
-      "Der Punktwert ist der Mittelwert der Punkte aller Stimmen, geteilt durch die höchste Stufe, mal 100; x,5 wird aufgerundet.",
-    quorumRule: (needed: number, denominator: number) => `${needed} von ${denominator} Stimmen reichen`,
+      "Der Score ist der Mittelwert der Punkte aller Stimmen, geteilt durch die höchste Stufe, mal 100; x,5 wird aufgerundet.",
+    quorumRule: (needed: number, denominator: number) => `Für die Berechnung des Scores reichen ${needed} von ${denominator} möglichen Stimmen`,
     empty: (title: string | null) =>
       title === null
         ? "Gerade läuft keine Runde, an der du teilnimmst."
@@ -839,7 +847,7 @@ export const de = {
     // The visually hidden companion to the check glyph on the selected rating, so the selected
     // level is never told by colour alone (FR-4.19).
     selected: "gewählt",
-    favouriteNote: "= dein Favorit",
+    favouriteNote: "(für deinen Favoriten)",
     progress: (n: number, total: number) => `${n} von ${total}`,
     progressLabel: "Fortschritt beim Sichten",
     ratingGroupLabel: "Deine Bewertung",

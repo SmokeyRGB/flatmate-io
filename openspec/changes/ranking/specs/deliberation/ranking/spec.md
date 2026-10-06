@@ -260,15 +260,15 @@ FR-5.15–5.19, FR-5.19a (V1.1: met by the redirect), C-5.9, EC-5.4, EC-5.10, F-
 - **WHEN** the round's frozen hide flag is off
 - **THEN** every candidate's results are shown, whether or not the viewer voted
 
-### Requirement: Three groups: Punktwert, Eingeladen, Verdeckt
+### Requirement: Three groups: Score, Eingeladen, Verdeckt
 
 The visible candidates SHALL be shown in up to three groups, in this order, each with its heading,
 and a group with no row SHALL not be shown:
-1. **„Punktwert"**: the candidates still being decided (`new`/`screened`). Scored rows come first,
+1. **„Score"**: the candidates still being decided (`new`/`screened`). Scored rows come first,
    in the order above. Each SHALL show a circular progress-ring score with the number inside and
    „aus x Stimmen" beside it, and nothing else about the result. There is no rank number and no
    distribution. Unscored rows (below quorum) follow at the bottom, oldest application first. Each
-   SHALL show no score and no ring, only the notice naming the real threshold: „Noch kein Punktwert
+   SHALL show no score and no ring, only the notice naming the real threshold: „Noch kein Score
    — für ein faires Bild braucht es mindestens {needed} Stimmen (bisher {n})."
 2. **„Eingeladen"**: the `invited` candidates, with the same row shapes (ring at quorum, the
    notice below it), scored rows first in the order above, then unscored oldest first. This group
@@ -284,7 +284,7 @@ AC-5.28, EC-5.2, EC-5.3, EC-5.12, human decisions Q-3, Q-10, R-5, R-6 and 2026-1
 
 #### Scenario: Below quorum
 - **WHEN** a visible candidate in `new` has 1 counted vote and 2 are needed
-- **THEN** it sits at the bottom of „Punktwert" with „Noch kein Punktwert — für ein faires Bild
+- **THEN** it sits at the bottom of „Score" with „Noch kein Score — für ein faires Bild
   braucht es mindestens 2 Stimmen (bisher 1)." and no ring (AC-5.9)
 
 #### Scenario: Everyone below quorum
@@ -298,21 +298,23 @@ AC-5.28, EC-5.2, EC-5.3, EC-5.12, human decisions Q-3, Q-10, R-5, R-6 and 2026-1
 
 #### Scenario: An invited candidate
 - **WHEN** a candidate at quorum is `invited`
-- **THEN** it is shown with its ring under „Eingeladen" and not under „Punktwert"
+- **THEN** it is shown with its ring under „Eingeladen" and not under „Score"
 
 ### Requirement: The top rows by score, as many as there are open rooms, are highlighted
 
-The first N scored rows of the group „Punktwert" SHALL carry a faint, slowly drifting background
+The first N scored rows of the group „Score" SHALL carry a faint, slowly drifting background
 highlight. N is the number of the round's rooms that are `open` and not deleted, read at request
 time. A tie at the boundary SHALL be decided by the order above, so exactly min(N, scored rows in
-„Punktwert") rows are highlighted. Rows under „Eingeladen" or „Verdeckt" and unscored rows SHALL
+„Score") rows are highlighted. Rows under „Eingeladen" or „Verdeckt" and unscored rows SHALL
 never take a slot. The highlight SHALL be visual only: no word about the person, a text equivalent
-naming the real threshold („Unter den {N} höchsten Punktwerten — {N} Zimmer frei"), no movement of
+naming the real threshold („Unter den {N} höchsten Scores — {N} Zimmer frei"), no movement of
 layout or of any control. Under reduced motion it SHALL be a static tint. With N = 0 nothing is
-highlighted. Sources: human decisions R-6 and Q-15 (2026-10-05), C-5.16, AC-5.28.
+highlighted. Under the round's title the screen SHALL name N and what it means („2 Zimmer frei — die 2
+höchsten Scores sind hervorgehoben"; with N = 0 „Kein Zimmer frei in dieser Runde"), so the
+highlight explains itself (human walkthrough 2026-10-06). Sources: human decisions R-6 and Q-15 (2026-10-05), C-5.16, AC-5.28.
 
 #### Scenario: Two open rooms
-- **WHEN** the round covers two `open` rooms and four rows of „Punktwert" are scored
+- **WHEN** the round covers two `open` rooms and four rows of „Score" are scored
 - **THEN** exactly the first two scored rows are highlighted
 
 #### Scenario: A room is put on hold
@@ -320,12 +322,16 @@ highlighted. Sources: human decisions R-6 and Q-15 (2026-10-05), C-5.16, AC-5.28
 - **THEN** only the first scored row is highlighted on the next read
 
 #### Scenario: Fewer scored rows than rooms
-- **WHEN** two rooms are open and one row of „Punktwert" is scored
+- **WHEN** two rooms are open and one row of „Score" is scored
 - **THEN** only that row is highlighted
 
 #### Scenario: Invited rows take no slot
 - **WHEN** two rooms are open and the highest score belongs to an `invited` candidate
-- **THEN** the first two scored rows of „Punktwert" are highlighted, and the invited row is not
+- **THEN** the first two scored rows of „Score" are highlighted, and the invited row is not
+
+#### Scenario: The open rooms are named
+- **WHEN** the round covers two `open` rooms
+- **THEN** „2 Zimmer frei — die 2 höchsten Scores sind hervorgehoben" appears under the round's title
 
 #### Scenario: Reduced motion
 - **WHEN** the device asks for reduced motion

@@ -112,7 +112,7 @@ describe("buildDashboardView (start-screen design.md Decision 10, tasks.md 7.4)"
       kind: "phase",
       waiting: false,
       allRated: false,
-      distribution: [{ label: "2 in Sichtung", count: 2 }],
+      distribution: [{ label: de.start.distribution.in_screening(2), count: 2 }],
     });
   });
 
