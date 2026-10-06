@@ -9,6 +9,7 @@ vi.mock("@/app/(org)/rounds/new/actions", () => ({ createAndOpenRoundAction: vi.
 
 const { RoundForm } = await import("@/app/(org)/rounds/new/round-form");
 const { isRoomOpenableForRound } = await import("@/modules/casting/repository");
+const { roomStatusEnum } = await import("@/modules/casting/schema");
 
 function render(rooms: { id: string; label: string; castable: boolean }[]) {
   return renderToStaticMarkup(createElement(RoundForm, { rooms }));
@@ -40,10 +41,22 @@ describe("new-round form: the submit lock follows whether any room can be cast f
 });
 
 describe("isRoomOpenableForRound", () => {
-  it("refuses occupied and not_available only", () => {
-    expect(isRoomOpenableForRound("occupied")).toBe(false);
-    expect(isRoomOpenableForRound("not_available")).toBe(false);
-    expect(isRoomOpenableForRound("open")).toBe(true);
-    expect(isRoomOpenableForRound("planned")).toBe(true);
+  // Every RoomStatus is listed, so adding a status to the locked set (or a new status at all)
+  // fails here until the expectation is stated.
+  const expected: Record<(typeof roomStatusEnum.enumValues)[number], boolean> = {
+    planned: true,
+    open: true,
+    promised: true,
+    on_hold: true,
+    occupied: false,
+    not_available: false,
+  };
+
+  it("covers every RoomStatus value", () => {
+    expect(Object.keys(expected).sort()).toEqual([...roomStatusEnum.enumValues].sort());
+  });
+
+  it.each(roomStatusEnum.enumValues)("%s: openable iff not occupied or not_available", (status) => {
+    expect(isRoomOpenableForRound(status)).toBe(expected[status]);
   });
 });

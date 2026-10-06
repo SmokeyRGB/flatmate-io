@@ -1352,8 +1352,9 @@ export async function listRoundsForSession(context: SessionContext) {
 // The ONE definition of what is open for a moderator, read by Start's moderation bridge and by the
 // organisation tab's first-round card alike, so the two can never disagree.
 export type OrganisationTask =
-  // The household has no round at all, in any status. Opening the first round covers every room,
-  // so this is the only task then — no room tasks alongside it.
+  // The household has no round at all, in any status. The first round is the moderator's next
+  // step, so it is the only task until one exists; room tasks start once the household has any
+  // round.
   | { kind: "open_first_round" }
   // A room open for letting that no draft/open/paused round covers (start-screen design.md
   // Decision 4; the room-covered check is local to this function on purpose).

@@ -840,9 +840,9 @@ export async function getResidentList(
       canCreateProfile: membershipHoldsPermission(callerRow, "create_resident_profile"),
       canAppointModerator: membershipHoldsPermission(callerRow, "appoint_moderator"),
       canIssueResetLink: membershipHoldsPermission(callerRow, "issue_password_reset_link"),
-      // AC-1.22/FR-1.29: no resident member exists yet -> lead with the join-link action instead of
-      // an empty list. A moderator always sees at least its own profile, so "no resident yet"
-      // needs no role (design D6).
+      // AC-1.22/FR-1.29: marks the empty state (no resident member yet), which now leads with the
+      // add-resident form instead of an empty list (amended 2026-10-06). A moderator always sees at
+      // least its own profile, so "no resident yet" needs no role (design D6).
       leadWithJoinCode: canManageJoinCodes && members.length === 0,
     };
   });
