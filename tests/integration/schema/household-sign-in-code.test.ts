@@ -137,12 +137,21 @@ describe("household.sign_in_code (drizzle/0032)", () => {
       candidates.add(`ABCD${ch}EFGH-JKLM`);
     }
 
-    for (const candidate of candidates) {
-      const rows = await withSessionContext(
-        { accountId: randomUUID(), householdId: randomUUID(), profileId: null },
-        (tx) => tx.execute<{ ok: boolean }>(sql`SELECT ${candidate}::text ~ ${pattern}::text AS ok`),
-      );
-      expect(rows[0].ok, JSON.stringify(candidate)).toBe(isWellFormedHouseholdSignInCode(candidate));
+    // One round trip for all candidates: ~190 sequential ones took longer than the 60 s timeout
+    // from a US runner to the EU database (verify-hosted failed on every push to main since #51).
+    const list = [...candidates];
+    const verdicts = await withSessionContext(
+      { accountId: randomUUID(), householdId: randomUUID(), profileId: null },
+      (tx) =>
+        tx.execute<{ ord: number; ok: boolean }>(sql`
+          SELECT t.ord::int AS ord, t.value ~ ${pattern}::text AS ok
+          FROM jsonb_array_elements_text(${JSON.stringify(list)}::jsonb) WITH ORDINALITY AS t(value, ord)
+        `),
+    );
+    expect(verdicts).toHaveLength(list.length);
+    for (const { ord, ok } of verdicts) {
+      const candidate = list[ord - 1];
+      expect(ok, JSON.stringify(candidate)).toBe(isWellFormedHouseholdSignInCode(candidate));
     }
   });
 });
