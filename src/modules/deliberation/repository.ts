@@ -273,14 +273,21 @@ export interface HiddenRow {
   state: VoteCandidate["state"];
 }
 
+export interface RankedGroup {
+  scored: ScoredRow[];
+  unscored: UnscoredRow[];
+}
+
 export type Ranking =
   | {
       kind: "board";
       round: { id: string; title: string; status: RoundStatus };
       rules: { weights: ScaleWeights; needed: number; denominator: number };
       openRoomCount: number;
-      scored: ScoredRow[];
-      unscored: UnscoredRow[];
+      // Design D10: the applications still being decided (`new`/`screened`), the invited ones
+      // (nobody can vote on them any more), and the rows the viewer may not see yet.
+      decided: RankedGroup;
+      invited: RankedGroup;
       hidden: HiddenRow[];
     }
   | { kind: "none" }
@@ -290,7 +297,7 @@ export type Ranking =
 // F5 change 1 (ranking), design D4: the scoreboard's one read, in ONE transaction, read-only. It
 // enforces before anything reaches the client: V-2 (a participant only), V-1 (the own application
 // is absent from every list and count: the candidate port's predicate) and V-4 (results per
-// candidate only after one's own non-withdrawn `invite` vote). `roundId` null picks the newest
+// candidate only after one's own non-withdrawn `invite` vote, or once nobody can vote on it). `roundId` null picks the newest
 // `open` or `paused` round the viewer takes part in; a closed or archived round is refused, since
 // no path closes a round yet and `quorum_denominator_frozen` has no writer (F-12).
 //
@@ -378,54 +385,74 @@ export async function getRanking(context: SessionContext, roundId: string | null
       }
     }
 
-    // V-4, per candidate. A candidate that is not visible carries no vote-derived field and is
-    // listed oldest first (the port's order), never by anything derived from votes.
-    const visible = candidates.filter((c) => !rules.hideResultsUntilVoted || ownVoted.has(c.applicationId));
+    // V-4, per candidate (design D4 step 8, D10). A candidate is visible when hiding is off, when
+    // the viewer holds a vote on it, or when it is no longer `new`/`screened`: `vote_guard`
+    // refuses every vote on it then, so there is nothing left to protect. A paused round reveals
+    // nothing by itself, because voting resumes. A candidate that is not visible carries no
+    // vote-derived field and is listed oldest first (the port's order), never by anything derived
+    // from votes.
+    const isVisible = (c: (typeof candidates)[number]) =>
+      !rules.hideResultsUntilVoted ||
+      ownVoted.has(c.applicationId) ||
+      (c.state !== "new" && c.state !== "screened");
+    const visible = candidates.filter(isVisible);
     const hidden: HiddenRow[] = candidates
-      .filter((c) => !visible.includes(c))
+      .filter((c) => !isVisible(c))
       .map((c) => ({ applicationId: c.applicationId, applicantName: c.applicantName ?? "", state: c.state }));
 
-    // The sort is a total order on per-candidate keys, so ranking only the visible set is the same
-    // as ranking everything and dropping the hidden rows, and the highlight slots go to visible
-    // rows only (Q-15).
+    // The sort is a total order on per-candidate keys, so ranking only a subset keeps the relative
+    // order. Each group is ranked on its own: the highlight slots (Q-15) go to the decided group
+    // only, and an invited row never takes one (N = 0 there).
     const byId = new Map(visible.map((c) => [c.applicationId, c]));
-    const ranked = computeRanking({
-      weights: rules.weights,
-      quorumShare: rules.quorumShare,
-      denominator,
-      openRoomCount: basis.openRoomCount,
-      candidates: visible.map((c) => ({
-        id: c.applicationId,
-        createdAt: c.createdAt,
-        values: countedValues.get(c.applicationId) ?? [],
-      })),
-    });
+    const rankGroup = (group: typeof visible, slots: number): RankedGroup => {
+      const ranked = computeRanking({
+        weights: rules.weights,
+        quorumShare: rules.quorumShare,
+        denominator,
+        openRoomCount: slots,
+        candidates: group.map((c) => ({
+          id: c.applicationId,
+          createdAt: c.createdAt,
+          values: countedValues.get(c.applicationId) ?? [],
+        })),
+      });
+      return {
+        scored: ranked.scored.map((r) => {
+          const c = byId.get(r.id)!;
+          return {
+            applicationId: r.id,
+            applicantName: c.applicantName ?? "",
+            state: c.state,
+            score: r.score,
+            n: r.n,
+            leading: r.leading,
+          };
+        }),
+        unscored: ranked.unscored.map((r) => {
+          const c = byId.get(r.id)!;
+          return {
+            applicationId: r.id,
+            applicantName: c.applicantName ?? "",
+            state: c.state,
+            n: r.n,
+            needed: r.needed,
+          };
+        }),
+      };
+    };
     return {
       kind: "board",
       round: { id: round.roundId, title: round.title, status: round.status },
       rules: { weights: rules.weights, needed: quorumNeeded(rules.quorumShare, denominator), denominator },
       openRoomCount: basis.openRoomCount,
-      scored: ranked.scored.map((r) => {
-        const c = byId.get(r.id)!;
-        return {
-          applicationId: r.id,
-          applicantName: c.applicantName ?? "",
-          state: c.state,
-          score: r.score,
-          n: r.n,
-          leading: r.leading,
-        };
-      }),
-      unscored: ranked.unscored.map((r) => {
-        const c = byId.get(r.id)!;
-        return {
-          applicationId: r.id,
-          applicantName: c.applicantName ?? "",
-          state: c.state,
-          n: r.n,
-          needed: r.needed,
-        };
-      }),
+      decided: rankGroup(
+        visible.filter((c) => c.state !== "invited"),
+        basis.openRoomCount,
+      ),
+      invited: rankGroup(
+        visible.filter((c) => c.state === "invited"),
+        0,
+      ),
       hidden,
     };
   });

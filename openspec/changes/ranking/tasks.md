@@ -486,11 +486,11 @@ reason codes, not only lengths.
     (design Risks), and one for "`screened` hidden in v0.1,
     implemented with the invite change";
   - `node tools/check-refs.ts` and `--scope docs` clean.
-- [ ] 10.2 `src/modules/deliberation/repository.ts` `getRanking`: the reveal rule of D4 step 8 (state
+- [x] 10.2 `src/modules/deliberation/repository.ts` `getRanking`: the reveal rule of D4 step 8 (state
   no longer `new`/`screened` reveals), and the board shape of D10 (`decided` and `invited`, each
   `{ scored, unscored }`, plus `hidden`). `computeRanking` is called once per group, N =
   `openRoomCount` for `decided`, 0 for `invited`. Update the exported types.
-- [ ] 10.3 `tests/integration/deliberation/ranking.test.ts`:
+- [x] 10.3 `tests/integration/deliberation/ranking.test.ts`:
   - rewrite 6.4's case: a candidate moved to `invited` before the viewer voted is now **visible**,
     in `invited`, with its score; the paused-round case stays hidden. Break: drop the state
     condition; the invited case must fail;

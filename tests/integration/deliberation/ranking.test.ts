@@ -4,6 +4,7 @@ import { withSessionContext, type SessionContext } from "@/db/session-context";
 import {
   createAndOpenRound,
   createRoom,
+  transitionApplication,
   transitionRoomStatus,
   updateHouseholdSettings,
 } from "@/modules/casting/repository";
@@ -133,7 +134,7 @@ describe("getRanking: the frozen rules (AC-5.5, F-1) and broken rules (EC-5.5, E
     const before = await board(viewer.context, s.roundId);
     // Two voters (moderator, viewer) at 0.5: one vote reaches quorum. good = 3 of max 5: 60.
     expect(before.rules).toMatchObject({ denominator: 2, needed: 1 });
-    expect(before.scored.find((r) => r.applicationId === voted.id)).toMatchObject({ score: 60, n: 1 });
+    expect(before.decided.scored.find((r) => r.applicationId === voted.id)).toMatchObject({ score: 60, n: 1 });
     expect(idsOf(before.hidden)).toContain(unvoted.id);
 
     await updateHouseholdSettings(
@@ -149,7 +150,7 @@ describe("getRanking: the frozen rules (AC-5.5, F-1) and broken rules (EC-5.5, E
     const after = await board(viewer.context, s.roundId);
     expect(after.rules.weights.good).toBe(3);
     expect(after.rules.needed).toBe(1);
-    expect(after.scored.find((r) => r.applicationId === voted.id)).toMatchObject({ score: 60, n: 1 });
+    expect(after.decided.scored.find((r) => r.applicationId === voted.id)).toMatchObject({ score: 60, n: 1 });
     // Hiding still follows the frozen flag: the unvoted application stays hidden.
     expect(idsOf(after.hidden)).toContain(unvoted.id);
   });
@@ -201,8 +202,8 @@ describe("getRanking: results hidden until the viewer's own vote (V-4)", () => {
     expect(hiddenRow).toBeDefined();
     expect(Object.keys(hiddenRow!).sort()).toEqual(["applicantName", "applicationId", "state"]);
     expect(hiddenRow!.applicantName).toBe(a.applicantName);
-    expect(idsOf(ranking.scored)).not.toContain(a.id);
-    expect(idsOf(ranking.unscored)).not.toContain(a.id);
+    expect(idsOf(ranking.decided.scored)).not.toContain(a.id);
+    expect(idsOf(ranking.decided.unscored)).not.toContain(a.id);
   });
 
   it("AC-5.17: casting a vote reveals that candidate on the next read", async () => {
@@ -211,7 +212,7 @@ describe("getRanking: results hidden until the viewer's own vote (V-4)", () => {
     await cast(s, viewer.context, a.id, "good");
     const after = await board(viewer.context, s.roundId);
     expect(idsOf(after.hidden)).not.toContain(a.id);
-    expect(after.scored.find((r) => r.applicationId === a.id)).toMatchObject({ score: 60, n: 1 });
+    expect(after.decided.scored.find((r) => r.applicationId === a.id)).toMatchObject({ score: 60, n: 1 });
   });
 
   it("AC-5.18: voted on A but not on B: A is visible, B is hidden", async () => {
@@ -219,7 +220,7 @@ describe("getRanking: results hidden until the viewer's own vote (V-4)", () => {
     const b = await insertApplicationAt(s, "new", { createdAt: at(4) });
     await cast(s, viewer.context, a.id, "rather_not");
     const ranking = await board(viewer.context, s.roundId);
-    expect([...idsOf(ranking.scored), ...idsOf(ranking.unscored)]).toContain(a.id);
+    expect([...idsOf(ranking.decided.scored), ...idsOf(ranking.decided.unscored)]).toContain(a.id);
     expect(idsOf(ranking.hidden)).toContain(b.id);
     expect(idsOf(ranking.hidden)).not.toContain(a.id);
   });
@@ -239,8 +240,8 @@ describe("getRanking: results hidden until the viewer's own vote (V-4)", () => {
     );
     const ranking = await board(viewer.context, s.roundId);
     expect(idsOf(ranking.hidden)).toContain(c.id);
-    expect(idsOf(ranking.scored)).not.toContain(c.id);
-    expect(idsOf(ranking.unscored)).not.toContain(c.id);
+    expect(idsOf(ranking.decided.scored)).not.toContain(c.id);
+    expect(idsOf(ranking.decided.unscored)).not.toContain(c.id);
   });
 
   it("EC-5.12: withdrawing the viewer's vote hides the candidate again", async () => {
@@ -262,19 +263,32 @@ describe("getRanking: results hidden until the viewer's own vote (V-4)", () => {
     expect(ours).toEqual([early.id, middle.id, late.id]);
   });
 
-  it("R-7: a candidate invited before the viewer voted stays hidden, also after the viewer's other votes", async () => {
-    const invited = await insertApplicationAt(s, "invited", { createdAt: at(40) });
-    const other = await insertApplicationAt(s, "new", { createdAt: at(41) });
-    expect(idsOf((await board(viewer.context, s.roundId)).hidden)).toContain(invited.id);
-    await cast(s, viewer.context, other.id, "good");
+  it("R-8 (human decision 2026-10-06): a candidate invited before the viewer voted is visible, in the invited group, with its score", async () => {
+    const inv = await insertApplicationAt(s, "new", { createdAt: at(40) });
+    const bare = await insertApplicationAt(s, "new", { createdAt: at(41) });
+    await cast(s, s.moderator.context, inv.id, "good");
+    // While it is still `new` the viewer has not voted on it, so it is hidden.
+    expect(idsOf((await board(viewer.context, s.roundId)).hidden)).toContain(inv.id);
+    for (const id of [inv.id, bare.id]) {
+      await transitionApplication(s.moderator.context, id, "screened");
+      await transitionApplication(s.moderator.context, id, "invited");
+    }
     const after = await board(viewer.context, s.roundId);
-    expect(idsOf(after.hidden)).toContain(invited.id);
-    expect(after.hidden.find((r) => r.applicationId === invited.id)!.state).toBe("invited");
-    expect(idsOf(after.scored)).not.toContain(invited.id);
-    expect(idsOf(after.unscored)).not.toContain(invited.id);
+    expect(idsOf(after.hidden)).not.toContain(inv.id);
+    expect(idsOf(after.hidden)).not.toContain(bare.id);
+    expect(after.invited.scored.find((r) => r.applicationId === inv.id)).toMatchObject({
+      state: "invited",
+      score: 60,
+      n: 1,
+      leading: false,
+    });
+    expect(after.invited.unscored.find((r) => r.applicationId === bare.id)).toMatchObject({ state: "invited", n: 0 });
+    // The decided group holds neither.
+    expect(idsOf(after.decided.scored)).not.toContain(inv.id);
+    expect(idsOf(after.decided.unscored)).not.toContain(bare.id);
   });
 
-  it("R-7: an unvoted `new` candidate in a paused round stays hidden", async () => {
+  it("R-7: an unvoted `new` candidate in a paused round stays hidden (a paused round reveals nothing)", async () => {
     const waiting = await insertApplicationAt(s, "new", { createdAt: at(50) });
     await setRoundStatus(s, s.roundId, "paused");
     const ranking = await board(viewer.context, null); // the newest open or paused round
@@ -288,7 +302,7 @@ describe("getRanking: results hidden until the viewer's own vote (V-4)", () => {
     await patchSnapshot(s, { hideResultsUntilVoted: false });
     const ranking = await board(viewer.context, s.roundId);
     expect(ranking.hidden).toEqual([]);
-    expect([...idsOf(ranking.scored), ...idsOf(ranking.unscored)]).toContain(unvoted.id);
+    expect([...idsOf(ranking.decided.scored), ...idsOf(ranking.decided.unscored)]).toContain(unvoted.id);
     await patchSnapshot(s, { hideResultsUntilVoted: true });
   });
 });
@@ -320,11 +334,17 @@ describe("getRanking: the viewer's own application does not exist (V-1)", () => 
 
   async function expectAbsent(context: SessionContext, label: string) {
     const ranking = await board(context, null);
-    const all = [...idsOf(ranking.scored), ...idsOf(ranking.unscored), ...idsOf(ranking.hidden)];
+    const all = [
+      ...idsOf(ranking.decided.scored),
+      ...idsOf(ranking.decided.unscored),
+      ...idsOf(ranking.invited.scored),
+      ...idsOf(ranking.invited.unscored),
+      ...idsOf(ranking.hidden),
+    ];
     expect(all, label).not.toContain(own.id);
     expect(JSON.stringify(ranking), label).not.toContain(own.applicantName);
     // It takes no highlight slot: the one open room goes to the control row.
-    expect(ranking.scored.map((r) => [r.applicationId, r.leading]), label).toEqual([[control.id, true]]);
+    expect(ranking.decided.scored.map((r) => [r.applicationId, r.leading]), label).toEqual([[control.id, true]]);
   }
 
   it("AC-5.24/5.27: absent from every list, with no leading slot, open or paused, hiding on or off", async () => {
@@ -341,7 +361,7 @@ describe("getRanking: the viewer's own application does not exist (V-1)", () => 
 
   it("AC-5.25: everyone else sees it scored, first and leading", async () => {
     const ranking = await board(other.context, null);
-    expect(ranking.scored.map((r) => [r.applicationId, r.score, r.leading])).toEqual([
+    expect(ranking.decided.scored.map((r) => [r.applicationId, r.score, r.leading])).toEqual([
       [own.id, 100, true],
       [control.id, 60, false],
     ]);
@@ -382,50 +402,50 @@ describe("getRanking: former members leave the quorum denominator (G-D2 open-rou
   });
 
   const row = (b: Board, id: string) =>
-    b.scored.find((r) => r.applicationId === id) ?? b.unscored.find((r) => r.applicationId === id);
+    b.decided.scored.find((r) => r.applicationId === id) ?? b.decided.unscored.find((r) => r.applicationId === id);
 
   it("a move-out takes the vote out of score, count and numerator, and the voter out of the denominator; reactivation restores it", async () => {
     const before = await board(m(), s.roundId);
     expect(before.rules).toMatchObject({ denominator: 4, needed: 2 });
-    expect(before.scored.find((r) => r.applicationId === x.id)).toMatchObject({ score: 30, n: 2 });
-    expect(before.scored.find((r) => r.applicationId === z.id)).toMatchObject({ score: 40, n: 3 });
+    expect(before.decided.scored.find((r) => r.applicationId === x.id)).toMatchObject({ score: 30, n: 2 });
+    expect(before.decided.scored.find((r) => r.applicationId === z.id)).toMatchObject({ score: 40, n: 3 });
 
     await setMovedOut(s.hh.context, s.hh.accountId, v1.accountId);
     const out = await board(m(), s.roundId);
     expect(out.rules).toMatchObject({ denominator: 3, needed: 2 });
     // X had 2 votes, now 1 < 2: it falls back to unscored, with the real count.
     expect(row(out, x.id)).toMatchObject({ n: 1, needed: 2 });
-    expect(out.unscored.map((r) => r.applicationId)).toContain(x.id);
+    expect(out.decided.unscored.map((r) => r.applicationId)).toContain(x.id);
     expect("score" in row(out, x.id)!).toBe(false);
     // Z loses the 'No' vote: (3 + 3) / 2 / 5 = 60 from two votes, not 40 from three.
-    expect(out.scored.find((r) => r.applicationId === z.id)).toMatchObject({ score: 60, n: 2 });
+    expect(out.decided.scored.find((r) => r.applicationId === z.id)).toMatchObject({ score: 60, n: 2 });
 
     await reactivateMember(s.hh.context, s.hh.accountId, v1.accountId);
     const back = await board(m(), s.roundId);
     expect(back.rules).toMatchObject({ denominator: 4, needed: 2 });
-    expect(back.scored.find((r) => r.applicationId === x.id)).toMatchObject({ score: 30, n: 2 });
-    expect(back.scored.find((r) => r.applicationId === z.id)).toMatchObject({ score: 40, n: 3 });
+    expect(back.decided.scored.find((r) => r.applicationId === x.id)).toMatchObject({ score: 30, n: 2 });
+    expect(back.decided.scored.find((r) => r.applicationId === z.id)).toMatchObject({ score: 40, n: 3 });
   });
 
   it("a removed member's vote leaves in the same way", async () => {
-    expect((await board(m(), s.roundId)).scored.map((r) => r.applicationId)).toContain(y.id);
+    expect((await board(m(), s.roundId)).decided.scored.map((r) => r.applicationId)).toContain(y.id);
     await removeMember(s.hh.context, s.hh.accountId, v2.accountId, "Zwei");
     const out = await board(m(), s.roundId);
     expect(out.rules).toMatchObject({ denominator: 3, needed: 2 });
-    expect(out.unscored.find((r) => r.applicationId === y.id)).toMatchObject({ n: 1, needed: 2 });
-    expect(out.scored.map((r) => r.applicationId)).not.toContain(y.id);
+    expect(out.decided.unscored.find((r) => r.applicationId === y.id)).toMatchObject({ n: 1, needed: 2 });
+    expect(out.decided.scored.map((r) => r.applicationId)).not.toContain(y.id);
   });
 
   it("EC-5.12: withdrawing a vote moves a candidate from scored to unscored and back", async () => {
-    expect((await board(m(), s.roundId)).scored.map((r) => r.applicationId)).toContain(w.id);
+    expect((await board(m(), s.roundId)).decided.scored.map((r) => r.applicationId)).toContain(w.id);
     await withSessionContext(v3.context, (tx) =>
       tx.update(vote).set({ withdrawnAt: new Date() }).where(eq(vote.applicationId, w.id)),
     );
     const down = await board(m(), s.roundId);
-    expect(down.unscored.find((r) => r.applicationId === w.id)).toMatchObject({ n: 1 });
-    expect(down.scored.map((r) => r.applicationId)).not.toContain(w.id);
+    expect(down.decided.unscored.find((r) => r.applicationId === w.id)).toMatchObject({ n: 1 });
+    expect(down.decided.scored.map((r) => r.applicationId)).not.toContain(w.id);
     await cast(s, v3.context, w.id, "good");
-    expect((await board(m(), s.roundId)).scored.find((r) => r.applicationId === w.id)).toMatchObject({ n: 2 });
+    expect((await board(m(), s.roundId)).decided.scored.find((r) => r.applicationId === w.id)).toMatchObject({ n: 2 });
   });
 });
 
@@ -436,7 +456,7 @@ describe("getRanking: the highlight follows the round's open rooms (Q-15)", () =
   let rooms: { id: string }[];
   const leadingCount = async () => {
     const ranking = await board(s.moderator.context, s.roundId);
-    return { ranking, leading: ranking.scored.filter((r) => r.leading).length };
+    return { ranking, leading: ranking.decided.scored.filter((r) => r.leading).length };
   };
 
   beforeAll(async () => {
@@ -467,17 +487,36 @@ describe("getRanking: the highlight follows the round's open rooms (Q-15)", () =
     await transitionRoomStatus(hh.context, rooms[1].id, "open", hhActor(hh));
     const two = await leadingCount();
     expect(two.ranking.openRoomCount).toBe(2);
-    expect(two.ranking.scored.map((r) => r.leading)).toEqual([true, true, false]);
+    expect(two.ranking.decided.scored.map((r) => r.leading)).toEqual([true, true, false]);
 
     await transitionRoomStatus(hh.context, rooms[1].id, "on_hold", hhActor(hh));
     const one = await leadingCount();
     expect(one.ranking.openRoomCount).toBe(1);
-    expect(one.ranking.scored.map((r) => r.leading)).toEqual([true, false, false]);
+    expect(one.ranking.decided.scored.map((r) => r.leading)).toEqual([true, false, false]);
 
     await transitionRoomStatus(hh.context, rooms[2].id, "open", hhActor(hh));
     expect((await leadingCount()).leading).toBe(2);
     await transitionRoomStatus(hh.context, rooms[2].id, "not_available", hhActor(hh));
     expect((await leadingCount()).leading).toBe(1);
+  });
+
+  it("D10: an invited candidate with the highest score takes no leading slot; the first two decided rows lead", async () => {
+    await transitionRoomStatus(hh.context, rooms[1].id, "open", hhActor(hh)); // rooms 0 and 1: N = 2
+    const star = await insertApplicationAt(s, "new", { createdAt: at(10) });
+    await cast(s, s.moderator.context, star.id, "definitely");
+    await transitionApplication(s.moderator.context, star.id, "screened");
+    await transitionApplication(s.moderator.context, star.id, "invited");
+    const ranking = await board(s.moderator.context, s.roundId);
+    expect(ranking.openRoomCount).toBe(2);
+    expect(ranking.invited.scored).toEqual([
+      expect.objectContaining({ applicationId: star.id, score: 100, leading: false }),
+    ]);
+    expect(ranking.decided.scored.map((r) => [r.score, r.leading])).toEqual([
+      [100, true],
+      [60, true],
+      [20, false],
+    ]);
+    expect(idsOf(ranking.decided.scored)).not.toContain(star.id);
   });
   // `promised` and `deleted_at` cannot be reached through real paths for a room in an open round
   // (removeRoom refuses it, open -> promised is not F1-reachable). Both are invariant guards
