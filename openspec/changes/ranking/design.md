@@ -178,11 +178,13 @@ itself (`kontextgrenzen.md` §4 rule 1).
    candidates. From this one statement the read derives:
    - the viewer's own votes: rows with `resident_profile_id = context.profileId`;
    - the counted votes: rows whose voter is in `countedVoterIds`.
-8. Visibility per candidate (V-4): visible if `!hideResultsUntilVoted`, or if the viewer holds a
-   vote on it. A candidate that is not visible goes to `hidden` as `{ applicationId, applicantName,
-   state }`, ordered by `createdAt, id`, never by anything vote-derived. There is no
-   `canStillVote`: under the redirect every hidden row on `/casting` is one the viewer can no
-   longer vote on (Non-Goals), so one notice serves them all (R-7).
+8. Visibility per candidate (V-4, as amended 2026-10-06, D10): visible if
+   `!hideResultsUntilVoted`, or if the viewer holds a vote on it, or if its state is no longer
+   `new`/`screened` (nobody can vote on it any more). A candidate that is not visible goes to
+   `hidden` as `{ applicationId, applicantName, state }`, ordered by `createdAt, id`, never by
+   anything vote-derived. There is no `canStillVote`: under the redirect every hidden row on
+   `/casting` is one the viewer can no longer vote on in a paused round, or a race (Non-Goals), so
+   one notice serves them all.
 9. D1's module runs over the **visible candidates only**. The sort is a total order on per-candidate
    keys, so restricting the input preserves the relative order. Ranking the visible set is
    therefore the same as ranking everything and dropping the hidden rows, and the highlight slots
@@ -296,6 +298,9 @@ a comment naming this change.
   Claiming Robin later auto-joins the open round (`drizzle/0031`), which makes the denominator 5
   and quorum 3.
 - **Rooms:** the household account moves both rooms `planned → open`, so N = 2.
+- **No `screened`.** The seed moves no application to `screened` except as the pass-through step to
+  `invited` (human decision 2026-10-06: `screened` is hidden in v0.1; the invite change removes the
+  manual step from the pipeline UI).
 - **Applications:** seven realistic synthetic applications (G-B1: invented names,
   `@example.test`, the 030 23125 range), replacing the „Testbewerbung" set. Every application gets
   either **zero** or **all three** other votes, never one or two: one or two other votes plus the
@@ -362,6 +367,44 @@ the board appears.
 - `pending-feedback.ts`: `/casting` already has `loading.tsx`, the board has no form, and the
   popover trigger is `type="button"`.
 - Data inventory: no column, so no change.
+
+### D10 · Groups and reveal after voting closes (human decisions 2026-10-06)
+
+The human walked the board and changed two things, replacing R-7's "hidden for good":
+- **Reveal once nobody can vote.** V-4 exists against anchoring and bandwagon effects on a vote
+  still to be cast. Once an application has left `new`/`screened`, `vote_guard` refuses every vote
+  on it, so there is nothing to protect. D4 step 8 reveals such a candidate to every participant. A
+  *paused* round does not count as closed: voting resumes, so its unvoted candidates stay hidden.
+  This is a narrower form of `invarianten.md` §5.4's original `¬can_vote` disjunct: per
+  application state, not per round status. §5.4 is amended again in the docs (task 10.1).
+- **Three groups.** `Ranking`'s board shape becomes `{ …, decided: { scored, unscored }, invited:
+  { scored, unscored }, hidden }`. The read splits the visible candidates by state: `new`/`screened`
+  go to the first group, `invited` to the second, and calls `computeRanking` once per group. The
+  first call gets N = `openRoomCount`, the second N = 0, so invited rows never take a highlight
+  slot. The pure module is unchanged: it already ranks whatever set it is given. The board renders
+  „Punktwert", „Eingeladen", „Verdeckt" with headings and omits an empty group. The empty state
+  is shown only when all three are empty.
+
+*Alternative:* one list with an "invited" label (the first version). Rejected by the human: an
+invited applicant is no longer being decided, and mixing them made the top-N highlight land on
+someone already invited.
+
+### D11 · Start: acknowledgement instead of a phase name (human decision 2026-10-06)
+
+`dashboard-view.ts` builds the standing card. Two changes, both pure in the view model:
+- **No phase label.** The `phase` standing keeps its distribution and drops `phaseLabel`: one phase
+  per round is misleading when each application has its own standing ("Terminfindung" appeared
+  because one application was invited). `phaseOf` stays in `task-precedence.ts`, because the round
+  deadlines of `rahmenwerk.md` §3 hang on it elsewhere. Only Start stops showing it. The
+  "waiting for applications" sentence stays for a round with no main-path application.
+- **Acknowledgement.** `B-start.md` decided on 2026-09-15 that rating the last open application is
+  acknowledged, but it was never built. It is shown when the standing round is one the viewer may
+  vote in (`canVote`), its `stateCounts` hold at least one `new`/`screened` application (the
+  overview already excludes the viewer's own, spec "The viewer's own past application is not
+  counted"), and the awaiting count for it is 0. No new read is needed: `getStartOverview` and
+  `getAwaitingVoteCounts` already carry both numbers. The wording goes in `de.ts`
+  (`start.allRated`: „Stark gemacht — du hast alle Bewerbungen bewertet!"); P-O-04 keeps the
+  wording open.
 
 ## Risks / Trade-offs
 

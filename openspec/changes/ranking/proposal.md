@@ -55,6 +55,11 @@ D1 scoreboard on a re-seedable Demo-WG, with **no migration**.
   and one hidden `invited` row.
 - **G-D2's open-round half is tested** (former members leave the quorum denominator). The manifest entry stays `pending` until the closed-round half can be tested, which the human will do in the finalization of F3 (human decision 2026-10-06).
 
+- **Walkthrough changes (human, 2026-10-06):** the board shows three groups, „Punktwert", „Eingeladen"
+  and „Verdeckt". An application that left `new`/`screened` is revealed to every participant, since
+  nobody can vote on it any more. Start acknowledges having rated everything and names no single
+  phase. The seed leaves no application in `screened`.
+
 Not in this change (plan changes 2–5):
 - the detail card, per-candidate arithmetic, distribution, „5 von 7" and `reveal_vote_authorship`
   (change 2);
@@ -76,6 +81,9 @@ Not in this change (plan changes 2–5):
   the viewer's vote, the tab shows the round's scoreboard instead of the placeholder sentence.
 - `deliberation/screening-pass`: "The round's frozen weights are one tap away". All-zero frozen
   weights refuse the pass like malformed ones, because the shared parser now applies.
+- `start/next-action`: "Nothing open means the round's standing" drops the single phase name, and a
+  new requirement acknowledges having rated everything (`B-start.md`, decided 2026-09-15, never
+  built). Human walkthrough 2026-10-06.
 
 ## Impact
 

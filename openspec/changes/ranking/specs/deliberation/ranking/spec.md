@@ -144,17 +144,17 @@ SHALL return the same order. Sources: FR-5.11, FR-5.12, FR-5.13, C-5.7, C-5.8, E
 
 ### Requirement: Which applications the scoreboard holds
 
-The scoreboard SHALL hold the round's applications in `new`, `screened` and `invited`. An
-`invited` one SHALL carry its state as a label. Applications in any other state SHALL not appear.
-Sources: FR-5.22, human decision Q-4; FR-5.23 is served by O4 (F3).
+The scoreboard SHALL hold the round's applications in `new`, `screened` and `invited`.
+Applications in any other state SHALL not appear. Sources: FR-5.22, human decision Q-4; FR-5.23
+is served by O4 (F3).
 
 #### Scenario: A rejected application
 - **WHEN** an application in the round is `rejected_by_household` or `withdrawn`
 - **THEN** it does not appear on the scoreboard
 
 #### Scenario: An invited application
-- **WHEN** an application in the round is `invited` and its results are visible to the viewer
-- **THEN** it appears in its place with the label for its state
+- **WHEN** an application in the round is `invited`
+- **THEN** it appears in the group „Eingeladen", not among the applications still being decided
 
 ### Requirement: Only a participant of the round sees its ranking
 
@@ -204,25 +204,29 @@ FR-5.30, AC-5.24, AC-5.25, AC-5.27 (repository half), EC-5.11 (V1.1, F-5), V-1 (
 - **WHEN** another resident of the round opens the scoreboard
 - **THEN** the application appears for them in its place
 
-### Requirement: Results are hidden per candidate until the viewer's own vote
+### Requirement: Results are hidden per candidate until the viewer's own vote, while voting on it is still possible
 
 While the round's frozen hide flag is on, a candidate's score, vote count, quorum state, position
-and highlight SHALL be withheld from a viewer who holds no non-withdrawn `invite` vote on it. They
-SHALL be withheld before data reaches the client: the hidden entry SHALL carry no result field at
-all, not an empty one. A hidden candidate SHALL still be listed by name, below the scoreboard,
-greyed, with an eye-off mark and the notice „Verdeckt — du hast hier nicht abgestimmt", oldest
-application first and never in an order derived from votes. Casting a vote SHALL reveal that
-candidate on the next read, and withdrawing it SHALL hide it again. Votes at another stage SHALL
-reveal nothing. While anything in an open round awaits the viewer's vote, the Casting tab leads to
-the pass instead (capability `ui/resident-frame`), so on the screen a hidden row is always one the
-viewer can no longer vote on: the round is not open, or the application left `new`/`screened`.
-Sources: FR-5.15–5.19, FR-5.19a (V1.1: met by the redirect), C-5.9, EC-5.4, EC-5.10, F-7, F-8,
-V-4 (`invarianten.md` §5.4, amended V1.1), human decisions Q-2, Q-3 and R-7.
+and highlight SHALL be withheld from a viewer who holds no non-withdrawn `invite` vote on it, as
+long as the candidate is still in `new` or `screened`. Once a candidate has left those states
+(for example `invited`), nobody can vote on it any more, so there is nothing left to anchor, and its
+results SHALL be shown to every participant whether or not they voted. A paused round does not
+reveal anything: voting resumes with it. Withheld values SHALL be withheld before data reaches the
+client: the hidden entry SHALL carry no result field at all, not an empty one. A hidden candidate
+SHALL still be listed by name in the group „Verdeckt", greyed, with an eye-off mark and the notice
+„Verdeckt — du hast hier nicht abgestimmt", oldest application first and never in an order
+derived from votes. Casting a vote SHALL reveal that candidate on the next read, and withdrawing it
+SHALL hide it again. Votes at another stage SHALL reveal nothing. While anything in an open round
+awaits the viewer's vote, the Casting tab leads to the pass instead (capability
+`ui/resident-frame`), so the group „Verdeckt" is a fallback that normally stays empty. Sources:
+FR-5.15–5.19, FR-5.19a (V1.1: met by the redirect), C-5.9, EC-5.4, EC-5.10, F-7, F-8, V-4
+(`invarianten.md` §5.4, amended V1.1), human decisions Q-2, Q-3 and 2026-10-06 (replacing R-7's
+"hidden for good").
 
 #### Scenario: Not yet voted
-- **WHEN** hiding is on and the viewer has not voted on a candidate
-- **THEN** the candidate is listed below the scoreboard, greyed, with its name and the notice, and
-  with no score, count or position (AC-5.15)
+- **WHEN** hiding is on and the viewer has not voted on a candidate in `new` or `screened`
+- **THEN** the candidate is listed in „Verdeckt", greyed, with its name and the notice, and with no
+  score, count or position (AC-5.15)
 
 #### Scenario: Requested directly
 - **WHEN** the data behind the scoreboard is requested directly under the same conditions
@@ -233,7 +237,7 @@ V-4 (`invarianten.md` §5.4, amended V1.1), human decisions Q-2, Q-3 and R-7.
 - **THEN** the next read shows the candidate's results (AC-5.17)
 
 #### Scenario: Per candidate
-- **WHEN** the viewer has voted on A but not on B
+- **WHEN** the viewer has voted on A but not on B, both still open for voting
 - **THEN** A's results are shown and B is hidden (AC-5.18)
 
 #### Scenario: Another stage
@@ -244,57 +248,71 @@ V-4 (`invarianten.md` §5.4, amended V1.1), human decisions Q-2, Q-3 and R-7.
 - **WHEN** the viewer's vote on a candidate is withdrawn
 - **THEN** the candidate is hidden again (EC-5.12)
 
-#### Scenario: Can no longer vote
+#### Scenario: Invited before the viewer voted
 - **WHEN** a candidate moved to `invited` before the viewer voted on it
-- **THEN** it stays hidden with the notice „Verdeckt — du hast hier nicht abgestimmt", also after
-  every other vote of the viewer is cast
+- **THEN** its results are shown to the viewer in the group „Eingeladen"
+
+#### Scenario: Paused round
+- **WHEN** the round is paused and the viewer has not voted on a candidate in `new`
+- **THEN** the candidate stays hidden
 
 #### Scenario: Hiding off
 - **WHEN** the round's frozen hide flag is off
 - **THEN** every candidate's results are shown, whether or not the viewer voted
 
-### Requirement: One scoreboard: scored rows, then unscored rows
+### Requirement: Three groups: Punktwert, Eingeladen, Verdeckt
 
-The visible candidates SHALL form one list:
-- **Scored rows** come first, in the order above. Each SHALL show a circular progress-ring score
-  with the number inside and „aus x Stimmen" beside it, and nothing else about the result. There
-  is no rank number and no distribution.
-- **Unscored rows** (below quorum) follow at the bottom, oldest application first. Each SHALL show
-  no score and no ring, only the notice naming the real threshold: „Noch kein Punktwert — für ein
-  faires Bild braucht es mindestens {needed} Stimmen (bisher {n})."
+The visible candidates SHALL be shown in up to three groups, in this order, each with its heading,
+and a group with no row SHALL not be shown:
+1. **„Punktwert"**: the candidates still being decided (`new`/`screened`). Scored rows come first,
+   in the order above. Each SHALL show a circular progress-ring score with the number inside and
+   „aus x Stimmen" beside it, and nothing else about the result. There is no rank number and no
+   distribution. Unscored rows (below quorum) follow at the bottom, oldest application first. Each
+   SHALL show no score and no ring, only the notice naming the real threshold: „Noch kein Punktwert
+   — für ein faires Bild braucht es mindestens {needed} Stimmen (bisher {n})."
+2. **„Eingeladen"**: the `invited` candidates, with the same row shapes (ring at quorum, the
+   notice below it), scored rows first in the order above, then unscored oldest first. This group
+   may later become its own tab.
+3. **„Verdeckt"**: the hidden candidates (requirement above).
 
-A falling vote count SHALL move a candidate from scored back to unscored. The ring SHALL carry a
-text equivalent „{score} von 100 Punkten, aus {n} Stimmen". No text on the screen SHALL make an
-evaluative statement about a person. Sources: FR-5.10 (V1.1), AC-5.9 (V1.1), C-5.16, AC-5.28,
-EC-5.2, EC-5.3, EC-5.12, human decisions Q-3, Q-10, R-5, R-6; amends PRD §4.1.6's separate
-„Warten auf Stimmen" section and `rechenmodelle.md` §8.3's pending sort.
+A falling vote count SHALL move a candidate from scored back to unscored within its group. The ring
+SHALL carry a text equivalent „{score} von 100 Punkten, aus {n} Stimmen". No text on the screen
+SHALL make an evaluative statement about a person. Sources: FR-5.10 (V1.1), AC-5.9 (V1.1), C-5.16,
+AC-5.28, EC-5.2, EC-5.3, EC-5.12, human decisions Q-3, Q-10, R-5, R-6 and 2026-10-06 (the
+„Eingeladen" group); amends PRD §4.1.6's separate „Warten auf Stimmen" section and
+`rechenmodelle.md` §8.3's pending sort.
 
 #### Scenario: Below quorum
-- **WHEN** a visible candidate has 1 counted vote and 2 are needed
-- **THEN** it sits at the bottom of the scoreboard with „Noch kein Punktwert — für ein faires Bild
+- **WHEN** a visible candidate in `new` has 1 counted vote and 2 are needed
+- **THEN** it sits at the bottom of „Punktwert" with „Noch kein Punktwert — für ein faires Bild
   braucht es mindestens 2 Stimmen (bisher 1)." and no ring (AC-5.9)
 
 #### Scenario: Everyone below quorum
 - **WHEN** no visible candidate has reached quorum
-- **THEN** every row is unscored, oldest first, and no placeholder order is invented (EC-5.2)
+- **THEN** every row is unscored, oldest first within its group, and no placeholder order is
+  invented (EC-5.2)
 
 #### Scenario: No votes at all
 - **WHEN** no candidate has any vote and hiding is off
 - **THEN** all are unscored rows with „(bisher 0)" (EC-5.3)
 
+#### Scenario: An invited candidate
+- **WHEN** a candidate at quorum is `invited`
+- **THEN** it is shown with its ring under „Eingeladen" and not under „Punktwert"
+
 ### Requirement: The top rows by score, as many as there are open rooms, are highlighted
 
-The first N scored rows SHALL carry a faint, slowly drifting background highlight. N is the number
-of the round's rooms that are `open` and not deleted, read at request time. A tie at the boundary
-SHALL be decided by the order above, so exactly min(N, scored rows) rows are highlighted. Unscored
-and hidden rows SHALL never take a slot. The highlight SHALL be visual only: no word about the
-person, a text equivalent naming the real threshold („Unter den {N} höchsten Punktwerten —
-{N} Zimmer frei"), no movement of layout or of any control. Under reduced motion it SHALL be a
-static tint. With N = 0 nothing is highlighted. Sources: human decisions R-6 and Q-15
-(2026-10-05), C-5.16, AC-5.28.
+The first N scored rows of the group „Punktwert" SHALL carry a faint, slowly drifting background
+highlight. N is the number of the round's rooms that are `open` and not deleted, read at request
+time. A tie at the boundary SHALL be decided by the order above, so exactly min(N, scored rows in
+„Punktwert") rows are highlighted. Rows under „Eingeladen" or „Verdeckt" and unscored rows SHALL
+never take a slot. The highlight SHALL be visual only: no word about the person, a text equivalent
+naming the real threshold („Unter den {N} höchsten Punktwerten — {N} Zimmer frei"), no movement of
+layout or of any control. Under reduced motion it SHALL be a static tint. With N = 0 nothing is
+highlighted. Sources: human decisions R-6 and Q-15 (2026-10-05), C-5.16, AC-5.28.
 
 #### Scenario: Two open rooms
-- **WHEN** the round covers two `open` rooms and four rows are scored
+- **WHEN** the round covers two `open` rooms and four rows of „Punktwert" are scored
 - **THEN** exactly the first two scored rows are highlighted
 
 #### Scenario: A room is put on hold
@@ -302,8 +320,12 @@ static tint. With N = 0 nothing is highlighted. Sources: human decisions R-6 and
 - **THEN** only the first scored row is highlighted on the next read
 
 #### Scenario: Fewer scored rows than rooms
-- **WHEN** two rooms are open and one row is scored
+- **WHEN** two rooms are open and one row of „Punktwert" is scored
 - **THEN** only that row is highlighted
+
+#### Scenario: Invited rows take no slot
+- **WHEN** two rooms are open and the highest score belongs to an `invited` candidate
+- **THEN** the first two scored rows of „Punktwert" are highlighted, and the invited row is not
 
 #### Scenario: Reduced motion
 - **WHEN** the device asks for reduced motion

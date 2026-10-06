@@ -444,7 +444,7 @@ reason codes, not only lengths.
 
 ## 9. Verify, demo reset, walkthrough
 
-- [x] 9.1 `npm run verify` (re-run after 8.3–8.6; first green run before them) green (eslint, tsc, the nine lints, check-refs, the full suite on dev).
+- [ ] 9.1 `npm run verify` (re-run after group 10) green (eslint, tsc, the nine lints, check-refs, the full suite on dev).
   Report the counts.
 - [ ] 9.2 **Human hand-off (owner SQL):** the human runs `scripts/reset-demo-household.sql` in the
   Supabase SQL editor for `flatmate-io-dev`. Never production. Its last result shows zero votes,
@@ -467,3 +467,52 @@ reason codes, not only lengths.
   Screenshot the board.
 - [ ] 9.5 As Robin (already claimed by the human), rate and confirm the board shows all three row
   kinds.
+
+## 10. Walkthrough changes (human, 2026-10-06; design D10, D11). Run before 9.1's re-run.
+
+- [ ] 10.1 Docs, one commit (German where the file is German):
+  - `docs/domain/invarianten.md` §5.4: results are revealed to every participant once the
+    application has left `new`/`screened` (nobody can vote any more); a paused round reveals
+    nothing. This replaces the R-7 wording of task 1.4 („bleiben verdeckt"), dated, human decision
+    2026-10-06;
+  - `docs/screens/D-casting-tab.md` D1: three groups „Punktwert", „Eingeladen", „Verdeckt"; top-N
+    only in „Punktwert"; „Eingeladen" may become its own tab later;
+  - `docs/screens/B-start.md` B1: the acknowledgement is built (wording „Stark gemacht — du hast
+    alle Bewerbungen bewertet!", P-O-04 open); Start shows the distribution without a single phase
+    name (human decision 2026-10-06; `rahmenwerk.md` §3's phase stays for deadlines);
+  - `docs/backlog/requirements/F5-requirements.md`: a V1.1 note on FR-5.16 (reveal once voting on
+    the application is closed) and FR-5.10 (the „Eingeladen" group);
+  - `docs/review-log.md`: register rows for both decisions, and one for "`screened` hidden in v0.1,
+    implemented with the invite change";
+  - `node tools/check-refs.ts` and `--scope docs` clean.
+- [ ] 10.2 `src/modules/deliberation/repository.ts` `getRanking`: the reveal rule of D4 step 8 (state
+  no longer `new`/`screened` reveals), and the board shape of D10 (`decided` and `invited`, each
+  `{ scored, unscored }`, plus `hidden`). `computeRanking` is called once per group, N =
+  `openRoomCount` for `decided`, 0 for `invited`. Update the exported types.
+- [ ] 10.3 `tests/integration/deliberation/ranking.test.ts`:
+  - rewrite 6.4's case: a candidate moved to `invited` before the viewer voted is now **visible**,
+    in `invited`, with its score; the paused-round case stays hidden. Break: drop the state
+    condition; the invited case must fail;
+  - a new case: with two open rooms, an invited candidate with the highest score takes no leading
+    slot, and the first two of `decided.scored` lead. Break: compute one ranking over both groups;
+    the case must fail;
+  - adjust every other case to the new shape, without weakening an assertion.
+- [ ] 10.4 `src/app/(resident)/casting/ranking-board.tsx` and `de.ts` `casting`: headings
+  „Punktwert", „Eingeladen", „Verdeckt"; a group with no row is not rendered; the empty state only
+  when all three are empty; drop the per-row invited label (the group says it). Update
+  `tests/unit/casting/ranking-board.test.ts`: the three headings appear only with rows; an invited
+  row renders under „Eingeladen" with its ring; the highlight never on an invited row. Break: render
+  invited rows inside „Punktwert"; the test must fail.
+- [ ] 10.5 Start (D11), `src/app/(resident)/dashboard/dashboard-view.ts` and its page and `de.ts`
+  `start`: drop `phaseLabel` from the `phase` standing view (keep the "waiting for applications"
+  sentence for a round without main-path applications), and add `allRated: boolean` when the
+  standing round is one the viewer may vote in, its `stateCounts` hold ≥ 1 `new`/`screened`, and
+  its awaiting count is 0. Render „Stark gemacht — du hast alle Bewerbungen bewertet!" leading the
+  standing. Update the dashboard-view unit tests: the three spec scenarios (last card rated, nothing
+  to rate yet, something still waits) and "no phase name". Breaks: show the acknowledgement without
+  the `new`/`screened` condition → "nothing to rate yet" fails; keep `phaseLabel` → "no phase name"
+  fails. Check that no other caller relied on `phaseLabel`.
+- [ ] 10.6 `scripts/demo/seed-round.ts`: remove the two `transitionApplication(…, "screened")` calls
+  of applications that stay in the round (around l.112–113); keep `screened` only as the
+  pass-through step of the invited application. Update the comment.
+- [ ] 10.7 Re-run `npm run verify` (task 9.1) and report the counts.
