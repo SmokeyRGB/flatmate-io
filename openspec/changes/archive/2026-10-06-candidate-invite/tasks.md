@@ -311,7 +311,7 @@ pieces they reuse. The scoreboard imports them across route groups, as it alread
 - [x] 7.1 `npm run verify` green: eslint, tsc, the nine guardrail lints, check-refs and the full
   vitest run against `flatmate-io-dev`. Record the test count against 0.4's. A single timeout
   under load is re-run once, never fixed by raising a timeout.
-- [ ] 7.2 Report to the orchestrator:
+- [x] 7.2 Report to the orchestrator:
   - every deliberate break and the failure seen;
   - every file touched;
   - anything in design that turned out wrong.

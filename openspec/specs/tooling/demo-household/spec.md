@@ -13,7 +13,9 @@ with no demo household, produce a household in which:
 - one prepared, unclaimed profile has a bound join link;
 - the round covers exactly two `open` rooms;
 - realistic synthetic applications exist;
-- the other residents' votes were cast through the same write path the app uses.
+- the other residents' votes were cast through the same write path the app uses;
+- the invited application was invited through the same invitation the app uses, not by separate
+  state changes.
 
 After the presenting resident (a resident who cast none of the seeded votes, such as Sam, or Robin
 after claiming) completes the pass, whatever they rated, the scoreboard SHALL show:
