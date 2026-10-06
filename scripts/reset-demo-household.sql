@@ -4,7 +4,8 @@
 -- scripts/cleanup-demo-household.sql is the heavier tool: it removes the whole household.
 --
 -- Deletes ONLY the demo household's vote, application, round_participation, casting_round and
--- room rows. Household id, WG-Kennung, accounts, profiles, memberships, sessions, join links and
+-- room rows, and clears resident_profile.room_id (a profile's room points at a deleted room
+-- otherwise). Household id, WG-Kennung, accounts, profiles, memberships, sessions, join links and
 -- settings stay. activity_event stays (append-only, FR-0.13).
 --
 -- *** HOW TO RUN IT: the Supabase SQL editor for flatmate-io-dev. ***
@@ -49,13 +50,15 @@ BEGIN
   DELETE FROM application          WHERE household_id = v_household;
   DELETE FROM round_participation  WHERE household_id = v_household;
   DELETE FROM casting_round        WHERE household_id = v_household;
+  -- resident_profile.room_id would point at a deleted room, so clear it first (no foreign keys).
+  UPDATE resident_profile SET room_id = NULL WHERE household_id = v_household AND room_id IS NOT NULL;
   DELETE FROM room                 WHERE household_id = v_household;
 
   RAISE NOTICE 'Demo casting activity reset.';
 END $$;
 
--- What is left, for the demo household only, so you can see it worked: the five counts are 0, the
--- household id is unchanged and the resident count did not move.
+-- What is left, for the demo household only, so you can see it worked: the five counts and the
+-- profiles with a room_id are 0, the household id is unchanged and the resident count did not move.
 SELECT 'vote' AS item, count(*)::text AS value
   FROM vote v JOIN household h ON h.id = v.household_id WHERE h.contact_email = 'demo-household@example.test'
 UNION ALL SELECT 'application', count(*)::text
@@ -66,6 +69,8 @@ UNION ALL SELECT 'casting_round', count(*)::text
   FROM casting_round c JOIN household h ON h.id = c.household_id WHERE h.contact_email = 'demo-household@example.test'
 UNION ALL SELECT 'room', count(*)::text
   FROM room r JOIN household h ON h.id = r.household_id WHERE h.contact_email = 'demo-household@example.test'
+UNION ALL SELECT 'resident_profile with room_id', count(*)::text
+  FROM resident_profile p JOIN household h ON h.id = p.household_id WHERE h.contact_email = 'demo-household@example.test' AND p.room_id IS NOT NULL
 UNION ALL SELECT 'household id (unchanged)', h.id::text
   FROM household h WHERE h.contact_email = 'demo-household@example.test'
 UNION ALL SELECT 'resident_profile (unchanged)', count(*)::text

@@ -14,7 +14,7 @@
 
 import { claimResidentProfile, signIn } from "@/modules/identity/auth";
 import type { SignInResult } from "@/modules/identity/auth";
-import { createResidentProfile, getHouseholdSignInCode, getResidentList } from "@/modules/identity/repository";
+import { createResidentProfile, getHouseholdSignInCode, getResidentList, revokeSession } from "@/modules/identity/repository";
 import { listRoundsForSession } from "@/modules/casting/repository";
 import { getRanking } from "@/modules/deliberation/repository";
 import { db } from "@/db/client";
@@ -27,6 +27,10 @@ assertSafeSupabaseEnv(process.env, "seed");
 const DEMO_EMAIL = "demo-household@example.test";
 
 class DemoRoundError extends Error {}
+
+// The household account's one sign-in (it proves DEMO_PASSWORD). Ended in the final handler below
+// so a run leaves no session row behind.
+let householdSession: SignInResult | null = null;
 
 async function main() {
   const envPassword = process.env.DEMO_PASSWORD;
@@ -45,6 +49,7 @@ async function main() {
       `Could not sign in as the household account (${DEMO_EMAIL}): ${err instanceof Error ? err.message : String(err)}`,
     );
   }
+  householdSession = household;
   const context = household.context;
   const adminActor = { accountId: context.accountId, profileId: null };
 
@@ -55,34 +60,44 @@ async function main() {
   }
 
   // Residents come from the household account's own list. Kim and Jule are claimed only when
-  // missing; Alex and Sam were part of the original seed and are never created here.
+  // missing; Alex and Sam were part of the original seed and are never created here. "Present"
+  // means active with an account: a prepared profile of that name is claimed rather than
+  // duplicated (the active-name index would refuse a second one), and a moved-out one has
+  // released its name, so a fresh profile is created.
   const { members } = await getResidentList(context, context.accountId);
+  const claimed = new Map<string, { accountId: string; profileId: string }>();
+  for (const m of members) {
+    if (m.status === "active" && m.accountId !== null && !claimed.has(m.displayName)) {
+      claimed.set(m.displayName, { accountId: m.accountId, profileId: m.id });
+    }
+  }
   for (const name of ["Kim", "Jule"]) {
-    if (members.some((m) => m.displayName === name)) continue;
-    const profile = await createResidentProfile(context, name, adminActor);
-    await claimResidentProfile(context, profile.id, password);
+    if (claimed.has(name)) continue;
+    const prepared = members.find((m) => m.displayName === name && m.status === "prepared");
+    const profileId = prepared ? prepared.id : (await createResidentProfile(context, name, adminActor)).id;
+    const { accountId } = await claimResidentProfile(context, profileId, password);
+    claimed.set(name, { accountId, profileId });
     console.log(`Claimed missing resident ${name}.`);
   }
 
-  async function signInResident(displayName: string) {
-    try {
-      const result = await signIn({
-        kind: "resident",
-        householdId: context.householdId,
-        displayName,
-        password,
-      });
-      return result.context;
-    } catch (err) {
+  // No resident signs in: the casting and voting functions authorise through the stored
+  // membership, so a context built from the resident list is enough and leaves no session row.
+  function residentContext(displayName: string) {
+    const resident = claimed.get(displayName);
+    if (!resident) {
       throw new DemoRoundError(
-        `Sign-in failed for resident ${displayName}: ${err instanceof Error ? err.message : String(err)}. Nothing after it ran.`,
+        `Resident ${displayName} is missing from the household (no active, claimed profile). Nothing after it ran.`,
       );
     }
+    return {
+      accountId: resident.accountId,
+      householdId: context.householdId,
+      profileId: resident.profileId,
+    };
   }
-  const alexContext = await signInResident("Alex");
-  const kimContext = await signInResident("Kim");
-  const juleContext = await signInResident("Jule");
-  if (alexContext.profileId === null) throw new DemoRoundError("Alex's session has no profile.");
+  const alexContext = residentContext("Alex");
+  const kimContext = residentContext("Kim");
+  const juleContext = residentContext("Jule");
 
   const { round, applicationCount, seededVotes } = await seedDemoRound({
     household: context,
@@ -129,4 +144,11 @@ main()
     else console.error("\nSeeding the demo round failed:", err);
     process.exitCode = 1;
   })
-  .finally(() => db.$client.end({ timeout: 5 }));
+  .finally(async () => {
+    try {
+      if (householdSession) await revokeSession(householdSession.context, householdSession.session.id);
+    } catch (err) {
+      console.error("Could not end the household sign-in session:", err instanceof Error ? err.message : err);
+    }
+    await db.$client.end({ timeout: 5 });
+  });

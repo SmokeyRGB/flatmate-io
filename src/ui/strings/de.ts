@@ -5,6 +5,9 @@
 // (openspec/changes/german-ui-vocabulary, Assumption 1). See design.md Decisions 1–3 for why this
 // is a plain `as const` object rather than a `t()` accessor, and Decision 2 for why interpolated
 // entries are functions rather than a template-substitution helper.
+// "1 Stimme" / "n Stimmen": the one place the singular is decided.
+const votesLabel = (n: number) => (n === 1 ? "1 Stimme" : `${n} Stimmen`);
+
 export const de = {
   common: {
     // src/ui/password-input.tsx: the eye toggle beside every password field.
@@ -759,14 +762,10 @@ export const de = {
     reasonOverdue: "Die Frist ist abgelaufen — deine Stimme zählt trotzdem noch.",
     reasonUndated: (roundTitle: string) => `In der Runde „${roundTitle}" wird gerade abgestimmt.`,
     andNMore: (n: number) => `und ${n} weitere`,
-    // rahmenwerk.md §3.1's phase labels — the round's standing, shown when nothing is open.
-    phase: {
-      waiting_for_applications: "Warten auf Bewerbungen",
-      voting_round_1: "Abstimmung Runde 1",
-      scheduling: "Terminfindung",
-      voting_round_2: "Abstimmung Runde 2",
-      offer: "Zusage läuft",
-    },
+    // Start names no single phase (human decision 2026-10-06); this is the one label it still uses.
+    waitingForApplications: "Warten auf Bewerbungen",
+    // The neutral heading when the standing is neither waiting nor fully rated.
+    standingHeading: "So steht die Runde",
     // design.md Decision 6: the four display buckets beneath the phase, non-zero only.
     distribution: {
       in_screening: (n: number) => `Für ${n} wird noch abgestimmt`,
@@ -797,11 +796,11 @@ export const de = {
   casting: {
     rankingHeading: "Rangliste",
     backToStart: "Zurück zu Start",
-    votes: (n: number) => (n === 1 ? "1 Stimme" : `${n} Stimmen`),
-    scoreOf: (n: number) => `aus ${n === 1 ? "1 Stimme" : `${n} Stimmen`}`,
-    ringLabel: (score: number, n: number) => `${score} von 100 Punkten, aus ${n === 1 ? "1 Stimme" : `${n} Stimmen`}`,
+    votes: votesLabel,
+    scoreOf: (n: number) => `aus ${votesLabel(n)}`,
+    ringLabel: (score: number, n: number) => `${score} von 100 Punkten, aus ${votesLabel(n)}`,
     unscored: (needed: number, n: number) =>
-      `Noch kein Score — für ein faires Bild braucht es mindestens ${needed === 1 ? "1 Stimme" : `${needed} Stimmen`} (bisher ${n}).`,
+      `Noch kein Score — für ein faires Bild braucht es mindestens ${votesLabel(needed)} (bisher ${n}).`,
     hidden: "Verdeckt — du hast hier nicht abgestimmt",
     // The three groups of the board (design D10, human decision 2026-10-06).
     scoredHeading: "Score",

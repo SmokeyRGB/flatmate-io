@@ -21,7 +21,7 @@ export interface RankingCandidate {
   values: VoteValue[];
 }
 
-export interface ScoredRow {
+export interface RankedEntry {
   id: string;
   // 0..100. A real score; a candidate without counted votes is never in this list (C-5.1).
   score: number;
@@ -32,7 +32,7 @@ export interface ScoredRow {
 
 // An unscored row has NO `score` key at all, so a 0 cannot stand in for NO_SCORE by accident
 // (AC-5.4, C-5.1).
-export interface UnscoredRow {
+export interface PendingEntry {
   id: string;
   n: number;
   needed: number;
@@ -65,7 +65,7 @@ interface Keyed {
   no: number;
 }
 
-export function computeRanking(input: RankingInput): { scored: ScoredRow[]; unscored: UnscoredRow[] } {
+export function computeRanking(input: RankingInput): { scored: RankedEntry[]; unscored: PendingEntry[] } {
   const { weights, quorumShare, denominator, openRoomCount, candidates } = input;
 
   // One common scale for all four weights before any sum.

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildDashboardView, pendingVoteCount, shouldOpenScreening } from "@/app/(resident)/dashboard/dashboard-view";
+import { buildDashboardView, pendingVoteCount, shouldOpenScreening, standingHeadingOf } from "@/app/(resident)/dashboard/dashboard-view";
 import { de } from "@/ui/strings";
 import type { StartOpenRound, StartOverview } from "@/modules/casting/repository";
 
@@ -126,9 +126,23 @@ describe("buildDashboardView (start-screen design.md Decision 10, tasks.md 7.4)"
     });
     const view = build(o);
     expect(view.standing).not.toHaveProperty("phaseLabel");
-    for (const name of Object.values(de.start.phase)) {
-      if (name !== de.start.phase.waiting_for_applications) expect(JSON.stringify(view)).not.toContain(name);
+    for (const name of ["Abstimmung Runde 1", "Terminfindung", "Abstimmung Runde 2", "Zusage läuft"]) {
+      expect(JSON.stringify(view)).not.toContain(name);
     }
+  });
+
+  it("a standing that is neither waiting nor all rated gets the neutral heading", () => {
+    const view = build(
+      overview({
+        anyOpenRound: true,
+        openRounds: [round({ canVote: false })],
+        standing: { roundId: "r1", stateCounts: { new: 2 } },
+      }),
+    );
+    expect(standingHeadingOf(view.standing!)).toBe(de.start.standingHeading);
+    expect(standingHeadingOf({ kind: "phase", waiting: true, allRated: false, distribution: [] })).toBeNull();
+    expect(standingHeadingOf({ kind: "phase", waiting: false, allRated: true, distribution: [] })).toBeNull();
+    expect(standingHeadingOf({ kind: "noRound" })).toBeNull();
   });
 
   it("a round with no main-path application reads as waiting for applications", () => {

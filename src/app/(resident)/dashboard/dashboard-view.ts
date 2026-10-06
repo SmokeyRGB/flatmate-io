@@ -31,6 +31,13 @@ export type DashboardStandingView =
       distribution: Array<{ label: string; count: number }>;
     };
 
+// The neutral heading for a phase standing that is neither waiting nor fully rated, so the
+// distribution never stands without a headline. allRated and waiting keep their own.
+export function standingHeadingOf(standing: DashboardStandingView): string | null {
+  if (standing.kind !== "phase" || standing.allRated || standing.waiting) return null;
+  return de.start.standingHeading;
+}
+
 export interface DashboardBridgeView {
   heading: string;
   body: string;

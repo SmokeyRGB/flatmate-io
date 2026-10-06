@@ -8,7 +8,7 @@ import { de } from "@/ui/strings";
 import { landingPathFor } from "@/app/landing";
 import { LinkPendingHint } from "@/ui/link-pending-hint";
 import { householdFor, identityLabelFor, navigationAccessFor } from "../session-data";
-import { buildDashboardView } from "./dashboard-view";
+import { buildDashboardView, standingHeadingOf } from "./dashboard-view";
 
 // Screen B1 — the resident's Start screen (FR-2.18, FR-2.20-2.24). A household-account session
 // (profileId null) is never shown this screen: the `(resident)` layout already redirects it to
@@ -75,7 +75,8 @@ export default async function DashboardPage({
           {view.standing?.kind === "phase" && (
             <>
               {view.standing.allRated && <p className="text-lg font-semibold">{de.start.allRated}</p>}
-              {view.standing.waiting && <p className="text-lg font-semibold">{de.start.phase.waiting_for_applications}</p>}
+              {view.standing.waiting && <p className="text-lg font-semibold">{de.start.waitingForApplications}</p>}
+              {standingHeadingOf(view.standing) && <p className="text-lg font-semibold">{standingHeadingOf(view.standing)}</p>}
               {view.standing.distribution.length > 0 && (
                 <p className="text-sm text-muted-foreground">
                   {view.standing.distribution.map((d) => d.label).join(" · ")}
