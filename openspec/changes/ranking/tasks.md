@@ -343,11 +343,11 @@ reason codes, not only lengths.
 
 ## 7. The screen (design D7)
 
-- [ ] 7.1 Extract the weights list from `casting/screening/screening-deck.tsx` (the `<ul>` over
+- [x] 7.1 Extract the weights list from `casting/screening/screening-deck.tsx` (the `<ul>` over
   `VOTE_VALUES` with `t.points` and the favourite note) into
   `src/app/(resident)/casting/weights-list.tsx`. The deck uses it unchanged.
   `tests/unit/.../screening-deck.test.ts` pins the popover markup and must stay green unchanged.
-- [ ] 7.2 `src/ui/strings/de.ts` `casting`: replace `rankingBody` with the board's copy:
+- [x] 7.2 `src/ui/strings/de.ts` `casting`: replace `rankingBody` with the board's copy:
   - `scoreOf(n)` „aus {n} Stimmen" (singular „aus 1 Stimme");
   - `ringLabel(score, n)` „{score} von 100 Punkten, aus {n} Stimmen";
   - `unscored(needed, n)` „Noch kein Punktwert — für ein faires Bild braucht es mindestens {needed}
@@ -359,11 +359,11 @@ reason codes, not only lengths.
   - `stateLabel` reuses `de.status.application.invited`;
   - `empty(title)`, `refusal.notEligible`, `refusal.rulesInvalid`, `refusal.notAvailable(status)`.
   Copy rules: nothing evaluative about a person (C-10, AC-5.28), and no „Gewinner".
-- [ ] 7.3 `src/app/globals.css`: `.score-ring`, the `.ranking-leading` gradient drift (keyframes on
+- [x] 7.3 `src/app/globals.css`: `.score-ring`, the `.ranking-leading` gradient drift (keyframes on
   `background-position`, `--accent` → `--card`, slow, both themes through tokens), a
   `@media (prefers-reduced-motion: reduce)` static tint, and `.ranking-hidden` (muted). No layout
   property animates.
-- [ ] 7.4 Create `src/app/(resident)/casting/ranking-board.tsx`, a server component and a pure
+- [x] 7.4 Create `src/app/(resident)/casting/ranking-board.tsx`, a server component and a pure
   render of a `Ranking` result per D7:
   - the ring is an inline SVG, `role="img"`, `aria-label` = `ringLabel`;
   - leading rows carry the sr-only `leadingLabel(openRoomCount)`;
@@ -372,14 +372,14 @@ reason codes, not only lengths.
   - a native popover „(?)" with `WeightsList`, the formula and the quorum rule; the trigger is
     `<button type="button">`;
   - no rank numbers anywhere, and no hint.
-- [ ] 7.5 `src/app/(resident)/casting/page.tsx`: keep the redirect exactly as it is. Parse `?round=`
+- [x] 7.5 `src/app/(resident)/casting/page.tsx`: keep the redirect exactly as it is. Parse `?round=`
   like the pass does, call `getRanking`, and render the heading „Rangliste" plus the board or the
   empty/refusal states. Update the file's header comment, including that the redirect wins over
   `?round=` (design D7).
-- [ ] 7.6 `src/app/(resident)/casting/loading.tsx`: the skeleton becomes a heading plus three row
+- [x] 7.6 `src/app/(resident)/casting/loading.tsx`: the skeleton becomes a heading plus three row
   shapes (a circle plus two text lines) from `@/ui/skeletons`. If a circle shape is missing, add it
   there. The `pending-feedback.ts` lint must stay green.
-- [ ] 7.7 Create `tests/unit/casting/ranking-board.test.ts` (`renderToStaticMarkup`, a `.test.ts`
+- [x] 7.7 Create `tests/unit/casting/ranking-board.test.ts` (`renderToStaticMarkup`, a `.test.ts`
   file per the repo convention). Use digit-free synthetic names:
   - an unscored row has no `role="img"` ring, and its only digits are exactly those of
     `unscored(needed, n)`;

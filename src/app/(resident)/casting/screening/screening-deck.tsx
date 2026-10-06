@@ -20,6 +20,7 @@ import type { ScaleWeights } from "@/modules/deliberation/round-rules";
 import { VOTE_VALUES, type VoteValue } from "@/modules/deliberation/vote-values";
 import { SubmitButton } from "@/ui/submit-button";
 import { de } from "@/ui/strings";
+import { WeightsList } from "../weights-list";
 import { castVoteAction, type CastVoteResult } from "./actions";
 import { canGoBack, canGoForward, deckReducer, initialDeckState } from "./deck-state";
 
@@ -413,14 +414,7 @@ export function ScreeningDeck({
 
       <div id="weights-popover" popover="auto" className="weights-popover card">
         <p className="font-semibold">{t.weightsHeading}</p>
-        <ul className="mt-2 space-y-1 text-sm">
-          {VOTE_VALUES.map((v) => (
-            <li key={v}>
-              {t.ratings[v]}: {t.points(weights[v])}
-              {v === "definitely" && <> {t.favouriteNote}</>}
-            </li>
-          ))}
-        </ul>
+        <WeightsList weights={weights} />
         <p className="mt-3 text-sm text-muted-foreground">
           {t.weightsSentence(t.ratings.rather_not, t.ratings.good)}
         </p>

@@ -789,10 +789,35 @@ export const de = {
   },
   // F4 change 1 (screening-pass): the Casting tab is the D1 shell until F5 builds the ranking. No
   // evaluative text (C-4.11), no scores, and nothing about revising (C1 decision 2026-09-15).
+  // F5 change 1: screen D1, the scoreboard. Copy about the PROCESS, never about a person (C-10,
+  // AC-5.28), and no "Gewinner". Every number named here maps to a real threshold of the round.
   casting: {
     rankingHeading: "Rangliste",
-    rankingBody: "Hier erscheint die Rangliste dieser Runde.",
     backToStart: "Zurück zu Start",
+    votes: (n: number) => (n === 1 ? "1 Stimme" : `${n} Stimmen`),
+    scoreOf: (n: number) => `aus ${n === 1 ? "1 Stimme" : `${n} Stimmen`}`,
+    ringLabel: (score: number, n: number) => `${score} von 100 Punkten, aus ${n === 1 ? "1 Stimme" : `${n} Stimmen`}`,
+    unscored: (needed: number, n: number) =>
+      `Noch kein Punktwert — für ein faires Bild braucht es mindestens ${needed === 1 ? "1 Stimme" : `${needed} Stimmen`} (bisher ${n}).`,
+    hidden: "Verdeckt — du hast hier nicht abgestimmt",
+    hiddenHeading: "Verdeckte Bewerbungen",
+    leadingLabel: (n: number) =>
+      n === 1 ? "Unter dem höchsten Punktwert — 1 Zimmer frei" : `Unter den ${n} höchsten Punktwerten — ${n} Zimmer frei`,
+    rulesToggle: "(?)",
+    rulesToggleLabel: "So entsteht die Rangliste",
+    rulesHeading: "So wird gerechnet",
+    formula:
+      "Der Punktwert ist der Mittelwert der Punkte aller Stimmen, geteilt durch die höchste Stufe, mal 100; x,5 wird aufgerundet.",
+    quorumRule: (needed: number, denominator: number) => `${needed} von ${denominator} Stimmen reichen`,
+    empty: (title: string | null) =>
+      title === null
+        ? "Gerade läuft keine Runde, an der du teilnimmst."
+        : `In „${title}“ gibt es noch nichts zu sehen.`,
+    refusal: {
+      notEligible: "Diese Runde kannst du gerade nicht einsehen.",
+      rulesInvalid: "Die Regeln dieser Runde lassen sich gerade nicht lesen. Bitte melde dich bei der Verwaltung.",
+      notAvailable: (statusLabel: string) => `Die Rangliste dieser Runde ist gerade nicht verfügbar (Stand: ${statusLabel}).`,
+    },
   },
   // F4 change 1: screen C1, the screening pass. The four labels are the settled German ones
   // (Nein · Eher nicht · Finde gut · Unbedingt); how the weights are phrased is P-O-04 and stays

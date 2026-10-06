@@ -12,6 +12,11 @@ export function SkeletonText({ width = "w-32" }: { width?: string }) {
   return <div className={`skeleton h-4 ${width}`} />;
 }
 
+// A round shape: the ring of a scoreboard row.
+export function SkeletonCircle({ size = "size-13" }: { size?: string }) {
+  return <div className={`skeleton ${size} flex-none rounded-full`} />;
+}
+
 // A card-shaped block with N lines — the shape of a single list card or content card.
 export function SkeletonCard({ lines = 2 }: { lines?: number }) {
   return (
