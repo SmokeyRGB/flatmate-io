@@ -67,8 +67,9 @@ cover AC-5.1–5.4, 5.7–5.9, 5.11–5.14, EC-5.1–5.3, 5.13, N = 0, N greater
 and a tie at the N boundary.
 
 **Exact arithmetic.** Weights may be fractions and the quorum share is a decimal string, so plain
-floats can misround. Two examples: `0.1 × 30` gives `3.0000000000000004`, whose `ceil` is 4; and a
-54.5 can come out as 54.4999…. The module therefore turns each weight and the share into an exact
+floats can misround. Two examples: `0.07 × 100` gives `7.000000000000001`, whose `ceil` is 8 instead of 7; and a
+scaled mean that is exactly 37.5 can come out below it and round to 37. (An earlier draft named
+`0.1 × 30`, which is exactly 3 in JavaScript; the applier caught it.) The module therefore turns each weight and the share into an exact
 scaled integer, read from its decimal string (`String(n)` for a number, any number of fraction
 digits), brings all weights to **one common scale** (the largest fraction-digit count among them)
 before any sum, and computes in `BigInt`. The target is ES2017 (`tsconfig.json`), so the code
@@ -265,7 +266,10 @@ absent, as in the pass) and calls `getRanking`. The rendering lives in a new ser
 - **Unscored rows** use the same row shape without the ring. **Hidden rows** sit under a separator,
   muted, with lucide `EyeOff` (already a dependency) and the one notice „Verdeckt — du hast hier
   nicht abgestimmt".
-- **„(?)":** a native `popover` (as the deck does, so no JS). It reuses the weights list, which is
+- **„(?)":** a native `popover` (as the deck does, so no JS). Shared with the pass's „(?)" through
+  `.weights-popover`: it hangs below its trigger by CSS anchor positioning, right edges aligned, with
+  a caret, and its `::backdrop` dims and blurs the page (human walkthrough 2026-10-06, Carbon-style
+  popover). Without anchor support it stays centred, without the caret. It reuses the weights list, which is
   **extracted** from `screening-deck.tsx` into `casting/weights-list.tsx` (DRY). It adds the formula
   sentence and „{needed} von {denominator} Stimmen reichen". Its trigger is a `<button
   type="button">`, as in the deck, so the `pending-feedback.ts` lint does not read it as a submit.

@@ -196,13 +196,13 @@
   - a 54.5 → 55 case built from fractional weights so that floats misround (find one and assert
     the float version differs, as proof);
   - mixed scales: weights `{0, 1, 4.5, 5}` give the hand-computed score;
-  - share `0.1` × 30 → 3, not 4;
+  - share `0.07` × 100 → 7, not 8 (V1.1 of this list: `0.1 × 30` is exact in JavaScript);
   - N = 0, N > rows, and a tie at the boundary (exactly N lead);
   - determinism: shuffled input gives the same output.
   Breaks:
   - swap keys 3 and 4 → AC-5.11/5.12 fail;
   - replace the score's BigInt with `Math.round` on floats → the 54.5 case fails;
-  - replace `needed` with `Math.ceil(share * d)` on floats → the 0.1 × 30 case fails;
+  - replace `needed` with `Math.ceil(share * d)` on floats → the 0.07 × 100 case fails;
   - give unscored rows `score: 0` → the AC-5.4 case fails.
 
 ## 4. Casting ports (design D3)

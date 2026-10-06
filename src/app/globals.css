@@ -733,11 +733,50 @@ h3 {
     font-size: 0.8125rem;
     font-weight: 600;
     color: var(--color-muted-foreground);
+    anchor-name: --help-trigger;
   }
+  /* The "(?)" explanation (C1 and D1). Without anchor positioning it stays centred, as before; with
+     it, it hangs below its button, right edges aligned, with a caret pointing at the button's
+     centre (human walkthrough 2026-10-06, Carbon-style popover). Each page has one trigger, so one
+     anchor name serves both screens. */
   .weights-popover {
     margin: auto;
-    max-width: 20rem;
+    max-width: min(20rem, calc(100vw - 2rem));
     color: var(--color-card-foreground);
+    box-shadow: var(--dialog-shadow);
+  }
+  @supports (position-area: block-end) {
+    .weights-popover {
+      position-anchor: --help-trigger;
+      position-area: block-end span-inline-start;
+      inset: auto;
+      margin: 0.75rem 0 0;
+      overflow: visible;
+    }
+    .weights-popover::before {
+      content: "";
+      position: absolute;
+      top: -0.4375rem;
+      right: calc(1rem - 0.4375rem);
+      width: 0.875rem;
+      height: 0.875rem;
+      background: var(--color-card);
+      border-top: 1px solid var(--color-border);
+      border-left: 1px solid var(--color-border);
+      transform: rotate(45deg);
+    }
+  }
+  /* Dims and blurs the page while the explanation is open; a tap outside still closes it
+     (popover="auto"). Literal colours, as for .dialog::backdrop. */
+  .weights-popover::backdrop {
+    background: rgba(50, 31, 20, 0.35);
+    backdrop-filter: blur(3px);
+    -webkit-backdrop-filter: blur(3px);
+  }
+  @media (prefers-color-scheme: dark) {
+    .weights-popover::backdrop {
+      background: rgba(0, 0, 0, 0.6);
+    }
   }
 
   /* F5 change 1, the scoreboard (screen D1). Colours come from tokens only, so both themes work. */
