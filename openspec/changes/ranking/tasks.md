@@ -414,11 +414,11 @@ reason codes, not only lengths.
   table (12 deleted, `join_attempt` emptied, `activity_event` kept by design). Add a one-line
   comment naming this change as the last check. Change nothing else.
 
-- [ ] 8.3 **Reset in place** (design D8, human decision 2026-10-06). Move the rooms/round/applications/
+- [x] 8.3 **Reset in place** (design D8, human decision 2026-10-06). Move the rooms/round/applications/
   votes/invite part of `scripts/seed-demo-household.ts` into `scripts/demo/seed-round.ts` (one
   exported function taking the household context and the voters' contexts). `seed-demo-household.ts`
   calls it, and its behaviour is unchanged.
-- [ ] 8.4 Create `scripts/seed-demo-round.ts` and the npm script `seed:demo-round` (`tsx
+- [x] 8.4 Create `scripts/seed-demo-round.ts` and the npm script `seed:demo-round` (`tsx
   --env-file=.env.local …`, same `assertSafeSupabaseEnv` guard as the seed). Exported app
   functions only, no raw SQL:
   - `DEMO_PASSWORD` is required; without it, refuse with a message;
@@ -431,12 +431,12 @@ reason codes, not only lengths.
   - create two rooms and open them, then call `seedDemoRound`;
   - print the WG-Kennung, the voter count, the quorum, a warning when 3 + 1 < quorum, and "what to
     show". Counts only, no applicant data.
-- [ ] 8.5 Create `scripts/reset-demo-household.sql`, built from `cleanup-demo-household.sql`'s header
+- [x] 8.5 Create `scripts/reset-demo-household.sql`, built from `cleanup-demo-household.sql`'s header
   and guards (refuse `app_runtime`, fixed demo email, a notice when absent, "never production").
   Delete only `vote`, `application`, `round_participation`, `casting_round`, `room` for the demo
   household, in that order. End with the remaining counts for those five tables in that household,
   plus the unchanged household id and resident count, so the human sees it worked.
-- [ ] 8.6 Verify the round seed against a throwaway household, as for 8.1: register one under a
+- [x] 8.6 Verify the round seed against a throwaway household, as for 8.1: register one under a
   random email, run `seed:demo-round's` logic against it (one round, the board for a non-voting
   resident: scored, unscored, hidden), then the reset statements as the test cleanup does, then the
   round seed again (no duplicate residents, same board). Delete the throwaway household and any
