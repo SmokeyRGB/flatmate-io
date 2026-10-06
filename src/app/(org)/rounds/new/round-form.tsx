@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useActionState } from "react";
 import { de } from "@/ui/strings";
 import { SubmitButton } from "@/ui/submit-button";
@@ -8,8 +9,13 @@ import { createAndOpenRoundAction, type CreateRoundFormState } from "./actions";
 const initialState: CreateRoundFormState = { error: null };
 const t = de.rounds.new;
 
-export function RoundForm({ rooms }: { rooms: { id: string; label: string }[] }) {
+export function RoundForm({ rooms }: { rooms: { id: string; label: string; castable: boolean }[] }) {
   const [state, formAction] = useActionState(createAndOpenRoundAction, initialState);
+  // The notice below is for zero rooms only. The button also locks when rooms exist but none can
+  // be cast for (occupied / not available), the case openRoundTx refuses with rooms_unavailable.
+  // The server action refuses on its own; this lock is only the visible half.
+  const noRooms = rooms.length === 0;
+  const nothingToCastFor = !rooms.some((r) => r.castable);
 
   return (
     <form action={formAction} className="card space-y-4">
@@ -29,13 +35,21 @@ export function RoundForm({ rooms }: { rooms: { id: string; label: string }[] })
               {r.label}
             </label>
           ))}
-          {rooms.length === 0 && <p className="text-sm text-muted-foreground">{t.noRoomsYet}</p>}
+          {noRooms && (
+            <p className="text-sm text-muted-foreground">
+              {t.noRoomsYetBefore}
+              <Link href="/rooms" className="btn-link">
+                {t.noRoomsYetLink}
+              </Link>
+              {t.noRoomsYetAfter}
+            </p>
+          )}
         </div>
       </fieldset>
 
       {state.error && <p className="field-error">{state.error}</p>}
 
-      <SubmitButton className="btn btn-primary" pendingLabel={t.submitPending}>
+      <SubmitButton className="btn btn-primary" pendingLabel={t.submitPending} disabled={nothingToCastFor}>
         {t.submit}
       </SubmitButton>
     </form>

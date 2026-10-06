@@ -210,3 +210,29 @@ describe("every confirmation dialog on the members screen has an accessible name
     expect(names).toContain(de.members.remove.dialogHeading("Max Mitglied"));
   });
 });
+
+describe("the members screen with no resident yet", () => {
+  it("leads with the add-resident form, before the join-link section", () => {
+    const html = renderToStaticMarkup(
+      createElement(MembersView, {
+        residentList: {
+          members: [],
+          canManageMembers: true,
+          canManageJoinCodes: true,
+          canCreateProfile: true,
+          canAppointModerator: true,
+          canIssueResetLink: true,
+          leadWithJoinCode: true,
+        },
+        joinCodeIssuances: [],
+        host: "example.test",
+        now: NOW,
+      }),
+    );
+    const form = html.indexOf(de.members.addResidentSubmit);
+    const links = html.indexOf(de.members.joinCode.heading);
+    expect(form).toBeGreaterThan(-1);
+    expect(links).toBeGreaterThan(-1);
+    expect(form).toBeLessThan(links);
+  });
+});

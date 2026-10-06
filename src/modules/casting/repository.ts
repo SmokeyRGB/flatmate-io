@@ -739,6 +739,12 @@ export class RoundOpenPreconditionError extends Error {
 
 const LOCKED_ROOM_STATUSES: ReadonlySet<RoomStatus> = new Set(["occupied", "not_available"]);
 
+// The one definition of "a round can be cast for this room": openRoundTx refuses a round whose
+// covered rooms are all locked, and the new-round form locks its button on the same predicate.
+export function isRoomOpenableForRound(status: RoomStatus): boolean {
+  return !LOCKED_ROOM_STATUSES.has(status);
+}
+
 // FR-1.14/FR-1.15/FR-1.16: draft -> open takes an atomic snapshot of eligible residents into
 // RoundParticipation and freezes HouseholdSettings' four voting-procedure fields into settings_snapshot —
 // both effects or neither, in one transaction. EC-1.1/EC-1.2/EC-1.3 preconditions checked first.
@@ -784,7 +790,7 @@ async function openRoundTx(tx: Tx, context: SessionContext, roundId: string, act
     .where(and(inArray(room.id, round.roomIds), isNull(room.deletedAt)))
     .orderBy(room.id)
     .for("share");
-  const hasAvailableRoom = coveredRooms.some((r) => !LOCKED_ROOM_STATUSES.has(r.status));
+  const hasAvailableRoom = coveredRooms.some((r) => isRoomOpenableForRound(r.status));
   if (!hasAvailableRoom) {
     throw new RoundOpenPreconditionError(
       "Every room this round covers is already occupied or not available",
@@ -1343,19 +1349,21 @@ export async function listRoundsForSession(context: SessionContext) {
   });
 }
 
-// start-screen design.md Decision 4: the room-covered-by-a-round check for listOrganisationTasks
-// below and getStartOverview's own reads share the "open round" concept but nothing else, so this
-// stays local rather than becoming a third exported helper.
-export interface OrganisationTask {
-  kind: "open_round_for_room";
-  roomId: string;
-  label: string;
-}
+// The ONE definition of what is open for a moderator, read by Start's moderation bridge and by the
+// organisation tab's first-round card alike, so the two can never disagree.
+export type OrganisationTask =
+  // The household has no round at all, in any status. Opening the first round covers every room,
+  // so this is the only task then — no room tasks alongside it.
+  | { kind: "open_first_round" }
+  // A room open for letting that no draft/open/paused round covers (start-screen design.md
+  // Decision 4; the room-covered check is local to this function on purpose).
+  | { kind: "open_round_for_room"; roomId: string; label: string };
 
-// start-screen design.md Decision 4/Assumption 3 (tasks.md 3.2): a room open for letting and not
-// covered by any draft/open/paused round is v0.1's one organisation task. Returns `[]` for a
-// viewer who does not hold `manage_rounds` — the permission `rounds/new`'s own action already
-// requires — so the bridge's count never promises something the destination action would refuse.
+// start-screen design.md Decision 4/Assumption 3 (tasks.md 3.2): `open_first_round` when the
+// household has no `casting_round` row of any status, otherwise one `open_round_for_room` per room
+// open for letting and not covered by a draft/open/paused round. Returns `[]` for a viewer who
+// does not hold `manage_rounds` — the permission `rounds/new`'s own action already requires — so
+// the bridge's count never promises something the destination action would refuse.
 // Carries no application-derived value, so it is not a G-D15 read (design.md Decision 9's finding
 // is scoped to `application`, not `room`/`casting_round`).
 export async function listOrganisationTasks(context: SessionContext): Promise<OrganisationTask[]> {
@@ -1367,6 +1375,13 @@ export async function listOrganisationTasks(context: SessionContext): Promise<Or
   }
 
   return withSessionContext(context, async (tx) => {
+    const anyRound = await tx.execute<{ id: string }>(
+      sql`SELECT cr.id FROM casting_round cr
+          WHERE cr.household_id = ${context.householdId}::uuid
+          LIMIT 1`,
+    );
+    if (anyRound.length === 0) return [{ kind: "open_first_round" as const }];
+
     const rows = await tx.execute<{ id: string; label: string }>(
       sql`SELECT room.id, room.label
           FROM room
@@ -1379,7 +1394,7 @@ export async function listOrganisationTasks(context: SessionContext): Promise<Or
                 AND room.id = ANY(cr.room_ids)
             )`,
     );
-    return rows.map((r: { id: string; label: string }) => ({
+    return rows.map((r: { id: string; label: string }): OrganisationTask => ({
       kind: "open_round_for_room" as const,
       roomId: r.id,
       label: r.label,

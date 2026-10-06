@@ -1,7 +1,7 @@
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { listRooms } from "@/modules/casting/repository";
+import { isRoomOpenableForRound, listRooms } from "@/modules/casting/repository";
 import { assertHasPermission, PermissionDeniedError } from "@/modules/identity/repository";
 import { getCurrentSession } from "@/modules/identity/session-cookie";
 import { OrganisationAccessDenied } from "@/app/(org)/organisation-access-denied";
@@ -53,7 +53,7 @@ export default async function NewRoundPage() {
         <LinkPendingHint />
       </Link>
       <h1 className="font-serif text-2xl font-semibold">{t.heading}</h1>
-      <RoundForm rooms={rooms.map((r) => ({ id: r.id, label: r.label }))} />
+      <RoundForm rooms={rooms.map((r) => ({ id: r.id, label: r.label, castable: isRoomOpenableForRound(r.status) }))} />
     </div>
   );
 }
