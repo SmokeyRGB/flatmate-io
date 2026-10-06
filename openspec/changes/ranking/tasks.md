@@ -255,7 +255,7 @@
 
 ## 5. `getRanking` (design D4, D5)
 
-- [ ] 5.1 `src/modules/deliberation/repository.ts`: add `getRanking(context, roundId: string |
+- [x] 5.1 `src/modules/deliberation/repository.ts`: add `getRanking(context, roundId: string |
   null): Promise<Ranking>`, with the `Ranking` union and the `ScoredRow`, `UnscoredRow` and
   `HiddenRow` types.
   - Follow D4 steps 1–9 exactly, in one `withSessionContext`, with no nested context.
@@ -268,10 +268,10 @@
     `rules_invalid` for it.
   - No awaiting count, no hint data (design Non-Goals).
   - The comment cites the matrix decision: a read, `vote` permission first.
-- [ ] 5.2 `authorization-matrix.test.ts`: classify `getRanking` in `NOT_APPLICABLE_DELIBERATION`
+- [x] 5.2 `authorization-matrix.test.ts`: classify `getRanking` in `NOT_APPLICABLE_DELIBERATION`
   as "read; visibility tested in tests/integration/deliberation/ranking.test.ts". Break: remove
   the entry; the "every exported function" test must fail.
-- [ ] 5.3 `vote-household-account.test.ts`: `getRanking` with a profile-less context throws
+- [x] 5.3 `vote-household-account.test.ts`: `getRanking` with a profile-less context throws
   `ProfileRequiredError` and issues zero queries, in that file's mock pattern. Break: move the
   check inside `withSessionContext`; the zero-query assertion must fail.
 

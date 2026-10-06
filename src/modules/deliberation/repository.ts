@@ -3,6 +3,7 @@ import { isUuid, withSessionContext, type SessionContext } from "@/db/session-co
 import {
   ProfileRequiredError,
   ROUND_STATUSES,
+  getRoundTallyBasisTx,
   listVoteCandidatesTx,
   listVoterRoundsTx,
   type RoundStatus,
@@ -16,7 +17,8 @@ import {
   assertHasPermissionTx,
   assertHoldsAnyPermissionTx,
 } from "@/modules/identity/repository";
-import { parseScaleWeights, type ScaleWeights } from "./round-rules";
+import { computeRanking, quorumNeeded } from "./ranking";
+import { parseRoundRules, parseScaleWeights, type ScaleWeights } from "./round-rules";
 import { vote } from "./schema";
 import { VOTE_VALUES, type VoteValue } from "./vote-values";
 
@@ -242,6 +244,190 @@ export async function getScreeningPass(context: SessionContext, roundId: string 
       attributes: (c.card?.attributes ?? null) as ScreeningCard["attributes"],
     }));
     return { kind: "deck", round: { id: round.roundId, title: round.title }, weights, cards };
+  });
+}
+
+export interface ScoredRow {
+  applicationId: string;
+  applicantName: string;
+  state: VoteCandidate["state"];
+  score: number;
+  n: number;
+  leading: boolean;
+}
+
+// No `score` key at all (AC-5.4, C-5.1): NO_SCORE is not a number in the types.
+export interface UnscoredRow {
+  applicationId: string;
+  applicantName: string;
+  state: VoteCandidate["state"];
+  n: number;
+  needed: number;
+}
+
+// A row whose results the viewer may not see yet (V-4): exactly these three keys, and no result
+// field of any kind, so AC-5.16 holds by type and by test.
+export interface HiddenRow {
+  applicationId: string;
+  applicantName: string;
+  state: VoteCandidate["state"];
+}
+
+export type Ranking =
+  | {
+      kind: "board";
+      round: { id: string; title: string; status: RoundStatus };
+      rules: { weights: ScaleWeights; needed: number; denominator: number };
+      openRoomCount: number;
+      scored: ScoredRow[];
+      unscored: UnscoredRow[];
+      hidden: HiddenRow[];
+    }
+  | { kind: "none" }
+  | { kind: "refused"; reason: "not_eligible" | "rules_invalid" }
+  | { kind: "refused"; reason: "round_not_available"; status: RoundStatus };
+
+// F5 change 1 (ranking), design D4: the scoreboard's one read, in ONE transaction, read-only. It
+// enforces before anything reaches the client: V-2 (a participant only), V-1 (the own application
+// is absent from every list and count: the candidate port's predicate) and V-4 (results per
+// candidate only after one's own non-withdrawn `invite` vote). `roundId` null picks the newest
+// `open` or `paused` round the viewer takes part in; a closed or archived round is refused, since
+// no path closes a round yet and `quorum_denominator_frozen` has no writer (F-12).
+//
+// Authorization matrix: a read. The stored `vote` permission is checked first inside the
+// transaction (the lock it takes is the one every permission-checked read takes, FOR SHARE on the
+// caller's membership row, taken first so the lock order is unchanged); a caller without it gets
+// `not_eligible`, the refusal the screen already renders. Its visibility is tested in
+// tests/integration/deliberation/ranking.test.ts.
+//
+// Consistency without a stricter isolation level: reveal and aggregate come from ONE statement
+// (the vote read), so a castVote committing mid-read cannot make a row visible without its new
+// vote or the reverse. The tally basis is a separate statement, but a vote counts only if its
+// voter is in that same set, so numerator <= denominator always holds.
+export async function getRanking(context: SessionContext, roundId: string | null): Promise<Ranking> {
+  if (context.profileId === null) throw new ProfileRequiredError("getRanking");
+  const viewerId = context.profileId;
+  return withSessionContext(context, async (tx): Promise<Ranking> => {
+    try {
+      await assertHasPermissionTx(tx, context, "vote");
+    } catch (err) {
+      if (err instanceof PermissionDeniedError) return { kind: "refused", reason: "not_eligible" };
+      throw err;
+    }
+
+    let round;
+    if (roundId === null) {
+      round = (await listVoterRoundsTx(tx, context)).find((r) => r.status === "open" || r.status === "paused");
+      if (!round) return { kind: "none" };
+    } else {
+      // A malformed id or no voter row is the same refusal and names no title (V-2).
+      const [found] = await listVoterRoundsTx(tx, context, { roundId });
+      if (!found) return { kind: "refused", reason: "not_eligible" };
+      if (found.status !== "open" && found.status !== "paused") {
+        return { kind: "refused", reason: "round_not_available", status: found.status };
+      }
+      round = found;
+    }
+
+    const rules = parseRoundRules(round.settingsSnapshot);
+    if (rules === null) return { kind: "refused", reason: "rules_invalid" };
+
+    const candidates = await listVoteCandidatesTx(tx, context, [round.roundId], { scope: "board", fields: "names" });
+
+    // Steps 3 and 6 are separate statements under READ COMMITTED, so a move-out of the viewer
+    // committing in between makes the port return null: refused, never thrown. An empty set cannot
+    // reach here (the port returns null when the viewer is not in it), so a zero denominator is
+    // this same refusal (EC-5.7), never `rules_invalid`.
+    const basis = await getRoundTallyBasisTx(tx, context, round.roundId);
+    if (basis === null) return { kind: "refused", reason: "not_eligible" };
+    const counted = new Set(basis.countedVoterIds);
+    const denominator = basis.countedVoterIds.length;
+
+    // ONE statement reads every vote of the round's `invite` stage on these candidates. From it:
+    // the viewer's own votes (what reveals a row) and the counted votes (what scores).
+    const votes =
+      candidates.length === 0
+        ? []
+        : await tx
+            .select({
+              applicationId: vote.applicationId,
+              residentProfileId: vote.residentProfileId,
+              value: vote.value,
+            })
+            .from(vote)
+            .where(
+              and(
+                eq(vote.householdId, context.householdId),
+                eq(vote.roundId, round.roundId),
+                eq(vote.stage, "invite"),
+                isNull(vote.withdrawnAt),
+                inArray(
+                  vote.applicationId,
+                  candidates.map((c) => c.applicationId),
+                ),
+              ),
+            );
+    const ownVoted = new Set<string>();
+    const countedValues = new Map<string, VoteValue[]>();
+    for (const v of votes) {
+      if (v.residentProfileId === viewerId) ownVoted.add(v.applicationId);
+      if (counted.has(v.residentProfileId)) {
+        const list = countedValues.get(v.applicationId) ?? [];
+        list.push(v.value);
+        countedValues.set(v.applicationId, list);
+      }
+    }
+
+    // V-4, per candidate. A candidate that is not visible carries no vote-derived field and is
+    // listed oldest first (the port's order), never by anything derived from votes.
+    const visible = candidates.filter((c) => !rules.hideResultsUntilVoted || ownVoted.has(c.applicationId));
+    const hidden: HiddenRow[] = candidates
+      .filter((c) => !visible.includes(c))
+      .map((c) => ({ applicationId: c.applicationId, applicantName: c.applicantName ?? "", state: c.state }));
+
+    // The sort is a total order on per-candidate keys, so ranking only the visible set is the same
+    // as ranking everything and dropping the hidden rows, and the highlight slots go to visible
+    // rows only (Q-15).
+    const byId = new Map(visible.map((c) => [c.applicationId, c]));
+    const ranked = computeRanking({
+      weights: rules.weights,
+      quorumShare: rules.quorumShare,
+      denominator,
+      openRoomCount: basis.openRoomCount,
+      candidates: visible.map((c) => ({
+        id: c.applicationId,
+        createdAt: c.createdAt,
+        values: countedValues.get(c.applicationId) ?? [],
+      })),
+    });
+    return {
+      kind: "board",
+      round: { id: round.roundId, title: round.title, status: round.status },
+      rules: { weights: rules.weights, needed: quorumNeeded(rules.quorumShare, denominator), denominator },
+      openRoomCount: basis.openRoomCount,
+      scored: ranked.scored.map((r) => {
+        const c = byId.get(r.id)!;
+        return {
+          applicationId: r.id,
+          applicantName: c.applicantName ?? "",
+          state: c.state,
+          score: r.score,
+          n: r.n,
+          leading: r.leading,
+        };
+      }),
+      unscored: ranked.unscored.map((r) => {
+        const c = byId.get(r.id)!;
+        return {
+          applicationId: r.id,
+          applicantName: c.applicantName ?? "",
+          state: c.state,
+          n: r.n,
+          needed: r.needed,
+        };
+      }),
+      hidden,
+    };
   });
 }
 

@@ -133,6 +133,7 @@ const NOT_APPLICABLE_CASTING: Record<string, string> = {
 const NOT_APPLICABLE_DELIBERATION: Record<string, string> = {
   getAwaitingVoteCounts: "read; visibility tested in tests/integration/deliberation/awaiting-vote-counts.test.ts",
   getScreeningPass: "read; visibility tested in tests/integration/deliberation/screening-pass.test.ts",
+  getRanking: "read; visibility tested in tests/integration/deliberation/ranking.test.ts",
 };
 
 const NOT_APPLICABLE_IDENTITY: Record<string, string> = {

@@ -47,6 +47,14 @@ describe("deliberation: a household-account session", () => {
     expect(withSessionContextSpy).not.toHaveBeenCalled();
   });
 
+  it("getRanking throws ProfileRequiredError and issues no query", async () => {
+    const { getRanking } = await import("@/modules/deliberation/repository");
+    const { ProfileRequiredError } = await import("@/modules/casting/repository");
+    await expect(getRanking(householdContext, null)).rejects.toBeInstanceOf(ProfileRequiredError);
+    await expect(getRanking(householdContext, uuid5)).rejects.toBeInstanceOf(ProfileRequiredError);
+    expect(withSessionContextSpy).not.toHaveBeenCalled();
+  });
+
   it("getAwaitingVoteCounts returns an empty map and issues no query", async () => {
     const { getAwaitingVoteCounts } = await import("@/modules/deliberation/repository");
     const counts = await getAwaitingVoteCounts(householdContext);
