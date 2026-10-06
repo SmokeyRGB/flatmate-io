@@ -800,7 +800,10 @@ export const de = {
     unscored: (needed: number, n: number) =>
       `Noch kein Punktwert — für ein faires Bild braucht es mindestens ${needed === 1 ? "1 Stimme" : `${needed} Stimmen`} (bisher ${n}).`,
     hidden: "Verdeckt — du hast hier nicht abgestimmt",
-    hiddenHeading: "Verdeckte Bewerbungen",
+    // The three groups of the board (design D10, human decision 2026-10-06).
+    scoredHeading: "Punktwert",
+    invitedHeading: "Eingeladen",
+    hiddenHeading: "Verdeckt",
     leadingLabel: (n: number) =>
       n === 1 ? "Unter dem höchsten Punktwert — 1 Zimmer frei" : `Unter den ${n} höchsten Punktwerten — ${n} Zimmer frei`,
     rulesToggle: "(?)",

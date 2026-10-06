@@ -1,13 +1,13 @@
 import { EyeOff } from "lucide-react";
 import Link from "next/link";
-import type { Ranking } from "@/modules/deliberation/repository";
+import type { RankedGroup, Ranking } from "@/modules/deliberation/repository";
 import { de } from "@/ui/strings";
 import { WeightsList } from "./weights-list";
 
 const t = de.casting;
 
 type BoardRanking = Extract<Ranking, { kind: "board" }>;
-type Row = { applicationId: string; applicantName: string; state: string };
+type Row = { applicationId: string; applicantName: string };
 
 // F5 change 1, screen D1: the scoreboard. A pure render of what `getRanking` returned, so every
 // visibility rule has already been applied in the repository (V-1, V-2, V-4); nothing here decides
@@ -25,36 +25,23 @@ export function RankingBoard({ ranking }: { ranking: Ranking }) {
     }
     return <Refusal text={ranking.reason === "rules_invalid" ? t.refusal.rulesInvalid : t.refusal.notEligible} />;
   }
-  const { scored, unscored, hidden } = ranking;
-  if (scored.length + unscored.length + hidden.length === 0) return <EmptyState title={ranking.round.title} />;
+  const { decided, invited, hidden } = ranking;
+  const total =
+    decided.scored.length +
+    decided.unscored.length +
+    invited.scored.length +
+    invited.unscored.length +
+    hidden.length;
+  if (total === 0) return <EmptyState title={ranking.round.title} />;
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
         <p className="min-w-0 truncate text-sm text-muted-foreground">{ranking.round.title}</p>
         <RulesPopover ranking={ranking} />
       </div>
-      {scored.length + unscored.length > 0 && (
-        <ul className="space-y-3">
-          {scored.map((row) => (
-            <li key={row.applicationId} className={`card ranking-row${row.leading ? " ranking-leading" : ""}`}>
-              <ScoreRing score={row.score} n={row.n} />
-              <div className="min-w-0 flex-1">
-                <RowName row={row} />
-                <p className="text-xs text-muted-foreground">{t.scoreOf(row.n)}</p>
-                {row.leading && <span className="sr-only">{t.leadingLabel(ranking.openRoomCount)}</span>}
-              </div>
-            </li>
-          ))}
-          {unscored.map((row) => (
-            <li key={row.applicationId} className="card ranking-row">
-              <div className="min-w-0 flex-1">
-                <RowName row={row} />
-                <p className="text-sm text-muted-foreground">{t.unscored(row.needed, row.n)}</p>
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
+      {/* Only this group highlights (design D10): the repository sets `leading` here and nowhere else. */}
+      <Group heading={t.scoredHeading} group={decided} openRoomCount={ranking.openRoomCount} />
+      <Group heading={t.invitedHeading} group={invited} openRoomCount={ranking.openRoomCount} />
       {hidden.length > 0 && (
         <section className="space-y-3">
           <h2 className="text-sm font-semibold text-muted-foreground">{t.hiddenHeading}</h2>
@@ -75,13 +62,48 @@ export function RankingBoard({ ranking }: { ranking: Ranking }) {
   );
 }
 
-function RowName({ row }: { row: Row }) {
+// One group of the board: its heading and its scored rows, then its unscored rows. A group with no
+// row renders nothing, not even a heading.
+function Group({
+  heading,
+  group,
+  openRoomCount,
+}: {
+  heading: string;
+  group: RankedGroup;
+  openRoomCount: number;
+}) {
+  if (group.scored.length + group.unscored.length === 0) return null;
   return (
-    <p className="truncate font-medium">
-      {row.applicantName}
-      {row.state === "invited" && <span className="ranking-state"> · {de.status.application.invited}</span>}
-    </p>
+    <section className="space-y-3">
+      <h2 className="text-sm font-semibold text-muted-foreground">{heading}</h2>
+      <ul className="space-y-3">
+        {group.scored.map((row) => (
+          <li key={row.applicationId} className={`card ranking-row${row.leading ? " ranking-leading" : ""}`}>
+            <ScoreRing score={row.score} n={row.n} />
+            <div className="min-w-0 flex-1">
+              <RowName row={row} />
+              <p className="text-xs text-muted-foreground">{t.scoreOf(row.n)}</p>
+              {row.leading && <span className="sr-only">{t.leadingLabel(openRoomCount)}</span>}
+            </div>
+          </li>
+        ))}
+        {group.unscored.map((row) => (
+          <li key={row.applicationId} className="card ranking-row">
+            <div className="min-w-0 flex-1">
+              <RowName row={row} />
+              <p className="text-sm text-muted-foreground">{t.unscored(row.needed, row.n)}</p>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
+}
+
+// The group a row sits in says whether it is invited, so the row carries only the name.
+function RowName({ row }: { row: Row }) {
+  return <p className="truncate font-medium">{row.applicantName}</p>;
 }
 
 // The circular progress ring: the score inside, a text equivalent for the whole (FR-5.10, AC-5.28).

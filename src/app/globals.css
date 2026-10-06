@@ -895,10 +895,6 @@ h3 {
     height: 1.25rem;
     flex: none;
   }
-  .ranking-state {
-    font-weight: 400;
-    color: var(--color-muted-foreground);
-  }
 
   /* The stack takes all the height that is left; a long message scrolls inside its card. */
   .deck-stack {

@@ -498,7 +498,7 @@ reason codes, not only lengths.
     slot, and the first two of `decided.scored` lead. Break: compute one ranking over both groups;
     the case must fail;
   - adjust every other case to the new shape, without weakening an assertion.
-- [ ] 10.4 `src/app/(resident)/casting/ranking-board.tsx` and `de.ts` `casting`: headings
+- [x] 10.4 `src/app/(resident)/casting/ranking-board.tsx` and `de.ts` `casting`: headings
   „Punktwert", „Eingeladen", „Verdeckt"; a group with no row is not rendered; the empty state only
   when all three are empty; drop the per-row invited label (the group says it). Update
   `tests/unit/casting/ranking-board.test.ts`: the three headings appear only with rows; an invited

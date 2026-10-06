@@ -20,12 +20,17 @@ function board(over: Partial<Board> = {}): Board {
     round: { id: "r", title: "Herbstrunde", status: "open" },
     rules: { weights: WEIGHTS, needed: 2, denominator: 4 },
     openRoomCount: 2,
-    scored: [
-      { applicationId: "a", applicantName: "Anna", state: "new", score: 73, n: 5, leading: true },
-      { applicationId: "b", applicantName: "Bea", state: "invited", score: 60, n: 3, leading: true },
-      { applicationId: "c", applicantName: "Cora", state: "screened", score: 20, n: 2, leading: false },
-    ],
-    unscored: [{ applicationId: "d", applicantName: "Dora", state: "new", n: 1, needed: 2 }],
+    decided: {
+      scored: [
+        { applicationId: "a", applicantName: "Anna", state: "new", score: 73, n: 5, leading: true },
+        { applicationId: "c", applicantName: "Cora", state: "screened", score: 20, n: 2, leading: true },
+      ],
+      unscored: [{ applicationId: "d", applicantName: "Dora", state: "new", n: 1, needed: 2 }],
+    },
+    invited: {
+      scored: [{ applicationId: "b", applicantName: "Bea", state: "invited", score: 60, n: 3, leading: false }],
+      unscored: [],
+    },
     hidden: [{ applicationId: "e", applicantName: "Elsa", state: "invited" }],
     ...over,
   };
@@ -82,8 +87,8 @@ describe("RankingBoard rows", () => {
     const markup = await render(board());
     expect(markup.match(/ranking-leading/g)).toHaveLength(2);
     expect(rowOf(markup, "Anna")).toContain("ranking-leading");
-    expect(rowOf(markup, "Bea")).toContain("ranking-leading");
-    expect(rowOf(markup, "Cora")).not.toContain("ranking-leading");
+    expect(rowOf(markup, "Cora")).toContain("ranking-leading");
+    expect(rowOf(markup, "Bea")).not.toContain("ranking-leading");
     expect(rowOf(markup, "Dora")).not.toContain("ranking-leading");
     expect(rowOf(markup, "Elsa")).not.toContain("ranking-leading");
     expect(markup.match(/sr-only">Unter den 2 höchsten Punktwerten — 2 Zimmer frei</g)).toHaveLength(2);
@@ -93,18 +98,36 @@ describe("RankingBoard rows", () => {
     const markup = await render(
       board({
         openRoomCount: 0,
-        scored: [{ applicationId: "a", applicantName: "Anna", state: "new", score: 73, n: 5, leading: false }],
+        decided: {
+          scored: [{ applicationId: "a", applicantName: "Anna", state: "new", score: 73, n: 5, leading: false }],
+          unscored: [],
+        },
       }),
     );
     expect(markup).not.toContain("ranking-leading");
     expect(markup).not.toContain("Zimmer frei");
   });
 
-  it("an invited row carries its state as a label, in every list", async () => {
+  it("the three headings appear only with rows, and an invited row sits under \"Eingeladen\" with its ring, never highlighted", async () => {
     const markup = await render(board());
-    expect(rowOf(markup, "Bea")).toContain(de.status.application.invited);
-    expect(rowOf(markup, "Elsa")).toContain(de.status.application.invited);
-    expect(rowOf(markup, "Anna")).not.toContain(de.status.application.invited);
+    const h = (name: string) => markup.indexOf(`>${name}</h2>`);
+    expect(h(t.scoredHeading)).toBeGreaterThan(-1);
+    expect(h(t.invitedHeading)).toBeGreaterThan(h(t.scoredHeading));
+    expect(h(t.hiddenHeading)).toBeGreaterThan(h(t.invitedHeading));
+    const bea = markup.indexOf("Bea");
+    expect(bea).toBeGreaterThan(h(t.invitedHeading));
+    expect(bea).toBeLessThan(h(t.hiddenHeading));
+    expect(markup.indexOf("Dora")).toBeLessThan(h(t.invitedHeading));
+    expect(rowOf(markup, "Bea")).toContain(`aria-label="${t.ringLabel(60, 3)}"`);
+    expect(rowOf(markup, "Bea")).not.toContain("ranking-leading");
+    expect(textOf(rowOf(markup, "Bea"))).not.toContain(de.status.application.invited);
+
+    const onlyDecided = await render(
+      board({ invited: { scored: [], unscored: [] }, hidden: [] }),
+    );
+    expect(onlyDecided).toContain(`>${t.scoredHeading}</h2>`);
+    expect(onlyDecided).not.toContain(`>${t.invitedHeading}</h2>`);
+    expect(onlyDecided).not.toContain(`>${t.hiddenHeading}</h2>`);
   });
 
   it("has no rank numbers, no list that numbers, and no word about a person (C-10)", async () => {
@@ -115,7 +138,7 @@ describe("RankingBoard rows", () => {
 
   it("lists hidden rows below the others, under their own heading", async () => {
     const markup = await render(board());
-    const heading = markup.indexOf(t.hiddenHeading);
+    const heading = markup.indexOf(`>${t.hiddenHeading}</h2>`);
     expect(heading).toBeGreaterThan(markup.indexOf("Dora"));
     expect(markup.indexOf("Elsa")).toBeGreaterThan(heading);
   });
@@ -140,7 +163,11 @@ describe("RankingBoard (?) pop-over", () => {
 
 describe("RankingBoard states", () => {
   it("an empty board names the round and leads back to Start", async () => {
-    const markup = await render(board({ scored: [], unscored: [], hidden: [] }));
+    const markup = await render(board({
+        decided: { scored: [], unscored: [] },
+        invited: { scored: [], unscored: [] },
+        hidden: [],
+      }));
     expect(textOf(markup)).toContain(t.empty("Herbstrunde"));
     expect(markup).toContain('href="/dashboard"');
     expect(markup).not.toContain("<li");
