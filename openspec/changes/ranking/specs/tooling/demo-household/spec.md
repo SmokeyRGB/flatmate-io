@@ -51,3 +51,28 @@ as the application's runtime role. Sources: `.claude/rules/implementation-hazard
 - **WHEN** the cleanup has run
 - **THEN** no row with the demo household's id remains in any table except `activity_event`, and
   its Auth users are gone
+
+### Requirement: The demo household can be reset in place
+
+Resetting the demo (the reset SQL as the database owner, then the demo round seed) SHALL keep the
+existing demo household: its id, its sign-in code, its accounts, profiles, memberships, join links
+and settings. It SHALL delete only the household's votes, applications, round participations,
+rounds and rooms, and recreate them, through the app's own write paths, in the showable state the
+fresh seed produces. Residents the seed needs that are missing SHALL be added, and residents that
+exist SHALL be reused. The round seed SHALL refuse to run while the household still has a round,
+and SHALL stop with a message naming the resident whose sign-in failed. It SHALL print the number
+of voters and the quorum, and warn when the seeded votes plus one presenter vote cannot reach it.
+Source: human decision 2026-10-06.
+
+#### Scenario: Reset keeps the household
+- **WHEN** the reset SQL and then the demo round seed run on the existing demo household
+- **THEN** the household id and sign-in code are unchanged, every resident can still sign in with
+  their password, and the Casting tab shows the fresh round
+
+#### Scenario: Reset twice
+- **WHEN** the reset and the round seed run a second time
+- **THEN** no resident is duplicated and the same showable state results
+
+#### Scenario: A round still exists
+- **WHEN** the round seed runs without the reset first
+- **THEN** it refuses and changes nothing

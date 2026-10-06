@@ -414,16 +414,44 @@ reason codes, not only lengths.
   table (12 deleted, `join_attempt` emptied, `activity_event` kept by design). Add a one-line
   comment naming this change as the last check. Change nothing else.
 
+- [ ] 8.3 **Reset in place** (design D8, human decision 2026-10-06). Move the rooms/round/applications/
+  votes/invite part of `scripts/seed-demo-household.ts` into `scripts/demo/seed-round.ts` (one
+  exported function taking the household context and the voters' contexts). `seed-demo-household.ts`
+  calls it, and its behaviour is unchanged.
+- [ ] 8.4 Create `scripts/seed-demo-round.ts` and the npm script `seed:demo-round` (`tsx
+  --env-file=.env.local …`, same `assertSafeSupabaseEnv` guard as the seed). Exported app
+  functions only, no raw SQL:
+  - `DEMO_PASSWORD` is required; without it, refuse with a message;
+  - sign in as the household account (`signIn({ kind: "household", email: DEMO_EMAIL, password })`);
+  - read the residents via the household account's resident list; claim Kim and Jule only if
+    missing (`createResidentProfile` + `claimResidentProfile` with `DEMO_PASSWORD`);
+  - refuse ("run scripts/reset-demo-household.sql first") when the household still has any round;
+  - voter contexts for Alex, Kim and Jule via `signIn({ kind: "resident", householdId,
+    displayName, password })`. On a failure, stop and name the resident;
+  - create two rooms and open them, then call `seedDemoRound`;
+  - print the WG-Kennung, the voter count, the quorum, a warning when 3 + 1 < quorum, and "what to
+    show". Counts only, no applicant data.
+- [ ] 8.5 Create `scripts/reset-demo-household.sql`, built from `cleanup-demo-household.sql`'s header
+  and guards (refuse `app_runtime`, fixed demo email, a notice when absent, "never production").
+  Delete only `vote`, `application`, `round_participation`, `casting_round`, `room` for the demo
+  household, in that order. End with the remaining counts for those five tables in that household,
+  plus the unchanged household id and resident count, so the human sees it worked.
+- [ ] 8.6 Verify the round seed against a throwaway household, as for 8.1: register one under a
+  random email, run `seed:demo-round's` logic against it (one round, the board for a non-voting
+  resident: scored, unscored, hidden), then the reset statements as the test cleanup does, then the
+  round seed again (no duplicate residents, same board). Delete the throwaway household and any
+  scratch copy afterwards. Report the board counts.
+
 ## 9. Verify, demo reset, walkthrough
 
-- [x] 9.1 `npm run verify` green (eslint, tsc, the nine lints, check-refs, the full suite on dev).
+- [ ] 9.1 `npm run verify` (re-run after 8.3–8.6; first green run before them) green (eslint, tsc, the nine lints, check-refs, the full suite on dev).
   Report the counts.
-- [ ] 9.2 **Human hand-off (owner SQL):** the human runs `scripts/cleanup-demo-household.sql` in the
-  Supabase SQL editor for `flatmate-io-dev`, or explicitly lets the agent run it through the
-  Supabase MCP. Never production. Afterwards, check by query that no account with the demo email
-  remains. If one remains, **stop**; do not infer that the cleanup is merely pending.
-- [ ] 9.3 `npm run seed:demo`. Record the new household id and WG-Kennung in the plan file, not in
-  the repo.
+- [ ] 9.2 **Human hand-off (owner SQL):** the human runs `scripts/reset-demo-household.sql` in the
+  Supabase SQL editor for `flatmate-io-dev`. Never production. Its last result shows zero votes,
+  applications, participations, rounds and rooms for the demo household, and the unchanged household
+  id. If not, **stop**.
+- [ ] 9.3 `DEMO_PASSWORD=<the seed's password> npm run seed:demo-round`. Record the voter count and
+  quorum in the plan file, not in the repo.
 - [ ] 9.4 Walkthrough = pitch rehearsal (localhost, seed credentials, the browser pane):
   - sign in as Sam with the WG-Kennung; B1 shows the awaiting count, and Casting redirects to the
     pass;
@@ -432,9 +460,10 @@ reason codes, not only lengths.
     abgestimmt";
   - check „(?)";
   - reduced motion (emulated) gives a static tint;
-  - as Alex, the shared rows have the same scores (the invited row is visible for Alex);
+  - as Alex, the shared rows have the same scores (the invited row is visible for Alex, and the
+    application nobody voted on is hidden for Alex);
   - the household account cannot reach `/casting`;
   - the dev log holds no applicant data.
   Screenshot the board.
-- [ ] 9.5 Optionally, claim Robin through the bound link, rate, and confirm the board still shows
-  all three row kinds (quorum now 3).
+- [ ] 9.5 As Robin (already claimed by the human), rate and confirm the board shows all three row
+  kinds.

@@ -312,6 +312,35 @@ a comment naming this change.
 - **Output:** the seed prints the WG-Kennung (`household.signInCode`, PR #51), the names, the links
   and a short "what to show" list. Counts only, no applicant data.
 
+**Reset in place (human decision 2026-10-06).** The human keeps the existing Demo-WG: its
+household id, WG-Kennung, accounts, profiles, memberships, join links and settings stay, and only
+the casting activity is reset. Two pieces:
+- `scripts/reset-demo-household.sql`, run as owner in the SQL editor with the same guards as the
+  cleanup (refuses `app_runtime`, matches the fixed demo email, a notice and no change when there
+  is no demo household). It deletes the demo household's `vote`, `application`,
+  `round_participation`, `casting_round` and `room` rows, in that order (`drizzle/0026` refuses a
+  round that still has applications). Rooms go too, so the round starts from two fresh `open`
+  rooms whatever state earlier testing left them in (a room left `occupied` or `promised` has no
+  F1 path back to `open`). `activity_event` stays (append-only). It prints the remaining counts.
+- `npm run seed:demo-round` (`scripts/seed-demo-round.ts`) works on the existing household through
+  the app's own paths only. It signs in with `signIn({ kind: "household", … })` using
+  `DEMO_PASSWORD` (the password the original seed printed), so it needs no id and no raw lookup.
+  It reads the residents through the household account's own resident list, and claims Kim and
+  Jule only when they are missing, with the same password. The voters' contexts come from
+  `signIn({ kind: "resident", householdId, displayName, password })`. A failed sign-in stops the
+  script with a message naming who, and nothing after it runs. It then creates the two rooms, opens
+  them, and calls the shared round seeding. It refuses to run when the household still has a
+  round ("run the reset SQL first"), so it never stacks rounds.
+- **One round seeding, used twice (DRY).** The rooms-round-applications-votes-invite part of
+  `seed-demo-household.ts` moves into `scripts/demo/seed-round.ts`, called by both scripts. The
+  fresh-database path (`cleanup` + `seed:demo`) keeps working unchanged in behaviour.
+- **Voters.** The snapshot holds every active resident: Alex, Sam, Kim, Jule, plus Robin if
+  claimed. That is 5 voters (quorum 3) or 4 (quorum 2). Each application gets 0 or 3 seeded votes
+  (Alex, Kim, Jule), so for Sam and Robin as presenters the three row kinds hold in both cases, even
+  when both of them rate. Residents the human added by hand also land in the snapshot. They raise
+  the denominator, and with 9 or more voters at share 0.5, 3 seeded votes plus the presenter's fall below
+  quorum. The script prints the voter count and the quorum, and warns when 3 + 1 < quorum.
+
 *Why not seed the presenter's votes:* the walkthrough is the pitch. The presenter rates live and
 the board appears.
 
