@@ -444,7 +444,7 @@ reason codes, not only lengths.
 
 ## 9. Verify, demo reset, walkthrough
 
-- [ ] 9.1 `npm run verify` (re-run after group 10) green (eslint, tsc, the nine lints, check-refs, the full suite on dev).
+- [x] 9.1 `npm run verify` (re-run after group 10) green (eslint, tsc, the nine lints, check-refs, the full suite on dev).
   Report the counts.
 - [ ] 9.2 **Human hand-off (owner SQL):** the human runs `scripts/reset-demo-household.sql` in the
   Supabase SQL editor for `flatmate-io-dev`. Never production. Its last result shows zero votes,
@@ -516,4 +516,4 @@ reason codes, not only lengths.
 - [x] 10.6 `scripts/demo/seed-round.ts`: remove the two `transitionApplication(…, "screened")` calls
   of applications that stay in the round (around l.112–113); keep `screened` only as the
   pass-through step of the invited application. Update the comment.
-- [ ] 10.7 Re-run `npm run verify` (task 9.1) and report the counts.
+- [x] 10.7 Re-run `npm run verify` (task 9.1) and report the counts.
