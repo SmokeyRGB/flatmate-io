@@ -43,14 +43,25 @@
 `join_code_issuance.is_founding_link boolean NOT NULL DEFAULT false`.
 
 Constraints, enforcing the relationship as well as the count:
-- `CHECK (NOT is_founding_link OR (purpose = 'join' AND bound_resident_profile_id IS NULL))`. A
-  founding link is a neutral join link, never a reset link or a bound one.
+- `CHECK (NOT is_founding_link OR (purpose = 'join' AND resident_profile_id IS NULL))`. A
+  founding link is a neutral join link, never a reset link or a bound one. The table column is
+  `resident_profile_id` (schema.ts); `bound_resident_profile_id` is only the definer functions'
+  output name. The TS `check()` (`${t.residentProfileId}`) and the hand-written SQL must carry the
+  same predicate.
 - `CREATE UNIQUE INDEX … ON join_code_issuance (household_id) WHERE is_founding_link`. At most one
   per household, so a later lookup can never be ambiguous.
 
 Writers: only `registerHousehold`, through a new `founding: true` option on `issueJoinCodeTx`.
-The public `issueJoinCode` (moderator or household account, O16) never passes it, and its
-signature does not expose it. The column is never updated.
+When `founding` is set, `issueJoinCodeTx` forces `purpose 'join'`, `maxUses 1` and no profile.
+The public `issueJoinCode` (moderator or household account, O16) never passes it:
+`PublicIssueJoinCodeOptions` becomes `Omit<IssueJoinCodeOptions, "purpose" | "founding">`, and
+`issueJoinCode` strips the key at runtime too, because it forwards `options` as-is. The column is
+never updated.
+
+`issueJoinCodeTx`'s insert loop retries on any `23505` as a code collision (`isUniqueViolation`
+ignores the constraint name). A hit on `join_code_issuance_one_founding_link` would loop forever
+inside the transaction. So the retry becomes conditional on the code index's constraint name, and
+every other unique violation is rethrown.
 
 Paths that could reach a marked link:
 - **Raw SQL as `app_runtime`:** it could `UPDATE … SET is_founding_link = true` on an ordinary
@@ -71,7 +82,11 @@ Inside `joinHousehold`'s transaction, after `claimJoinCodeTx` returns `issuanceI
 2. If it is set, insert the membership with `role 'moderator'` and
    `permissions = appointedPermissions(RESIDENT_PERMISSIONS)`.
    - `appointedPermissions` is one exported helper in `identity`: the sorted, deduplicated union
-     with `MODERATOR_PERMISSIONS`.
+     with `MODERATOR_PERMISSIONS`. It lives in `repository.ts` (classified pure in the
+     authorization matrix), NOT in `schema.ts`, because `data-inventory.ts` refuses a schema.ts
+     that exports a function.
+   - The membership insert gains `.returning({ id })`. The `membership.role_changed` event carries
+     `subjectType 'membership'` and `subjectId` = that id, exactly as `setMemberRole` records it.
    - A test pins that it equals what `setMemberRole` stores for a fresh member, so the two cannot
      drift.
    - It passes the 0024/0027 CHECKs. Moderator + resident is the normal pair
@@ -148,18 +163,32 @@ The revocation is a DB write inside the transaction, so it can never outlive a f
 - **`revokeMembershipForProfileTx` / `insertSessionTx` / `signIn`:** they touch resident sessions
   or insert new rows, never this household session row. No conflict.
 
-### D4. Members screen names the founding link
+### D4. The founder is pointed at the founding link, and told not to pass it on
 
-The founder lands on the members screen after registration. It now leads with
-„Bewohner:in hinzufügen" (PR #55). Preparing a profile and issuing a bound link would make the
-founder a plain member, so the founding link's row in the join-link list gets a label and a
-one-line hint:
-- the label: „Dein Gründungslink";
-- the hint: „Tritt selbst darüber bei, dann bist du Moderator:in.";
-- shown only while the link is unused and live.
+After registration the founder lands on `/organization` (`register/actions.ts`), not on the
+members screen. There the household account has no pointer to the link. On the members screen
+the founding link is today a plain-text URL with copy buttons, under a generic warning (*„Wer ihn
+hat, kann mitstimmen"*) that is false for this link. Copying and forwarding it is easier than
+using it, which is exactly the leak this change must avoid. So:
 
-`listJoinCodeIssuances` adds `isFoundingLink` to its rows. The wording is a draft, for the human
-to confirm (memory: German UI tone).
+- **`/organization`, household account, founding link live** (unused, not deleted, not expired):
+  a featured card replaces the noRoundYet card.
+  - Heading „Tritt deiner WG selbst bei".
+  - Body „Über deinen Gründungslink wirst du Bewohner:in und Moderator:in. Nur für dich — gib ihn
+    nicht weiter."
+  - A primary button „Jetzt beitreten" that is a plain `<a href>` to the join path, not a
+    prefetching `next/link`: the join GET records a rate-limit attempt and resolves the code.
+- **Members screen, the founding link's row while live:**
+  - the label „Dein Gründungslink";
+  - the hint „Nur für dich. Wer darüber beitritt, wird Moderator:in.", replacing the generic
+    warning on that row;
+  - the URL rendered as a plain `<a href>` to the join path.
+- **Once the link is spent:** both disappear, and the row is listed like any other.
+
+`listJoinCodeIssuances` adds `isFoundingLink` to its rows. A small read for the organisation page
+returns the live founding link's join path for the household account (or `null`), under its own
+context with a `household_id` predicate. All wording is a draft for the human to confirm (memory:
+German UI tone).
 
 ### D5. Migration
 
@@ -173,6 +202,11 @@ before applying, and apply to dev late.
    (household_id) WHERE is_founding_link;`
    No row is true yet, so it can't conflict.
 
+Generate the snapshot with `drizzle-kit generate`, then hand-edit the SQL to the re-runnable form
+above, so the next generate does not re-emit the diff. The journal's `when` values are not
+monotonic (0030 and 0031 are swapped). The new entry's `when` must exceed every existing one
+(currently 1791220900000), or the migrator may skip it.
+
 It is additive, so older branches on shared `flatmate-io-dev` keep inserting rows with the default
 (memory: expand/contract on shared dev). No DROP COLUMN and no SECURITY DEFINER, so the harness
 does not refuse it. The data-inventory entry is `⚙️` operational (no personal data).
@@ -184,8 +218,18 @@ does not refuse it. The data-inventory entry is `⚙️` operational (no persona
   registration-only link and by recording the appointment.
 - **The founding link leaks to a flatmate.** If the founder forwards the founding link instead of
   joining through it, that flatmate becomes moderator. This is the old misfire in a narrower
-  form. D4's label is the mitigation, and the household account can demote at once. Raise it in
-  the human review.
+  form. D4 is the mitigation: the organisation card and the members row both say „Nur für dich",
+  and one click joins directly. The household account can also demote at once. Raise it in the
+  human review.
+- **Concurrency tests are invariant guards, not regression tests.** `joinHousehold`'s transaction
+  is internal, so a test cannot hold it open. A spent founding link is refused pre-Auth by
+  `resolve_join_code` (`uses < max_uses`). The in-transaction refusal is reachable only by a race.
+- **Demo seed text.** `scripts/seed-demo-household.ts` prints the founding link as the
+  single-use link for the AC-2.8 cap demo. A presenter redeeming it would now become moderator, so
+  the seed prints a separately issued link for that demo instead.
+- **Term collision.** „Gründungs-Link-Ausnahme" already names the deferred usage-limit prefill
+  (`identity.md`, F2, review-log). The amendments call this rule „Moderation über den
+  Gründungslink" and name the other one when needed.
 - **Tests that join through the founding link flip silently.** Most tests issue their own links.
   Tasks include an audit of every test that redeems a household's first or founding issuance.
 - **A seed or test using `claimResidentProfile`** is unaffected by design.
@@ -193,8 +237,8 @@ does not refuse it. The data-inventory entry is `⚙️` operational (no persona
 
 ## Open Questions
 
-- D4 wording. Should the hint also appear on Start/organisation for the household account? Kept
-  to the members screen here.
+- D4 wording (organisation card, members row): drafts, for the human to confirm after the
+  walkthrough.
 
 ## Coordination with F5 (candidate-invite, change 2)
 
