@@ -444,7 +444,7 @@ reason codes, not only lengths.
 
 ## 9. Verify, demo reset, walkthrough
 
-- [ ] 9.1 `npm run verify` (re-run after 8.3–8.6; first green run before them) green (eslint, tsc, the nine lints, check-refs, the full suite on dev).
+- [x] 9.1 `npm run verify` (re-run after 8.3–8.6; first green run before them) green (eslint, tsc, the nine lints, check-refs, the full suite on dev).
   Report the counts.
 - [ ] 9.2 **Human hand-off (owner SQL):** the human runs `scripts/reset-demo-household.sql` in the
   Supabase SQL editor for `flatmate-io-dev`. Never production. Its last result shows zero votes,
