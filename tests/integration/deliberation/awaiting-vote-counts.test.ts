@@ -6,7 +6,7 @@ import { castVote, getAwaitingVoteCounts, getScreeningPass } from "@/modules/del
 import { vote } from "@/modules/deliberation/schema";
 import { insertTestRound } from "../../helpers/applications";
 import { cleanupAll, deleteTestAccount, type TestHousehold } from "../../helpers/identity";
-import { claimPlainMember, insertApplicationAt, setupPipeline } from "../../helpers/pipeline";
+import { claimPlainMember, grantPermissions, insertApplicationAt, setupPipeline } from "../../helpers/pipeline";
 
 // F4 change 1 tasks 6.6: T-5, "awaiting my vote" per round, from deliberation. The deck and the
 // count share one definition (awaitingVoteTx), so the map must equal the deck size. The cases
@@ -72,6 +72,27 @@ describe("getAwaitingVoteCounts", () => {
   // Case (g), a deleted application absent from the count, is not ported as a test: nothing sets
   // `application.deleted_at` (F3 change 3 D1) and F3 change 4 drops the column, so no new read
   // names it (design Risks).
+
+  // Copilot round on PR #54: Start's acknowledgement needs an explicit 0 to tell "nothing
+  // awaits" from "the count was refused", so the two must differ in the map.
+  it("an eligible voter with nothing awaiting gets an explicit 0, and a voter stripped of `vote` gets no entry", async () => {
+    const { s, voter } = await fixture();
+    const app = await insertApplicationAt(s, "new");
+    await castVote(voter.context, { roundId: s.roundId, applicationId: app.id, value: "good" });
+    const rated = await getAwaitingVoteCounts(voter.context);
+    expect(rated.has(s.roundId)).toBe(true);
+    expect(rated.get(s.roundId)).toBe(0);
+
+    // Positive control: the same voter with an application awaiting is counted, so the empty map
+    // below comes from the missing permission and not from an empty round.
+    await insertApplicationAt(s, "new");
+    expect((await getAwaitingVoteCounts(voter.context)).get(s.roundId)).toBe(1);
+
+    await grantPermissions(s.hh, voter.accountId, []);
+    const refused = await getAwaitingVoteCounts(voter.context);
+    expect(refused.has(s.roundId)).toBe(false);
+    expect(refused.size).toBe(0);
+  });
 
   it("a round without the viewer's participation is absent from the map", async () => {
     const { s, voter } = await fixture();

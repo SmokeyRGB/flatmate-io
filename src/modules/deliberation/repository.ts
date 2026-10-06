@@ -150,8 +150,9 @@ async function awaitingVoteTx(
 }
 
 // T-5 per open round the viewer may vote in. A profile-less context gets an empty map with no
-// query (start spec, "No application-derived number for the household account"). A round missing
-// from the map counts 0. Matrix row „Vote abgeben / ändern": the stored `vote` permission is
+// query (start spec, "No application-derived number for the household account"). Every open round
+// the viewer may vote in has an entry, 0 when nothing awaits; a round with NO entry is unknown (the
+// caller was refused), which only the acknowledgement treats differently from 0. Matrix row „Vote abgeben / ändern": the stored `vote` permission is
 // checked first inside this transaction (F3 change 2b, design D11); a caller that does not hold it
 // gets the same empty map as the household account, not an error.
 export async function getAwaitingVoteCounts(context: SessionContext): Promise<Map<string, number>> {
@@ -168,6 +169,9 @@ export async function getAwaitingVoteCounts(context: SessionContext): Promise<Ma
     }
     const rounds = (await listVoterRoundsTx(tx, context)).filter((r) => r.status === "open");
     if (rounds.length === 0) return counts;
+    // An explicit 0 for every open round the viewer may vote in: "nothing awaiting" is then told
+    // apart from "no answer" (refused above), which has no entry at all.
+    for (const r of rounds) counts.set(r.roundId, 0);
     const awaiting = await awaitingVoteTx(
       tx,
       context,
@@ -339,44 +343,52 @@ export async function getRanking(context: SessionContext, roundId: string | null
     const rules = parseRoundRules(round.settingsSnapshot);
     if (rules === null) return { kind: "refused", reason: "rules_invalid" };
 
+    // ORDER IS THE CONSISTENCY ARGUMENT (Copilot round on PR #54; no stricter isolation level,
+    // since REPEATABLE READ would turn assertHasPermissionTx's FOR SHARE on the membership row
+    // into a 40001 whenever a concurrent move-out updates it). Step 1: ONE statement reads every
+    // non-withdrawn `invite` vote of the round, scoped by household and round only. Step 2: the
+    // candidates, with their state, are read AFTER it. A row is revealed only if its state, read
+    // in step 2, is no longer new/screened. Every vote in the result was committed before that
+    // read, and no vote can be cast on an invited application (`vote_guard`), so a revealed row
+    // never carries a vote cast after the viewer could have been anchored by it. A vote committed
+    // between the two reads is simply absent: conservative, never a leak. Reveal (the viewer's own
+    // votes) and scoring (the counted votes) both come from this one vote statement, so a
+    // castVote committing mid-read cannot show a row without its new vote or the reverse.
+    const allVotes = await tx
+      .select({
+        applicationId: vote.applicationId,
+        residentProfileId: vote.residentProfileId,
+        value: vote.value,
+      })
+      .from(vote)
+      .where(
+        and(
+          eq(vote.householdId, context.householdId),
+          eq(vote.roundId, round.roundId),
+          eq(vote.stage, "invite"),
+          isNull(vote.withdrawnAt),
+        ),
+      );
+
     const candidates = await listVoteCandidatesTx(tx, context, [round.roundId], { scope: "board", fields: "names" });
 
-    // Steps 3 and 6 are separate statements under READ COMMITTED, so a move-out of the viewer
-    // committing in between makes the port return null: refused, never thrown. An empty set cannot
-    // reach here (the port returns null when the viewer is not in it), so a zero denominator is
-    // this same refusal (EC-5.7), never `rules_invalid`.
+    // The candidate and tally reads are separate statements under READ COMMITTED, so a move-out of
+    // the viewer committing in between makes the port return null: refused, never thrown. An empty
+    // set cannot reach here (the port returns null when the viewer is not in it), so a zero
+    // denominator is this same refusal (EC-5.7), never `rules_invalid`.
     const basis = await getRoundTallyBasisTx(tx, context, round.roundId);
     if (basis === null) return { kind: "refused", reason: "not_eligible" };
     const counted = new Set(basis.countedVoterIds);
     const denominator = basis.countedVoterIds.length;
 
-    // ONE statement reads every vote of the round's `invite` stage on these candidates. From it:
-    // the viewer's own votes (what reveals a row) and the counted votes (what scores).
-    const votes =
-      candidates.length === 0
-        ? []
-        : await tx
-            .select({
-              applicationId: vote.applicationId,
-              residentProfileId: vote.residentProfileId,
-              value: vote.value,
-            })
-            .from(vote)
-            .where(
-              and(
-                eq(vote.householdId, context.householdId),
-                eq(vote.roundId, round.roundId),
-                eq(vote.stage, "invite"),
-                isNull(vote.withdrawnAt),
-                inArray(
-                  vote.applicationId,
-                  candidates.map((c) => c.applicationId),
-                ),
-              ),
-            );
+    // Only votes on the port's candidates may reach the result: nothing about another application
+    // (the viewer's own included, V-1) can be counted, revealed or listed. A vote counts only if
+    // its voter is in the tally basis' set, so numerator <= denominator always holds.
+    const candidateIds = new Set(candidates.map((c) => c.applicationId));
     const ownVoted = new Set<string>();
     const countedValues = new Map<string, VoteValue[]>();
-    for (const v of votes) {
+    for (const v of allVotes) {
+      if (!candidateIds.has(v.applicationId)) continue;
       if (v.residentProfileId === viewerId) ownVoted.add(v.applicationId);
       if (counted.has(v.residentProfileId)) {
         const list = countedValues.get(v.applicationId) ?? [];
@@ -404,15 +416,18 @@ export async function getRanking(context: SessionContext, roundId: string | null
     // order. Each group is ranked on its own: the highlight slots (Q-15) go to the decided group
     // only, and an invited row never takes one (N = 0 there).
     const byId = new Map(visible.map((c) => [c.applicationId, c]));
+    const orderOf = new Map(candidates.map((c, i) => [c.applicationId, i]));
     const rankGroup = (group: typeof visible, slots: number): RankedGroup => {
       const ranked = computeRanking({
         weights: rules.weights,
         quorumShare: rules.quorumShare,
         denominator,
         openRoomCount: slots,
+        // `order` is the candidate's position in the port's full-precision (created_at, id) order;
+        // `createdAt` is a millisecond Date and cannot tell two applications of one millisecond apart.
         candidates: group.map((c) => ({
           id: c.applicationId,
-          createdAt: c.createdAt,
+          order: orderOf.get(c.applicationId)!,
           values: countedValues.get(c.applicationId) ?? [],
         })),
       });

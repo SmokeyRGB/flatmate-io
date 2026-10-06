@@ -132,13 +132,15 @@ export function buildDashboardView(
       const { roundId, stateCounts } = overview.standing;
       // Design D11: acknowledged when the viewer may vote in the standing round, something in it
       // is open for voting, and nothing awaits them. "Awaits" is deliberation's one count; the
-      // standing counts exclude the viewer's own application already.
+      // standing counts exclude the viewer's own application already. Only an EXPLICIT 0 counts:
+      // a round with no entry is a count the viewer was refused (the `vote` permission is gone),
+      // which is unknown, never zero, so nobody is congratulated on it.
       const openForVoting = (stateCounts.new ?? 0) + (stateCounts.screened ?? 0) > 0;
       const mayVote = overview.openRounds.some((r) => r.roundId === roundId && r.canVote);
       standing = {
         kind: "phase",
         waiting: phaseOf(stateCounts) === "waiting_for_applications",
-        allRated: mayVote && openForVoting && (awaitingVotes.get(roundId) ?? 0) === 0,
+        allRated: mayVote && openForVoting && awaitingVotes.get(roundId) === 0,
         distribution: distributionOf(stateCounts).map((d) => ({
           label: de.start.distribution[d.bucket](d.count),
           count: d.count,

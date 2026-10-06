@@ -10,11 +10,11 @@ import type { VoteValue } from "@/modules/deliberation/vote-values";
 
 const DEFAULT_WEIGHTS: ScaleWeights = { no: 0, rather_not: 1, good: 3, definitely: 5 };
 
-// Dates are built from a base so a test can say "applied first" with a small number.
-const at = (n: number) => new Date(Date.UTC(2026, 9, 1, 12, 0, 0) + n * 60_000);
-const cand = (id: string, created: number, ...values: VoteValue[]): RankingCandidate => ({
+// `order` is the candidate's position in the port's full-precision (created_at, id) order, so a
+// test says "applied first" with a small number.
+const cand = (id: string, order: number, ...values: VoteValue[]): RankingCandidate => ({
   id,
-  createdAt: at(created),
+  order,
   values,
 });
 
@@ -160,8 +160,8 @@ describe("order (FR-5.11 .. FR-5.13, C-5.7, C-5.8)", () => {
     expect(ids(scored)).toEqual(["b", "a"]);
   });
 
-  it("AC-5.14 / key 7: identical on keys 1-6, the id decides, on every read", () => {
-    const input = [cand("c", 1, "good", "good"), cand("a", 1, "good", "good"), cand("b", 1, "good", "good")];
+  it("AC-5.14 / keys 6+7: identical on keys 1-5, the port's order decides, on every read", () => {
+    const input = [cand("c", 3, "good", "good"), cand("a", 1, "good", "good"), cand("b", 2, "good", "good")];
     expect(ids(run(input, { denominator: 2 }).scored)).toEqual(["a", "b", "c"]);
     expect(ids(run([...input].reverse(), { denominator: 2 }).scored)).toEqual(["a", "b", "c"]);
   });
@@ -185,10 +185,20 @@ describe("order (FR-5.11 .. FR-5.13, C-5.7, C-5.8)", () => {
   });
 });
 
+describe("sub-millisecond creation order (Copilot round on PR #54)", () => {
+  it("two candidates of one millisecond, ids in the 'wrong' order, follow `order`, scored and unscored", () => {
+    // "z" sorts after "a" by id and is the same millisecond; only the port's `order` puts it first.
+    const scoredRun = run([cand("a", 2, "good", "good"), cand("z", 1, "good", "good")], { denominator: 2 });
+    expect(ids(scoredRun.scored)).toEqual(["z", "a"]);
+    const pendingRun = run([cand("a", 2), cand("z", 1)], { denominator: 4 });
+    expect(ids(pendingRun.unscored)).toEqual(["z", "a"]);
+  });
+});
+
 describe("unscored rows (Q-3, EC-5.2, EC-5.3)", () => {
-  it("are ordered oldest first, then by id, never by anything vote-derived", () => {
+  it("are ordered by the port's order (oldest first), never by anything vote-derived", () => {
     const { scored, unscored } = run(
-      [cand("z", 1), cand("y", 3, "good"), cand("b", 2), cand("a", 2, "no")],
+      [cand("z", 1), cand("y", 4, "good"), cand("b", 3), cand("a", 2, "no")],
       { denominator: 4 }, // needs 2
     );
     expect(scored).toHaveLength(0);

@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { withSessionContext, type SessionContext } from "@/db/session-context";
 import {
@@ -29,6 +29,7 @@ import {
   insertApplicationAt,
   type PipelineSetup,
 } from "../../helpers/pipeline";
+import { uuid } from "../../helpers/uuid";
 import { addParticipation, rawVoteInsertSql, setRoundStatus } from "../../helpers/votes";
 
 // F5 change 1 (ranking), group 6: getRanking, the scoreboard's visibility-enforcing read.
@@ -342,6 +343,8 @@ describe("getRanking: the viewer's own application does not exist (V-1)", () => 
       ...idsOf(ranking.hidden),
     ];
     expect(all, label).not.toContain(own.id);
+    // Nothing about another application reaches the result: neither its id (in any field) nor its name.
+    expect(JSON.stringify(ranking), label).not.toContain(own.id);
     expect(JSON.stringify(ranking), label).not.toContain(own.applicantName);
     // It takes no highlight slot: the one open room goes to the control row.
     expect(ranking.decided.scored.map((r) => [r.applicationId, r.leading]), label).toEqual([[control.id, true]]);
@@ -365,6 +368,57 @@ describe("getRanking: the viewer's own application does not exist (V-1)", () => 
       [own.id, 100, true],
       [control.id, 60, false],
     ]);
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+// Copilot round on PR #54, finding 1 (read order). getRanking reads the round's votes in ONE
+// statement BEFORE it reads the candidates and their state. The interleaving the order defends
+// against (a moderator reverses an invitation and another resident votes between two reads) cannot
+// be forced deterministically from a test, so there is deliberately no regression test for it:
+// the order in getRanking (votes, then candidates, then the tally basis) is an INVARIANT GUARD,
+// and the positive controls it must not disturb are the reveal cases above (AC-5.17, R-8) and the
+// V-1 case, which also asserts that no id of an application outside the candidates reaches the
+// result. Reading the candidates first again would not turn any test here red.
+
+// ---------------------------------------------------------------------------------------------
+describe("getRanking: creation order below the millisecond (Copilot round on PR #54, finding 3)", () => {
+  let s: PipelineSetup;
+  let viewer: Awaited<ReturnType<typeof claimPlainMember>>;
+  beforeAll(async () => {
+    s = await sharedPipeline();
+    viewer = await claimPlainMember(s.hh, "Mikrosekunde", accountIds);
+    await patchSnapshot(s, { hideResultsUntilVoted: false });
+  });
+
+  // Two applications whose created_at differ by 800 microseconds inside ONE millisecond (a JS Date
+  // reads both as the same instant); the LATER one has the smaller id, so a re-sort by
+  // (Date, id) would put it first.
+  async function microPair(millisecond: number) {
+    const [small, large] = [uuid(), uuid()].sort();
+    const stamp = (micros: number) =>
+      sql`('2026-10-01 12:00:00+00'::timestamptz + ${millisecond}::int * interval '1 millisecond' + ${micros}::int * interval '1 microsecond')` as unknown as Date;
+    const earlier = await insertApplicationAt(s, "new", { id: large, createdAt: stamp(100) });
+    const later = await insertApplicationAt(s, "new", { id: small, createdAt: stamp(900) });
+    expect(later.id < earlier.id).toBe(true);
+    return { earlier: earlier.id, later: later.id };
+  }
+
+  it("two unscored rows of one millisecond keep the port's order: the earlier application first", async () => {
+    const pair = await microPair(1);
+    const ranking = await board(viewer.context, s.roundId);
+    const ours = idsOf(ranking.decided.unscored).filter((id) => id === pair.earlier || id === pair.later);
+    expect(ours).toEqual([pair.earlier, pair.later]);
+  });
+
+  it("two equally scored rows of one millisecond keep the port's order too", async () => {
+    const pair = await microPair(2);
+    await cast(s, s.moderator.context, pair.earlier, "good");
+    await cast(s, s.moderator.context, pair.later, "good");
+    const ranking = await board(viewer.context, s.roundId);
+    const scored = ranking.decided.scored.filter((r) => r.applicationId === pair.earlier || r.applicationId === pair.later);
+    expect(scored.map((r) => r.score)).toEqual([60, 60]);
+    expect(idsOf(scored)).toEqual([pair.earlier, pair.later]);
   });
 });
 

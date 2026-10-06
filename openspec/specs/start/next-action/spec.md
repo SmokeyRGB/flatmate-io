@@ -223,7 +223,9 @@ When the resident may vote in an open round, that round still has applications o
 SHALL lead the standing with a short acknowledgement that the resident has rated every
 application, worded about the resident's own part and never about an applicant. It SHALL not
 appear in any other empty state: not when the round has no application open for voting, not when
-the resident does not take part, and not for the household account. Sources: `screens/B-start.md`
+the resident does not take part, and not for the household account. An awaiting count the viewer
+was refused (no entry for the round, as when the stored `vote` permission was removed) counts as
+unknown, never as zero: only an explicit 0 is acknowledged. Sources: `screens/B-start.md`
 B1 (*„Entschieden (2026-09-15): der Moment nach der letzten eigenen Stimme wird anerkannt, nicht
 nur gemeldet."*), P-O-04 (wording open), human decision 2026-10-06.
 
@@ -240,4 +242,9 @@ nur gemeldet."*), P-O-04 (wording open), human decision 2026-10-06.
 #### Scenario: Something still waits
 - **WHEN** an application still awaits the resident's vote
 - **THEN** the vote task is shown, and no acknowledgement
+
+#### Scenario: The awaiting count was refused
+- **WHEN** the round is open for voting but the viewer's awaiting count for it is unknown (the
+  stored `vote` permission was removed, so the count carries no entry for the round)
+- **THEN** no acknowledgement is shown, only the standing
 

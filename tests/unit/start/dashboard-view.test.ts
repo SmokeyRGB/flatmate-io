@@ -29,6 +29,11 @@ function build(o: StartOverview, organisationTaskCount = 0, organisation = false
   return buildDashboardView(o, awaiting(o, counts), organisationTaskCount, { organisation }, now);
 }
 
+// A map WITHOUT the round's entry: what getAwaitingVoteCounts returns to a caller it refused.
+function buildWithoutEntry(o: StartOverview) {
+  return buildDashboardView(o, new Map(), 0, { organisation: false }, NOW);
+}
+
 describe("buildDashboardView (start-screen design.md Decision 10, tasks.md 7.4)", () => {
   it("one T-5 -> primary, no rows", () => {
     const view = build(overview({ openRounds: [round({})], anyOpenRound: true }));
@@ -177,6 +182,12 @@ describe("buildDashboardView (start-screen design.md Decision 10, tasks.md 7.4)"
       const view = build(standingOf({ new: 2 }), 0, false, NOW, { r1: 2 });
       expect(view.primary).not.toBeNull();
       expect(view.standing).toBeNull();
+    });
+
+    it("no entry for the round (vote permission refused): unknown, not zero, so no acknowledgement", () => {
+      const view = buildWithoutEntry(standingOf({ new: 2, screened: 1 }));
+      expect(view.primary).toBeNull();
+      expect(view.standing).toMatchObject({ kind: "phase", allRated: false });
     });
 
     it("a viewer who may not vote is not congratulated", () => {

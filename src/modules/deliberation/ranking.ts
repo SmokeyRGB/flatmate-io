@@ -16,7 +16,10 @@ import { pow10, toCommonScale, toScaled, type Scaled, type ScaleWeights } from "
 
 export interface RankingCandidate {
   id: string;
-  createdAt: Date;
+  // The candidate's position in the port's full-precision (created_at, id) order: the combined
+  // keys 6 and 7. A JS Date keeps milliseconds only, so two applications of one millisecond
+  // could swap if this were re-derived from a Date and an id.
+  order: number;
   // The counted votes' values, one entry per counted vote.
   values: VoteValue[];
 }
@@ -58,7 +61,7 @@ interface Keyed {
   id: string;
   // Constant 0 in this release (no veto exists), kept as key 1 so the comparator never changes shape.
   veto: number;
-  createdAt: number;
+  order: number;
   n: number;
   score: number;
   definitely: number;
@@ -86,7 +89,7 @@ export function computeRanking(input: RankingInput): { scored: RankedEntry[]; un
   const two = BigInt(2);
 
   const ranked: Keyed[] = [];
-  const pending: { id: string; createdAt: number; n: number }[] = [];
+  const pending: { id: string; order: number; n: number }[] = [];
 
   for (const c of candidates) {
     const n = c.values.length;
@@ -102,9 +105,9 @@ export function computeRanking(input: RankingInput): { scored: RankedEntry[]; un
       const bigN = BigInt(n);
       // round_half_up(mean / max * 100), exactly: floor((2 * sum * 100 + n * max) / (2 * n * max)).
       const score = Number((two * sum * hundred + bigN * max) / (two * bigN * max));
-      ranked.push({ id: c.id, veto: 0, createdAt: c.createdAt.getTime(), n, score, definitely, no });
+      ranked.push({ id: c.id, veto: 0, order: c.order, n, score, definitely, no });
     } else {
-      pending.push({ id: c.id, createdAt: c.createdAt.getTime(), n });
+      pending.push({ id: c.id, order: c.order, n });
     }
   }
 
@@ -116,20 +119,16 @@ export function computeRanking(input: RankingInput): { scored: RankedEntry[]; un
       b.definitely - a.definitely || //   3. more "Must have" wins
       a.no - b.no || //                   4. fewer "No" wins
       b.n - a.n || //                     5. broader vote base wins
-      a.createdAt - b.createdAt || //     6. who applied first
-      compareIds(a.id, b.id), //          7. determinism anchor
+      a.order - b.order, //               6+7. who applied first, then the determinism anchor: the
+      //                                       port's full-precision (created_at, id) order
   );
 
   // Below quorum: oldest application first, never by anything vote-derived (Q-3, F-9).
-  pending.sort((a, b) => a.createdAt - b.createdAt || compareIds(a.id, b.id));
+  pending.sort((a, b) => a.order - b.order);
 
   const slots = Math.max(0, Math.min(openRoomCount, ranked.length));
   return {
     scored: ranked.map((r, i) => ({ id: r.id, score: r.score, n: r.n, leading: i < slots })),
     unscored: pending.map((p) => ({ id: p.id, n: p.n, needed })),
   };
-}
-
-function compareIds(a: string, b: string): number {
-  return a < b ? -1 : a > b ? 1 : 0;
 }
