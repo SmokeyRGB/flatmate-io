@@ -32,6 +32,7 @@ import { randomBytes } from "node:crypto";
 import { claimResidentProfile, registerHousehold } from "@/modules/identity/auth";
 import {
   createResidentProfile,
+  getHouseholdSignInCode,
   issueJoinCode,
   listJoinCodeIssuances,
   setMemberRole,
@@ -115,8 +116,10 @@ async function main() {
   console.log("Sign in as administration (tab: Household):");
   console.log(`  Email:    ${DEMO_EMAIL}`);
   console.log(`  Password: ${PASSWORD}\n`);
+  // household-sign-in-code: the resident tab takes the WG-Kennung, never the internal id.
+  const signInCode = await getHouseholdSignInCode(context);
   console.log("Sign in as a resident (tab: Resident):");
-  console.log(`  WG-Kennung: ${household.signInCode}`);
+  console.log(`  WG-Kennung: ${signInCode}`);
   console.log("  Name:       Alex   (moderator)");
   console.log("  Name:       Sam    (plain resident, the presenter)");
   console.log("  Name:       Kim    (plain resident)");
@@ -131,7 +134,7 @@ async function main() {
   console.log("What to show:");
   console.log("  1. Sign in as Sam: Start shows the applications waiting, and Casting opens the pass.");
   console.log("  2. Rate every card. The scoreboard then shows rings in order, two highlighted rows,");
-  console.log('     one row without a score at the bottom of "Punktwert", and the invited one under "Eingeladen".');
+  console.log('     one row without a score at the bottom of "Score", and the invited one under "Eingeladen".');
   console.log('  3. Tap "(?)" for the weights, the formula and the quorum rule.');
   console.log("  4. Claim Robin through the bound link below, rate, and look again: the same three");
   console.log("     groups remain (quorum is now 3).\n");
