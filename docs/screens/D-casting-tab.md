@@ -14,17 +14,27 @@
 
 **Kernelemente**
 
-- **Eine** Rangliste (Menschenentscheidung Q-3, 2026-10-05; vormals: sortierbare Rangliste plus ein
-  getrennter Abschnitt „Warten auf Stimmen"):
-  - Zeilen mit Quorum zuerst, jede mit einem **Kreis-Fortschrittsring** (Score in der Mitte) und
-    „aus x Stimmen"; kein Rangplatz, keine Verteilung (die steht in D2, Q-10).
-  - Die ersten N Zeilen, N = Zahl der offenen Zimmer der Runde, tragen eine leise, langsam
-    wandernde Hervorhebung (R-6/Q-15); bei reduzierter Bewegung eine statische Tönung.
-  - Zeilen unter Quorum **unten**, älteste Bewerbung zuerst, ohne Score und ohne Ring, mit dem
-    Hinweis, der die echte Schwelle nennt („Noch kein Punktwert — für ein faires Bild braucht es
-    mindestens {n} Stimmen (bisher {k}).").
-  - Verdeckte Zeilen **grau darunter**, mit durchgestrichenem Auge (eye-off) und dem einen Hinweis
-    „Verdeckt — du hast hier nicht abgestimmt" (R-7).
+- **Drei Gruppen** auf einer Rangliste (Menschenentscheidung Q-3, 2026-10-05, und Rundgang
+  2026-10-06; vormals: eine Liste mit einem Etikett „Eingeladen" je Zeile). Eine Gruppe ohne Zeile
+  erscheint nicht; der leere Zustand nur, wenn alle drei leer sind:
+  - **„Punktwert"** (Bewerbungen `new`/`screened`): Zeilen mit Quorum zuerst, jede mit einem
+    **Kreis-Fortschrittsring** (Score in der Mitte) und „aus x Stimmen"; kein Rangplatz, keine
+    Verteilung (die steht in D2, Q-10).
+    - Die ersten N Zeilen **dieser Gruppe**, N = Zahl der offenen Zimmer der Runde, tragen eine
+      leise, langsam wandernde Hervorhebung (R-6/Q-15); bei reduzierter Bewegung eine statische
+      Tönung. In den anderen Gruppen gibt es keine Hervorhebung.
+    - Zeilen unter Quorum **unten**, älteste Bewerbung zuerst, ohne Score und ohne Ring, mit dem
+      Hinweis, der die echte Schwelle nennt („Noch kein Punktwert — für ein faires Bild braucht es
+      mindestens {n} Stimmen (bisher {k}).").
+  - **„Eingeladen"** (Bewerbungen `invited`, Menschenentscheidung 2026-10-06): dieselbe Zeile mit
+    Ring, aber ohne Hervorhebung. Wer eingeladen ist, wird nicht mehr entschieden. Die Gruppe kann
+    später ein eigener Reiter werden (siehe die Idee „Casting-Tab nach Stufe unterteilt" im
+    Register).
+  - **„Verdeckt"**: Zeilen **grau darunter**, mit durchgestrichenem Auge (eye-off) und dem einen
+    Hinweis „Verdeckt — du hast hier nicht abgestimmt" (R-7, neu gefasst 2026-10-06): verdeckt sind
+    nur noch Bewerbungen in `new`/`screened`, auf die die Person nicht abgestimmt hat. Hat eine
+    Bewerbung diese Zustände verlassen, sieht jede teilnehmende Person ihr Ergebnis; eine pausierte
+    Runde deckt nichts auf.
   - Ein bildschirmweites „(?)" nennt die eingefrorenen Gewichte, die Formel und die
     Quorum-Regel mit den echten Zahlen (P-3).
   - *Sortierumschalter (FR-5.14) und die Markierung „seit deiner Stimme geändert" folgen mit F5

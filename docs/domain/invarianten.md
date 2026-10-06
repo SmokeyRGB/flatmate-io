@@ -267,6 +267,7 @@ can_see_results(session, application, stage) :=
   ∧ (
       ¬ settings_of(round).hide_results_until_voted          // Einstellung aus
       ∨ ¬ is_round_voter(session, round_of(application))     // wer nie Stimmberechtigter der Runde ist, wartet nicht
+      ∨ application.state ∉ { new, screened }               // niemand kann mehr abstimmen: nichts mehr zu schützen
       ∨ ∃ v ∈ Vote : v.application_id = application.id
             ∧ v.stage = stage
             ∧ v.resident_profile_id = session.profile_id
@@ -289,7 +290,19 @@ Drei Details, die leicht falsch laufen:
    nicht mehr `new`/`screened`) — und damit „abstimmen, dann sehen" umgangen. Diese Zeilen bleiben
    verdeckt („Verdeckt — du hast hier nicht abgestimmt"). Die Ausnahme behält ihren Zweck: wer
    überhaupt kein Stimmberechtigter der Runde ist. In v0.1 sieht eine solche Sitzung keine Rangliste
-   (V-2), die Ausnahme greift dort noch nicht. Dasselbe gilt für ehemalige Mitglieder, sofern sie
+   (V-2), die Ausnahme greift dort noch nicht.
+   *(Menschenentscheidung 2026-10-06, ersetzt den Satz „Diese Zeilen bleiben verdeckt" für
+   Bewerbungen, die `new`/`screened` verlassen haben:)* Die Verdeckung schützt vor Anker- und
+   Bandwagon-Effekten auf eine Stimme, die noch abzugeben ist. Hat die Bewerbung `new`/`screened`
+   verlassen, verweigert `vote_guard` jede Stimme darauf, und es gibt nichts mehr zu schützen:
+   das Ergebnis ist **allen** Teilnehmenden der Runde sichtbar, auch wer nicht abgestimmt hat. Eine
+   **pausierte** Runde zählt nicht als abgeschlossen, denn die Abstimmung läuft danach weiter; ihre
+   `new`/`screened`-Bewerbungen bleiben für alle verdeckt, die nicht darauf abgestimmt haben.
+   Der Zustand `screened` gilt in v0.1 als Teil dieser noch offenen Abstimmung. V-1 und V-2 bleiben
+   unberührt: die eigene Bewerbung fehlt weiterhin, und wer nicht Teilnehmender ist, sieht nichts.
+   Offenes Risiko: eine zurückgenommene Einladung (P-4) öffnet die Abstimmung wieder, nachdem das
+   Ergebnis sichtbar war (Register in `review-log.md`).
+   Für ehemalige Mitglieder gilt dasselbe wie für Nicht-Teilnehmende, sofern sie
    überhaupt noch Zugriff hätten (haben sie nach V-3 nicht).
 2. **`stage`-Granularität.** Wer in Runde 1 abgestimmt hat, hat damit **nicht** die Ergebnisse von
    Runde 2 freigeschaltet. Die Prüfung läuft pro `stage`, nicht pro Bewerbung.

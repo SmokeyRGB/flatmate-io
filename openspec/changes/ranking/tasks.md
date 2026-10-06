@@ -470,7 +470,7 @@ reason codes, not only lengths.
 
 ## 10. Walkthrough changes (human, 2026-10-06; design D10, D11). Run before 9.1's re-run.
 
-- [ ] 10.1 Docs, one commit (German where the file is German):
+- [x] 10.1 Docs, one commit (German where the file is German):
   - `docs/domain/invarianten.md` §5.4: results are revealed to every participant once the
     application has left `new`/`screened` (nobody can vote any more); a paused round reveals
     nothing. This replaces the R-7 wording of task 1.4 („bleiben verdeckt"), dated, human decision
