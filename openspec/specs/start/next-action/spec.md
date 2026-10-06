@@ -196,7 +196,10 @@ organisation tasks the viewer can carry out. When there are none, it SHALL say t
 taken care of. A resident who may not act on organisation tasks SHALL not see it at all. Only work
 that moves the casting process forward counts as an organisation task. For a viewer who holds the
 permission that creating a round requires (`manage_rounds`), the task list SHALL be exactly one
-"open the first round" task, and no room tasks, while the household has no round of any status.
+"open the first round" task, and no room tasks, while the household has no round of any status,
+provided a first round can be held: the household has no undeleted room yet, or at least one
+undeleted room is neither occupied nor not available. When rooms exist but none can be cast for,
+the list SHALL be empty.
 Once the household has any round, the list SHALL hold one task per room that is open for letting,
 not deleted, and not covered by any draft, open or paused round. For a viewer without that
 permission the list SHALL be empty. The bridge heading counts the tasks; when the first-round task
@@ -208,6 +211,10 @@ persönliche Liste gemischt"*), U-5; `screens/O-organisation.md` rules 1–3.
 #### Scenario: A fresh household has one first-round task
 - **WHEN** a moderator views Start and the household has no round of any status
 - **THEN** the task list is exactly one first-round task, with no room tasks, the bridge counts one, and its body is the organisation tab's first-round text
+
+#### Scenario: No round and no room a round can be held for gives no first-round task
+- **WHEN** a moderator views Start, the household has no round of any status, and every undeleted room is occupied or not available
+- **THEN** the task list is empty, since the new-round form would refuse every room
 
 #### Scenario: A free room with no round covering it
 - **WHEN** a moderator views Start, the household already has a round, and an open, undeleted room is covered by no draft, open or paused round
