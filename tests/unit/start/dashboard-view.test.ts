@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { buildDashboardView, pendingVoteCount, shouldOpenScreening, standingHeadingOf } from "@/app/(resident)/dashboard/dashboard-view";
 import { de } from "@/ui/strings";
-import type { StartOpenRound, StartOverview } from "@/modules/casting/repository";
+import type { OrganisationTask, StartOpenRound, StartOverview } from "@/modules/casting/repository";
 
 const NOW = new Date("2026-10-01T12:00:00Z");
 
@@ -25,13 +25,28 @@ function awaiting(o: StartOverview, counts: Record<string, number> = {}): Map<st
   return new Map(o.openRounds.map((r) => [r.roundId, counts[r.roundId] ?? 3]));
 }
 
-function build(o: StartOverview, organisationTaskCount = 0, organisation = false, now = NOW, counts = {}) {
-  return buildDashboardView(o, awaiting(o, counts), organisationTaskCount, { organisation }, now);
+// A number stands for that many room tasks; a list is passed through as given.
+function build(
+  o: StartOverview,
+  organisationTasks: number | OrganisationTask[] = 0,
+  organisation = false,
+  now = NOW,
+  counts = {},
+) {
+  const tasks: OrganisationTask[] =
+    typeof organisationTasks === "number"
+      ? Array.from({ length: organisationTasks }, (_, i) => ({
+          kind: "open_round_for_room" as const,
+          roomId: `room-${i}`,
+          label: `Room ${i}`,
+        }))
+      : organisationTasks;
+  return buildDashboardView(o, awaiting(o, counts), tasks, { organisation }, now);
 }
 
 // A map WITHOUT the round's entry: what getAwaitingVoteCounts returns to a caller it refused.
 function buildWithoutEntry(o: StartOverview) {
-  return buildDashboardView(o, new Map(), 0, { organisation: false }, NOW);
+  return buildDashboardView(o, new Map(), [], { organisation: false }, NOW);
 }
 
 describe("buildDashboardView (start-screen design.md Decision 10, tasks.md 7.4)", () => {
@@ -205,6 +220,14 @@ describe("buildDashboardView (start-screen design.md Decision 10, tasks.md 7.4)"
 
     const two = build(overview({}), 2, true);
     expect(two.bridge?.heading).toBe("2 Sachen warten auf dich");
+    expect(two.bridge?.body).toBe(de.start.bridge.body);
+  });
+
+  it("the first-round task: singular heading and the organisation tab's own body", () => {
+    const view = build(overview({}), [{ kind: "open_first_round" }], true);
+    expect(view.bridge?.heading).toBe(de.start.bridge.headingSingular);
+    expect(view.bridge?.body).toBe(de.org.dashboard.openFirstRoundBody);
+    expect(view.bridge?.body).not.toBe(de.start.bridge.body);
   });
 
   it("an overdue deadline -> the overdue reason", () => {

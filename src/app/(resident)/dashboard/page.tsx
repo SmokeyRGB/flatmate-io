@@ -37,7 +37,7 @@ export default async function DashboardPage({
   const displayName =
     identity.kind === "resident" ? (identity.displayName ?? de.org.identityResidentFallback) : de.org.identityResidentFallback;
   const householdName = household?.name ?? de.org.identityHouseholdFallback;
-  const view = buildDashboardView(overview, awaitingVotes, organisationTasks.length, access, new Date());
+  const view = buildDashboardView(overview, awaitingVotes, organisationTasks, access, new Date());
 
   return (
     <div className="mx-auto max-w-2xl space-y-6 p-6">

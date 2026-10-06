@@ -142,7 +142,7 @@ function renderJoinCodeCard(
 // canManageMembers, the join-link section and the per-profile invitation by canManageJoinCodes,
 // the reset-link controls by canIssueResetLink. No control reads the caller's role; only the
 // badge and the toggle's direction read the LISTED member's role, which describes that member.
-// Leads with the join-code action when no resident exists yet.
+// With no resident yet it leads with the add-resident form, then the join-link section (O16).
 export function MembersView({
   residentList,
   joinCodeIssuances,
@@ -294,8 +294,9 @@ export function MembersView({
         {backLink}
         <h1 className="font-serif text-2xl font-semibold">{t.heading}</h1>
         <p className="text-sm text-muted-foreground">{t.noOneJoinedYet}</p>
-        {joinCodeSection}
+        {/* A link bound to a prepared profile needs that profile first, so the form leads (O16). */}
         {createResidentForm}
+        {joinCodeSection}
       </div>
     );
   }

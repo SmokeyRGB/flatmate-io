@@ -4,12 +4,13 @@ import {
   phaseOf,
   type OpenTask,
 } from "@/modules/casting/task-precedence";
-import type { StartOpenRound, StartOverview } from "@/modules/casting/repository";
+import type { OrganisationTask, StartOpenRound, StartOverview } from "@/modules/casting/repository";
 import { de } from "@/ui/strings";
 
 // start-screen design.md Decision 10/tasks.md 7.4/8.3: B1's pure mapping from `getStartOverview` +
-// `listOrganisationTasks().length` + `now` to a view model — deliberately no counter field
-// (the participation counter left Start, human decision 2026-09-24). Kept out of the page so its
+// `listOrganisationTasks()` + `now` to a view model — deliberately no counter field
+// (the participation counter left Start, human decision 2026-09-24). The heading counts the
+// tasks; the body names the first-round task when that is among them. Kept out of the page so its
 // branches are a unit test, not a rendering test.
 
 export interface DashboardTaskView {
@@ -92,7 +93,7 @@ function taskViewFor(round: StartOpenRound, awaitingVotes: AwaitingVotes, now: D
 export function buildDashboardView(
   overview: StartOverview | null,
   awaitingVotes: AwaitingVotes,
-  organisationTaskCount: number,
+  organisationTasks: OrganisationTask[],
   access: { organisation: boolean },
   now: Date,
 ): DashboardView {
@@ -151,6 +152,12 @@ export function buildDashboardView(
 
   let bridge: DashboardBridgeView | null = null;
   if (access.organisation) {
+    const organisationTaskCount = organisationTasks.length;
+    // The first-round task has its own body: it is the organisation tab's own text, read from the
+    // one place it is defined, so Start and the tab say the same thing.
+    const bodyText = organisationTasks.some((t) => t.kind === "open_first_round")
+      ? de.org.dashboard.openFirstRoundBody
+      : de.start.bridge.body;
     bridge = {
       heading:
         organisationTaskCount === 0
@@ -158,7 +165,7 @@ export function buildDashboardView(
           : organisationTaskCount === 1
             ? de.start.bridge.headingSingular
             : de.start.bridge.headingPlural(organisationTaskCount),
-      body: organisationTaskCount === 0 ? "" : de.start.bridge.body,
+      body: organisationTaskCount === 0 ? "" : bodyText,
       buttonHref: "/organization",
     };
   }

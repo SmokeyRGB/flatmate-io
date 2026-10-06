@@ -1,7 +1,7 @@
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { listRoundsForSession } from "@/modules/casting/repository";
+import { listOrganisationTasks, listRoundsForSession } from "@/modules/casting/repository";
 import {
   assertHasPermission,
   getNavigationAccess,
@@ -45,9 +45,16 @@ export default async function OrganizationPage({
   // account's old `profileId === null` shortcut is gone: it holds these permissions or it does not.
   const access = await getNavigationAccess(current.context);
 
+  // The first-round card comes from the same task list Start's bridge counts, so the two cannot
+  // disagree: `open_first_round` exists only for a caller holding manage_rounds, in a household
+  // with no round of any status (so it can never show beside an `active` round).
+  const showFirstRoundCard =
+    !active &&
+    (await listOrganisationTasks(current.context)).some((task) => task.kind === "open_first_round");
+
   // Design D13 (application-capture): the household account runs no rounds (03-PRD.md §4.0.1,
-  // S-50/U-20), and neither does anyone without manage_rounds. The way to open one is offered only to
-  // a session that holds it, checked the way rounds/new's own page does.
+  // S-50/U-20), and neither does anyone without manage_rounds. The "open another round" link is
+  // offered only to a session that holds it, checked the way rounds/new's own page does.
   let canOpenRound = false;
   try {
     await assertHasPermission(current.context, current.context.accountId, "manage_rounds");
@@ -81,7 +88,7 @@ export default async function OrganizationPage({
           <span className="badge mt-2">{de.status.round[active.status as keyof typeof de.status.round]}</span>
           <LinkPendingHint />
         </Link>
-      ) : canOpenRound ? (
+      ) : showFirstRoundCard ? (
         // The single most important prompt on this page when nothing else is going on yet —
         // the "banded" featured-card variant (09-Design-System.md), not a quiet one.
         <div className="card card-featured">
