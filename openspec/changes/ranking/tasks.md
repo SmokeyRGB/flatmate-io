@@ -207,7 +207,7 @@
 
 ## 4. Casting ports (design D3)
 
-- [ ] 4.1 `src/modules/casting/repository.ts` `listVoteCandidatesTx`:
+- [x] 4.1 `src/modules/casting/repository.ts` `listVoteCandidatesTx`:
   - the options become `{ scope: "votable" | "board"; fields: "ids" | "names" | "cards" }`, typed
     so that `scope: "board"` with `fields: "cards"` does not compile;
   - the state lists are fixed inside casting: `votable` = `new`/`screened`, `board` =
@@ -220,7 +220,7 @@
     port's `EXISTS` and by 4.2 (DRY, design D3);
   - rewrite the comments that state the old narrowness, around l.55–57, l.76, l.248 and the port's
     header, with design D3's widening justification.
-- [ ] 4.2 In the same file, add `getRoundTallyBasisTx(tx, context, roundId)` per D3:
+- [x] 4.2 In the same file, add `getRoundTallyBasisTx(tx, context, roundId)` per D3:
   - it throws `ProfileRequiredError` when the profile is null, before any query;
   - it returns `null` for a non-UUID;
   - one query reads the counted voters (the shared fragment) and one the open-room count;
@@ -228,25 +228,25 @@
   - otherwise it returns `{ countedVoterIds, openRoomCount }`;
   - every join carries `household_id`;
   - add it to the port comment block.
-- [ ] 4.3 Update every caller of the old `{ withCard }` option:
+- [x] 4.3 Update every caller of the old `{ withCard }` option:
   - the three in `deliberation/repository.ts` (`withCard: false` → `{ scope: "votable", fields:
     "ids" }`, `true` → `"cards"`);
   - `tests/integration/deliberation/screening-pass.test.ts` around l.178, 188, 192, 263, 277;
   - `tests/integration/policy/vote-household-account.test.ts` around l.64.
   The key-set assertion in `screening-pass.test.ts` (around l.265) gains `state`, on purpose. Then
   `grep -rn "withCard" src tests` is empty.
-- [ ] 4.4 Direct port tests:
+- [x] 4.4 Direct port tests:
   - in `screening-pass.test.ts` (or a new `ranking.test.ts` block), call `getRoundTallyBasisTx`
     for a non-participant and expect `null`, and for a participant expect their id among
     `countedVoterIds`. Break: drop the own-result guard; the non-participant case must fail;
   - in `listVoteCandidatesTx`, `scope: "votable"` never returns an `invited` row, and `"board"`
     never returns a `rejected_by_household` or `withdrawn` row. Break: add `invited` to `votable`;
     the deck case must fail.
-- [ ] 4.5 `tests/integration/policy/vote-household-account.test.ts` (registered for G-D15): add
+- [x] 4.5 `tests/integration/policy/vote-household-account.test.ts` (registered for G-D15): add
   `getRoundTallyBasisTx` to "the two casting ports throw ProfileRequiredError", following that
   file's `vi.mock("@/db/session-context")` pattern. Break: move the profile check below the first
   query; the test must fail.
-- [ ] 4.6 `tests/integration/policy/authorization-matrix.test.ts`:
+- [x] 4.6 `tests/integration/policy/authorization-matrix.test.ts`:
   - add `getRoundTallyBasisTx` to the casting port classification (beside `listVoteCandidatesTx`,
     around l.117–125), with its visibility tested in `ranking.test.ts`;
   - extend the "no caller outside casting and deliberation's repository" assertion (around

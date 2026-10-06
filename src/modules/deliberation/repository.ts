@@ -7,6 +7,7 @@ import {
   listVoterRoundsTx,
   type RoundStatus,
   type VoteCandidate,
+  type VoteCandidateOptions,
 } from "@/modules/casting/repository";
 import {
   HouseholdAccountCannotVoteError,
@@ -122,7 +123,7 @@ async function awaitingVoteTx(
   tx: Tx,
   context: SessionContext,
   roundIds: string[],
-  options: { withCard: boolean },
+  options: Extract<VoteCandidateOptions, { scope: "votable" }>,
 ): Promise<VoteCandidate[]> {
   if (context.profileId === null) throw new ProfileRequiredError("awaitingVote");
   const candidates = await listVoteCandidatesTx(tx, context, roundIds, options);
@@ -169,7 +170,7 @@ export async function getAwaitingVoteCounts(context: SessionContext): Promise<Ma
       tx,
       context,
       rounds.map((r) => r.roundId),
-      { withCard: false },
+      { scope: "votable", fields: "ids" },
     );
     for (const c of awaiting) counts.set(c.roundId, (counts.get(c.roundId) ?? 0) + 1);
     return counts;
@@ -213,7 +214,7 @@ export async function getScreeningPass(context: SessionContext, roundId: string 
         tx,
         context,
         open.map((r) => r.roundId),
-        { withCard: false },
+        { scope: "votable", fields: "ids" },
       );
       const withWork = new Set(awaiting.map((c) => c.roundId));
       // `open` is ordered newest first.
@@ -231,7 +232,7 @@ export async function getScreeningPass(context: SessionContext, roundId: string 
     const weights = parseScaleWeights(snapshot?.scaleWeights);
     if (weights === null) return { kind: "refused", reason: "rules_invalid" };
 
-    const awaiting = await awaitingVoteTx(tx, context, [round.roundId], { withCard: true });
+    const awaiting = await awaitingVoteTx(tx, context, [round.roundId], { scope: "votable", fields: "cards" });
     if (awaiting.length === 0) return { kind: "empty" };
     const cards: ScreeningCard[] = awaiting.map((c) => ({
       applicationId: c.applicationId,
