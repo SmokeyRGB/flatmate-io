@@ -119,7 +119,7 @@ async function main() {
   console.log("\nWhat to show:");
   console.log("  1. Sign in as Sam: Start shows the applications waiting, and Casting opens the pass.");
   console.log("  2. Rate every card. The scoreboard shows rings in order, highlighted rows, one row");
-  console.log('     without a score and one greyed row "Verdeckt" (invited).');
+  console.log('     without a score under "Punktwert", and the invited one under "Eingeladen".');
   console.log('  3. Tap "(?)" for the weights, the formula and the quorum rule.\n');
 }
 

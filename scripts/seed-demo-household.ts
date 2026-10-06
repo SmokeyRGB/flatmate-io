@@ -7,7 +7,7 @@
 //
 // The seeded state is the pitch path (F5 change 1, human decision Q-12): sign in as Sam (or claim
 // Robin), rate every card in the pass, and the scoreboard shows scored rows, one unscored row and
-// one hidden `invited` row. See the robustness note above the votes.
+// one `invited` row under its own heading. See the robustness note above the votes.
 //
 // Usage: npm run seed:demo
 //
@@ -131,10 +131,10 @@ async function main() {
   console.log("What to show:");
   console.log("  1. Sign in as Sam: Start shows the applications waiting, and Casting opens the pass.");
   console.log("  2. Rate every card. The scoreboard then shows rings in order, two highlighted rows,");
-  console.log('     one row without a score at the bottom, and one greyed row "Verdeckt" (invited).');
+  console.log('     one row without a score at the bottom of "Punktwert", and the invited one under "Eingeladen".');
   console.log('  3. Tap "(?)" for the weights, the formula and the quorum rule.');
   console.log("  4. Claim Robin through the bound link below, rate, and look again: the same three");
-  console.log("     kinds of row remain (quorum is now 3).\n");
+  console.log("     groups remain (quorum is now 3).\n");
 
   console.log("Join by link (open in a clean browser profile — signed out):");
   console.log(`  Reusable link (5 uses):  ${BASE_URL}/join/${reusableLink.code}`);

@@ -513,7 +513,7 @@ reason codes, not only lengths.
   to rate yet, something still waits) and "no phase name". Breaks: show the acknowledgement without
   the `new`/`screened` condition → "nothing to rate yet" fails; keep `phaseLabel` → "no phase name"
   fails. Check that no other caller relied on `phaseLabel`.
-- [ ] 10.6 `scripts/demo/seed-round.ts`: remove the two `transitionApplication(…, "screened")` calls
+- [x] 10.6 `scripts/demo/seed-round.ts`: remove the two `transitionApplication(…, "screened")` calls
   of applications that stay in the round (around l.112–113); keep `screened` only as the
   pass-through step of the invited application. Update the comment.
 - [ ] 10.7 Re-run `npm run verify` (task 9.1) and report the counts.

@@ -109,8 +109,8 @@ export async function seedDemoRound({ household: context, adminActor, alex, kim,
     applicationIds.push(created.id);
   }
   // Alex is a moderator, so holds change_application_state; the actor comes from the context.
-  await transitionApplication(alexContext, applicationIds[1], "screened");
-  await transitionApplication(alexContext, applicationIds[3], "screened");
+  // Nothing is left in `screened` (human decision 2026-10-06): `screened` is hidden in v0.1 and
+  // only the invited application passes through it, below, as a step on the way to `invited`.
 
   // The other residents' votes, cast through castVote in each voter's own context (the same write
   // path the app uses). Each application gets ZERO or ALL THREE other votes, never one or two: one
@@ -122,10 +122,11 @@ export async function seedDemoRound({ household: context, adminActor, alex, kim,
   //     (five voters), so they are scored either way;
   //   - the sixth carries none: the presenter's single vote stays below quorum 2 or 3, so it is
   //     unscored either way;
-  //   - the seventh carries three other votes, then moves new -> screened -> invited below. The
-  //     presenter never voted on it and now cannot, so it is hidden from them (V-4). For Alex, Kim
-  //     and Jule it is visible, because they did vote on it: their walkthrough checks shared
-  //     scores only.
+  //   - the seventh carries three other votes, then moves new -> screened -> invited below. Nobody
+  //     can vote on it any more, so every participant sees it, scored, under "Eingeladen" and
+  //     never highlighted (design D10). The presenter's pass holds only the six `new` cards, so
+  //     after rating them the board has no hidden row: "Verdeckt" appears only for a candidate
+  //     still open for voting that the viewer has not rated (e.g. in a paused round).
   const voters = [alex.context, kim.context, jule.context];
   const votesByApplication: Record<number, [VoteValue, VoteValue, VoteValue] | null> = {
     0: ["definitely", "good", "definitely"],
