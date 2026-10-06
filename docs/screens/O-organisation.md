@@ -185,10 +185,10 @@ Prozess vs. Person, nicht bei „beschreibend vs. empfehlend".
 **Kernelemente**
 
 - „Als eingeladen markieren" → `status: new → screened → invited`
-- **Copy-Paste-Text mit Datenschutzhinweis** wird erzeugt (S-16) — **in derselben Handlung, nicht
-  optional und nicht nachgelagert:** ein Klick auf „Einladen"/„Als eingeladen markieren", der nur
-  den Status wechselt und keinen Text erzeugt, erfüllt diesen Screen nicht (im Prototyp
-  beobachteter Fehler, 2026-09-16)
+- **Copy-Paste-Text** (die Einladung, **ohne Datenschutzhinweis**) wird erzeugt (S-16) — **in
+  derselben Handlung, nicht optional und nicht nachgelagert:** ein Klick auf „Einladen"/„Als
+  eingeladen markieren", der nur den Status wechselt und keinen Text erzeugt, erfüllt diesen Screen
+  nicht (im Prototyp beobachteter Fehler, 2026-09-16) *(geändert 2026-10-06, Menschenentscheidung, F5 `candidate-invite`: Der Datenschutzhinweis steht schon bei der Erfassung und in der Bewerbung; im Einladungstext wäre er aufdringlich. Informieren ist Sache des Haushalts.)*
 
 **Abweichende Zustände**
 

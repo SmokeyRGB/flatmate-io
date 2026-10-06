@@ -22,7 +22,7 @@ move-in dates in one calendar.
 |---|---|---|---|
 | S-25 | Room, move-in date and offer details recorded on the `Application`, including provisionally | `v0.2` | — |
 | S-42 | `ApplicationInviteToken`: single-use invite token per `Application` at `moved_in`, sets `became_resident_id` on registration, revocable | `v0.2` | — |
-| S-16 | Copy-paste text (with a privacy notice) generated when marking a candidate `invited`, as a household aid — never sent by the app | `v0.1` | Already built — see below |
+| S-16 | Copy-paste text (without a privacy notice since 2026-10-06, human decision) generated when marking a candidate `invited`, as a household aid — never sent by the app | `v0.1` | Already built — see below |
 | S-26 | Calendar view over `Appointment`s and move-in dates | `v1.1` | — |
 
 ## What already exists in v0.1
