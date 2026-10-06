@@ -757,7 +757,7 @@ export const de = {
     // warten auf deine Stimme") — the same fact, so the same words on Start as in a notification.
     voteTaskHeading: (count: number) =>
       count === 1 ? "1 Bewerbung wartet auf deine Stimme" : `${count} Bewerbungen warten auf deine Stimme`,
-    voteTaskButton: "Jetzt sichten",
+    voteTaskButton: "Jetzt abstimmen",
     reasonDated: (dateLabel: string) => `Stimme ab bis ${dateLabel}.`,
     reasonOverdue: "Die Frist ist abgelaufen — deine Stimme zählt trotzdem noch.",
     reasonUndated: (roundTitle: string) => `In der Runde „${roundTitle}" wird gerade abgestimmt.`,
@@ -768,8 +768,8 @@ export const de = {
     standingHeading: "So steht die Runde",
     // design.md Decision 6: the four display buckets beneath the phase, non-zero only.
     distribution: {
-      in_screening: (n: number) => `Für ${n} wird noch abgestimmt`,
-      in_scheduling: (n: number) => `${n} eingeladen`,
+      in_screening: (n: number) => `Für ${n} Bewerber:innen wird noch abgestimmt`,
+      in_scheduling: (n: number) => `${n} schon eingeladen`,
       interviewed: (n: number) => `${n} gecastet`,
       in_offer: (n: number) => `${n} zugesagt`,
     },

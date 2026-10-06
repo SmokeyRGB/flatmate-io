@@ -446,13 +446,13 @@ reason codes, not only lengths.
 
 - [x] 9.1 `npm run verify` (re-run after group 10) green (eslint, tsc, the nine lints, check-refs, the full suite on dev).
   Report the counts.
-- [ ] 9.2 **Human hand-off (owner SQL):** the human runs `scripts/reset-demo-household.sql` in the
+- [x] 9.2 **Human hand-off (owner SQL):** the human runs `scripts/reset-demo-household.sql` in the
   Supabase SQL editor for `flatmate-io-dev`. Never production. Its last result shows zero votes,
   applications, participations, rounds and rooms for the demo household, and the unchanged household
   id. If not, **stop**.
-- [ ] 9.3 `DEMO_PASSWORD=<the seed's password> npm run seed:demo-round`. Record the voter count and
+- [x] 9.3 `DEMO_PASSWORD=<the seed's password> npm run seed:demo-round`. Record the voter count and
   quorum in the plan file, not in the repo.
-- [ ] 9.4 Walkthrough = pitch rehearsal (localhost, seed credentials, the browser pane):
+- [x] 9.4 Walkthrough = pitch rehearsal (localhost, seed credentials, the browser pane):
   - sign in as Sam with the WG-Kennung; B1 shows the awaiting count, and Casting redirects to the
     pass;
   - rate every card; Start then shows „Stark gemacht — du hast alle Bewerbungen bewertet!" and no
@@ -465,7 +465,7 @@ reason codes, not only lengths.
   - the household account cannot reach `/casting`;
   - the dev log holds no applicant data.
   Screenshot the board.
-- [ ] 9.5 As Robin (already claimed by the human), rate and confirm the same board.
+- [x] 9.5 As Robin (already claimed by the human), rate and confirm the same board.
 
 ## 10. Walkthrough changes (human, 2026-10-06; design D10, D11). Run before 9.1's re-run.
 
