@@ -8,6 +8,7 @@ import { de } from "@/ui/strings";
 // renderToStaticMarkup (the pattern of tests/unit/screening/screening-deck.test.ts). Names are
 // digit-free synthetic ones, so every digit in a row's text comes from the row's own numbers.
 vi.mock("server-only", () => ({}));
+vi.mock("@/app/(org)/rounds/[id]/applications/invite-actions", () => ({ inviteApplicationAction: vi.fn() }));
 
 const t = de.casting;
 type Board = Extract<Ranking, { kind: "board" }>;
@@ -36,9 +37,9 @@ function board(over: Partial<Board> = {}): Board {
   };
 }
 
-async function render(ranking: Ranking): Promise<string> {
+async function render(ranking: Ranking, canInvite?: boolean): Promise<string> {
   const { RankingBoard } = await import("@/app/(resident)/casting/ranking-board");
-  return renderToStaticMarkup(createElement(RankingBoard, { ranking }));
+  return renderToStaticMarkup(createElement(RankingBoard, { ranking, canInvite }));
 }
 
 const textOf = (html: string) => html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
@@ -193,5 +194,35 @@ describe("RankingBoard states", () => {
     expect(textOf(await render({ kind: "refused", reason: "round_not_available", status: "closed" }))).toBe(
       t.refusal.notAvailable(de.status.round.closed),
     );
+  });
+});
+
+describe("RankingBoard Einladen (spec deliberation/ranking, casting/invitation)", () => {
+  const trigger = (row: string) => row.includes(`>${de.invite.open}</button>`);
+
+  it("with canInvite, every decided row, scored or unscored, carries the trigger; no invited or hidden row does", async () => {
+    const markup = await render(board(), true);
+    expect(trigger(rowOf(markup, "Anna"))).toBe(true);
+    expect(trigger(rowOf(markup, "Cora"))).toBe(true);
+    expect(trigger(rowOf(markup, "Dora"))).toBe(true);
+    expect(trigger(rowOf(markup, "Bea"))).toBe(false);
+    expect(trigger(rowOf(markup, "Elsa"))).toBe(false);
+    expect(markup.split(`>${de.invite.open}</button>`)).toHaveLength(4);
+  });
+
+  it("without canInvite (false or omitted) there is no trigger anywhere", async () => {
+    for (const markup of [await render(board(), false), await render(board())]) {
+      expect(markup).not.toContain(de.invite.open);
+      expect(markup).not.toContain("<dialog");
+    }
+  });
+
+  it("the digit assertions hold with canInvite, because a closed dialog carries no digit (C-5.1)", async () => {
+    const markup = await render(board(), true);
+    const dora = rowOf(markup, "Dora");
+    expect(textOf(dora).replace(/\D/g, "")).toBe("21");
+    expect(dora).not.toContain("score-ring");
+    expect(textOf(rowOf(markup, "Anna"))).toContain(t.scoreOf(5));
+    expect(markup).not.toContain("<textarea");
   });
 });

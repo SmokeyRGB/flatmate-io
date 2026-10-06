@@ -52,6 +52,7 @@ vi.mock("@/app/(org)/settings/actions", () => ({ updateSettingsAction: vi.fn() }
 vi.mock("@/app/(org)/rounds/new/actions", () => ({ createAndOpenRoundAction: vi.fn() }));
 vi.mock("@/app/(org)/rounds/[id]/applications/new/actions", () => ({ captureApplicationAction: vi.fn() }));
 vi.mock("@/app/(org)/rounds/[id]/applications/[applicationId]/edit/actions", () => ({ updateApplicationAction: vi.fn() }));
+vi.mock("@/app/(org)/rounds/[id]/applications/invite-actions", () => ({ inviteApplicationAction: vi.fn() }));
 
 const { requireOrganisationAccess } = await import("@/app/(org)/organisation-access");
 const { default: OrganizationPage } = await import("@/app/(org)/organization/page");

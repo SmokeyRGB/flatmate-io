@@ -68,6 +68,20 @@ describe("a household-account session issues no query for the capture functions"
     expect(withSessionContextSpy).not.toHaveBeenCalled();
   });
 
+  // F5 candidate-invite: the invitation.
+  it("inviteApplication refuses with ProfileRequiredError, and withSessionContext is never called", async () => {
+    const { inviteApplication, ProfileRequiredError } = await import("@/modules/casting/repository");
+    let caught: unknown;
+    try {
+      await inviteApplication(householdContext, { roundId: ROUND_ID, applicationId: APPLICATION_ID });
+    } catch (err) {
+      caught = err;
+    }
+    expect(caught).toBeInstanceOf(ProfileRequiredError);
+    expect((caught as InstanceType<typeof ProfileRequiredError>).code).toBe("profile_required");
+    expect(withSessionContextSpy).not.toHaveBeenCalled();
+  });
+
   it("listOrganisationApplications returns null, and withSessionContext is never called", async () => {
     const { listOrganisationApplications } = await import("@/modules/casting/repository");
     const result = await listOrganisationApplications(householdContext, ROUND_ID);

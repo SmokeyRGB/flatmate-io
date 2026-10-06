@@ -14,6 +14,7 @@ import {
   type ParsedApplication,
   type RawApplicationInput,
 } from "./application-input";
+import { noticeCategories } from "./application-notice";
 import {
   applicationBaseline,
   changedApplicationFields,
@@ -422,7 +423,7 @@ export async function updateApplication(
   });
 }
 
-export type ApplicationTransitionErrorCode = "not_found" | "step_not_available";
+export type ApplicationTransitionErrorCode = "not_found" | "step_not_available" | "not_invitable";
 
 // Codes only, no id and no value in the message: the caller (a future screen's action) maps the
 // code to a sentence.
@@ -443,11 +444,12 @@ export class ApplicationTransitionError extends Error {
 //   require `confirm_appointment` and not `change_application_state`) -> the UPDATE of `state` and
 //   `state_changed_at` -> exactly one `application.state_changed` event, the actor from `context`.
 //
-// It stays private here. The first feature that owns an operation with effects (an appointment, an
-// offer with its room), OR needs two or more rows in one transaction (F5's "Als eingeladen
-// markieren" takes new -> screened -> invited in one action; two transitionApplication calls would
-// be two transactions and nesting them is refused, NestedSessionContextError), exports it with an
-// `expectedKind` argument.
+// It stays private here. `inviteApplication` below is the first caller that runs two rows in one
+// transaction (new -> screened -> invited; two transitionApplication calls would be two
+// transactions and nesting them is refused, NestedSessionContextError), and it lives in this file,
+// so nothing needed an export. An export, with an `expectedKind` argument, stays the job of the
+// first operation that lives in another module, or the first one with effects (an appointment, an
+// offer with its room).
 //
 // Both the SELECT the caller made and the RETURNING here list lifecycle columns only: this used to
 // hand out the whole row, name, contacts and message included (pre-mortem M10).
@@ -531,6 +533,88 @@ export async function transitionApplication(
     if (!current) throw new ApplicationTransitionError("not_found");
 
     return applyTransitionTx(tx, context, current, toState);
+  });
+}
+
+// F5 `candidate-invite`, FR-5.24, FR-5.28, AC-5.10, AC-5.23 (design D1/D2). „Einladen": takes an
+// application from `new` or `screened` to `invited` in ONE transaction. From `new` it runs the two
+// declared rows new -> screened -> invited through applyTransitionTx, so each step is a declared
+// transition with its own `application.state_changed` event (G-D3). No edge is added to the
+// declared table. Takes NO actor: both ids come from `context`.
+//
+// Order: a profile-less session is refused BEFORE any query (G-D15), then a malformed id. Then ONE
+// transaction:
+//   a. the caller's live membership is read FOR SHARE and must hold `change_application_state`,
+//      BEFORE the row is read, so a member without it learns nothing about the row's state (an
+//      `invited` no-op or `not_invitable` answer would be a state oracle);
+//   b. the row is read FOR UPDATE with the id + round + household predicates (no row -> not_found;
+//      the round predicate makes a stale tab for another round a refusal, never a silent invite),
+//      lifecycle columns only;
+//   c. by state: `invited` is a no-op ({ alreadyInvited: true }, no write, no event); `new` runs
+//      two applyTransitionTx calls (the second on the first's returned row); `screened` runs one;
+//      any other state is `not_invitable`. applyTransitionTx re-checks every `requires` per row.
+//
+// Lock order: membership FOR SHARE -> application FOR UPDATE, as transitionApplication and
+// updateApplication (LOCK ORDER on openRoundTx): no settings, round or room lock, so no cycle.
+// Serialised on the row against every other writer of `application.state`:
+//   inviteApplication x inviteApplication: the second sees `invited` and is a no-op;
+//   inviteApplication x transitionApplication: the second re-reads the state and applies its rule;
+//   inviteApplication x updateApplication: same row lock, the update writes no state;
+//   inviteApplication x castVote: `vote_guard` (drizzle/0028) reads the row FOR SHARE, which waits
+//   for this FOR UPDATE and then refuses the vote (the application has left new/screened).
+//
+// It reads no vote, no quorum and no round status (FR-5.28, AC-5.10, proposal A-3). The two events
+// share one `occurred_at` (transaction time): order them by chaining fromState/toState, never by
+// time. Showing the example text is the caller's UI duty, not this function's (design D1): the text
+// is never stored and never passed in here.
+//
+// Returns { alreadyInvited } only: no row and no personal column.
+export async function inviteApplication(
+  context: SessionContext,
+  input: { roundId: string; applicationId: string },
+): Promise<{ alreadyInvited: boolean }> {
+  if (context.profileId === null) {
+    throw new ProfileRequiredError("inviteApplication");
+  }
+  if (
+    typeof input.roundId !== "string" ||
+    !isUuid(input.roundId) ||
+    typeof input.applicationId !== "string" ||
+    !isUuid(input.applicationId)
+  ) {
+    throw new ApplicationTransitionError("not_found");
+  }
+  return withSessionContext(context, async (tx) => {
+    await assertHasPermissionTx(tx, context, "change_application_state");
+
+    const [current] = await tx
+      .select({
+        id: application.id,
+        householdId: application.householdId,
+        state: application.state,
+      })
+      .from(application)
+      .where(
+        and(
+          eq(application.id, input.applicationId),
+          eq(application.roundId, input.roundId),
+          eq(application.householdId, context.householdId),
+        ),
+      )
+      .for("update");
+    if (!current) throw new ApplicationTransitionError("not_found");
+
+    if (current.state === "invited") return { alreadyInvited: true };
+    if (current.state === "new") {
+      const screened = await applyTransitionTx(tx, context, current, "screened");
+      await applyTransitionTx(tx, context, screened, "invited");
+      return { alreadyInvited: false };
+    }
+    if (current.state === "screened") {
+      await applyTransitionTx(tx, context, current, "invited");
+      return { alreadyInvited: false };
+    }
+    throw new ApplicationTransitionError("not_invitable");
   });
 }
 

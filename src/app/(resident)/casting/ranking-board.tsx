@@ -1,5 +1,6 @@
 import { EyeOff } from "lucide-react";
 import Link from "next/link";
+import { InviteDialog } from "@/app/(org)/rounds/[id]/applications/invite-dialog";
 import type { RankedGroup, Ranking } from "@/modules/deliberation/repository";
 import { de } from "@/ui/strings";
 import { WeightsList } from "./weights-list";
@@ -11,13 +12,18 @@ type Row = { applicationId: string; applicantName: string };
 
 // F5 change 1, screen D1: the scoreboard. A pure render of what `getRanking` returned, so every
 // visibility rule has already been applied in the repository (V-1, V-2, V-4); nothing here decides
-// who may see what. A server component with no client JavaScript: nothing on it is interactive
-// except the "(?)" pop-over, which is native (as in the screening deck).
+// who may see what. A server component. Its one client island is `InviteDialog` („Einladen",
+// F5 `candidate-invite`); apart from that, nothing on it is interactive except the "(?)" pop-over,
+// which is native (as in the screening deck).
 //
 // There are no rank numbers anywhere (FR-5.10), no distribution (Q-10) and no word about a person
 // (C-10, AC-5.28). A row without a score carries no ring and no numeral of its own, only the
 // notice that names the real threshold (C-5.1).
-export function RankingBoard({ ranking }: { ranking: Ranking }) {
+//
+// `canInvite` is decided by the page from the stored permission (never by a role, never here).
+// Only the „Score" group receives it, so an invited or hidden row never carries „Einladen". The
+// dialog gets the row's id and name, which the row already holds, and nothing else.
+export function RankingBoard({ ranking, canInvite = false }: { ranking: Ranking; canInvite?: boolean }) {
   if (ranking.kind === "none") return <EmptyState title={null} />;
   if (ranking.kind === "refused") {
     if (ranking.reason === "round_not_available") {
@@ -45,8 +51,19 @@ export function RankingBoard({ ranking }: { ranking: Ranking }) {
         <RulesPopover ranking={ranking} />
       </div>
       {/* Only this group highlights (design D10): the repository sets `leading` here and nowhere else. */}
-      <Group heading={t.scoredHeading} group={decided} openRoomCount={ranking.openRoomCount} />
-      <Group heading={t.invitedHeading} group={invited} openRoomCount={ranking.openRoomCount} />
+      <Group
+        heading={t.scoredHeading}
+        group={decided}
+        openRoomCount={ranking.openRoomCount}
+        roundId={ranking.round.id}
+        canInvite={canInvite}
+      />
+      <Group
+        heading={t.invitedHeading}
+        group={invited}
+        openRoomCount={ranking.openRoomCount}
+        roundId={ranking.round.id}
+      />
       {hidden.length > 0 && (
         <section className="space-y-3">
           <h2 className="text-sm font-semibold text-muted-foreground">{t.hiddenHeading}</h2>
@@ -73,10 +90,14 @@ function Group({
   heading,
   group,
   openRoomCount,
+  roundId,
+  canInvite = false,
 }: {
   heading: string;
   group: RankedGroup;
   openRoomCount: number;
+  roundId: string;
+  canInvite?: boolean;
 }) {
   if (group.scored.length + group.unscored.length === 0) return null;
   return (
@@ -91,6 +112,9 @@ function Group({
               <p className="text-xs text-muted-foreground">{t.scoreOf(row.n)}</p>
               {row.leading && <span className="sr-only">{t.leadingLabel(openRoomCount)}</span>}
             </div>
+            {canInvite && (
+              <InviteDialog roundId={roundId} applicationId={row.applicationId} applicantName={row.applicantName} />
+            )}
           </li>
         ))}
         {group.unscored.map((row) => (
@@ -99,6 +123,9 @@ function Group({
               <RowName row={row} />
               <p className="text-sm text-muted-foreground">{t.unscored(row.needed, row.n)}</p>
             </div>
+            {canInvite && (
+              <InviteDialog roundId={roundId} applicationId={row.applicationId} applicantName={row.applicantName} />
+            )}
           </li>
         ))}
       </ul>
