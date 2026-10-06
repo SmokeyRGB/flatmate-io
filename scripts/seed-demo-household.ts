@@ -23,6 +23,7 @@ import { randomBytes } from "node:crypto";
 import { claimResidentProfile, registerHousehold } from "@/modules/identity/auth";
 import {
   createResidentProfile,
+  getHouseholdSignInCode,
   issueJoinCode,
   listJoinCodeIssuances,
   setMemberRole,
@@ -164,8 +165,10 @@ async function main() {
   console.log("Sign in as administration (tab: Household):");
   console.log(`  Email:    ${DEMO_EMAIL}`);
   console.log(`  Password: ${PASSWORD}\n`);
+  // household-sign-in-code: the resident tab takes the WG-Kennung, never the internal id.
+  const signInCode = await getHouseholdSignInCode(context);
   console.log("Sign in as a resident (tab: Resident):");
-  console.log(`  Household: ${household.id}`);
+  console.log(`  WG-Kennung: ${signInCode}`);
   console.log(`  Name:      Alex   (moderator)`);
   console.log(`  Name:      Sam    (plain resident)`);
   console.log(`  Password:  ${PASSWORD}\n`);
