@@ -34,7 +34,6 @@ import {
   createResidentProfile,
   getHouseholdSignInCode,
   issueJoinCode,
-  listJoinCodeIssuances,
   setMemberRole,
 } from "@/modules/identity/repository";
 import { seedDemoRound } from "./demo/seed-round";
@@ -94,11 +93,11 @@ async function main() {
     jule,
   });
 
-  // join-by-link: registerHousehold already mints a founding link, but it is single-use by default
-  // (FR-2.4: max_uses 1) — enough to walk the join path exactly once and then only the used-up
-  // refusal. A second, multi-use link is what makes the path repeatable by hand without re-seeding,
-  // so both are issued and both are printed: the reusable one for the happy path, the founding
-  // single-use one for AC-2.8's "the cap is enforced" refusal once it has been spent.
+  // join-by-link: a multi-use link makes the path repeatable by hand without re-seeding, and a
+  // separately issued single-use link serves AC-2.8's "the cap is enforced" refusal once it has
+  // been spent. registerHousehold's own founding link is NOT used for that demo any more:
+  // founding-link-moderator (2026-10-06) makes whoever redeems it a moderator, so a presenter
+  // spending it would appoint a moderator by accident.
   const reusableLink = await issueJoinCode(context, context.accountId, { validDays: 7, maxUses: 5 });
   // join-screen task 6.1: a BOUND link for the prepared profile above — issueJoinCode forces
   // maxUses to 1 for any link naming a residentProfileId, regardless of what is passed here.
@@ -107,8 +106,7 @@ async function main() {
     maxUses: 1,
     residentProfileId: preparedProfile.id,
   });
-  const allLinks = await listJoinCodeIssuances(context, context.accountId);
-  const foundingLink = allLinks.find((link) => link.id !== reusableLink.id && link.id !== boundLink.id);
+  const singleUseLink = await issueJoinCode(context, context.accountId, { validDays: 7, maxUses: 1 });
 
   const BASE_URL = process.env.DEMO_BASE_URL ?? "http://localhost:3000";
 
@@ -144,12 +142,12 @@ async function main() {
   console.log(`  Code to type by hand:    ${reusableLink.code}`);
   console.log(`  Bound link (Robin, 1 use): ${BASE_URL}/join/${boundLink.code}`);
   console.log('    ^ greets "Hi Robin!" and asks only for a password (design.md Decision 13)');
-  if (foundingLink) {
-    console.log(`  Founding link (1 use):   ${BASE_URL}/join/${foundingLink.code}`);
-    console.log("    ^ spend it once, then re-open it to see the used-up refusal (AC-2.8)");
-  }
+  console.log(`  Single-use link (1 use): ${BASE_URL}/join/${singleUseLink.code}`);
+  console.log("    ^ spend it once, then re-open it to see the used-up refusal (AC-2.8)");
+  console.log("  The household's founding link (Mitglieder screen) is not printed here: whoever joins");
+  console.log("  through it becomes moderator, so it is for the founder only, not for this demo.");
   console.log(`\nEnter any of the above by hand at ${BASE_URL}/join instead of opening the link.`);
-  console.log("\nBoth links are also listed on the Mitglieder screen (O16) when signed in as");
+  console.log("\nThese links are also listed on the Mitglieder screen (O16) when signed in as");
   console.log("administration or as Alex (moderator), together with who joined through each.\n");
   // Not `psql "$DATABASE_URL" -f ...`: DATABASE_URL connects as app_runtime, and under RLS every
   // statement in that script would match zero rows and report success. It has its own guard that

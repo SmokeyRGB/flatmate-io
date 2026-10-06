@@ -58,7 +58,7 @@ roles · parallel rounds offered in the UI · anything about applications, votes
 - **FR-1.5** The household account shall be able to create a resident profile, including one intended for the person operating it. It shall **never occupy** that profile itself — whoever uses it signs in separately with `(household, display name) + password`. Source: ADR-013.
 - **FR-1.6** The acting identity of a session shall be fixed at sign-in and shall not be writable afterwards. Moving between administration and a resident identity shall require signing out and signing in again. The interface shall name the signed-in identity rather than offer a switch. Source: ADR-013.
 - **FR-1.7** The household account shall not be able to cast a vote.
-- **FR-1.8** Membership shall carry voting eligibility and a role as **independent** attributes, plus permissions grantable individually to a moderator only; residents vote and take part *(amended 2026-10-01)*.
+- **FR-1.8** Membership shall carry voting eligibility and a role as **independent** attributes, plus permissions grantable individually to a moderator only; residents vote and take part *(amended 2026-10-01)*. *(Amended 2026-10-06, human decision: a membership created by redeeming the household's **founding link** carries the role `moderator`, with the resident set plus the moderator set, exactly what an appointment stores. No other link and no order of arrival confers a role. See `domain/identity.md` §2.1, Rolle-Vorbelegung.)*
 
 ### Resident list (administration)
 

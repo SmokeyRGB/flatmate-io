@@ -2,7 +2,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { landingPathFor } from "@/app/landing";
 import { JOIN_PASSWORD_MIN_LENGTH, joinAttemptSourceHash } from "@/modules/identity/auth";
-import { recordJoinAttempt, resolveJoinCode } from "@/modules/identity/repository";
+import { isFoundingLink, recordJoinAttempt, resolveJoinCode } from "@/modules/identity/repository";
 import { getCurrentSession } from "@/modules/identity/session-cookie";
 import { de } from "@/ui/strings";
 import { JoinForm } from "./join-form";
@@ -32,10 +32,20 @@ export default async function JoinPage({ params }: { params: Promise<{ code: str
   const allowed = await recordJoinAttempt(joinAttemptSourceHash(ip));
   const resolved = allowed ? await resolveJoinCode(code) : null;
 
+  // founding-link-moderator D3: the household account opening its own household's founding link
+  // sees the join form. Read-only: opening the page changes no session.
+  const householdAccountFoundingLink =
+    resolved !== null &&
+    current !== null &&
+    current.context.householdId === resolved.householdId &&
+    current.context.profileId === null &&
+    (await isFoundingLink(current.context, resolved.issuanceId));
+
   const screen = decideJoinScreen({
     allowed,
     resolved,
     sessionHouseholdId: current?.context.householdId ?? null,
+    householdAccountFoundingLink,
   });
 
   switch (screen.kind) {
@@ -89,6 +99,11 @@ export default async function JoinPage({ params }: { params: Promise<{ code: str
         <div className="space-y-6">
           <h1 className="font-serif text-2xl font-semibold">{t.heading()}</h1>
           <span className="context-chip">{t.householdChip(screen.householdName)}</span>
+          {screen.founderNote && (
+            <p role="note" className="callout callout-info">
+              {t.foundingJoinNote}
+            </p>
+          )}
           <JoinForm code={code} passwordMinLength={JOIN_PASSWORD_MIN_LENGTH} boundDisplayName={null} />
         </div>
       );

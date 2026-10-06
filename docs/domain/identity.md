@@ -535,6 +535,24 @@ Recht, das die Rechtematrix der Moderation mit ⬜ gibt (heute `manage_voting_pr
 > entfernen ist ein eigenes Recht, `manage_round_participation`, weil es eine eigene Zeile der
 > Rechtematrix ist und so für sich verhandelbar bleibt.)*
 
+> **Moderation über den Gründungslink (menschliche Entscheidung, 2026-10-06, Rundgang durch das
+> Onboarding).** Wer den **Gründungslink** einlöst, den `registerHousehold` ausstellt, wird
+> `moderator`. Das ist **nicht** der Automatismus vom 2026-09-22 zurück: Der Automatismus knüpfte an
+> die *Reihenfolge* des Beitritts, an die „erste beigetretene Bewohner-Mitgliedschaft", und fehlte,
+> sobald eine Mitbewohnerin vor der registrierenden Person selbst beitrat. Hier hängt die
+> Sonderstellung an **einem benannten, einmal nutzbaren Link** (`JoinCodeIssuance.is_founding_link`),
+> den nur die Registrierung markiert; keine Reihenfolge spielt eine Rolle, und die Ernennung steht
+> als eigenes Ereignis `membership.role_changed` im Verlauf. Läuft der Link ungenutzt ab oder wird er
+> gelöscht, wird niemand automatisch Moderator:in; die Ernennung bleibt, wie sie ist. Der Begriff
+> ist ein anderer als die **Gründungs-Link-Ausnahme** (Vorbelegung der Nutzungsgrenze, zurückgestellt,
+> `backlog/requirements/F2-requirements.md`).
+>
+> **Die Abgabebedingung oben ist ausdrücklich geprüft:** Es entsteht **keine** Vorlage und **kein**
+> neues Rechtebündel. Gespeichert wird das bestehende Bündel der Rolle `moderator` (plus das
+> Bewohnerbündel, genau wie bei einer Ernennung durch `setMemberRole`), auf **einem** benannten Weg
+> mehr. Niemand im Haushalt kann ein Bündel benennen, zusammenstellen oder ändern. **S-04 bleibt
+> geschlossen.**
+
 > **`create_application` und `change_application_state` sind die dritte und vierte
 > Rolle-Vorbelegung (menschliche Entscheidung, 2026-09-28, F3-Vorprüfung) — und S-04 wurde dafür,
 > wie die Abgabebedingung oben verlangt, neu aufgemacht.** Vorbelegt bei `moderator`, nicht bei

@@ -200,6 +200,15 @@ sondern in *Art* des Zugriffs. Sie entstehen aus **orthogonalen `Membership`-Att
 > teil; Runden, Teilnehmende und Bewerbungen organisiert die Moderation. Einzeln vergebbar (⬜) sind
 > Rechte nur noch an die Moderation.
 
+> **Ergänzt 2026-10-06 (menschliche Entscheidung, Rundgang durch das Onboarding) — Zeile „Moderator
+> ernennen / zurückstufen":** Eine Ernennung geschieht auch **ohne** diese Handlung, auf genau einem
+> Weg: Wer den **Gründungslink** einlöst, den die Registrierung ausstellt, wird Moderator:in
+> („Moderation über den Gründungslink"). Jeder andere Link und die Reihenfolge des Beitritts
+> verleihen nichts. Der Haushalts-Account darf seinen eigenen Gründungslink einlösen; das beendet
+> seine Sitzung, und die Person macht als Bewohner:in und Moderator:in weiter. Er bekommt dadurch
+> **keine** Rundenrechte (S-50/U-20 gelten unverändert). Maßgeblich: `domain/identity.md`
+> (Rolle-Vorbelegung), `docs/review-log.md` §Offene-Punkte-Register.
+
 #### Wechsel- und Herabstufungslogik
 
 > **Band:** `v0.1` — später: `moved_out`-Rechteentzug S-32 (`v0.2`)

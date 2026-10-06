@@ -9,7 +9,9 @@ export type JoinScreen =
   | { kind: "invalid_link" }
   | { kind: "already_member" } // page.tsx redirects: EC-2.4
   | { kind: "other_household" } // Keine Berechtigung: EC-2.5
-  | { kind: "neutral"; householdName: string }
+  // founderNote: the household account on its own founding link, who is told that joining ends
+  // its session (founding-link-moderator D3).
+  | { kind: "neutral"; householdName: string; founderNote?: true }
   | { kind: "bound"; householdName: string; displayName: string }
   // resident-settings design.md Decision 3/8 (identity/password-reset): a third shape, for a link
   // whose purpose is 'password_reset' — always bound (the CHECK constraint guarantees a named
@@ -22,6 +24,10 @@ export interface DecideJoinScreenInput {
   allowed: boolean;
   resolved: JoinCodeResolution;
   sessionHouseholdId: string | null;
+  // founding-link-moderator D3: true only when the session is this household's household account
+  // AND the link is its founding link (page.tsx computes it). Then the founder is about to join as
+  // a resident, so the form shows instead of already_member. Optional, default false.
+  householdAccountFoundingLink?: boolean;
 }
 
 // The order below is the order design.md's Context describes the page as having today: the rate
@@ -51,15 +57,17 @@ export function decideJoinScreen(input: DecideJoinScreenInput): JoinScreen {
   }
 
   if (input.sessionHouseholdId !== null) {
-    if (input.sessionHouseholdId === input.resolved.householdId) {
-      return { kind: "already_member" };
-    }
-    return { kind: "other_household" };
+    if (input.sessionHouseholdId !== input.resolved.householdId) return { kind: "other_household" };
+    if (input.householdAccountFoundingLink !== true) return { kind: "already_member" };
+    // fall through to the form below: the household account opens its own founding link
   }
 
   const bound = input.resolved.boundResidentProfile;
   if (bound) {
     return { kind: "bound", householdName: input.resolved.householdName, displayName: bound.displayName };
+  }
+  if (input.sessionHouseholdId !== null) {
+    return { kind: "neutral", householdName: input.resolved.householdName, founderNote: true };
   }
   return { kind: "neutral", householdName: input.resolved.householdName };
 }

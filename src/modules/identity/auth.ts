@@ -13,8 +13,10 @@ import {
 } from "./auth-provider";
 import type { CurrentSession } from "./session-cookie";
 import {
+  appointedPermissions,
   claimJoinCodeTx,
   isDisplayNameTaken,
+  isFoundingLink,
   isWellFormedHouseholdSignInCode,
   issueJoinCodeTx,
   normalizeHouseholdSignInCode,
@@ -218,7 +220,10 @@ export async function registerHousehold(email: string, password: string, name: s
       // itself — proposal.md's 2026-09-21 register decision: FR-2.4's founding-link usage-count
       // prefill ("expected resident count") is not built in v0.1 (nobody collects that number), so
       // the founding link takes the same default any other issued link would: 7 days, max 1 use.
-      await issueJoinCodeTx(tx, householdId, accountId, null, { validDays: 7, maxUses: 1 });
+      //
+      // founding-link-moderator D1: marked as the founding link, the one path that ever sets the
+      // mark. Whoever redeems it becomes moderator (joinHousehold).
+      await issueJoinCodeTx(tx, householdId, accountId, null, { validDays: 7, maxUses: 1, founding: true });
 
       await tx.insert(account).values({
         id: accountId,
@@ -907,7 +912,7 @@ export interface JoinHouseholdResult {
 export async function joinHousehold(
   code: string,
   input: JoinHouseholdInput,
-  options: { rememberMe?: boolean; currentSession?: SessionContext | null } = {},
+  options: { rememberMe?: boolean; currentSession?: CurrentSession | null } = {},
 ): Promise<JoinHouseholdResult> {
   const displayNameInput = input.displayName?.trim() ?? "";
   const password = input.password;
@@ -960,11 +965,21 @@ export async function joinHousehold(
   // The route's own GET render already refuses to show the form in either case (page.tsx), so
   // this is a defence-in-depth re-check for the submit path itself (e.g. a session established in
   // another tab between page load and submit) — not the primary enforcement point.
+  //
+  // founding-link-moderator D3: the one exception is the household account of THIS household
+  // redeeming its own founding link. It is the founder about to join as a resident, and the
+  // transaction below ends its session. Anything else (a resident session, an ordinary link) is
+  // still refused as before.
+  let householdSession: { id: string; accountId: string } | null = null;
   if (options.currentSession) {
-    if (options.currentSession.householdId === resolved.householdId) {
+    const current = options.currentSession;
+    if (current.context.householdId !== resolved.householdId) {
+      throw new JoinError("Visitor is signed in to a different household", "other_household");
+    }
+    if (current.context.profileId !== null || !(await isFoundingLink(current.context, resolved.issuanceId))) {
       throw new JoinError("Visitor already belongs to this household", "already_member");
     }
-    throw new JoinError("Visitor is signed in to a different household", "other_household");
+    householdSession = { id: current.sessionId, accountId: current.context.accountId };
   }
 
   // design.md Decision 13: only NOW that the link is resolved do we know whether it is bound.
@@ -1110,19 +1125,41 @@ export async function joinHousehold(
         // address above, has always stored exactly this and is unaffected by design.md Decision 3
       });
 
+      // founding-link-moderator D2: is the link just claimed the household's founding link? Read
+      // after the claim's row lock, with an explicit household_id predicate (RLS admits it: same
+      // household as the new account). The column is immutable, so no further lock is needed.
+      const [claimedIssuance] = await tx
+        .select({ isFoundingLink: joinCodeIssuance.isFoundingLink })
+        .from(joinCodeIssuance)
+        .where(
+          and(eq(joinCodeIssuance.id, claimed.issuanceId), eq(joinCodeIssuance.householdId, resolved.householdId)),
+        );
+      const founding = claimedIssuance?.isFoundingLink === true;
+      // D3 defence in depth: a household-account session may only redeem a founding link. The
+      // pre-Auth check above already decided that; this re-checks it against the claimed row.
+      if (householdSession !== null && !founding) {
+        throw new JoinError("Visitor already belongs to this household", "already_member");
+      }
+
       // design.md Decision 7 (identity/permissions capability's "no permission is inferred from
-      // how a membership came about"): role: "member", permissions: [] — nothing is inferred from
-      // being first, from the link used, or from anything else about the arrival. A joiner
-      // occupies the resident role only, so it stores RESIDENT_PERMISSIONS (design D3).
-      await tx.insert(membership).values({
-        householdId: resolved.householdId,
-        accountId,
-        residentProfileId,
-        isResident: true,
-        role: "member",
-        permissions: [...RESIDENT_PERMISSIONS],
-        joinedViaIssuanceId: claimed.issuanceId,
-      });
+      // how a membership came about"): nothing is inferred from being first, from the link used,
+      // or from anything else about the arrival. A joiner occupies the resident role only, so it
+      // stores RESIDENT_PERMISSIONS (design D3), role: "member".
+      // founding-link-moderator D2 is the one named exception: the household's founding link,
+      // which only registration marks, makes its redeemer a moderator, stored exactly as
+      // setMemberRole stores an appointment (the resident set plus the moderator set).
+      const [insertedMembership] = await tx
+        .insert(membership)
+        .values({
+          householdId: resolved.householdId,
+          accountId,
+          residentProfileId,
+          isResident: true,
+          role: founding ? "moderator" : "member",
+          permissions: founding ? appointedPermissions(RESIDENT_PERMISSIONS) : [...RESIDENT_PERMISSIONS],
+          joinedViaIssuanceId: claimed.issuanceId,
+        })
+        .returning({ id: membership.id });
 
       // design.md Decision 8 (FR-2.19/AC-2.19): empty payload — the issuance is the
       // joinedViaIssuanceId COLUMN, never a second copy here (G-D8), and the code never enters a
@@ -1136,6 +1173,38 @@ export async function joinHousehold(
         actorProfileId: residentProfileId,
         payload: {},
       });
+
+      // D2: the appointment is its own event, as setMemberRole records it, so the special
+      // position is visible in the history. The actor is the joiner.
+      if (founding) {
+        await recordActivityEvent(tx, {
+          householdId: resolved.householdId,
+          eventType: "membership.role_changed",
+          subjectType: "membership",
+          subjectId: insertedMembership.id,
+          actorAccountId: accountId,
+          actorProfileId: residentProfileId,
+          payload: { fromRole: "member", toRole: "moderator" },
+        });
+      }
+
+      // D3: the household account's session ends in this same transaction, so a failed join never
+      // leaves it revoked. Conditional on the row still being live: zero rows means it already
+      // ended in another tab (sign-out, password change), which leaves the visitor a plain visitor
+      // either way. clock_timestamp(), not now(): now() predates the provider calls made above.
+      if (householdSession !== null) {
+        await tx
+          .update(session)
+          .set({ revokedAt: sql`clock_timestamp()` })
+          .where(
+            and(
+              eq(session.id, householdSession.id),
+              eq(session.accountId, householdSession.accountId),
+              eq(session.householdId, resolved.householdId),
+              isNull(session.revokedAt),
+            ),
+          );
+      }
 
       const sessionRow = await insertSessionTx(tx, {
         householdId: resolved.householdId,
