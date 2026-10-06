@@ -17,6 +17,7 @@ import {
   claimJoinCodeTx,
   isDisplayNameTaken,
   isFoundingLink,
+  isHouseholdAccount,
   isWellFormedHouseholdSignInCode,
   issueJoinCodeTx,
   normalizeHouseholdSignInCode,
@@ -976,7 +977,12 @@ export async function joinHousehold(
     if (current.context.householdId !== resolved.householdId) {
       throw new JoinError("Visitor is signed in to a different household", "other_household");
     }
-    if (current.context.profileId !== null || !(await isFoundingLink(current.context, resolved.issuanceId))) {
+    // R1: the household account is identified by its stored permissions, not by a missing profile
+    // (a non-resident moderator has none either).
+    if (
+      !(await isHouseholdAccount(current.context)) ||
+      !(await isFoundingLink(current.context, resolved.issuanceId))
+    ) {
       throw new JoinError("Visitor already belongs to this household", "already_member");
     }
     householdSession = { id: current.sessionId, accountId: current.context.accountId };

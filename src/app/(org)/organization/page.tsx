@@ -5,6 +5,7 @@ import { listOrganisationTasks, listRoundsForSession } from "@/modules/casting/r
 import {
   assertHasPermission,
   getLiveFoundingLinkPath,
+  isHouseholdAccount,
   getNavigationAccess,
   PermissionDeniedError,
 } from "@/modules/identity/repository";
@@ -69,7 +70,7 @@ export default async function OrganizationPage({
   // next/link: the join GET records a rate-limit attempt and resolves the code, so it must not be
   // prefetched. The read returns null for a caller without manage_join_codes (the code is a secret).
   const foundingJoinPath =
-    !active && !canOpenRound && current.context.profileId === null
+    !active && !canOpenRound && (await isHouseholdAccount(current.context))
       ? await getLiveFoundingLinkPath(current.context)
       : null;
 

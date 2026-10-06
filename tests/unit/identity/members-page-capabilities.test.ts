@@ -74,6 +74,7 @@ function render(flags: Flags): string {
       joinCodeIssuances: flags.canManageJoinCodes ? [liveIssuance] : [],
       host: "example.test",
       now: NOW,
+      callerIsHouseholdAccount: true,
     }),
   );
 }
@@ -154,6 +155,7 @@ describe("the reset link on a member row", () => {
         joinCodeIssuances: issuances,
         host: "example.test",
         now: NOW,
+        callerIsHouseholdAccount: true,
       }),
     );
 
@@ -228,6 +230,7 @@ describe("the members screen with no resident yet", () => {
         joinCodeIssuances: [],
         host: "example.test",
         now: NOW,
+        callerIsHouseholdAccount: true,
       }),
     );
     const form = html.indexOf(de.members.addResidentSubmit);
@@ -248,13 +251,14 @@ describe("the founding link on the members screen", () => {
     isFoundingLink: true,
     ...over,
   });
-  const renderWith = (issuances: Issuance[]) =>
+  const renderWith = (issuances: Issuance[], callerIsHouseholdAccount = true) =>
     renderToStaticMarkup(
       createElement(MembersView, {
         residentList: { members, ...NONE, canManageJoinCodes: true, leadWithJoinCode: false },
         joinCodeIssuances: issuances,
         host: "example.test",
         now: NOW,
+        callerIsHouseholdAccount,
       }),
     );
 
@@ -274,6 +278,21 @@ describe("the founding link on the members screen", () => {
     expect(html).not.toContain(de.members.joinCode.foundingLinkLabel);
     expect(html).not.toContain(de.members.joinCode.foundingLinkHint);
     expect(html).not.toContain('<a href="/join/FOUND-1NGCD"');
+  });
+
+  it("the household account sees the founder copy", () => {
+    const html = renderWith([founding({})], true);
+    expect(html).toContain(de.members.joinCode.foundingLinkLabel);
+    expect(html).toContain(de.members.joinCode.foundingLinkHint);
+    expect(html).not.toContain(de.members.joinCode.foundingLinkHintNeutral);
+  });
+
+  it("a moderator sees caller-neutral copy, never the founder's own", () => {
+    const html = renderWith([founding({})], false);
+    expect(html).toContain(de.members.joinCode.foundingLinkLabelNeutral);
+    expect(html).toContain(de.members.joinCode.foundingLinkHintNeutral);
+    expect(html).not.toContain(de.members.joinCode.foundingLinkLabel);
+    expect(html).not.toContain(de.members.joinCode.foundingLinkHint);
   });
 
   it("a household with only a live founding link shows no generic warning", () => {

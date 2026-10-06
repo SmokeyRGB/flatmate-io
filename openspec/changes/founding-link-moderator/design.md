@@ -252,3 +252,52 @@ does not refuse it. The data-inventory entry is `⚙️` operational (no persona
   is not touched.
 - `authorization-matrix.test.ts`: rows are appended without reformatting. Whichever PR merges
   second merges `main` and re-runs verify.
+
+## Revision after the Copilot round on PR #56
+
+### R1. "The household account" is a stored permission set, not a session shape (fixes D3, D4)
+
+D3 and D4 identified the household account by `context.profileId === null`. The schema also admits
+a non-resident moderator (no CHECK forbids it; `createNonResidentModerator` creates one), whose
+session has no profile either. One identity read replaces every such check:
+`isHouseholdAccount(context)` (identity repository, read-only). It reads the caller's live
+membership and returns true when the membership is non-resident and holds every
+`HOUSEHOLD_ONLY_PERMISSIONS` value. The database allows those permissions only on `household_admin`
+(`membership_household_only_permissions`), and `setMemberRole` refuses to change that role, so the
+answer cannot change between the pre-Auth check and the commit.
+
+Every place that uses the identity:
+- the join page's `householdAccountFoundingLink`;
+- `joinHousehold`'s pre-Auth exception;
+- the organisation page's founding card;
+- the members screen's founder copy.
+
+### R2. The founding link's whole grant boundary is in the database (fixes D1)
+
+The CHECK pinned purpose and profile but not what bounds the grant. Raw SQL as `app_runtime`
+passes RLS, so three more rules move into the database:
+- **The CHECK gains `max_uses = 1`.** A founding link can never admit more than one redeemer.
+- **A `BEFORE INSERT OR UPDATE` trigger, `join_code_issuance_founding_guard`**, a plain invoker
+  function (no SECURITY DEFINER) that raises `check_violation` with
+  `CONSTRAINT = 'join_code_issuance_founding_guard'`, refuses:
+  - an INSERT of a founding link into a household that already has a membership. Registration
+    inserts the link before the administering membership, so only registration can create one.
+    The insert's own RLS WITH CHECK pins the session to `NEW.household_id`, so the trigger's
+    membership read sees that household.
+  - an UPDATE that changes `is_founding_link`, either way.
+  - an UPDATE that lowers `uses` on a founding link.
+
+Migration 0034 is not on `main` yet, so it is amended in place (it stays re-runnable:
+`CREATE OR REPLACE FUNCTION`, `DROP TRIGGER IF EXISTS` before `CREATE TRIGGER`) and re-applied to
+dev.
+
+### R3. Founder copy only for the founder (fixes D4)
+
+Moderators also see the members screen and hold `manage_join_codes`. They see the founding row with
+caller-neutral copy:
+- label „Gründungslink";
+- hint „Gedacht für die Person, die die WG angelegt hat. Wer darüber beitritt, wird
+  Moderator:in.".
+
+The household account keeps „Dein Gründungslink" and „Nur für dich…". `MembersView` takes
+`callerIsHouseholdAccount`, computed with R1's read. The wording is a draft.

@@ -41,6 +41,8 @@ vi.mock("@/modules/identity/repository", async () => {
   return {
     ...actual,
     getLiveFoundingLinkPath: vi.fn(async () => state.foundingPath),
+    // The household account is the session with no profile in these fixtures.
+    isHouseholdAccount: vi.fn(async () => state.profileId === null),
     getNavigationAccess: vi.fn(async () => ({ organisation: true, membersList: true, rooms: true, settings: true })),
     assertHasPermission: vi.fn(async (_ctx: unknown, _accountId: string, permission: string) => {
       if (permission !== "manage_rounds" || !state.holdsManageRounds) {

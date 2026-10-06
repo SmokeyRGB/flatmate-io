@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 import { afterEach, describe, expect, it } from "vitest";
 import { withSessionContext, type SessionContext } from "@/db/session-context";
+import { MODERATOR_PERMISSIONS, membership } from "@/modules/identity/schema";
 import { uuid } from "../../helpers/uuid";
 
 // [G-C7 raw SQL] founding-link-moderator D1: the founding mark's shape and count are enforced by
@@ -19,9 +20,10 @@ afterEach(async () => {
   if (!context) return;
   const ctx = context;
   context = undefined;
-  await withSessionContext(ctx, (tx) =>
-    tx.execute(sql`DELETE FROM join_code_issuance WHERE household_id = ${ctx.householdId}::uuid`),
-  );
+  await withSessionContext(ctx, async (tx) => {
+    await tx.execute(sql`DELETE FROM join_code_issuance WHERE household_id = ${ctx.householdId}::uuid`);
+    await tx.execute(sql`DELETE FROM membership WHERE household_id = ${ctx.householdId}::uuid`);
+  });
 });
 
 function freshContext(): SessionContext {
@@ -39,7 +41,12 @@ function pgErrorOf(caught: unknown): PgError {
 
 function insertLink(
   ctx: SessionContext,
-  over: { founding: boolean; purpose?: "join" | "password_reset"; residentProfileId?: string | null },
+  over: {
+    founding: boolean;
+    purpose?: "join" | "password_reset";
+    residentProfileId?: string | null;
+    maxUses?: number;
+  },
 ) {
   const code = `T${uuid().replace(/-/g, "").slice(0, 10).toUpperCase()}`;
   const profile = over.residentProfileId ?? null;
@@ -47,8 +54,17 @@ function insertLink(
     tx.execute(
       sql`INSERT INTO join_code_issuance
             (household_id, code, expires_at, max_uses, created_by_account_id, purpose, resident_profile_id, is_founding_link)
-          VALUES (${ctx.householdId}::uuid, ${code}, now() + interval '7 days', 1, ${ctx.accountId}::uuid,
+          VALUES (${ctx.householdId}::uuid, ${code}, now() + interval '7 days', ${over.maxUses ?? 1}, ${ctx.accountId}::uuid,
                   ${over.purpose ?? "join"}::join_code_purpose, ${profile}::uuid, ${over.founding})`,
+    ),
+  );
+}
+
+function updateLinks(ctx: SessionContext, assignment: ReturnType<typeof sql>, founding: boolean) {
+  return withSessionContext(ctx, (tx) =>
+    tx.execute(
+      sql`UPDATE join_code_issuance SET ${assignment}
+          WHERE household_id = ${ctx.householdId}::uuid AND is_founding_link = ${founding}`,
     ),
   );
 }
@@ -117,5 +133,87 @@ describe("[G-C7 raw SQL] founding link constraints (drizzle/0034)", () => {
       "23514",
       "join_code_issuance_founding_shape",
     );
+  });
+
+  it("refuses a founding link that admits more than one redeemer (join_code_issuance_founding_shape)", async () => {
+    const ctx = freshContext();
+    await expectRefusedBy(
+      insertLink(ctx, { founding: true, maxUses: 2 }),
+      "23514",
+      "join_code_issuance_founding_shape",
+    );
+  });
+});
+
+// founding-link-moderator R2 (drizzle/0034): the trigger holds the rest of the grant boundary.
+describe("[G-C7 raw SQL] founding link guard trigger (drizzle/0034, join_code_issuance_founding_guard)", () => {
+  const GUARD = "join_code_issuance_founding_guard";
+
+  it("refuses an UPDATE that raises max_uses on a founding link (join_code_issuance_founding_shape)", async () => {
+    const ctx = freshContext();
+    await insertLink(ctx, { founding: true });
+    await expectRefusedBy(updateLinks(ctx, sql`max_uses = 5`, true), "23514", "join_code_issuance_founding_shape");
+  });
+
+  it("refuses an UPDATE that marks an ordinary link as founding", async () => {
+    const ctx = freshContext();
+    await insertLink(ctx, { founding: false });
+    await expectRefusedBy(updateLinks(ctx, sql`is_founding_link = true`, false), "23514", GUARD);
+  });
+
+  it("refuses an UPDATE that un-marks a founding link", async () => {
+    const ctx = freshContext();
+    await insertLink(ctx, { founding: true });
+    await expectRefusedBy(updateLinks(ctx, sql`is_founding_link = false`, true), "23514", GUARD);
+  });
+
+  it("refuses an UPDATE that lowers uses on a founding link, and allows raising it", async () => {
+    const ctx = freshContext();
+    await insertLink(ctx, { founding: true });
+    // Positive control: spending the link (what claim_join_code does) passes.
+    await updateLinks(ctx, sql`uses = 1`, true);
+    await expectRefusedBy(updateLinks(ctx, sql`uses = 0`, true), "23514", GUARD);
+  });
+
+  it("does not stop an ordinary link's count from changing", async () => {
+    const ctx = freshContext();
+    await insertLink(ctx, { founding: false, maxUses: 3 });
+    await updateLinks(ctx, sql`uses = 2`, false);
+    await updateLinks(ctx, sql`uses = 1`, false);
+  });
+
+  it("refuses an INSERT of a founding link into a household that already has a membership", async () => {
+    const ctx = freshContext();
+    await withSessionContext(ctx, (tx) =>
+      tx.insert(membership).values({
+        householdId: ctx.householdId,
+        accountId: uuid(),
+        residentProfileId: null,
+        isResident: false,
+        role: "moderator",
+        permissions: [...MODERATOR_PERMISSIONS],
+      }),
+    );
+    await expectRefusedBy(insertLink(ctx, { founding: true }), "23514", GUARD);
+  });
+
+  it("positive control: a founding insert into a household without memberships passes", async () => {
+    const ctx = freshContext();
+    await insertLink(ctx, { founding: true });
+  });
+
+  it("still lets an ordinary link be inserted into a household that has a membership", async () => {
+    const ctx = freshContext();
+    await withSessionContext(ctx, (tx) =>
+      tx.insert(membership).values({
+        householdId: ctx.householdId,
+        accountId: uuid(),
+        residentProfileId: null,
+        isResident: false,
+        role: "moderator",
+        permissions: [...MODERATOR_PERMISSIONS],
+      }),
+    );
+    await insertLink(ctx, { founding: false });
   });
 });

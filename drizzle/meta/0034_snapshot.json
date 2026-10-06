@@ -1352,7 +1352,7 @@
         },
         "join_code_issuance_founding_shape": {
           "name": "join_code_issuance_founding_shape",
-          "value": "NOT \"join_code_issuance\".\"is_founding_link\" OR (\"join_code_issuance\".\"purpose\" = 'join' AND \"join_code_issuance\".\"resident_profile_id\" IS NULL)"
+          "value": "NOT \"join_code_issuance\".\"is_founding_link\" OR (\"join_code_issuance\".\"purpose\" = 'join' AND \"join_code_issuance\".\"resident_profile_id\" IS NULL AND \"join_code_issuance\".\"max_uses\" = 1)"
         }
       },
       "isRLSEnabled": false

@@ -36,3 +36,31 @@ offer to join through it in one click. Sources: FR-2.4 (single use); the human d
 #### Scenario: No founding offer once it is spent
 - **WHEN** the founding link has been used, has expired or was deleted
 - **THEN** the organisation screen shows no offer to join
+
+### Requirement: A founding link cannot be widened, re-marked or minted later
+
+The database SHALL refuse:
+- a founding link that admits more than one redeemer;
+- a change of a link's founding mark in either direction;
+- lowering a founding link's use count;
+- a founding link created in a household that already has a member.
+
+These hold for any writer, including direct database access by the application role, because the
+founding mark grants the moderator role. Sources: the human decision of 2026-10-06; the Copilot
+review of PR #56.
+
+#### Scenario: A founding link's cap cannot be raised
+- **WHEN** any writer sets a founding link's maximum use count above one
+- **THEN** the write is refused
+
+#### Scenario: An ordinary link cannot be marked later
+- **WHEN** any writer marks an existing ordinary link as a founding link
+- **THEN** the write is refused
+
+#### Scenario: A founding link's count cannot be reset
+- **WHEN** any writer lowers a founding link's use count
+- **THEN** the write is refused
+
+#### Scenario: No founding link after registration
+- **WHEN** any writer creates a founding link in a household that already has a member
+- **THEN** the write is refused

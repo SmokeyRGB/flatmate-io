@@ -2,7 +2,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { landingPathFor } from "@/app/landing";
 import { JOIN_PASSWORD_MIN_LENGTH, joinAttemptSourceHash } from "@/modules/identity/auth";
-import { isFoundingLink, recordJoinAttempt, resolveJoinCode } from "@/modules/identity/repository";
+import { isFoundingLink, isHouseholdAccount, recordJoinAttempt, resolveJoinCode } from "@/modules/identity/repository";
 import { getCurrentSession } from "@/modules/identity/session-cookie";
 import { de } from "@/ui/strings";
 import { JoinForm } from "./join-form";
@@ -38,7 +38,7 @@ export default async function JoinPage({ params }: { params: Promise<{ code: str
     resolved !== null &&
     current !== null &&
     current.context.householdId === resolved.householdId &&
-    current.context.profileId === null &&
+    (await isHouseholdAccount(current.context)) &&
     (await isFoundingLink(current.context, resolved.issuanceId));
 
   const screen = decideJoinScreen({

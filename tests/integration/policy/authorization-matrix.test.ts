@@ -143,6 +143,7 @@ const NOT_APPLICABLE_IDENTITY: Record<string, string> = {
   isDisplayNameTaken: "read-only",
   appointedPermissions: "pure helper — no DB, no session (the sorted union with the moderator set)",
   isFoundingLink: "read-only",
+  isHouseholdAccount: "read-only (identifies the caller by its stored household-only permissions)",
   getLiveFoundingLinkPath:
     "read-only; returns null for a caller without manage_join_codes (the code is a secret)",
   resolveAccountHousehold:

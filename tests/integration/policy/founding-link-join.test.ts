@@ -7,6 +7,7 @@ import { joinHousehold, signIn } from "@/modules/identity/auth";
 import {
   appointedPermissions,
   getLiveFoundingLinkPath,
+  isHouseholdAccount,
   issueJoinCode,
   listJoinCodeIssuances,
   setMemberRole,
@@ -14,6 +15,7 @@ import {
 import { membership, RESIDENT_PERMISSIONS, session } from "@/modules/identity/schema";
 import {
   cleanupAll,
+  createNonResidentModerator,
   deleteTestAccount,
   registerTestHousehold,
   type TestHousehold,
@@ -293,5 +295,60 @@ describe("getLiveFoundingLinkPath (D4)", () => {
     const founder = await joinHousehold(founding.code, { displayName: testName("Frieda"), password: PASSWORD });
     accountIds.push(founder.context.accountId);
     expect(await getLiveFoundingLinkPath(hh.context)).toBeNull();
+  });
+});
+
+// R1 (Copilot round, PR #56): "the household account" is the membership holding the household-only
+// permissions, not "a session with no profile". A non-resident moderator has no profile either.
+describe("isHouseholdAccount and the founding join (R1)", () => {
+  it("is true for the household account, false for a resident, false for a non-resident moderator", async () => {
+    hh = await registerTestHousehold();
+    const ordinary = await issueJoinCode(hh.context, hh.accountId, { validDays: 7, maxUses: 1 });
+    const resident = await joinHousehold(ordinary.code, { displayName: testName("Max"), password: PASSWORD });
+    accountIds.push(resident.context.accountId);
+    const nonResidentModerator = await createNonResidentModerator(hh);
+
+    expect(await isHouseholdAccount(hh.context)).toBe(true);
+    expect(await isHouseholdAccount(resident.context)).toBe(false);
+    expect(nonResidentModerator.context.profileId).toBeNull(); // same session shape as the household account
+    expect(await isHouseholdAccount(nonResidentModerator.context)).toBe(false);
+  });
+
+  it("refuses the founding join from a profile-less moderator session with already_member, creating nothing", async () => {
+    hh = await registerTestHousehold();
+    const founding = await foundingLinkOf(hh);
+    const moderator = await createNonResidentModerator(hh);
+    // createNonResidentModerator makes no session row; give it a live one to assert on.
+    const [sessionInserted] = await withSessionContext(moderator.context, (tx) =>
+      tx
+        .insert(session)
+        .values({
+          householdId: hh!.householdId,
+          accountId: moderator.accountId,
+          actingProfileId: null,
+          tokenHash: uuid(),
+          expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+        })
+        .returning({ id: session.id }),
+    );
+    const before = await withSessionContext(hh.context, (tx) =>
+      tx.select().from(membership).where(eq(membership.householdId, hh!.householdId)),
+    );
+
+    await expect(
+      joinHousehold(
+        founding.code,
+        { displayName: testName("Zoe"), password: PASSWORD },
+        { currentSession: { sessionId: sessionInserted.id, context: moderator.context } },
+      ),
+    ).rejects.toMatchObject({ code: "already_member" });
+
+    expect((await sessionRow(hh, sessionInserted.id)).revokedAt).toBeNull();
+    const after = await withSessionContext(hh.context, (tx) =>
+      tx.select().from(membership).where(eq(membership.householdId, hh!.householdId)),
+    );
+    expect(after).toHaveLength(before.length); // no account or membership created
+    const link = (await listJoinCodeIssuances(hh.context, hh.accountId)).find((i) => i.id === founding.id);
+    expect(link?.uses).toBe(0);
   });
 });

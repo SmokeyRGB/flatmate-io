@@ -65,6 +65,7 @@ function renderJoinCodeCard(
   host: string | null,
   now: Date,
   profileNameById: Map<string, string>,
+  callerIsHouseholdAccount: boolean,
 ) {
   const isDeleted = issuance.deletedAt !== null;
   const url = buildJoinUrl(host, issuance.code);
@@ -119,12 +120,16 @@ function renderJoinCodeCard(
 
       {isLiveFoundingLink && (
         <>
-          <p className="text-sm font-medium">{t.joinCode.foundingLinkLabel}</p>
+          <p className="text-sm font-medium">
+            {callerIsHouseholdAccount ? t.joinCode.foundingLinkLabel : t.joinCode.foundingLinkLabelNeutral}
+          </p>
           {/* A caution, not a helper line: where ordinary links are listed beside it, this must
               visibly outweigh the section's generic warning, which is false for this link. */}
           <div className="callout callout-caution">
             <TriangleAlert className="size-4" />
-            <p>{t.joinCode.foundingLinkHint}</p>
+            <p>
+              {callerIsHouseholdAccount ? t.joinCode.foundingLinkHint : t.joinCode.foundingLinkHintNeutral}
+            </p>
           </div>
         </>
       )}
@@ -173,11 +178,15 @@ export function MembersView({
   joinCodeIssuances,
   host,
   now,
+  callerIsHouseholdAccount,
 }: {
   residentList: ResidentListResult;
   joinCodeIssuances: JoinCodeIssuanceRow[];
   host: string | null;
   now: Date;
+  // founding-link-moderator R3: the founding row's copy addresses the founder; a moderator sees
+  // caller-neutral copy instead.
+  callerIsHouseholdAccount: boolean;
 }) {
   const {
     members,
@@ -299,7 +308,7 @@ export function MembersView({
         <p className="text-sm text-muted-foreground">{t.joinCode.empty}</p>
       ) : (
         <>
-          <ul className="space-y-3">{liveIssuances.map((issuance) => renderJoinCodeCard(issuance, host, now, profileNameById))}</ul>
+          <ul className="space-y-3">{liveIssuances.map((issuance) => renderJoinCodeCard(issuance, host, now, profileNameById, callerIsHouseholdAccount))}</ul>
 
           {/* design.md Decision 9 (revised 2026-09-23, human decision from the 8.3 walkthrough):
               dead links (expired, used up or deleted) are still listed — "Ein toter Link
@@ -312,7 +321,7 @@ export function MembersView({
               <summary className="cursor-pointer text-sm text-muted-foreground">
                 {t.joinCode.deadLinksSummary(deadIssuances.length)}
               </summary>
-              <ul className="space-y-3 pt-3">{deadIssuances.map((issuance) => renderJoinCodeCard(issuance, host, now, profileNameById))}</ul>
+              <ul className="space-y-3 pt-3">{deadIssuances.map((issuance) => renderJoinCodeCard(issuance, host, now, profileNameById, callerIsHouseholdAccount))}</ul>
             </details>
           )}
         </>

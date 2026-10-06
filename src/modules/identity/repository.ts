@@ -15,6 +15,7 @@ import {
   HOUSEHOLD_SIGN_IN_CODE_GROUPS,
   HOUSEHOLD_SIGN_IN_CODE_PATTERN,
   household,
+  HOUSEHOLD_ONLY_PERMISSIONS,
   householdSettings,
   joinCodeIssuance,
   MODERATOR_PERMISSIONS,
@@ -1657,6 +1658,20 @@ export async function listJoinCodeIssuances(
 // data-inventory lint refuses a schema.ts that exports a function.
 export function appointedPermissions(base: readonly string[]): string[] {
   return [...new Set([...base, ...MODERATOR_PERMISSIONS])].sort();
+}
+
+// founding-link-moderator R1: "the household account" is the live membership that holds the
+// household-only permissions, never "a session with no profile": the schema also allows a
+// non-resident moderator, whose session has no profile either. The database lets only
+// `household_admin` hold those permissions (membership_household_only_permissions) and
+// setMemberRole refuses to change that role, so the answer cannot change between a pre-Auth check
+// and the commit. Read-only, under the caller's own context; no role comparison.
+export async function isHouseholdAccount(context: SessionContext): Promise<boolean> {
+  return withSessionContext(context, async (tx) => {
+    const row = await readLiveMembershipTx(tx, context, false);
+    if (!row || row.isResident) return false;
+    return HOUSEHOLD_ONLY_PERMISSIONS.every((p) => row.permissions.includes(p));
+  });
 }
 
 // founding-link-moderator D3: is this issuance the household's founding link? Read-only, under the

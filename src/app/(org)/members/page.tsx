@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import {
   PermissionDeniedError,
   getResidentList,
+  isHouseholdAccount,
   listJoinCodeIssuances,
 } from "@/modules/identity/repository";
 import { getCurrentSession } from "@/modules/identity/session-cookie";
@@ -51,7 +52,18 @@ export default async function MembersPage() {
 
   // Copilot review fix: exactly one `now` per render, threaded through every helper, so a link's
   // live/dead split, its status label, and the removed-joiner caution cannot disagree.
-  return <MembersView residentList={residentList} joinCodeIssuances={joinCodeIssuances} host={host} now={new Date()} />;
+  // founding-link-moderator R3: the founding row speaks to the founder, so the view must know
+  // whether the caller is the household account (a moderator sees this screen too).
+  const callerIsHouseholdAccount = await isHouseholdAccount(current.context);
+  return (
+    <MembersView
+      residentList={residentList}
+      joinCodeIssuances={joinCodeIssuances}
+      host={host}
+      now={new Date()}
+      callerIsHouseholdAccount={callerIsHouseholdAccount}
+    />
+  );
 }
 
 // Both refusals of this page: no organisation access at all, or organisation access without a

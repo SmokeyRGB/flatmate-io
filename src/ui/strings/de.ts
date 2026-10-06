@@ -254,6 +254,11 @@ export const de = {
       // joiner moderator.
       foundingLinkLabel: "Dein Gründungslink",
       foundingLinkHint: "Nur für dich. Wer darüber beitritt, wird Moderator:in.",
+      // R3 (Copilot round, PR #56): the same row for a moderator, who also sees this screen and is
+      // not the founder. Caller-neutral drafts, for the human to confirm.
+      foundingLinkLabelNeutral: "Gründungslink",
+      foundingLinkHintNeutral:
+        "Gedacht für die Person, die die WG angelegt hat. Wer darüber beitritt, wird Moderator:in.",
       // S-49/FR-2.2: sits beside the links, visible without interaction — never presented as
       // security (C-2.5), just social visibility.
       warning:

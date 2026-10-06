@@ -570,11 +570,14 @@ export const joinCodeIssuance = pgTable(
       "join_code_issuance_reset_names_profile",
       sql`${t.purpose} = 'join' OR ${t.residentProfileId} IS NOT NULL`,
     ),
-    // founding-link-moderator D1: a founding link is a neutral join link, never a reset link and
-    // never bound to a profile. The table column is resident_profile_id.
+    // founding-link-moderator D1/R2: a founding link is a neutral join link, never a reset link and
+    // never bound to a profile, and it admits one redeemer. The table column is
+    // resident_profile_id. Immutability of the mark, `uses` never lowered and "only before the
+    // first membership" are a trigger (drizzle/0034, join_code_issuance_founding_guard), which a
+    // schema diff cannot express.
     check(
       "join_code_issuance_founding_shape",
-      sql`NOT ${t.isFoundingLink} OR (${t.purpose} = 'join' AND ${t.residentProfileId} IS NULL)`,
+      sql`NOT ${t.isFoundingLink} OR (${t.purpose} = 'join' AND ${t.residentProfileId} IS NULL AND ${t.maxUses} = 1)`,
     ),
     // At most one founding link per household, so a lookup through it is never ambiguous.
     uniqueIndex("join_code_issuance_one_founding_link")
