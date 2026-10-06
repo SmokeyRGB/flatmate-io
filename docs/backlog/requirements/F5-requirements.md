@@ -2,8 +2,8 @@
 
 > **Feature:** [F5 — A ranking you can check, hidden until you have voted](../features/F5-ranking-hidden-until-you-vote.md)
 > **Band:** `v0.1` · **Scope lines:** S-12, S-13, S-14, S-16, S-31
-> **Screens:** D1 Ranking — "waiting for votes" ⚡ · D2 Candidate detail · D3 My own application
-> **Status:** V1.0 · 2026-09-08
+> **Screens:** D1 Ranking — "waiting for votes" ⚡ · D2 Candidate detail · ~~D3 My own application~~ (struck, V1.1, human decision Q-9)
+> **Status:** V1.1 · 2026-10-05 (V1.0 · 2026-09-08; the V1.1 corrections are marked "(V1.1: …)")
 >
 > **`requirements.md` only — what must be built, not how.** The formulas below are stated
 > verbatim because they are **required behaviour**, not implementation choices.
@@ -18,7 +18,7 @@ invited yields a copy-paste text. A resident never sees the deliberation about t
 
 **In scope:** the score · quorum display and separation · the ordering and its tie-break · hidden
 results until own vote · the four-rating distribution · the candidate detail view · marking a
-candidate invited and its copy-paste text · the resident's own-application view · self-redaction
+candidate invited and its copy-paste text · ~~the resident's own-application view~~ (struck, V1.1, Q-9) · self-redaction
 across every read path.
 
 **Out of scope:** weighted votes, delegation, abstention as its own level · quorum as a hard block
@@ -36,13 +36,13 @@ permanently**.
 | **US-5.1** | As a resident, I want to see a candidate's score only after I have voted on that candidate, so that the group's opinion does not become my anchor. |
 | **US-5.2** | As a resident, I want to see the ranking sorted, so that the group's view is legible at a glance. |
 | **US-5.3** | As a resident, I want to see how the score is worked out, not just the number, so that I can check it rather than trust it. |
-| **US-5.4** | As a resident, I want to see candidates with too few votes in a separate "waiting for votes" section, so that one enthusiastic vote does not look like a front-runner. |
+| **US-5.4** | As a resident, I want to see candidates with too few votes in a separate "waiting for votes" section, so that one enthusiastic vote does not look like a front-runner. *(V1.1: not a separate section but the bottom of one scoreboard, see FR-5.10, human decision Q-3.)* |
 | **US-5.5** | As a resident, I want to see how the four ratings split for one candidate, so that a single number is not all I know about a person. |
 | **US-5.6** | As a moderator, I want to mark a candidate as invited, so that the state of the process is recorded where everyone sees it. |
 | **US-5.7** | As a moderator, I want a ready text including the data-protection notice, so that the household's information duty is dischargeable in practice. |
 | **US-5.8** | As a moderator, I want to see every candidate's current stage in one place, so that nobody is forgotten between states. |
 | **US-5.9** | As a resident, I want to never read a vote that was written about me, so that moving in does not start with reading the group's deliberation about me. |
-| **US-5.10** | As a resident, I want to see only the factual part of my own application with an honest note why, so that the gap is explained rather than looking like a bug. |
+| **US-5.10** | ~~As a resident, I want to see only the factual part of my own application with an honest note why, so that the gap is explained rather than looking like a bug.~~ **Struck (V1.1, human decision Q-9).** The own application does not exist for its subject: it is refused like a missing one. |
 
 ---
 
@@ -56,22 +56,24 @@ permanently**.
 WEIGHTS = { no: 0, rather_not: 1, good: 3, definitely: 5 }   // default, deliberately non-linear
 
 function score(application, stage, round) -> int | NO_SCORE
-    weights = round.settings_snapshot.scale_weights     // NOT the current settings
-    votes   = score_votes(application, stage)           // former members included
+    weights = round.settings_snapshot.scaleWeights      // NOT the current settings (V1.1: stored key, see FR-5.4)
+    votes   = score_votes(application, stage)           // counted voters only (V1.1, Q-6, see FR-5.8)
     if |votes| = 0:
         return NO_SCORE                                 // no score, not 0 — not the same thing
     mean = ( Σ_{v ∈ votes} weights[v.value] ) / |votes|
     return round_half_up( mean / max(weights.values) × 100 )   // 0…100
 ```
 
+*(V1.1: `round_half_up` means "x.5 rounds up, computed exactly" (F-25). A scaled mean of exactly 54.5 is 55. The computation must not go through floating point, so that no rounding error moves a result across a .5 boundary. The default-weight values 0 / 20 / 60 / 100 of the PRD hold for the default weights only.)*
+
 - **FR-5.2** Where a candidate has no votes at the stage, the system shall yield `NO_SCORE` and shall not yield `0`.
 - **FR-5.3** `NO_SCORE` shall be displayed as the absence of a score, never as a numeral.
-- **FR-5.4** The weights shall be read from the round's frozen rules, never from the household's current settings.
+- **FR-5.4** The weights shall be read from the round's frozen rules, never from the household's current settings. *(V1.1: the frozen rules are `round.settings_snapshot`, keys `scaleWeights`, `quorumShare`, `hideResultsUntilVoted` (F-1). FR-5.6 and FR-5.15 read the same snapshot, not `household_settings`.)*
 - **FR-5.5** The system shall present, on demand and without leaving the screen, how a displayed score was reached: the weight of each rating, the number of votes, and the arithmetic.
 
 ### 3.2 Quorum
 
-- **FR-5.6** The system shall determine whether a candidate has reached quorum as follows:
+- **FR-5.6** The system shall determine whether a candidate has reached quorum as follows: *(V1.1: `settings.quorum_share` below is the snapshot's `quorumShare`, F-1. The snapshot stores it as a decimal string.)*
 
 ```text
 function quorum_reached(application, stage, round) -> bool
@@ -80,9 +82,9 @@ function quorum_reached(application, stage, round) -> bool
 ```
 
 - **FR-5.7** The quorum share shall default to `0.5`, meaning **at least half** and not more than half: 7 eligible voters require 4; 6 require exactly 3.
-- **FR-5.8** The quorum denominator shall be the round's participant entries that may vote.
+- **FR-5.8** The quorum denominator shall be the round's participant entries that may vote. *(V1.1, human decision Q-6 / R-4, 2026-10-05: a vote counts only while its voter is in the denominator, i.e. an active participation with the right to vote and an `active` profile. Moved out or removed, the vote leaves the score, the numerator and the denominator together; reactivation restores it. Nothing is stored, it is derived on every read. This amends SRD S-32, `domain/invarianten.md` §5.3 and PRD §4.2.3, which kept the vote in the score.)*
 - **FR-5.9** Quorum shall be **display only**. No state transition shall be prevented, delayed or triggered by it.
-- **FR-5.10** Candidates below quorum shall appear in a separate section, labelled with how many votes they have against how many are needed, and shall have neither a rank position nor a score displayed.
+- **FR-5.10** Candidates below quorum shall appear in a separate section, labelled with how many votes they have against how many are needed, and shall have neither a rank position nor a score displayed. *(V1.1, human decision Q-3: one scoreboard, not a separate section. Unscored rows sit at its bottom, oldest first (`created_at`, then `id`), with count and threshold and no score. Hidden rows (FR-5.16) are greyed below it. Further V1.1, human decision 2026-10-06: the board has three groups, "Score" (`new`/`screened`), "Eingeladen" (`invited`) and "Verdeckt"; the top-N highlight of FR-5.13a applies only to "Punktwert".)*
 
 ### 3.3 Ordering
 
@@ -100,21 +102,22 @@ function quorum_reached(application, stage, round) -> bool
 
 - **FR-5.12** The ordering shall be fully deterministic: two candidates shall never be presented in an unstable order across two reads of unchanged data.
 - **FR-5.13** The veto key shall remain part of the ordering even though no veto exists in this release.
+- **FR-5.13a** *(V1.1, human decisions R-6 and Q-15, 2026-10-05)* The first N scored rows shall carry a faint highlight, N being the number of the round's rooms that are `open` and not deleted, read at request time. The order of FR-5.11 decides a tie at the boundary, so exactly min(N, scored rows) rows are highlighted; unscored and hidden rows never take a slot; N = 0 highlights nothing. The highlight is visual only, with a text equivalent, and static under reduced motion.
 - **FR-5.14** The ranking shall be sortable by the resident, without altering the stored ordering rule.
 
 ### 3.4 Hidden results
 
-- **FR-5.15** The system shall support a household setting that hides results until the viewing resident has voted, and it shall default to enabled.
-- **FR-5.16** While that setting is enabled and the viewing resident has not cast a vote on a candidate **at the current voting stage**, the system shall withhold from that resident, for that candidate: the score, the vote distribution, the vote count, and the rank position.
+- **FR-5.15** The system shall support a household setting that hides results until the viewing resident has voted, and it shall default to enabled. *(V1.1: a round reads the value frozen in its snapshot, F-1. The domain name is `hide_results_until_voted`, the PRD's `reveal_before_own_vote` is the same setting, F-2.)*
+- **FR-5.16** While that setting is enabled and the viewing resident has not cast a vote on a candidate **at the current voting stage**, the system shall withhold from that resident, for that candidate: the score, the vote distribution, the vote count, and the rank position. *(V1.1: a withdrawn vote does not count as having voted, so withdrawing hides the candidate again, F-8. Further V1.1, human decision 2026-10-06: once the application has left `new`/`screened`, nobody can vote on it any more and its result is shown to every participant. A paused round reveals nothing.)*
 - **FR-5.17** The withholding in FR-5.16 shall be applied before the data reaches the client, on every read path including aggregates and exports.
 - **FR-5.18** A candidate whose results are withheld shall still be listed, so that the resident knows the candidate exists.
 - **FR-5.19** Casting a vote on a candidate shall reveal that candidate's results to the voting resident immediately.
-- **FR-5.19a** The hidden-results explanation shall be bound to the resident's own voting progress in the round as a whole, not rendered as a static subtitle: it shall disappear entirely once the resident has cast every vote open to them in the round, not merely stop applying to individual already-voted candidates. *(Added 2026-09-16, prototype user test — the observed defect was this explanation persisting unconditionally after the resident had voted on every candidate.)*
-- **FR-5.19b** The ranking screen shall support a "who has voted" section, distinct from vote content, that is shown to a resident once they have cast at least one vote in the round's current stage: it names which eligible residents have voted, never what they voted. This is a documented, named exception to the no-participation-shaming principle (`02-SRD.md` §10), justified because results are already reciprocally revealed to that resident at that point (V-4). *(Added 2026-09-16, prototype user test.)* The existing participant list (screen B4) is unaffected and continues to show no voting status at all.
+- **FR-5.19a** *(V1.1, human decision Q-2: met by the redirect. The Casting tab leads to the pass while anything in an open round awaits the viewer, so the scoreboard is reachable only once nothing does, and no hint is needed on it. "The round" means the round's `invite` stage. A hidden row on the scoreboard is therefore always one the viewer can no longer vote on, human decision R-7.)* The hidden-results explanation shall be bound to the resident's own voting progress in the round as a whole, not rendered as a static subtitle: it shall disappear entirely once the resident has cast every vote open to them in the round, not merely stop applying to individual already-voted candidates. *(Added 2026-09-16, prototype user test — the observed defect was this explanation persisting unconditionally after the resident had voted on every candidate.)*
+- **FR-5.19b** *(V1.1, human decision Q-5: names are v0.2; a per-application vote count follows with the detail card.)* The ranking screen shall support a "who has voted" section, distinct from vote content, that is shown to a resident once they have cast at least one vote in the round's current stage: it names which eligible residents have voted, never what they voted. This is a documented, named exception to the no-participation-shaming principle (`02-SRD.md` §10), justified because results are already reciprocally revealed to that resident at that point (V-4). *(Added 2026-09-16, prototype user test.)* The existing participant list (screen B4) is unaffected and continues to show no voting status at all.
 
 ### 3.5 Candidate detail
 
-- **FR-5.20** The candidate detail view shall show how the four ratings split for that candidate, as counts per rating level.
+- **FR-5.20** The candidate detail view shall show how the four ratings split for that candidate, as counts per rating level. *(V1.1, human decision Q-10: the distribution lives on the detail card only, not on the scoreboard.)*
 - **FR-5.21** The distribution shall be shown in addition to the score, not instead of it.
 - **FR-5.21a** The system shall support a household setting, `reveal_vote_authorship` (default off), that — when enabled — additionally shows, next to the distribution, the name of the resident behind each vote. Self-redaction (FR-5.29/5.30) always takes precedence and is never affected by this setting. The data-subject export's ban on vote authorship (`GUARDRAILS.md` G-D6) is a separate rule scoped to that export and is likewise unaffected. *(Added 2026-09-16, prototype user test.)*
 - **FR-5.22** The candidate detail view shall show the candidate's current state.
@@ -130,10 +133,10 @@ function quorum_reached(application, stage, round) -> bool
 
 ### 3.7 The resident's own application
 
-- **FR-5.29** Where an application is linked to the viewing resident's own profile, the system shall permanently withhold from that resident every vote on it, its distribution, its aggregate and its rank position.
+- **FR-5.29** Where an application is linked to the viewing resident's own profile, the system shall permanently withhold from that resident every vote on it, its distribution, its aggregate and its rank position. *(V1.1: "linked to any resident profile of the viewer's account", F-4. Today that is one profile, because `membership_account_id_unique` (`drizzle/0021`) allows one membership per account.)*
 - **FR-5.30** The withholding in FR-5.29 shall apply on every read path — interface, aggregates, exports — and shall not depend on the round's state or the hidden-results setting.
-- **FR-5.31** The system shall show that resident the factual part of their own application together with a note explaining why the rest is not shown.
-- **FR-5.32** The note in FR-5.31 shall state the reason plainly and shall not present the omission as an error or an absence of data.
+- **FR-5.31** ~~The system shall show that resident the factual part of their own application together with a note explaining why the rest is not shown.~~ **Struck (V1.1, human decision Q-9).** The own application is refused like a missing one.
+- **FR-5.32** ~~The note in FR-5.31 shall state the reason plainly and shall not present the omission as an error or an absence of data.~~ **Struck (V1.1, human decision Q-9).**
 
 ---
 
@@ -164,7 +167,7 @@ Given 7 participants who may vote and a quorum share of 0.5, when a candidate ha
 Given 6 participants who may vote and a quorum share of 0.5, when a candidate has 3 votes, then quorum **is** reached — at least half, not more than half.
 
 **AC-5.9 — Below quorum means no rank and no score**
-Given a candidate below quorum, when I view the ranking, then that candidate appears in the waiting section with its vote count and required count, and shows neither a rank position nor a score.
+Given a candidate below quorum, when I view the ranking, then that candidate appears in the waiting section with its vote count and required count, and shows neither a rank position nor a score. *(V1.1, human decision Q-3: "the waiting section" is the bottom of the one scoreboard, oldest application first.)*
 
 **AC-5.10 — Quorum blocks nothing**
 Given a candidate below quorum, when a moderator marks that candidate `invited`, then the transition succeeds.
@@ -196,14 +199,14 @@ Given I have voted on candidate A but not candidate B, when I open the ranking, 
 **AC-5.19 — Stage-scoped reveal**
 Given I voted on a candidate at the invite stage, when a later stage exists and I have not voted at it, then that later stage's results are withheld from me.
 
-**AC-5.19a — The hidden-results explanation clears fully, not per candidate**
+**AC-5.19a — The hidden-results explanation clears fully, not per candidate** *(V1.1: met by the redirect to the pass, FR-5.19a)*
 Given hidden results are enabled and I have just cast my last remaining vote in the round, when I open the ranking, then the screen-level hidden-results explanation is no longer shown anywhere on the screen — not merely absent from the candidate rows I have voted on.
 
-**AC-5.19b — Participation is visible once I have voted, content is not**
+**AC-5.19b — Participation is visible once I have voted, content is not** *(V1.1: names are v0.2, human decision Q-5)*
 Given I have cast at least one vote in the round's current stage, when I open the ranking, then I can see which eligible residents have voted, but not what any of them voted; given I have not yet cast any vote in the current stage, this section is not shown to me.
 
 **AC-5.20 — The distribution is shown alongside the score**
-Given a candidate at quorum whose results are visible to me, when I open the candidate detail, then the count of each of the four ratings is shown in addition to the score.
+Given a candidate at quorum whose results are visible to me, when I open the candidate detail, then the count of each of the four ratings is shown in addition to the score. *(V1.1, human decision Q-10: on the detail card only.)*
 
 **AC-5.21a — Vote authorship is opt-in and self-redaction still wins**
 Given `reveal_vote_authorship` is enabled for the household, when I open a candidate detail that is not my own linked application, then each vote's rating is shown next to the name of the resident who cast it; given the same setting and a candidate that is my own linked application, then no vote, distribution or authorship is shown to me regardless of the setting.
@@ -218,13 +221,13 @@ Given the copy-paste text is displayed, when I look for a send action anywhere i
 Given a candidate was marked `invited`, when the audit entry is inspected, then it names the account and the acting profile.
 
 **AC-5.24 — My own application is redacted to me**
-Given an application linked to my own profile, when I open it, then I see its factual part and no vote, no distribution, no aggregate and no rank position.
+Given an application linked to any resident profile of my account, when I look for it, then it is absent from every list and count, and no vote, no distribution, no aggregate and no rank position of it reaches me. *(V1.1: F-4 and human decision Q-9, the own application is refused like a missing one.)*
 
 **AC-5.25 — Own-application redaction is server-side and unconditional**
 Given the conditions of AC-5.24, when the data is requested directly, and regardless of the round's state or the hidden-results setting, then the withheld values are absent from the response.
 
-**AC-5.26 — The redaction is explained**
-Given I open my own application, when the redacted area is displayed, then a note states plainly why the rest is not shown, and it does not read as an error or as missing data.
+**AC-5.26 — The redaction is explained** *(Struck (V1.1, human decision Q-9), with FR-5.31 and FR-5.32.)*
+~~Given I open my own application, when the redacted area is displayed, then a note states plainly why the rest is not shown, and it does not read as an error or as missing data.~~
 
 **AC-5.27 — Redaction survives the aggregate**
 Given an application linked to my own profile with four votes on it, when I request any aggregate that includes that application, then no value derived from those votes reaches me.
@@ -236,20 +239,20 @@ Given any text on the ranking screen, when it is reviewed, then it makes no eval
 
 ## 5. Constraints
 
-- **C-5.1** `NO_SCORE` and `0` are different values with different meanings and must remain distinguishable through every layer. Source: `04-Domaenenmodell.md` §8.1 — *"kein Score, keine 0 — das ist nicht dasselbe"*.
-- **C-5.2** Scoring reads the round's frozen rules, never live settings. Source: §8.1, and F1 FR-1.15.
+- **C-5.1** `NO_SCORE` and `0` are different values with different meanings and must remain distinguishable through every layer. Source: `domain/rechenmodelle.md` §8.1 — *"kein Score, keine 0 — das ist nicht dasselbe"*.
+- **C-5.2** Scoring reads the round's frozen rules, never live settings. Source: `domain/rechenmodelle.md` §8.1, and F1 FR-1.15.
 - **C-5.3** The score is a **mean**, not a sum, so that candidates with different vote counts stay comparable. Source: **E-07**.
 - **C-5.4** The weights are non-linear by design; the numbers 0 · 1 · 3 · 5 are not an arbitrary scale. Source: `ADR-008`.
 - **C-5.5** Quorum is display, never a block. A high threshold was explicitly rejected because an empty ranking demotivates the participation it depends on. Source: S-13.
 - **C-5.6** Quorum means **at least** half at the default share, including on even denominators. Source: `03-PRD.md` §4.2.4 — *"Nicht „mehr als die Hälfte" — bei geradem Nenner ist es genau die Hälfte"*.
-- **C-5.7** The ordering must be fully deterministic; the application id exists in the tie-break purely to guarantee that. Source: §8.3.
+- **C-5.7** The ordering must be fully deterministic; the application id exists in the tie-break purely to guarantee that. Source: `domain/rechenmodelle.md` §8.3.
 - **C-5.8** The veto key stays in the ordering tuple even while inert, so that the sort does not change shape when v0.2 adds the veto. Source: S-24 staging.
 - **C-5.9** Hidden results are enforced server-side on every read path, never merely hidden in the client. Source: S-14, `03-PRD.md` §4.2.4.
 - **C-5.10** Hidden results are a **setting with a default**, not a hard-wired rule — the underlying assumption is untested and must remain measurable. Source: S-14, check-in assumption 2.
 - **C-5.11** The visibility invariant over the resident's own application is **permanent** and independent of round state, stage and settings. Source: S-31.
-- **C-5.12** It is enforced twice — through the policy layer and through the data layer — and must be tested through both. Source: `ADR-004`, **G-C7** — *"sonst ist ADR-004 eine Illusion"*.
-- **C-5.13** The aggregate is covered by a policy rule of its own, because row-level rules do not reach it. Source: **V-4**, `ADR-004`.
-- **C-5.14** No notification, feed entry or export may become a path around the invariant. Source: S-28 visibility clause, `GUARDRAILS.md` **G-D7**/**G-D8**.
+- **C-5.12** *(V1.1, F-7: applies to V-1 and V-2 only; V-4 is enforced in the read, `domain/invarianten.md` §5.5.)* It is enforced twice — through the policy layer and through the data layer — and must be tested through both. Source: `ADR-004`, **G-C7** — *"sonst ist ADR-004 eine Illusion"*.
+- **C-5.13** *(V1.1, F-7: V-1 and V-2 only, see C-5.12.)* The aggregate is covered by a policy rule of its own, because row-level rules do not reach it. Source: **V-4**, `ADR-004`.
+- **C-5.14** No notification, feed entry or export may become a path around the invariant. Source: S-28 visibility clause, `GUARDRAILS.md` **G-C6**/**G-D5** (notifications), **G-D7** (feed payload) and **G-D6** (export). *(V1.1: re-pointed, F-26.)*
 - **C-5.15** The application never sends messages to applicants; the invite text is an aid for the household. Source: S-16.
 - **C-5.16** Interface text may be promotional about the **process**, never evaluative about a **person**. Every statement about several candidates must map to a real threshold and be recomputable on demand. Source: content rule **C-10**.
 - **C-5.17** No AI may produce a score, ranking, recommendation or best-fit suggestion about a person — permanently. The ranking here is lawful because it aggregates human votes under disclosed rules. Source: **P-5**, and **C-10**'s reasoning.
@@ -262,19 +265,19 @@ Given any text on the ranking screen, when it is reviewed, then it makes no eval
 | ID | Case | Required behaviour |
 |---|---|---|
 | **EC-5.1** | A candidate has one vote of "Must have" and the denominator is 7 | Score is 100 **and** the candidate is below quorum, so it appears in the waiting section with no rank and no score shown. This is precisely the case the section exists for |
-| **EC-5.2** | Every candidate is below quorum | The ranking is empty and states why; the waiting section holds them all. No placeholder ordering is invented |
+| **EC-5.2** | Every candidate is below quorum | The ranking is empty and states why; the waiting section holds them all. No placeholder ordering is invented *(V1.1: every row is an unscored row at the bottom of the one scoreboard, Q-3)* |
 | **EC-5.3** | No candidate has any votes | All are `NO_SCORE` and all are below quorum |
 | **EC-5.4** | The resident has voted on nothing | Every candidate is listed with results withheld; the list itself is not hidden |
-| **EC-5.5** | The frozen weights are missing or malformed for a round | The ranking is refused with a stated reason rather than falling back to defaults, because a fallback would silently change every score |
-| **EC-5.6** | All frozen weights are zero | `max(weights)` is zero and the division is undefined. Treated as EC-5.5: refused, not divided |
+| **EC-5.5** | The frozen weights are missing or malformed for a round, the frozen quorum share is outside (0, 1] or not readable as a plain decimal, or the frozen hide flag is not a boolean *(V1.1, F-3, human decision Q-7)* | The ranking is refused with a stated reason rather than falling back to defaults, because a fallback would silently change every score |
+| **EC-5.6** | All frozen weights are zero, or a weight is not readable as a plain decimal *(V1.1, F-3, Q-7)* | `max(weights)` is zero and the division is undefined. Treated as EC-5.5: refused, not divided |
 | **EC-5.7** | The quorum denominator is zero | Cannot occur — F1 refuses to open a round with no eligible residents (F1 EC-1.3). If encountered, the ranking is refused with a stated reason |
-| **EC-5.8** | Quorum share is set to 1.0 | Every eligible resident must vote before any candidate is ranked. Permitted; the household is warned that the ranking will stay empty until participation is complete |
+| **EC-5.8** | Quorum share is set to 1.0 | Every eligible resident must vote before any candidate is ranked. Permitted; the household is warned that the ranking will stay empty until participation is complete *(V1.1: 1.0 is permitted; the warning belongs in the settings form, later)* |
 | **EC-5.9** | A candidate is deleted while the ranking is displayed | The ranking recomputes without it; no gap or placeholder remains |
 | **EC-5.10** | A resident changes a vote after seeing the result | Permitted. The anchor they saw was their own opinion, which is the point of hiding results in the first place |
-| **EC-5.11** | The only candidate at quorum is the viewing resident's own application | It is withheld from them entirely, so their ranking is empty and states why. It remains visible and ranked for everyone else |
+| **EC-5.11** | The only candidate at quorum is the viewing resident's own application | It is withheld from them entirely, so their ranking is empty and states why. It remains visible and ranked for everyone else *(V1.1, F-5: absent; an emptied ranking shows the same empty state as any other, never a reason that implies a hidden entry)* |
 | **EC-5.12** | A candidate reaches quorum, then a vote is withdrawn and it falls below | It moves back into the waiting section, and its rank and score stop being shown |
 | **EC-5.13** | Two candidates identical on all seven tie-break keys | Impossible: the id is unique, so the seventh key always resolves. Asserted rather than handled |
-| **EC-5.14** | A resident is marked ineligible after voting | Their vote remains in the score. Its removal from the quorum numerator and denominator is S-32's behaviour and arrives in v0.2 (see §7) |
+| **EC-5.14** | A resident is marked ineligible after voting | *(V1.1, human decision Q-6 / R-4: the vote leaves the score, the numerator and the denominator together; reactivation restores it, see FR-5.8 and §7.)* ~~Their vote remains in the score. Its removal from the quorum numerator and denominator is S-32's behaviour and arrives in v0.2.~~ |
 
 ---
 
@@ -282,7 +285,7 @@ Given any text on the ranking screen, when it is reviewed, then it makes no eval
 
 ### Assumptions
 
-- **A-5.1** Nobody moves out during the slice, so the former-member branch of `score_votes()` never fires. It is specified now because building the function without it means rewriting it later.
+- ~~**A-5.1** Nobody moves out during the slice, so the former-member branch of `score_votes()` never fires. It is specified now because building the function without it means rewriting it later.~~ **Struck (V1.1, human decision Q-6).** The former-member rule is built in v0.1, see FR-5.8.
 - **A-5.2** Only one voting stage exists in the slice — the invite stage. Stage-scoping is nonetheless required (FR-5.16, AC-5.19) because round two reuses the same structures in v0.2.
 - **A-5.3** Candidate counts are low tens, so the ranking is computed on read without caching, and no pagination is needed.
 - **A-5.4** The household accepts a ranking produced from human votes as legitimate provided the arithmetic is inspectable. This is **P-3** taken as a premise; the prototype tests it.
@@ -290,11 +293,14 @@ Given any text on the ranking screen, when it is reviewed, then it makes no eval
 
 ### Deferred behaviour worth specifying now
 
-**S-32 — votes from former members.** The marker *"1 Stimme von einem ehemaligen Mitglied"*
-arrives in v0.2, but the arithmetic is asymmetric and easy to get wrong later, so it is recorded
-here: a former member's vote **stays in the score**, and drops out of **both the numerator and
-the denominator** of participation and quorum displays. Building `score_votes()` and
-`quorum_denominator()` without anticipating this means changing both functions in v0.2.
+**S-32 — votes from former members.** *(V1.1, human decision Q-6 / R-4, 2026-10-05.)* A vote counts
+only while its voter is in the quorum denominator. A voter who has moved out or been removed
+leaves the score, the numerator and the denominator together, in an open round; reactivation
+restores the vote. The marker *"1 Stimme von einem ehemaligen Mitglied"* stays v0.2, and the
+detail card's note that votes were removed answers P-3's "Rangliste würde ohne sichtbaren Anlass
+springen". Closing a round must later freeze the denominator and the former-member basis, so
+that a closed round's figures never change; that half (G-D2's closed-round half) waits for a
+close path.
 
 ### Risks
 
@@ -322,10 +328,11 @@ redaction and the product does the specific thing it exists not to do.
 
 **Anything unclear or missing?** Three items, all flagged rather than invented:
 
-1. **The wording of the redaction note** (FR-5.31/FR-5.32) is the most delicate copy in the
+1. ~~**The wording of the redaction note** (FR-5.31/FR-5.32) is the most delicate copy in the
    product — it is read by someone who has just moved in, about deliberation concerning
    themselves. `03-PRD.md` **P-O-04** is still open. This should come from the prototype, not
-   from this document.
+   from this document.~~ **Resolved (V1.1, human decision Q-9):** FR-5.31 and FR-5.32 are struck, so
+   there is no note to word. The own application is refused like a missing one.
 2. **Whether the score is recomputed on read or stored** is a `design.md` question and
    deliberately left open here. The requirement is only that FR-5.12's determinism holds and that
    C-5.2's frozen weights are used.

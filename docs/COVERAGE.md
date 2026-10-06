@@ -33,7 +33,7 @@ Order follows `02-SRD.md` §5.4's v0.1 row exactly, group by group.
 
 | Scope line | What it is | Packet | Owning requirements | Status |
 |---|---|---|---|---|
-| **S-31** | Visibility invariant over `Application.became_resident_id`, enforced twice (policy layer + row-level security) | F5 | FR-5.29–FR-5.32; AC-5.24–AC-5.27 | ✅ |
+| **S-31** | Visibility invariant over `Application.became_resident_id`, enforced twice (policy layer + row-level security) | F5 | FR-5.29–FR-5.30; AC-5.24–AC-5.25, AC-5.27 (FR-5.31, FR-5.32 and AC-5.26 struck, V1.1) | ✅ |
 | **S-36** | Authorization enforced twice: central policy objects **and** Postgres row-level security | F0 | FR-0.1–FR-0.4; AC-0.5, AC-0.6, AC-0.7 | ✅ |
 | **S-15** | Full 11-state `Application` transition table; backward transitions permitted and audited | F0 | FR-0.9–FR-0.12; AC-0.10 | ✅¹ |
 | **S-37** | Machine-readable `data-inventory.yml`, enforced as a CI build gate | F0 | FR-0.5–FR-0.8; AC-0.4 | ✅ |
@@ -81,7 +81,7 @@ between it and the packet fails the build rather than going unnoticed.
 | Scope line | What it is | Packet | Owning requirements |
 |---|---|---|---|
 | **S-36** | Authorization enforced twice | F0 | FR-0.1–FR-0.4 |
-| **S-31** | Self-redaction visibility invariant | F5 | FR-5.29–FR-5.32 |
+| **S-31** | Self-redaction visibility invariant | F5 | FR-5.29–FR-5.30 (FR-5.31, FR-5.32 struck, V1.1) |
 | **S-15** | Complete `Application` transition table | F0 | FR-0.9–FR-0.12; AC-0.10 |
 | **S-37** | `data-inventory.yml` as a CI gate | F0 | FR-0.5–FR-0.8 |
 | **S-27** | Append-only `ActivityEvent` log (log only) | F0 | FR-0.13–FR-0.15; AC-0.11 |

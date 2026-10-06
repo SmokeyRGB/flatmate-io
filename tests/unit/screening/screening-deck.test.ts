@@ -2,6 +2,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import type { ScreeningCard } from "@/modules/deliberation/repository";
+import { de } from "@/ui/strings";
 
 // F4 change 1 tasks 7.7: the deck's markup, rendered with createElement + renderToStaticMarkup
 // (the repo has no testing-library and vitest collects only tests/**/*.test.ts in the node
@@ -64,7 +65,7 @@ describe("ScreeningDeck markup", () => {
     expect(panel).toContain("Eher nicht: 1 Punkt");
     expect(panel).toContain("Finde gut: 4 Punkte");
     expect(panel).toContain("Unbedingt: 5 Punkte");
-    expect(panel).toContain("= dein Favorit");
+    expect(panel).toContain(de.screening.favouriteNote);
     expect(panel).toContain("Der große Sprung liegt zwischen Eher nicht und Finde gut.");
     expect(panel).not.toContain("3 Punkte");
   });
@@ -92,7 +93,10 @@ describe("ScreeningDeck markup", () => {
     expect(text).toContain("Hallo!");
     expect(text).toContain("Beruf: Lehrerin");
     expect(text).not.toMatch(/@|E-Mail|Telefon|Kontakt/i);
-    expect(text).not.toMatch(/Budget|Favoriten|Warnung|Stimmen der anderen/i);
+    // Guards against favourite-budget text (out of scope for C1). "Budget" covers it; the bare word
+    // "Favoriten" was dropped, because the weights note may name a favourite (human decision
+    // 2026-10-06, G-G3).
+    expect(text).not.toMatch(/Budget|Warnung|Stimmen der anderen/i);
   });
 
   // Human amendment 2026-09-30 (D9): the neighbours are REAL cards, so the card being revealed is

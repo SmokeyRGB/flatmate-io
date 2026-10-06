@@ -15,12 +15,16 @@ das ist die Betriebsbedingung von **P-3**, nicht ein Dokumentationsluxus.
 WEIGHTS = { no: 0, rather_not: 1, good: 3, definitely: 5 }
 
 function score(application, stage, round) -> int | NO_SCORE
-    weights = round.settings_snapshot.scale_weights     // NICHT die aktuellen Settings
-    votes   = score_votes(application, stage)           // §5.3 (b): ehemalige Mitglieder inklusive
+    weights = round.settings_snapshot.scaleWeights      // NICHT die aktuellen Settings
+    votes   = score_votes(application, stage)           // §5.3 (b): nur Stimmen aus dem Nenner (Q-6, 2026-10-05)
     if |votes| = 0:
         return NO_SCORE                                 // kein Score, keine 0 — das ist nicht dasselbe
     mean = ( Σ_{v ∈ votes} weights[v.value] ) / |votes|
     return round_half_up( mean / max(weights.values) × 100 )   // 0…100
+
+// round_half_up: "x,5 rundet auf", exakt gerechnet (kein Gleitkomma, damit kein Rundungsfehler
+// ein Ergebnis über die .5-Grenze schiebt):
+//   score = floor( (2 · Σ w · 100 + n · max) / (2 · n · max) )
 ```
 
 **Warum Mittelwert und nicht Summe.** Die Summe belohnt **Aufmerksamkeit**, nicht Zustimmung: eine
@@ -127,15 +131,26 @@ function rank(applications, stage, round) -> { ranked, pending }
           a.created_at,                          // 6. wer früher da war
           a.id )                                 // 7. rein technischer Determinismus-Anker
 
-    sort pending by ( − quorum_numerator(a, stage), a.created_at, a.id )
+    sort pending by ( a.created_at, a.id )          // älteste Bewerbung zuerst (Q-3, 2026-10-05; vormals: − quorum_numerator zuerst)
     return { ranked, pending }
+
+function needed(round) -> int
+    // exakt gerechnet, auf Dezimalbasis: ceil( quorum_share × quorum_denominator(round) )
+    // (0,1 × 30 ist 3, nicht 4)
+
+function leading(ranked, round) -> set of Application
+    // R-6/Q-15 (2026-10-05): die ersten N Zeilen von ranked, N = Anzahl der Zimmer der Runde mit
+    // status = 'open' und nicht gelöscht, zur Anfragezeit gelesen. Ein Gleichstand an der Grenze
+    // entscheidet das Tupel oben, es sind also genau min(N, |ranked|) Zeilen. pending und verdeckte
+    // Zeilen belegen nie einen Platz; N = 0 hebt nichts hervor. Nur Hervorhebung, kein Rang.
 ```
 
-**Kandidaten unter Quorum erscheinen nicht in der Rangliste.** Sie stehen in einem eigenen Abschnitt
-darunter — **„Warten auf Stimmen (3 von 7)"**. Grund: ein Score aus zwei Stimmen neben einem Score
-aus sieben Stimmen in derselben Liste ist eine Falschaussage, egal wie man ihn beschriftet. Der
-getrennte Abschnitt ist zugleich der konkreteste Beteiligungsanreiz im Produkt: er zeigt namentlich,
-worauf gewartet wird.
+**Kandidaten unter Quorum haben weder Rangplatz noch Score.** *(Q-3, 2026-10-05: sie stehen unten auf
+derselben einen Rangliste, nicht in einem eigenen Abschnitt; die Zeile nennt die Schwelle statt „3 von 7",
+weil „5 von 7" je Bewerbung in die Einzelansicht gehört, Q-5. Vormals: ein eigener Abschnitt darunter —
+„Warten auf Stimmen (3 von 7)".)* Grund: ein Score aus zwei Stimmen neben einem Score
+aus sieben Stimmen in derselben Liste ist eine Falschaussage, egal wie man ihn beschriftet. Die Abtrennung ist zugleich der konkreteste Beteiligungsanreiz im Produkt: sie zeigt, worauf
+gewartet wird.
 
 **Jeder Tie-Breaker mit Begründung**, weil eine unbegründete Reihenfolge bei Gleichstand genau die
 Willkür ist, die P-3 verhindern soll:

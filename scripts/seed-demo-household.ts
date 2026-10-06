@@ -1,13 +1,22 @@
 // Manual/dev tool — NOT part of the app or the test suite. Creates one fixed, memorable demo
-// household (a moderator resident, a plain resident, two rooms, one open round) via the same
+// household (a moderator, three plain residents, one prepared profile, two open rooms, one open
+// round, seven synthetic applications with the other residents' votes already cast) via the same
 // repository/auth functions the app itself uses, so there's something real to click through
 // instead of hunting through the households automated test runs and ad-hoc UI walkthroughs leave
 // behind.
 //
+// The seeded state is the pitch path (F5 change 1, human decision Q-12): sign in as Sam (or claim
+// Robin), rate every card in the pass, and the scoreboard shows scored rows, one unscored row and
+// one `invited` row under its own heading. See the robustness note above the votes.
+//
 // Usage: npm run seed:demo
 //
+// The rooms, round, applications, votes and invite come from scripts/demo/seed-round.ts, shared
+// with scripts/seed-demo-round.ts, which re-creates a round on an existing household.
+//
 // Not idempotent by design: run it once against a clean(ish) database. Re-running after the demo
-// household already exists fails loudly at Supabase Auth's "email already registered" step.
+// household already exists fails loudly at Supabase Auth's "email already registered" step, so
+// run scripts/cleanup-demo-household.sql (as owner, in the Supabase SQL editor) first.
 // The password is random per run unless DEMO_PASSWORD is set, and it is printed once on success.
 // Cleanup matches the fixed demo email (scripts/cleanup-demo-household.sql).
 
@@ -28,13 +37,7 @@ import {
   listJoinCodeIssuances,
   setMemberRole,
 } from "@/modules/identity/repository";
-import {
-  captureApplication,
-  createRoom,
-  createRound,
-  openRound,
-  transitionApplication,
-} from "@/modules/casting/repository";
+import { seedDemoRound } from "./demo/seed-round";
 import { db } from "@/db/client";
 import { assertSafeSupabaseEnv } from "./env-guard";
 
@@ -58,16 +61,23 @@ async function main() {
   // claimed. A realistic "person who set the WG up and lives there too" for demo purposes. The
   // household account itself runs no rounds (03-PRD.md §4.0.1, S-50/U-20), so Alex creates and
   // opens the round below and captures the demo applications.
-  const moderatorProfile = await createResidentProfile(context, "Alex", adminActor);
-  const { accountId: moderatorAccountId } = await claimResidentProfile(
-    context,
-    moderatorProfile.id,
-    PASSWORD,
-  );
-  await setMemberRole(context, context.accountId, moderatorAccountId, "moderator");
-
-  const residentProfile = await createResidentProfile(context, "Sam", adminActor);
-  await claimResidentProfile(context, residentProfile.id, PASSWORD);
+  //
+  // Alex, Sam, Kim and Jule are all claimed BEFORE the round opens, so its snapshot holds four
+  // voters and quorum (share 0.5) needs 2 votes. Robin stays prepared, below.
+  async function claim(displayName: string) {
+    const profile = await createResidentProfile(context, displayName, adminActor);
+    const { accountId } = await claimResidentProfile(context, profile.id, PASSWORD);
+    return {
+      accountId,
+      profileId: profile.id,
+      context: { accountId, householdId: household.id, profileId: profile.id },
+    };
+  }
+  const alex = await claim("Alex");
+  await setMemberRole(context, context.accountId, alex.accountId, "moderator");
+  await claim("Sam"); // the presenter: rates live, so the seeded votes below are never Sam's
+  const kim = await claim("Kim");
+  const jule = await claim("Jule");
 
   // join-screen task 6.1: a PREPARED profile — never claimed — so there is a live BOUND link to
   // walk through (design.md Decision 8's "Hi Robin!" greeting), beside the two already-claimed
@@ -76,72 +86,13 @@ async function main() {
   // context.accountId.
   const preparedProfile = await createResidentProfile(context, "Robin", adminActor);
 
-  const roomA = await createRoom(context, "Zimmer 1", adminActor);
-  const roomB = await createRoom(context, "Zimmer 2", adminActor);
-
-  // The rooms stay with the household account (manage_rooms); the round is Alex's (manage_rounds).
-  const alexContext = {
-    accountId: moderatorAccountId,
-    householdId: household.id,
-    profileId: moderatorProfile.id,
-  };
-  const alexActor = { accountId: moderatorAccountId, profileId: moderatorProfile.id };
-  const round = await createRound(alexContext, "Herbstrunde 2026", [roomA.id, roomB.id], alexActor);
-  await openRound(alexContext, round.id, alexActor);
-
-  // Six synthetic applications (G-B1: invented names, @example.test, the fictional 030 23125 range)
-  // so O4 (change 3) and F4 can be walked by hand. Captured as Alex through the same repository
-  // function the form uses; two are then moved new -> screened.
-  const applicationIds: string[] = [];
-  const captures = [
-    // a name only
-    { applicantName: "Testbewerbung Mia", collectedFrom: "data_subject" },
-    // a full one
-    {
-      applicantName: "Testbewerbung Noah",
-      age: 27,
-      contacts: ["noah.test@example.test", "+49 30 23125 0101", "Portal: noah-test"],
-      messageRaw: "Hallo, ich suche ab November ein Zimmer und koche gern für alle.",
-      attributes: [{ label: "Beruf", value: "Tischler" }],
-      collectedFrom: "data_subject",
-    },
-    // two third-party captures
-    {
-      applicantName: "Testbewerbung Lea",
-      contacts: ["+49 30 23125 0102"],
-      collectedFrom: "third_party",
-    },
-    {
-      applicantName: "Testbewerbung Jonas",
-      contacts: ["Messenger: jonas-test"],
-      messageRaw: "Über eine Kollegin empfohlen worden.",
-      collectedFrom: "third_party",
-    },
-    // one with attributes
-    {
-      applicantName: "Testbewerbung Yara",
-      age: 31,
-      attributes: [
-        { label: "Beruf", value: "Hebamme" },
-        { label: "Einzug", value: "ab sofort" },
-        { label: "Haustiere", value: "keine" },
-      ],
-      collectedFrom: "data_subject",
-    },
-    // one with a long message
-    {
-      applicantName: "Testbewerbung Ben",
-      messageRaw: "Ich stelle mich kurz vor. ".repeat(60),
-      collectedFrom: "data_subject",
-    },
-  ];
-  for (const capture of captures) {
-    const created = await captureApplication(alexContext, { roundId: round.id, ...capture });
-    applicationIds.push(created.id);
-  }
-  // Alex is a moderator, so holds change_application_state; the actor comes from the context.
-  await transitionApplication(alexContext, applicationIds[0], "screened");
-  await transitionApplication(alexContext, applicationIds[1], "screened");
+  const { round, applicationCount, seededVotes } = await seedDemoRound({
+    household: context,
+    adminActor,
+    alex,
+    kim,
+    jule,
+  });
 
   // join-by-link: registerHousehold already mints a founding link, but it is single-use by default
   // (FR-2.4: max_uses 1) — enough to walk the join path exactly once and then only the used-up
@@ -169,12 +120,24 @@ async function main() {
   const signInCode = await getHouseholdSignInCode(context);
   console.log("Sign in as a resident (tab: Resident):");
   console.log(`  WG-Kennung: ${signInCode}`);
-  console.log(`  Name:      Alex   (moderator)`);
-  console.log(`  Name:      Sam    (plain resident)`);
-  console.log(`  Password:  ${PASSWORD}\n`);
-  console.log(`Round "${round.title}" is open with both residents as participants.`);
+  console.log("  Name:       Alex   (moderator)");
+  console.log("  Name:       Sam    (plain resident, the presenter)");
+  console.log("  Name:       Kim    (plain resident)");
+  console.log("  Name:       Jule   (plain resident)");
+  console.log(`  Password:   ${PASSWORD}\n`);
+  console.log(`Round "${round.title}" is open with four residents as participants (quorum: 2 votes).`);
   // Counts only: nothing personal is printed (the applicants are synthetic, but the habit counts).
-  console.log(`${applicationIds.length} synthetic applications captured (2 of them screened).\n`);
+  console.log(
+    `${applicationCount} synthetic applications captured, ${seededVotes} votes cast by Alex, Kim and Jule,`,
+  );
+  console.log("2 rooms open, 1 application invited.\n");
+  console.log("What to show:");
+  console.log("  1. Sign in as Sam: Start shows the applications waiting, and Casting opens the pass.");
+  console.log("  2. Rate every card. The scoreboard then shows rings in order, two highlighted rows,");
+  console.log('     one row without a score at the bottom of "Score", and the invited one under "Eingeladen".');
+  console.log('  3. Tap "(?)" for the weights, the formula and the quorum rule.');
+  console.log("  4. Claim Robin through the bound link below, rate, and look again: the same three");
+  console.log("     groups remain (quorum is now 3).\n");
 
   console.log("Join by link (open in a clean browser profile — signed out):");
   console.log(`  Reusable link (5 uses):  ${BASE_URL}/join/${reusableLink.code}`);

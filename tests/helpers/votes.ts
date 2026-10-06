@@ -97,16 +97,18 @@ export interface RawVote {
   applicationId: string;
   residentProfileId: string;
   value?: "no" | "rather_not" | "good" | "definitely";
+  // Defaults to `invite`, the only stage written in v0.1; `offer` exists for tests of stage scoping.
+  stage?: "invite" | "offer";
 }
 
-// A raw INSERT of an `invite` vote, bypassing castVote. Extra column names/values (timestamps,
+// A raw INSERT of a vote (an `invite` one unless `stage` says otherwise), bypassing castVote. Extra column names/values (timestamps,
 // withdrawn_at) can be supplied as SQL fragments.
 export function rawVoteInsertSql(v: RawVote, extra: { columns?: string; values?: ReturnType<typeof sql> } = {}) {
   const columns = sql.raw(
     `household_id, round_id, application_id, resident_profile_id, stage, value${extra.columns ? `, ${extra.columns}` : ""}`,
   );
   return sql`INSERT INTO vote (${columns}) VALUES (${v.householdId}::uuid, ${v.roundId}::uuid, ${v.applicationId}::uuid,
-    ${v.residentProfileId}::uuid, 'invite'::vote_stage, ${v.value ?? "good"}::vote_value${extra.values ? sql`, ${extra.values}` : sql``})`;
+    ${v.residentProfileId}::uuid, ${v.stage ?? "invite"}::vote_stage, ${v.value ?? "good"}::vote_value${extra.values ? sql`, ${extra.values}` : sql``})`;
 }
 
 // A votable application (state `new`) in the fixture's round, inserted through the moderator.

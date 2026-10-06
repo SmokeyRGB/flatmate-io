@@ -47,6 +47,14 @@ describe("deliberation: a household-account session", () => {
     expect(withSessionContextSpy).not.toHaveBeenCalled();
   });
 
+  it("getRanking throws ProfileRequiredError and issues no query", async () => {
+    const { getRanking } = await import("@/modules/deliberation/repository");
+    const { ProfileRequiredError } = await import("@/modules/casting/repository");
+    await expect(getRanking(householdContext, null)).rejects.toBeInstanceOf(ProfileRequiredError);
+    await expect(getRanking(householdContext, uuid5)).rejects.toBeInstanceOf(ProfileRequiredError);
+    expect(withSessionContextSpy).not.toHaveBeenCalled();
+  });
+
   it("getAwaitingVoteCounts returns an empty map and issues no query", async () => {
     const { getAwaitingVoteCounts } = await import("@/modules/deliberation/repository");
     const counts = await getAwaitingVoteCounts(householdContext);
@@ -54,16 +62,17 @@ describe("deliberation: a household-account session", () => {
     expect(withSessionContextSpy).not.toHaveBeenCalled();
   });
 
-  it("the two casting ports throw ProfileRequiredError before any query", async () => {
-    const { listVoterRoundsTx, listVoteCandidatesTx, ProfileRequiredError } = await import(
+  it("the three casting ports throw ProfileRequiredError before any query", async () => {
+    const { listVoterRoundsTx, listVoteCandidatesTx, getRoundTallyBasisTx, ProfileRequiredError } = await import(
       "@/modules/casting/repository"
     );
     // The transaction is never touched: a profile-less context refuses first.
     const tx = {} as never;
     await expect(listVoterRoundsTx(tx, householdContext)).rejects.toBeInstanceOf(ProfileRequiredError);
-    await expect(listVoteCandidatesTx(tx, householdContext, [uuid5], { withCard: true })).rejects.toBeInstanceOf(
+    await expect(listVoteCandidatesTx(tx, householdContext, [uuid5], { scope: "votable", fields: "cards" })).rejects.toBeInstanceOf(
       ProfileRequiredError,
     );
+    await expect(getRoundTallyBasisTx(tx, householdContext, uuid5)).rejects.toBeInstanceOf(ProfileRequiredError);
     expect(withSessionContextSpy).not.toHaveBeenCalled();
   });
 });

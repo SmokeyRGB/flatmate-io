@@ -222,7 +222,7 @@ sondern in *Art* des Zugriffs. Sie entstehen aus **orthogonalen `Membership`-Att
 | Verwaltung → Bewohner (S-02) | **Abmelden und als Resident-Account neu anmelden** (ADR-013) — der Haushalts-Account legt das `ResidentProfile` an, besetzt es aber nie | Die angemeldete Identität wird benannt und ändert sich innerhalb der Sitzung nicht. `ActivityEvent`s tragen **beide** Angaben: `Account` und handelndes Profil (E-21) |
 | Verwaltung → Moderator ohne Bewohnerprofil | Haushalts-Account ernennt ein `ResidentProfile` zum Moderator; er kann ohnehin nicht in dieses Profil wechseln (ADR-013) | **Der Regelfall, nicht mehr nur ein zulässiger Dauerzustand.** Die Verwaltung bleibt ohne eigenes `ResidentProfile` **stimmrechtslos und ohne Casting-Zugriff** (S-50/U-20) |
 | Bewohnender → Moderator | Ernennung durch Haushalts-Account | Stimmrecht bleibt erhalten (orthogonale Attribute, E-04) |
-| Bewohnender → ehemaliger Bewohnender | Setzen auf `moved_out` | **Sofortiger** Zugriffsentzug auf alle `CastingRound`s. `Vote`s bleiben und **zählen weiter im Score** — auch in einer währenddessen offenen Runde —, werden als „ehemaliges Mitglied" markiert; die Person fällt aus **Zähler und Nenner** der Beteiligungs- und Quorum-Anzeige (E-14, S-32, §4.2.3) |
+| Bewohnender → ehemaliger Bewohnender | Setzen auf `moved_out` | **Sofortiger** Zugriffsentzug auf alle `CastingRound`s. Die `Vote`s bleiben gespeichert, **zählen aber nicht mehr** — weder im Score noch in Zähler und Nenner der Beteiligungs- und Quorum-Anzeige; bei Reaktivierung zählen sie wieder (Menschenentscheidung 2026-10-05, Q-6/R-4; vormals: „zählen weiter im Score … werden als ‚ehemaliges Mitglied' markiert"; E-14, S-32, §4.2.3) |
 | Ehemaliger → Bewohnender (Rückkehr) | Reaktivierung durch Haushalts-Account oder Moderator | Zugriff kehrt zurück. Alte `Vote`s bleiben unverändert zugeordnet. `RoundParticipation` muss **explizit** neu vergeben werden (E-13) |
 | Bewerbender → Bewohnender | `Application.status = moved_in`, automatischer `ApplicationInviteToken` (S-42), Anlage eines `ResidentProfile` beim Einlösen | **`Application.became_resident_id` wird gesetzt** → Selbst-Redaktion greift ab diesem Moment **dauerhaft** (E-12, S-31). Bevorzugter Weg über den Einladungslink; manuelle Zuordnung (§4.1.7) bleibt für alle übrigen Fälle |
 | Moderator scheidet aus **(geändert ggü. V0.5, S-50/U-20; präzisiert durch ADR-013)** | `moved_out` des einzigen Moderators | Der Haushalts-Account bleibt handlungsfähig, aber **nicht mehr unmittelbar** — er hat selbst keinen Casting-Zugriff. Der Weg führt über einen **Zwischenschritt**: die Verwaltung **legt ein `ResidentProfile` an** und ernennt es zum Moderator (beides bleibt Verwaltungsrecht, §4.0.1). Seit ADR-013 **besetzt sie dieses Profil nicht selbst** — wer es benutzt, meldet sich mit eigenen Zugangsdaten an. Ergebnis: ein **benannter** Handelnder statt eines anonymen „Verwaltung"-Zugriffs. Warnung im Feed und an den Haushalts-Account, solange kein Moderator mit `ResidentProfile` existiert |
@@ -698,21 +698,22 @@ unabhängig immer Vorrang.
 `Vote.stage` keine `Vote` zu dieser `Application` abgegeben hat, sind Score, Balken,
 Stimmenzahl und Rangplatz verdeckt — mit Erklärung und direktem Weg zur Stimmabgabe.
 
-**Selbst-Redaktion (E-12, S-31):** Ist `became_resident_id == aktives Profil`, zeigt die
-Einzelansicht **nur** das Sachprofil, mit einem ehrlichen Hinweis:
-
-> „Das ist deine eigene Bewerbung. Stimmen, Notizen und Bewertungen dazu sind für dich
-> dauerhaft ausgeblendet — auch nach Abschluss der Runde."
+**Selbst-Redaktion (E-12, S-31):** Ist `became_resident_id == aktives Profil`, existiert die
+Bewerbung für dieses Profil weder in der Rangliste noch in einer Einzelansicht: sie wird wie eine
+nicht vorhandene verweigert. ~~Die Einzelansicht zeigt **nur** das Sachprofil, mit einem ehrlichen
+Hinweis: „Das ist deine eigene Bewerbung. Stimmen, Notizen und Bewertungen dazu sind für dich
+dauerhaft ausgeblendet — auch nach Abschluss der Runde."~~ *(gestrichen 2026-10-05,
+Menschenentscheidung Q-9; die Screen-Schicht korrigiert das PRD, siehe `screens/D-casting-tab.md`)*
 
 **Akzeptanzkriterien §4.1.6**
 
-- [ ] Der Score ist der **Mittelwert** der `Vote`-Werte, linear auf 0–100 skaliert (`Nein = 0`, `Eher nicht = 20`, `Finde gut = 60`, `Unbedingt = 100`), nicht die Summe
+- [ ] Der Score ist der **Mittelwert** der `Vote`-Werte, linear auf 0–100 skaliert (bei Standardgewichten: `Nein = 0`, `Eher nicht = 20`, `Finde gut = 60`, `Unbedingt = 100`; „x,5 rundet auf", exakt gerechnet), nicht die Summe
 - [ ] Die Score-Formel und die Stufenwerte sind aus der Rangliste heraus einsehbar (P-3)
-- [ ] Eine `Application` unterhalb des Quorums erscheint ausschließlich im Abschnitt „Warten auf Stimmen" und trägt keinen Rangplatz und keinen Score
-- [ ] Der Abschnitt „Warten auf Stimmen" nennt Zähler und Nenner („3 von 7")
+- [ ] Eine `Application` unterhalb des Quorums steht **unten auf derselben Rangliste** (eine Rangliste, kein getrennter Abschnitt „Warten auf Stimmen"; Menschenentscheidung 2026-10-05, Q-3), ältere Bewerbung zuerst, und trägt keinen Rangplatz und keinen Score
+- [ ] Diese Zeile nennt die tatsächliche Schwelle und die bisherigen Stimmen („Noch kein Score — für ein faires Bild braucht es mindestens {n} Stimmen (bisher {k})"). „5 von 7" je `Application` steht in der Einzelansicht (Q-5)
 - [ ] Das Erreichen oder Nichterreichen des Quorums blockiert **keinen** Zustandsübergang (S-13)
 - [ ] Bei aktivem `reveal_before_own_vote` sind Score, Stimmungsbalken, Stimmenzahl **und** Rangplatz verdeckt, bis das aktive Profil in diesem `Vote.stage` eine `Vote` zu dieser `Application` abgegeben hat
-- [ ] Die verdeckte Darstellung nennt den Grund und führt mit einer Handlung in den Durchlauf
+- [ ] Die verdeckte Darstellung nennt den Grund und führt mit einer Handlung in den Durchlauf *(erfüllt durch die Weiterleitung: der Casting-Tab führt in den Durchlauf, solange irgendetwas auf die eigene Stimme wartet — Menschenentscheidung 2026-10-05, Q-2. Was dann noch verdeckt ist, ist verdeckt, weil man dort nicht mehr abstimmen kann: „Verdeckt — du hast hier nicht abgestimmt", R-7. `reveal_before_own_vote` bleibt als PRD-Name, der Domänenname ist `hide_results_until_voted`)*
 - [ ] **Sichtbarkeitsinvariante:** Für eine `Application` mit `became_resident_id == aktives Profil` liefert die Einzelansicht keine `Vote`, kein Aggregat, keinen Score, keinen Rangplatz, keine `Veto`-Information und keine `CastingNote` — **auch nicht in der API-Antwort**, nicht nur in der Darstellung
 - [ ] Diese Ausblendung gilt unabhängig davon, ob die Runde `open`, `closed` oder wiedereröffnet ist
 - [ ] Diese `Application` erscheint für das betroffene Profil auch nicht in der Rangliste, nicht im Abschnitt „Warten auf Stimmen" und nicht in einer Sortierung, aus der sich ihr Rangplatz ableiten ließe
@@ -1174,7 +1175,7 @@ aber **nie** auf dem primären-CTA-Platz und **nie** über einer Aufgabe mit ges
 | Asymmetrie | „Ein starkes Nein wiegt mehr" ist **nicht** in die Gewichte kodiert. Diese Funktion trägt ausschließlich das `Veto` in Runde 2 (E-11) |
 | Runden getrennt | `Vote`s aus Runde 1 und Runde 2 werden getrennt gespeichert und getrennt ausgewertet |
 | Revidierbarkeit | Eine `Vote` ist innerhalb des laufenden `Vote.stage` änderbar; jede Änderung erzeugt einen `ActivityEvent` |
-| **Stimmen Ausgezogener — auch bei Auszug während einer offenen Runde** | Die abgegebene `Vote` **bleibt im Score**, in offenen wie in abgeschlossenen Runden, und wird als „ehemaliges Mitglied" markiert („1 Stimme von einem ehemaligen Mitglied"). Die Person fällt aus **Zähler und Nenner** der Beteiligungs- und Quorum-Anzeige (§4.2.4). Begründung: Die Stimme wurde gültig abgegeben; sie rückwirkend zu entfernen ändert eine Grundlage, die andere schon gesehen und eingerechnet haben, und ließe die Rangliste **ohne sichtbaren Anlass springen** — P-3 (E-14) |
+| **Stimmen Ausgezogener — auch bei Auszug während einer offenen Runde** | **Menschenentscheidung 2026-10-05 (Q-6/R-4):** Die `Vote` eines ehemaligen Mitglieds (ausgezogen oder entfernt) zählt **nicht mehr** — weder im Score noch in Zähler und Nenner der Beteiligungs- und Quorum-Anzeige (§4.2.4); bei Reaktivierung zählt sie wieder. Nichts davon wird gespeichert, es wird bei jedem Lesen abgeleitet. Die Markierung („1 Stimme von einem ehemaligen Mitglied") bleibt v0.2. *Vormals:* Die abgegebene `Vote` **bleibt im Score**, in offenen wie in abgeschlossenen Runden, und wird als „ehemaliges Mitglied" markiert. Die Person fällt aus **Zähler und Nenner**. Begründung: Die Stimme wurde gültig abgegeben; sie rückwirkend zu entfernen ändert eine Grundlage, die andere schon gesehen und eingerechnet haben, und ließe die Rangliste **ohne sichtbaren Anlass springen** — P-3 (E-14) |
 | Verdeckte Ergebnisse | `reveal_before_own_vote` (Standard: verdeckt). Die Durchsetzung erfolgt **serverseitig** — verdeckte Werte werden nicht mitgeliefert (S-36) |
 
 #### 4.2.4 Quorum (Entscheidung zu SRD O-01)
@@ -1187,7 +1188,7 @@ aber **nie** auf dem primären-CTA-Platz und **nie** über einer Aufgabe mit ges
 | Zähler | Anzahl der **aktiven** Profile mit mindestens einer `Vote` zu dieser `Application` im laufenden `Vote.stage`. Stimmen von `moved_out`-Profilen zählen hier **nicht** mit (§4.2.3) |
 | **Schwelle** | **`quorum_share = 0,5`, einstellbar in `HouseholdSettings`.** Ein Kandidat erscheint in der Rangliste, sobald `Zähler ≥ ceil(quorum_share × Nenner)` — also **mindestens die Hälfte** der Stimmberechtigten abgestimmt hat: bei 7 Stimmberechtigten 4, bei 6 genau 3. **Nicht** „mehr als die Hälfte" — bei geradem Nenner ist es genau die Hälfte |
 | Begründung der 0,5 | Eine höhere Schwelle (z. B. 2/3) wurde ausgeschlagen: Eine Rangliste, die erst ab hoher Beteiligung erscheint, ist in den ersten Tagen leer — und **eine leere Rangliste demotiviert genau die Beteiligung, die sie voraussetzt.** Die Schwelle ist bewusst **nicht** an der Kernmetrik von 80 % ausgerichtet; die ist ein Ziel, keine Zugangsbedingung |
-| Wirkung | **Anzeige, keine Sperre.** Unterhalb der Schwelle erscheint die `Application` im Abschnitt „Warten auf Stimmen (x von y)" statt in der Rangliste, ohne Rangplatz und ohne Score. Zustandsübergänge bleiben uneingeschränkt möglich |
+| Wirkung | **Anzeige, keine Sperre.** Unterhalb der Schwelle steht die `Application` unten auf der einen Rangliste (Q-3, vormals: im Abschnitt „Warten auf Stimmen (x von y)"), ohne Rangplatz und ohne Score. Zustandsübergänge bleiben uneingeschränkt möglich |
 | Änderung während laufender Runde | Blockiert (§4.2.2, Verfahrenssperre) |
 
 #### 4.2.5 Sichtbarkeit — die Invariante
@@ -1202,7 +1203,7 @@ aber **nie** auf dem primären-CTA-Platz und **nie** über einer Aufgabe mit ges
 | Marker | Wird eine `Application` zum Bewohner, gilt `Application.became_resident_id = ResidentProfile.id` |
 | Prädikat | Jedes **Beratungsartefakt** mit `became_resident_id == aktives Profil` ist für dieses Profil unsichtbar — für immer |
 | Umfang „Beratungsartefakt" | `Vote` · `Veto` (auch die bloße Existenzangabe) · `CastingNote` · **jedes Aggregat** (Score, Stimmungsbalken, Stimmenzahl) · **Ranglistenposition** · jede Sortierung oder Zählung, aus der sich eines davon ableiten ließe |
-| Nicht erfasst | Das **Sachprofil** der eigenen Bewerbung (Name, Kontakt, Bewerbungstext, Termin, Zimmer, Einzugsdatum) bleibt sichtbar, mit ehrlichem Hinweis |
+| Nicht erfasst | ~~Das **Sachprofil** der eigenen Bewerbung (Name, Kontakt, Bewerbungstext, Termin, Zimmer, Einzugsdatum) bleibt sichtbar, mit ehrlichem Hinweis~~ *(gestrichen 2026-10-05, Menschenentscheidung Q-9: die eigene Bewerbung wird wie eine nicht vorhandene verweigert; die Screen-Schicht korrigiert das PRD)* |
 | Alle Ausgabekanäle | Die Invariante gilt für Oberfläche, API-Antworten, `Notification`-Inhalte (Betreff, Vorschautext, Inhalt), `ActivityEvent`-Feed, Digest und Exporte — **nicht nur für die Darstellung** |
 | Doppelte Durchsetzung | Zentrale Policy-Objekte **und** Row-Level-Security in der Datenhaltung (ADR-004, S-36). Eine vergessene Bedingung in der Anwendungsschicht muss an der Datenhaltung scheitern |
 | Unabhängig vom Status | Die Regel prüft **nicht** den Rundenzustand. Die früher angedachte „offen/abgeschlossen"-Heuristik ist verworfen, weil sie bei wiedereröffneten Runden und Wiederbewerbungen leckt |

@@ -16,7 +16,9 @@
 
 - Primärer CTA nach der Sortierung aus §2.2, mit genanntem Grund
 - Bis zu drei weitere Aufgabenzeilen, Rest eingeklappt als „und N weitere"
-- Phasenanzeige aus §3, nie ohne ihre Frist, falls gesetzt
+- Verteilung der Bewerbungen der Runde **ohne** einen einzelnen Phasennamen (Menschenentscheidung
+  2026-10-06: jede Bewerbung hat ihren eigenen Stand, eine Rundenphase wäre irreführend); die Phase
+  aus §3 bleibt für die Fristen. Eine gesetzte Frist erscheint nur mit ihrer Aufgabe
 - „Seit deinem letzten Besuch" — nur `outcome`-Ereignisse (§5), höchstens fünf Zeilen
 - **PWA-Install-Band** (S-45) — eigenes, optisch abgesetztes Element **unter** dem primären CTA,
   nie auf dessen Platz und nie über einer fristgebundenen Aufgabe (§13, Konflikt 2)
@@ -38,6 +40,11 @@
 > allgemeinen Leere. Grund für die Entscheidung: aus einem Usability-Test hervorgegangen, der
 > bemängelte, dass die reine Rundenstand-Meldung nach dem letzten Tap keine Rückmeldung über
 > die eigene Leistung gibt.
+>
+> **Gebaut (2026-10-06):** der Satz „Stark gemacht — du hast alle Bewerbungen bewertet!" steht
+> dem Rundenstand voran, sobald die Person in der laufenden Runde abstimmen darf, es mindestens
+> eine Bewerbung in `new`/`screened` gibt und ihr keine mehr zu bewerten bleibt. Der Wortlaut
+> bleibt offen (P-O-04).
 
 ---
 

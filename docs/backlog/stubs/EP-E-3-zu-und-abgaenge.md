@@ -27,7 +27,7 @@ once every room is taken.
 ## What already exists in v0.1
 
 The visibility invariant this goal's "never read a vote, veto or note about me" story restates —
-**S-31** — is already built and owned by `F5` (`FR-5.29`–`FR-5.32`, `AC-5.24`–`AC-5.27`). It is a
+**S-31** — is already built and owned by `F5` (`FR-5.29`–`FR-5.30`, `AC-5.24`–`AC-5.25`, `AC-5.27`; `FR-5.31`, `FR-5.32` and `AC-5.26` are struck, F5 V1.1). It is a
 permanent invariant, not something this v0.2 goal introduces; this goal extends it to a
 membership that changes over time.
 

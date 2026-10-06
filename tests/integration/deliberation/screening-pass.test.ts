@@ -1,7 +1,12 @@
 import { eq } from "drizzle-orm";
 import { afterEach, describe, expect, it } from "vitest";
 import { withSessionContext } from "@/db/session-context";
-import { listVoteCandidatesTx, updateHouseholdSettings, ProfileRequiredError } from "@/modules/casting/repository";
+import {
+  getRoundTallyBasisTx,
+  listVoteCandidatesTx,
+  updateHouseholdSettings,
+  ProfileRequiredError,
+} from "@/modules/casting/repository";
 import { castingRound } from "@/modules/casting/schema";
 import { castVote, getAwaitingVoteCounts, getScreeningPass } from "@/modules/deliberation/repository";
 import { vote } from "@/modules/deliberation/schema";
@@ -134,6 +139,19 @@ describe("getScreeningPass: the frozen weights (AC-4.9, EC-4.11)", () => {
     expect(await getScreeningPass(voter.context, s.roundId)).toEqual({ kind: "refused", reason: "rules_invalid" });
     expect(await getScreeningPass(voter.context, null)).toEqual({ kind: "refused", reason: "rules_invalid" });
   });
+
+  it("EC-5.6: all-zero frozen weights are refused like malformed ones, with no cards", async () => {
+    const { s, voter } = await fixture();
+    await insertApplicationAt(s, "new");
+    await withSessionContext(s.moderator.context, (tx) =>
+      tx
+        .update(castingRound)
+        .set({ settingsSnapshot: { scaleWeights: { no: 0, rather_not: 0, good: 0, definitely: 0 } } })
+        .where(eq(castingRound.id, s.roundId)),
+    );
+    expect(await getScreeningPass(voter.context, s.roundId)).toEqual({ kind: "refused", reason: "rules_invalid" });
+    expect(await getScreeningPass(voter.context, null)).toEqual({ kind: "refused", reason: "rules_invalid" });
+  });
 });
 
 describe("getScreeningPass: eligibility (FR-4.15, EC-4.3, V-2)", () => {
@@ -175,7 +193,7 @@ describe("getScreeningPass: eligibility (FR-4.15, EC-4.3, V-2)", () => {
     expect((await getAwaitingVoteCounts(voter.context)).size).toBe(0);
     // The candidates port itself, called directly: no card data reaches the caller.
     const leaked = await withSessionContext(voter.context, (tx) =>
-      listVoteCandidatesTx(tx, voter.context, [s.roundId], { withCard: true }),
+      listVoteCandidatesTx(tx, voter.context, [s.roundId], { scope: "votable", fields: "cards" }),
     );
     expect(leaked).toEqual([]);
   });
@@ -185,11 +203,11 @@ describe("getScreeningPass: eligibility (FR-4.15, EC-4.3, V-2)", () => {
     const round = await withSessionContext(s.moderator.context, (tx) => insertTestRound(tx, s.hh.householdId, "open"));
     await insertApplicationAt(s, "new", {}, round);
     const rows = await withSessionContext(voter.context, (tx) =>
-      listVoteCandidatesTx(tx, voter.context, [round], { withCard: true }),
+      listVoteCandidatesTx(tx, voter.context, [round], { scope: "votable", fields: "cards" }),
     );
     expect(rows).toEqual([]);
     const withoutCard = await withSessionContext(voter.context, (tx) =>
-      listVoteCandidatesTx(tx, voter.context, [round], { withCard: false }),
+      listVoteCandidatesTx(tx, voter.context, [round], { scope: "votable", fields: "ids" }),
     );
     expect(withoutCard).toEqual([]);
   });
@@ -260,11 +278,72 @@ describe("the card (FR-4.7, Q-2)", () => {
     const { s, voter } = await fixture();
     await insertApplicationAt(s, "new", { ...syntheticContacts() });
     const rows = await withSessionContext(voter.context, (tx) =>
-      listVoteCandidatesTx(tx, voter.context, [s.roundId], { withCard: true }),
+      listVoteCandidatesTx(tx, voter.context, [s.roundId], { scope: "votable", fields: "cards" }),
     );
     expect(rows).toHaveLength(1);
-    expect(Object.keys(rows[0]).sort()).toEqual(["applicationId", "card", "createdAt", "roundId"]);
+    // `state` joined the keys on purpose (F5 design D3): lifecycle state, not personal.
+    expect(Object.keys(rows[0]).sort()).toEqual(["applicationId", "card", "createdAt", "roundId", "state"]);
     expect(Object.keys(rows[0].card ?? {}).sort()).toEqual(["age", "applicantName", "attributes", "messageRaw"]);
+  });
+});
+
+describe("the casting ports for the scoreboard (F5 design D3)", () => {
+  it("scope votable never returns an invited row, and board never a side state", async () => {
+    const { s, voter } = await fixture();
+    const open = await insertApplicationAt(s, "new", { createdAt: at(1) });
+    const screened = await insertApplicationAt(s, "screened", { createdAt: at(2) });
+    const invited = await insertApplicationAt(s, "invited", { createdAt: at(3) });
+    await insertApplicationAt(s, "rejected_by_household", { createdAt: at(4) });
+    await insertApplicationAt(s, "withdrawn", { createdAt: at(5) });
+    const votable = await withSessionContext(voter.context, (tx) =>
+      listVoteCandidatesTx(tx, voter.context, [s.roundId], { scope: "votable", fields: "ids" }),
+    );
+    expect(votable.map((c) => c.applicationId)).toEqual([open.id, screened.id]);
+    expect(votable.map((c) => c.state)).toEqual(["new", "screened"]);
+    const board = await withSessionContext(voter.context, (tx) =>
+      listVoteCandidatesTx(tx, voter.context, [s.roundId], { scope: "board", fields: "names" }),
+    );
+    expect(board.map((c) => c.applicationId)).toEqual([open.id, screened.id, invited.id]);
+    expect(board.map((c) => c.state)).toEqual(["new", "screened", "invited"]);
+  });
+
+  it("fields names returns the applicant name at the top level and no card, no contact", async () => {
+    const { s, voter } = await fixture();
+    const contacts = syntheticContacts();
+    await insertApplicationAt(s, "invited", { ...contacts, applicantName: "Namensprobe", messageRaw: "geheim" });
+    const [row] = await withSessionContext(voter.context, (tx) =>
+      listVoteCandidatesTx(tx, voter.context, [s.roundId], { scope: "board", fields: "names" }),
+    );
+    expect(row.applicantName).toBe("Namensprobe");
+    expect(Object.keys(row).sort()).toEqual(["applicantName", "applicationId", "createdAt", "roundId", "state"]);
+    expect(JSON.stringify(row)).not.toContain("geheim");
+    expect(JSON.stringify(row)).not.toContain(contacts.contactEmail);
+  });
+
+  it("the board scope gives a non-participant no row either", async () => {
+    const { s, voter } = await fixture();
+    const round = await withSessionContext(s.moderator.context, (tx) => insertTestRound(tx, s.hh.householdId, "open"));
+    await insertApplicationAt(s, "invited", {}, round);
+    const rows = await withSessionContext(voter.context, (tx) =>
+      listVoteCandidatesTx(tx, voter.context, [round], { scope: "board", fields: "names" }),
+    );
+    expect(rows).toEqual([]);
+  });
+
+  it("getRoundTallyBasisTx: a participant sees their own id among the counted voters, a non-participant gets null", async () => {
+    const { s, voter } = await fixture();
+    const basis = await withSessionContext(voter.context, (tx) => getRoundTallyBasisTx(tx, voter.context, s.roundId));
+    expect(basis).not.toBeNull();
+    expect(basis!.countedVoterIds).toContain(voter.profileId);
+    expect(basis!.countedVoterIds).toContain(s.moderator.profileId);
+    // setupPipeline's one room is still planned.
+    expect(basis!.openRoomCount).toBe(0);
+
+    const round = await withSessionContext(s.moderator.context, (tx) => insertTestRound(tx, s.hh.householdId, "open"));
+    expect(await withSessionContext(voter.context, (tx) => getRoundTallyBasisTx(tx, voter.context, round))).toBeNull();
+    expect(
+      await withSessionContext(voter.context, (tx) => getRoundTallyBasisTx(tx, voter.context, "not-a-uuid")),
+    ).toBeNull();
   });
 });
 
@@ -274,7 +353,7 @@ describe("profile-less", () => {
     const profileless = { ...s.hh.context, profileId: null };
     await expect(
       withSessionContext(s.moderator.context, (tx) =>
-        listVoteCandidatesTx(tx, profileless, [s.roundId], { withCard: true }),
+        listVoteCandidatesTx(tx, profileless, [s.roundId], { scope: "votable", fields: "cards" }),
       ),
     ).rejects.toBeInstanceOf(ProfileRequiredError);
   });
