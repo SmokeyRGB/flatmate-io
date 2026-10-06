@@ -90,7 +90,7 @@ export async function joinHouseholdAction(
     const result = await joinHousehold(
       code,
       { displayName, password, email: email || null },
-      { rememberMe, currentSession: current?.context ?? null },
+      { rememberMe, currentSession: current ?? null },
     );
     await setSessionCookie(
       result.session.id,

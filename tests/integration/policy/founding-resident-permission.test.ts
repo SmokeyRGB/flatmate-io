@@ -14,6 +14,9 @@ import {
   type TestHousehold,
 } from "../../helpers/identity";
 
+// claimResidentProfile creates a plain resident, always, and that is unchanged: the founding link's
+// moderator rule applies only to a JOIN through the founding link
+// (founding-link-moderator, tests/integration/policy/founding-link-join.test.ts).
 let hh: TestHousehold | undefined;
 let firstAccountId: string | undefined;
 let secondAccountId: string | undefined;

@@ -65,9 +65,13 @@ function renderJoinCodeCard(
   host: string | null,
   now: Date,
   profileNameById: Map<string, string>,
+  callerIsHouseholdAccount: boolean,
 ) {
   const isDeleted = issuance.deletedAt !== null;
   const url = buildJoinUrl(host, issuance.code);
+  // founding-link-moderator D4: the founder's own link, only while it can still be used. Once it
+  // is spent, expired or deleted it is listed like any other.
+  const isLiveFoundingLink = issuance.isFoundingLink && joinCodeState(issuance, now) === "live";
   // identity/password-reset (O-16, design.md Decision 8): a reset row names the profile it was
   // issued for, "Passwort-Link für <Name>", instead of the ordinary "who joined through this link"
   // line below — a reset link never creates or claims a profile (spec), so that line would always
@@ -114,8 +118,34 @@ function renderJoinCodeCard(
         </div>
       )}
 
+      {isLiveFoundingLink && (
+        <>
+          <p className="text-sm font-medium">
+            {callerIsHouseholdAccount ? t.joinCode.foundingLinkLabel : t.joinCode.foundingLinkLabelNeutral}
+          </p>
+          {/* A caution, not a helper line: where ordinary links are listed beside it, this must
+              visibly outweigh the section's generic warning, which is false for this link. */}
+          <div className="callout callout-caution">
+            <TriangleAlert className="size-4" />
+            <p>
+              {callerIsHouseholdAccount ? t.joinCode.foundingLinkHint : t.joinCode.foundingLinkHintNeutral}
+            </p>
+          </div>
+        </>
+      )}
+
       <p className="font-mono text-sm font-semibold">{issuance.code}</p>
-      <p className="text-xs text-muted-foreground break-all">{url}</p>
+      {isLiveFoundingLink ? (
+        // A plain <a>, not next/link: following it records a rate-limit attempt and resolves the
+        // code, which a prefetch must not do (founding-link-moderator D4).
+        <p className="text-xs break-all">
+          <a href={buildJoinUrl(null, issuance.code)} className="btn-link">
+            {url}
+          </a>
+        </p>
+      ) : (
+        <p className="text-xs text-muted-foreground break-all">{url}</p>
+      )}
       <JoinCodeCopyButtons code={issuance.code} url={url} />
 
       {/* AC-2.26: every link names who joined through it — live, used-up, or deleted
@@ -148,11 +178,15 @@ export function MembersView({
   joinCodeIssuances,
   host,
   now,
+  callerIsHouseholdAccount,
 }: {
   residentList: ResidentListResult;
   joinCodeIssuances: JoinCodeIssuanceRow[];
   host: string | null;
   now: Date;
+  // founding-link-moderator R3: the founding row's copy addresses the founder; a moderator sees
+  // caller-neutral copy instead.
+  callerIsHouseholdAccount: boolean;
 }) {
   const {
     members,
@@ -195,6 +229,11 @@ export function MembersView({
   // joinCodeIssuances already comes back in that order and filtering preserves it (FR-2.29).
   const liveIssuances = joinCodeIssuances.filter((issuance) => joinCodeState(issuance, now) === "live");
   const deadIssuances = joinCodeIssuances.filter((issuance) => joinCodeState(issuance, now) !== "live");
+  // founding-link-moderator D4: the generic warning ("Wer ihn hat, kann mitstimmen") is false for
+  // the founding link, so it is hidden while the founding link is the only live link (a fresh
+  // household). Once ordinary links are listed too it stays, and the founding row's own hint
+  // overrides it for that row.
+  const onlyFoundingLinksLive = liveIssuances.length > 0 && liveIssuances.every((i) => i.isFoundingLink);
 
   const createResidentForm = canCreateProfile ? (
     <div className="card space-y-2">
@@ -223,10 +262,12 @@ export function MembersView({
       {/* FR-2.2/S-49: the warning sits beside the links, visible without interaction. C-2.5: this
           is social visibility, never security — no padlock, no "sicher", no "geschützt" anywhere
           in this section (task 3.9). */}
-      <div className="callout callout-caution">
-        <TriangleAlert className="size-4" />
-        <p>{t.joinCode.warning}</p>
-      </div>
+      {!onlyFoundingLinksLive && (
+        <div className="callout callout-caution">
+          <TriangleAlert className="size-4" />
+          <p>{t.joinCode.warning}</p>
+        </div>
+      )}
 
       {/* The create form parameterises the NEXT link, not an existing one (Decision 6) — issuing
           never rewrites an already-issued link's limits. */}
@@ -267,7 +308,7 @@ export function MembersView({
         <p className="text-sm text-muted-foreground">{t.joinCode.empty}</p>
       ) : (
         <>
-          <ul className="space-y-3">{liveIssuances.map((issuance) => renderJoinCodeCard(issuance, host, now, profileNameById))}</ul>
+          <ul className="space-y-3">{liveIssuances.map((issuance) => renderJoinCodeCard(issuance, host, now, profileNameById, callerIsHouseholdAccount))}</ul>
 
           {/* design.md Decision 9 (revised 2026-09-23, human decision from the 8.3 walkthrough):
               dead links (expired, used up or deleted) are still listed — "Ein toter Link
@@ -280,7 +321,7 @@ export function MembersView({
               <summary className="cursor-pointer text-sm text-muted-foreground">
                 {t.joinCode.deadLinksSummary(deadIssuances.length)}
               </summary>
-              <ul className="space-y-3 pt-3">{deadIssuances.map((issuance) => renderJoinCodeCard(issuance, host, now, profileNameById))}</ul>
+              <ul className="space-y-3 pt-3">{deadIssuances.map((issuance) => renderJoinCodeCard(issuance, host, now, profileNameById, callerIsHouseholdAccount))}</ul>
             </details>
           )}
         </>

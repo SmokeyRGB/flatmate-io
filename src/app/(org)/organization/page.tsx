@@ -4,6 +4,8 @@ import { redirect } from "next/navigation";
 import { listOrganisationTasks, listRoundsForSession } from "@/modules/casting/repository";
 import {
   assertHasPermission,
+  getLiveFoundingLinkPath,
+  isHouseholdAccount,
   getNavigationAccess,
   PermissionDeniedError,
 } from "@/modules/identity/repository";
@@ -63,6 +65,15 @@ export default async function OrganizationPage({
     if (!(err instanceof PermissionDeniedError)) throw err;
   }
 
+  // founding-link-moderator D4: the household account (no manage_rounds) is offered to join its own
+  // household through the founding link while that link is unused and valid. A plain <a> below, not
+  // next/link: the join GET records a rate-limit attempt and resolves the code, so it must not be
+  // prefetched. The read returns null for a caller without manage_join_codes (the code is a secret).
+  const foundingJoinPath =
+    !active && !canOpenRound && (await isHouseholdAccount(current.context))
+      ? await getLiveFoundingLinkPath(current.context)
+      : null;
+
   return (
     <div className="mx-auto max-w-2xl space-y-6 p-6">
       {/* A resident reaches O1 from the avatar menu or Start's moderation bridge, and the (org)
@@ -88,6 +99,19 @@ export default async function OrganizationPage({
           <span className="badge mt-2">{de.status.round[active.status as keyof typeof de.status.round]}</span>
           <LinkPendingHint />
         </Link>
+      ) : foundingJoinPath ? (
+        <div className="card card-featured">
+          <div className="card-band">
+            <p className="eyebrow">{t.asNextEyebrow}</p>
+          </div>
+          <div className="card-featured-body space-y-3">
+            <p className="text-lg font-semibold">{t.foundingJoinHeading}</p>
+            <p className="text-sm text-muted-foreground">{t.foundingJoinBody}</p>
+            <a href={foundingJoinPath} className="btn btn-primary">
+              {t.foundingJoinButton} <ArrowRight className="size-4" />
+            </a>
+          </div>
+        </div>
       ) : showFirstRoundCard ? (
         // The single most important prompt on this page when nothing else is going on yet —
         // the "banded" featured-card variant (09-Design-System.md), not a quiet one.

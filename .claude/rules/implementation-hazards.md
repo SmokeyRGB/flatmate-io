@@ -48,6 +48,24 @@ one property a reviewer named: which rows pair up (`membership_resident_pairing`
 behind it is ambiguous (`membership` per profile and per account, `drizzle/0021`). PR #23 needed
 two review rounds because the first fix covered only the pairing.
 
+**A stored value that grants a privilege needs its whole write boundary in the database.** When a
+column decides who gets a permission (a flag, a counter, a cap), constrain every column that bounds
+how often and to whom it grants, and make the grant-deciding column immutable after insert. The
+shape alone is not enough. Raw SQL as `app_runtime` passes RLS (`FOR ALL`, household isolation
+only), so a check that lives only in the TypeScript that writes the row protects nothing against
+an `UPDATE`. PR #56: the founding-link CHECK pinned purpose and profile but not `max_uses`, `uses`
+or the mark itself, so raising the cap, resetting the count or marking another link would each
+have made more moderators.
+
+**Identify a role by its stored permissions, never by the shape of a session.** "The household
+account" is the membership that holds the household-only permissions
+(`membership_household_only_permissions` lets only `household_admin` hold them). It is not "a
+session with no profile": the schema also allows a non-resident moderator, whose session has no
+profile either (`createNonResidentModerator`). Read the caller's live membership and ask for a
+permission the database reserves to that role. A view shared by several roles (members screen:
+household account and moderators) must not render copy addressed to one of them without knowing
+who the caller is. PR #56 got both wrong on the first push.
+
 **No transaction spans Postgres and Supabase Auth.** A provider call inside `withSessionContext`
 is not rolled back with it. Order the steps so that every failure point leaves a safe state, and
 write down which state each one leaves. For a reset, that means ending the sessions and spending

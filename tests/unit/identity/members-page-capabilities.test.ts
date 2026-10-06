@@ -61,6 +61,7 @@ const liveIssuance = {
   deletedAt: null,
   residentProfileId: null,
   purpose: "join" as const,
+  isFoundingLink: false,
   joinedResidentNames: [],
   hasRemovedJoiner: false,
 };
@@ -73,6 +74,7 @@ function render(flags: Flags): string {
       joinCodeIssuances: flags.canManageJoinCodes ? [liveIssuance] : [],
       host: "example.test",
       now: NOW,
+      callerIsHouseholdAccount: true,
     }),
   );
 }
@@ -153,6 +155,7 @@ describe("the reset link on a member row", () => {
         joinCodeIssuances: issuances,
         host: "example.test",
         now: NOW,
+        callerIsHouseholdAccount: true,
       }),
     );
 
@@ -227,6 +230,7 @@ describe("the members screen with no resident yet", () => {
         joinCodeIssuances: [],
         host: "example.test",
         now: NOW,
+        callerIsHouseholdAccount: true,
       }),
     );
     const form = html.indexOf(de.members.addResidentSubmit);
@@ -234,5 +238,83 @@ describe("the members screen with no resident yet", () => {
     expect(form).toBeGreaterThan(-1);
     expect(links).toBeGreaterThan(-1);
     expect(form).toBeLessThan(links);
+  });
+});
+
+// founding-link-moderator D4: the founder's own link is named while it can still be used.
+describe("the founding link on the members screen", () => {
+  type Issuance = Parameters<typeof MembersView>[0]["joinCodeIssuances"][number];
+  const founding = (over: Partial<Issuance>): Issuance => ({
+    ...liveIssuance,
+    id: "f1",
+    code: "FOUND-1NGCD",
+    isFoundingLink: true,
+    ...over,
+  });
+  const renderWith = (issuances: Issuance[], callerIsHouseholdAccount = true) =>
+    renderToStaticMarkup(
+      createElement(MembersView, {
+        residentList: { members, ...NONE, canManageJoinCodes: true, leadWithJoinCode: false },
+        joinCodeIssuances: issuances,
+        host: "example.test",
+        now: NOW,
+        callerIsHouseholdAccount,
+      }),
+    );
+
+  it("labels a live founding link, hints that it is only for the founder, and links it with a plain anchor", () => {
+    const html = renderWith([founding({})]);
+    expect(html).toContain(de.members.joinCode.foundingLinkLabel);
+    expect(html).toContain(de.members.joinCode.foundingLinkHint);
+    expect(html).toContain('<a href="/join/FOUND-1NGCD"');
+  });
+
+  it.each([
+    ["used", { uses: 1 }],
+    ["deleted", { deletedAt: new Date("2026-10-01T10:00:00Z") }],
+    ["expired", { expiresAt: new Date("2026-10-01T10:00:00Z") }],
+  ])("does not label a %s founding link", (_name, over) => {
+    const html = renderWith([founding(over)]);
+    expect(html).not.toContain(de.members.joinCode.foundingLinkLabel);
+    expect(html).not.toContain(de.members.joinCode.foundingLinkHint);
+    expect(html).not.toContain('<a href="/join/FOUND-1NGCD"');
+  });
+
+  it("the household account sees the founder copy", () => {
+    const html = renderWith([founding({})], true);
+    expect(html).toContain(de.members.joinCode.foundingLinkLabel);
+    expect(html).toContain(de.members.joinCode.foundingLinkHint);
+    expect(html).not.toContain(de.members.joinCode.foundingLinkHintNeutral);
+  });
+
+  it("a moderator sees caller-neutral copy, never the founder's own", () => {
+    const html = renderWith([founding({})], false);
+    expect(html).toContain(de.members.joinCode.foundingLinkLabelNeutral);
+    expect(html).toContain(de.members.joinCode.foundingLinkHintNeutral);
+    expect(html).not.toContain(de.members.joinCode.foundingLinkLabel);
+    expect(html).not.toContain(de.members.joinCode.foundingLinkHint);
+  });
+
+  it("a household with only a live founding link shows no generic warning", () => {
+    const html = renderWith([founding({})]);
+    expect(html).not.toContain(de.members.joinCode.warning);
+    expect(html).toContain(de.members.joinCode.foundingLinkHint);
+  });
+
+  it("keeps the generic warning when an ordinary live link is listed too, and the founding hint still shows", () => {
+    const html = renderWith([founding({}), liveIssuance]);
+    expect(html).toContain(de.members.joinCode.warning);
+    expect(html).toContain(de.members.joinCode.foundingLinkHint);
+  });
+
+  it("shows the generic warning when no link is live, even if a dead founding link is listed", () => {
+    const html = renderWith([founding({ uses: 1 })]);
+    expect(html).toContain(de.members.joinCode.warning);
+  });
+
+  it("does not label an ordinary link", () => {
+    const html = renderWith([liveIssuance]);
+    expect(html).not.toContain(de.members.joinCode.foundingLinkLabel);
+    expect(html).not.toContain(de.members.joinCode.foundingLinkHint);
   });
 });

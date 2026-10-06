@@ -76,3 +76,54 @@ describe("decideJoinScreen", () => {
     });
   });
 });
+
+// founding-link-moderator D3: the household account opening its own founding link is the founder
+// about to join, so it gets the form; every other same-household session is still already_member.
+describe("decideJoinScreen: the founding link and the household account", () => {
+  const sameHousehold = neutralResolution.householdId;
+
+  it("the household account on its founding link gets the neutral form", () => {
+    expect(
+      decideJoinScreen({
+        allowed: true,
+        resolved: neutralResolution,
+        sessionHouseholdId: sameHousehold,
+        householdAccountFoundingLink: true,
+      }),
+    ).toEqual({ kind: "neutral", householdName: neutralResolution.householdName, founderNote: true });
+  });
+
+  it("a signed-out visitor on the founding link gets the plain neutral form, with no founder note", () => {
+    expect(
+      decideJoinScreen({ allowed: true, resolved: neutralResolution, sessionHouseholdId: null }),
+    ).toEqual({ kind: "neutral", householdName: neutralResolution.householdName });
+  });
+
+  it("the household account on an ordinary link is still already_member", () => {
+    expect(
+      decideJoinScreen({
+        allowed: true,
+        resolved: neutralResolution,
+        sessionHouseholdId: sameHousehold,
+        householdAccountFoundingLink: false,
+      }),
+    ).toEqual({ kind: "already_member" });
+  });
+
+  it("a resident on the founding link is still already_member (the flag is never set for a resident)", () => {
+    expect(
+      decideJoinScreen({ allowed: true, resolved: neutralResolution, sessionHouseholdId: sameHousehold }),
+    ).toEqual({ kind: "already_member" });
+  });
+
+  it("the flag never overrides another household's session", () => {
+    expect(
+      decideJoinScreen({
+        allowed: true,
+        resolved: neutralResolution,
+        sessionHouseholdId: otherHouseholdId,
+        householdAccountFoundingLink: true,
+      }),
+    ).toEqual({ kind: "other_household" });
+  });
+});

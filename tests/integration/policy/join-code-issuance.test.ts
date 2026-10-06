@@ -9,7 +9,12 @@ import {
   listJoinCodeIssuances,
 } from "@/modules/identity/repository";
 import { membership } from "@/modules/identity/schema";
-import { cleanupAll, registerTestHousehold, type TestHousehold } from "../../helpers/identity";
+import {
+  cleanupAll,
+  createTestModerator,
+  registerTestHousehold,
+  type TestHousehold,
+} from "../../helpers/identity";
 
 let hh: TestHousehold | undefined;
 
@@ -100,5 +105,37 @@ describe("Join code issuance lifecycle (FR-2.1/FR-2.5 as amended)", () => {
 
     const days = (founding.expiresAt.getTime() - founding.createdAt.getTime()) / (24 * 60 * 60 * 1000);
     expect(days).toBeCloseTo(7, 1);
+  });
+});
+
+// founding-link-moderator D1: registration marks the one link it issues, and no other path does.
+describe("The founding link (founding-link-moderator D1)", () => {
+  it("marks the one link registration issues: neutral join link, no profile, single use", async () => {
+    hh = await registerTestHousehold();
+    const issuances = await listJoinCodeIssuances(hh.context, hh.accountId);
+    const founding = issuances.filter((i) => i.isFoundingLink);
+    expect(founding).toHaveLength(1);
+    expect(issuances).toHaveLength(1);
+    expect(founding[0].purpose).toBe("join");
+    expect(founding[0].residentProfileId).toBeNull();
+    expect(founding[0].maxUses).toBe(1);
+  });
+
+  it("never marks a link issued later, by the household account or by a moderator, even when a caller smuggles the option in", async () => {
+    hh = await registerTestHousehold();
+    const moderator = await createTestModerator(hh);
+    // `founding` is not part of the public options type; a cast is how a caller would try.
+    const smuggled = { validDays: 7, maxUses: 1, founding: true } as unknown as { validDays: number; maxUses: number };
+
+    const byHousehold = await issueJoinCode(hh.context, hh.accountId, smuggled);
+    const byModerator = await issueJoinCode(moderator.context, moderator.accountId, smuggled);
+    const plain = await issueJoinCode(hh.context, hh.accountId, { validDays: 7, maxUses: 2 });
+
+    expect(byHousehold.isFoundingLink).toBe(false);
+    expect(byModerator.isFoundingLink).toBe(false);
+    expect(plain.isFoundingLink).toBe(false);
+
+    const issuances = await listJoinCodeIssuances(hh.context, hh.accountId);
+    expect(issuances.filter((i) => i.isFoundingLink)).toHaveLength(1); // still only registration's
   });
 });

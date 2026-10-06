@@ -219,6 +219,12 @@ export const de = {
       // not offered the way to open a round; runs of the round are the moderation's (S-50/U-20).
       noRoundYetHeading: "Noch keine Runde",
       noRoundYetBody: "Casting-Runden eröffnet die Moderation der WG.",
+      // founding-link-moderator D4 (2026-10-06): drafts for the human to confirm. Shown to the
+      // household account while the founding link is still unused.
+      foundingJoinHeading: "Tritt deiner WG selbst bei",
+      foundingJoinBody:
+        "Über deinen Gründungslink wirst du Bewohner:in und Moderator:in. Nur für dich — gib ihn nicht weiter.",
+      foundingJoinButton: "Jetzt beitreten",
       otherRoundsHeading: "Weitere Runden",
       roomsLink: "Zimmer",
       membersLink: "Mitglieder",
@@ -243,6 +249,16 @@ export const de = {
     // synonym); everything else here is new copy for this change.
     joinCode: {
       heading: "Einladungslinks",
+      // founding-link-moderator D4 (2026-10-06): drafts for the human to confirm. The founder's own
+      // link, while it can still be used: not to be passed on, since joining through it makes the
+      // joiner moderator.
+      foundingLinkLabel: "Dein Gründungslink",
+      foundingLinkHint: "Nur für dich. Wer darüber beitritt, wird Moderator:in.",
+      // R3 (Copilot round, PR #56): the same row for a moderator, who also sees this screen and is
+      // not the founder. Caller-neutral drafts, for the human to confirm.
+      foundingLinkLabelNeutral: "Gründungslink",
+      foundingLinkHintNeutral:
+        "Gedacht für die Person, die die WG angelegt hat. Wer darüber beitritt, wird Moderator:in.",
       // S-49/FR-2.2: sits beside the links, visible without interaction — never presented as
       // security (C-2.5), just social visibility.
       warning:
@@ -652,6 +668,10 @@ export const de = {
     // link's heading is now just the greeting — the invitation itself is the shared household chip
     // above, so the two are never duplicated in one sentence as the old single-string version did.
     boundHeading: (displayName: string) => `Hi ${displayName}!`,
+    // founding-link-moderator D3 (2026-10-06): DRAFT for the human to confirm. Shown to the
+    // household account opening its own founding link.
+    foundingJoinNote:
+      "Du wirst dabei als Verwaltung abgemeldet und bist danach als Bewohner:in und Moderator:in angemeldet.",
     // identity/password-reset (O-16, screens/A-zugang.md A3 bound shape): a third screen shape,
     // shown when purpose = 'password_reset'. Same greeting as an ordinary bound link — the person
     // is asked only for a new password (spec: "SHALL NOT ask for a name or an email").
