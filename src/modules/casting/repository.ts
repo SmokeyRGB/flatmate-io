@@ -14,7 +14,6 @@ import {
   type ParsedApplication,
   type RawApplicationInput,
 } from "./application-input";
-import { noticeCategories } from "./application-notice";
 import {
   applicationBaseline,
   changedApplicationFields,
@@ -484,16 +483,66 @@ async function applyTransitionTx(
   return updated;
 }
 
+// The one preamble of every state change of an application (transitionApplication,
+// inviteApplication): one place for the order the guards run in, so the two cannot drift.
+//   - a profile-less session is refused BEFORE any query (G-D15/ADR-014), so the error names the
+//     missing profile instead of arriving as "not found" once RLS hides the row;
+//   - a malformed id is `not_found`, before any query. `roundId: null` means "no round predicate";
+//     any other value must be a UUID, so a caller that names a round can never lose the predicate;
+//   then ONE transaction:
+//   a. the caller's live membership is read FOR SHARE and must hold `change_application_state`,
+//      BEFORE the row is read, so a member without it learns nothing about the row (not even its
+//      state);
+//   b. the row is read FOR UPDATE with the household predicate, and the round predicate unless
+//      `roundId` is null (no row -> `not_found`), lifecycle columns only. Before this lock, two
+//      concurrent transitions both read `new` and both wrote;
+//   c. `fn` runs on the locked row, in the same transaction.
+// Lock order: membership FOR SHARE -> application FOR UPDATE (LOCK ORDER on openRoundTx).
+async function withLockedApplication<T>(
+  context: SessionContext,
+  caller: string,
+  ids: { applicationId: string; roundId: string | null },
+  fn: (tx: Tx, current: { id: string; householdId: string; state: ApplicationState }) => Promise<T>,
+): Promise<T> {
+  if (context.profileId === null) throw new ProfileRequiredError(caller);
+  const { applicationId, roundId } = ids;
+  if (
+    typeof applicationId !== "string" ||
+    !isUuid(applicationId) ||
+    (roundId !== null && (typeof roundId !== "string" || !isUuid(roundId)))
+  ) {
+    throw new ApplicationTransitionError("not_found");
+  }
+  return withSessionContext(context, async (tx) => {
+    await assertHasPermissionTx(tx, context, "change_application_state");
+
+    const [current] = await tx
+      .select({
+        id: application.id,
+        householdId: application.householdId,
+        state: application.state,
+      })
+      .from(application)
+      .where(
+        and(
+          eq(application.id, applicationId),
+          roundId === null ? undefined : eq(application.roundId, roundId),
+          eq(application.householdId, context.householdId),
+        ),
+      )
+      .for("update");
+    if (!current) throw new ApplicationTransitionError("not_found");
+
+    return fn(tx, current);
+  });
+}
+
 // FR-0.10/FR-0.11/FR-0.12, FR-3.24, AC-3.21. Takes NO actor: the account and profile come from
 // `context` (BREAKING: the caller-supplied actor parameter is gone).
 //
-// Order: a profile-less session is refused BEFORE any query (G-D15). Then ONE transaction:
-//   a. the caller's live membership is read FOR SHARE and must hold `change_application_state`,
-//      so someone without it learns nothing about the row;
-//   b. the row is read FOR UPDATE with the household predicate (no row -> `not_found`). Before
-//      this lock, two concurrent transitions both read `new` and both wrote;
-//   c. applyTransitionTx: the declared rule (D6a), every permission it requires, the UPDATE and
-//      the event.
+// Order: withLockedApplication's guards (profile, id, permission, the row FOR UPDATE with the
+// household predicate), then applyTransitionTx: the declared rule (D6a), every permission it
+// requires, the UPDATE and the event.
 //
 // Writers of an application row (design D7), each serialised on the row lock in ONE lock order,
 // membership (FOR SHARE) -> household_settings -> casting_round -> room -> application:
@@ -509,31 +558,9 @@ export async function transitionApplication(
   applicationId: string,
   toState: ApplicationState,
 ) {
-  // G-D15/ADR-014: a household-account session may not transition an Application. Refused here,
-  // before any query, so the error names the missing profile instead of arriving as "not found"
-  // once RLS hides the row.
-  if (context.profileId === null) {
-    throw new ProfileRequiredError("transitionApplication");
-  }
-  if (typeof applicationId !== "string" || !isUuid(applicationId)) {
-    throw new ApplicationTransitionError("not_found");
-  }
-  return withSessionContext(context, async (tx) => {
-    await assertHasPermissionTx(tx, context, "change_application_state");
-
-    const [current] = await tx
-      .select({
-        id: application.id,
-        householdId: application.householdId,
-        state: application.state,
-      })
-      .from(application)
-      .where(and(eq(application.id, applicationId), eq(application.householdId, context.householdId)))
-      .for("update");
-    if (!current) throw new ApplicationTransitionError("not_found");
-
-    return applyTransitionTx(tx, context, current, toState);
-  });
+  return withLockedApplication(context, "transitionApplication", { applicationId, roundId: null }, (tx, current) =>
+    applyTransitionTx(tx, context, current, toState),
+  );
 }
 
 // F5 `candidate-invite`, FR-5.24, FR-5.28, AC-5.10, AC-5.23 (design D1/D2). „Einladen": takes an
@@ -542,15 +569,10 @@ export async function transitionApplication(
 // transition with its own `application.state_changed` event (G-D3). No edge is added to the
 // declared table. Takes NO actor: both ids come from `context`.
 //
-// Order: a profile-less session is refused BEFORE any query (G-D15), then a malformed id. Then ONE
-// transaction:
-//   a. the caller's live membership is read FOR SHARE and must hold `change_application_state`,
-//      BEFORE the row is read, so a member without it learns nothing about the row's state (an
-//      `invited` no-op or `not_invitable` answer would be a state oracle);
-//   b. the row is read FOR UPDATE with the id + round + household predicates (no row -> not_found;
-//      the round predicate makes a stale tab for another round a refusal, never a silent invite),
-//      lifecycle columns only;
-//   c. by state: `invited` is a no-op ({ alreadyInvited: true }, no write, no event); `new` runs
+// Order: withLockedApplication's guards, the same as transitionApplication's (the permission BEFORE
+// the row is read, so an `invited` no-op or `not_invitable` answer is never a state oracle), with
+// the round predicate added (a stale tab for another round is a refusal, never a silent invite).
+// Then, by state: `invited` is a no-op ({ alreadyInvited: true }, no write, no event); `new` runs
 //      two applyTransitionTx calls (the second on the first's returned row); `screened` runs one;
 //      any other state is `not_invitable`. applyTransitionTx re-checks every `requires` per row.
 //
@@ -573,37 +595,9 @@ export async function inviteApplication(
   context: SessionContext,
   input: { roundId: string; applicationId: string },
 ): Promise<{ alreadyInvited: boolean }> {
-  if (context.profileId === null) {
-    throw new ProfileRequiredError("inviteApplication");
-  }
-  if (
-    typeof input.roundId !== "string" ||
-    !isUuid(input.roundId) ||
-    typeof input.applicationId !== "string" ||
-    !isUuid(input.applicationId)
-  ) {
-    throw new ApplicationTransitionError("not_found");
-  }
-  return withSessionContext(context, async (tx) => {
-    await assertHasPermissionTx(tx, context, "change_application_state");
-
-    const [current] = await tx
-      .select({
-        id: application.id,
-        householdId: application.householdId,
-        state: application.state,
-      })
-      .from(application)
-      .where(
-        and(
-          eq(application.id, input.applicationId),
-          eq(application.roundId, input.roundId),
-          eq(application.householdId, context.householdId),
-        ),
-      )
-      .for("update");
-    if (!current) throw new ApplicationTransitionError("not_found");
-
+  // `?? ""`: a missing round id must stay a refusal (not_found), never become null = no predicate.
+  const ids = { applicationId: input?.applicationId, roundId: input?.roundId ?? "" };
+  return withLockedApplication(context, "inviteApplication", ids, async (tx, current) => {
     if (current.state === "invited") return { alreadyInvited: true };
     if (current.state === "new") {
       const screened = await applyTransitionTx(tx, context, current, "screened");
