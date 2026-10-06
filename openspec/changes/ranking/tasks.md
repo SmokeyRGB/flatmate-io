@@ -394,7 +394,7 @@ reason codes, not only lengths.
 
 ## 8. Demo seed (design D8)
 
-- [ ] 8.1 `scripts/seed-demo-household.ts`:
+- [x] 8.1 `scripts/seed-demo-household.ts`:
   - claim Kim and Jule beside Alex and Sam **before** the round opens;
   - keep Robin prepared with the bound link;
   - move both rooms `planned → open` as the household account (`transitionRoomStatus`);
@@ -410,7 +410,7 @@ reason codes, not only lengths.
   - print the WG-Kennung (`household.signInCode`), the resident names, the links and a short
     "What to show" list naming Sam as the presenter. Counts only, no applicant data;
   - update the header comment. Keep the "not idempotent, run cleanup first" note.
-- [ ] 8.2 `scripts/cleanup-demo-household.sql`: the pre-mortem confirmed it covers every declared
+- [x] 8.2 `scripts/cleanup-demo-household.sql`: the pre-mortem confirmed it covers every declared
   table (12 deleted, `join_attempt` emptied, `activity_event` kept by design). Add a one-line
   comment naming this change as the last check. Change nothing else.
 

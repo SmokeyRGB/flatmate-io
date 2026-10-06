@@ -58,6 +58,8 @@ BEGIN
   -- production project accumulated 1.9k rooms and 1.5k rounds before anyone noticed. Order does not
   -- matter without FKs, except application before casting_round (drizzle/0026); the list is what matters, and it is the same list as
   -- tests/helpers/identity.ts's cleanup CTE.
+  -- Last checked against every table the modules declare for the ranking change (F5 change 1, openspec
+  -- change `ranking`): no new table, nothing to add; activity_event stays on purpose (append-only).
   DELETE FROM round_participation  WHERE household_id = v_household;
   -- application first: drizzle/0026 refuses to delete a round that still has applications.
   DELETE FROM vote                 WHERE household_id = v_household;
