@@ -1,6 +1,5 @@
 import { eq } from "drizzle-orm";
 import { afterEach, describe, expect, it } from "vitest";
-import { withSessionContext } from "@/db/session-context";
 import { ApplicationTransitionError, inviteApplication } from "@/modules/casting/repository";
 import { application } from "@/modules/casting/schema";
 import { castVote, VoteError } from "@/modules/deliberation/repository";
