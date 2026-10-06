@@ -28,7 +28,7 @@ type Tx = Parameters<Parameters<typeof withSessionContext>[1]>[0];
 // Deliberation's repository (F4 change 1, design D3-D5). The vote rules live in the database
 // (drizzle/0028 `vote_guard`); this file maps its refusals to typed codes and owns the one
 // definition of "awaiting my vote", used by the deck and by Start's T-5 count. It reads casting
-// data only through casting's two query ports, never in its own SQL (kontextgrenzen.md §4).
+// data only through casting's query ports, never in its own SQL (kontextgrenzen.md §4).
 // ---------------------------------------------------------------------------------------------
 
 export type VoteErrorCode =

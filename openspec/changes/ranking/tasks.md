@@ -282,17 +282,17 @@ and the closed-round half follows in the finalization of F3. `guarded-tests.ts` 
 `implemented` entries, so deleting this file turns nothing red until then. Assert result kinds and
 reason codes, not only lengths.
 
-- [ ] 6.1 **Frozen rules** (AC-5.5, F-1). After opening, change `scaleWeights.good` to 4,
+- [x] 6.1 **Frozen rules** (AC-5.5, F-1). After opening, change `scaleWeights.good` to 4,
   `quorumShare` to `"1"` and `hideResultsUntilVoted` to `false` via `updateHouseholdSettings`
   (allowed while open since 2026-10-05). Scores, needed and hiding still follow the snapshot.
   Break: read the weights from `household_settings` in `getRanking`; the test must fail.
-- [ ] 6.2 **Broken rules** (EC-5.5/5.6, Q-7). Write the snapshot through the same mechanism the
+- [x] 6.2 **Broken rules** (EC-5.5/5.6, Q-7). Write the snapshot through the same mechanism the
   pass's malformed-snapshot test uses, and expect `refused` with reason `rules_invalid` for:
   - all-zero weights;
   - share `0`, `"1.5"`, `"x"`;
   - hide flag `"yes"`.
   Break: skip `parseRoundRules`; the test must fail.
-- [ ] 6.3 **V-4** (AC-5.15–5.19, EC-5.12). With hiding on:
+- [x] 6.3 **V-4** (AC-5.15–5.19, EC-5.12). With hiding on:
   - unvoted A lands in `hidden`, and `Object.keys` of the row equals exactly `applicationId,
     applicantName, state` (AC-5.16);
   - after `castVote` on A, A is visible (AC-5.17);
@@ -305,16 +305,16 @@ reason codes, not only lengths.
   - hidden rows come back ordered `createdAt, id`.
   Break: treat any vote row of the viewer, regardless of stage, as a reveal; the AC-5.19 case must
   fail.
-- [ ] 6.4 **Hidden after voting closed** (R-7). A candidate moved to `invited` before the viewer
+- [x] 6.4 **Hidden after voting closed** (R-7). A candidate moved to `invited` before the viewer
   voted on it stays hidden. So does an unvoted `new` candidate in a paused round. Break: reveal
   when the viewer can no longer vote (the old §5.4 disjunct); both cases must fail.
-- [ ] 6.5 **V-1** (AC-5.24/5.25/5.27, EC-5.11). Set `became_resident_id` by raw SQL to the
+- [x] 6.5 **V-1** (AC-5.24/5.25/5.27, EC-5.11). Set `became_resident_id` by raw SQL to the
   viewer's profile, and give that application enough counted votes to reach quorum. It must be
   absent from `scored`, `unscored` and `hidden`, and it must not take a `leading` slot. Check this
   in an open and a paused round, with hiding on and off. Another resident sees it scored. Break:
   drop the port's `IS DISTINCT FROM` predicate; the test must fail. (There is no "earlier profile
   of the same account" case: design D5, the unique index refuses it.)
-- [ ] 6.6 **G-D2 open-round half and Q-6** (former members).
+- [x] 6.6 **G-D2 open-round half and Q-6** (former members).
   - Four voters at share 0.5 (quorum 2). Move one voter out via `setMovedOut`. Their vote leaves
     score, n and numerator, and the denominator drops to 3. Choose votes so that the candidate
     visibly changes, e.g. from scored to unscored.
@@ -322,14 +322,14 @@ reason codes, not only lengths.
   - Reactivate the moved-out voter via `reactivateMember`; their vote counts again.
   - Unscored → scored → unscored by withdrawing a vote (EC-5.12).
   Break: count every non-withdrawn vote regardless of `countedVoterIds`; the test must fail.
-- [ ] 6.7 **Highlight N** (Q-15). Build a round over three rooms (`createRoom` ×3, then
+- [x] 6.7 **Highlight N** (Q-15). Build a round over three rooms (`createRoom` ×3, then
   `createAndOpenRound`). Move two rooms `planned → open` via `transitionRoomStatus`; exactly two
   rows lead. Put one `on_hold`; one leads. Move it `open → not_available`; it stays excluded.
   (`promised` and `deleted_at` cannot be reached through real paths for a room in an open round:
   `removeRoom` refuses it and `open → promised` is not F1-reachable. Both are **invariant guards**
   covered by the `status = 'open' AND deleted_at IS NULL` predicate, so build no raw-SQL
   workaround.) Break: count `planned` rooms too; the test must fail.
-- [ ] 6.8 **V-2 and a stale context.**
+- [x] 6.8 **V-2 and a stale context.**
   - non-participant by address → `refused: not_eligible`, with no title in the result;
   - malformed id → the same;
   - a `draft` or `closed` round by address → `round_not_available` with its status;
@@ -338,7 +338,7 @@ reason codes, not only lengths.
   - a context whose membership was revoked after the context was built → `not_eligible` (design D5:
     the live-membership read refuses it).
   Break: skip step 2's permission check; the stripped-`vote` and revoked cases must fail.
-- [ ] 6.9 `test/guarded.manifest.json` G-D2 **stays `pending`** (human decision 2026-10-06). Do not
+- [x] 6.9 `test/guarded.manifest.json` G-D2 **stays `pending`** (human decision 2026-10-06). Do not
   touch the manifest.
 
 ## 7. The screen (design D7)
