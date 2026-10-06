@@ -67,10 +67,20 @@ can_read_deliberation(session, artifact) :=
 | `ActivityEvent` mit Beratungsbezug | aus dem Feed gefiltert |
 | `Notification` | wird mit `suppressed_reason = self_redaction` unterdrückt, nicht zugestellt |
 
-**Was die Person stattdessen sieht:** ihre eigene Karte mit dem **Sachprofil** (Name, Alter,
+**Was die Person stattdessen sieht:** ~~ihre eigene Karte mit dem **Sachprofil** (Name, Alter,
 Kontakt, eingereichter Text, Zimmer, Einzugsdatum) und einem **ehrlichen Hinweis** in der Art
 „Beratungsinhalte zu deiner eigenen Bewerbung sind für dich dauerhaft ausgeblendet." Kein leerer
-Kasten, keine Notlüge über nicht vorhandene Daten — die Person weiß, dass abgestimmt wurde.
+Kasten, keine Notlüge über nicht vorhandene Daten — die Person weiß, dass abgestimmt wurde.~~
+*Gestrichen 2026-10-05 (Menschenentscheidung Q-9):* die eigene Bewerbung wird wie eine nicht
+vorhandene verweigert, es gibt keine eigene Karte (siehe `screens/D-casting-tab.md`, D3 gestrichen).
+
+> **Hinweis zur Laufzeit (2026-10-05, F5 Änderung 1).** `membership_account_id_unique`
+> (`drizzle/0021`) erlaubt je Account genau eine Mitgliedschaft, damit höchstens ein Profil. Heute
+> ist `redaction_subjects` für eine Bewohner-Sitzung daher genau `{session.profile_id}`. Das
+> Lesen der Rangliste prüft das zur Laufzeit: die Prüfung der Berechtigung läuft über die lebende
+> Mitgliedschaft (nicht widerrufen **und** `resident_profile_id` gleich dem Profil der Sitzung),
+> nicht über ein Sitzungsfeld. Lockert eine Migration diese beiden Indizes, trägt diese Äquivalenz
+> nicht mehr.
 
 **Warum genau diese Formulierung und keine der naheliegenden Alternativen:**
 
@@ -178,12 +188,18 @@ profile.status = 'moved_out'  ⟹  can_see_round(...) = false  für jede Runde
 ```text
 // (b) Zählbarkeit — differenziert:
 
-// Stimmen bleiben erhalten und werden als "ehemaliges Mitglied" gekennzeichnet.
-// Sie werden NICHT gelöscht: eine abgeschlossene Entscheidung muss nachvollziehbar bleiben.
+// Stimmen bleiben gespeichert; sie WERDEN NICHT gelöscht.
+// Menschenentscheidung 2026-10-05 (Q-6/R-4): gezählt wird nur, wer im Nenner steht — ein
+// ausgezogenes oder entferntes Mitglied verlässt Score, Zähler und Nenner zugleich; bei
+// Reaktivierung zählt die Stimme wieder. Vormals: "ehemalige Mitglieder eingeschlossen".
 score_votes(application, stage) :=
     { v ∈ Vote | v.application_id = application.id
                ∧ v.stage = stage
-               ∧ v.withdrawn_at = null }        // ehemalige Mitglieder eingeschlossen
+               ∧ v.withdrawn_at = null
+               ∧ profile(v).status = 'active'
+               ∧ ∃ p ∈ RoundParticipation : p.resident_profile_id = v.resident_profile_id
+                     ∧ p.round_id = round_of(application).id
+                     ∧ p.removed_at = null ∧ p.can_vote = true }
 
 // Das Quorum misst Beteiligung der HEUTE Stimmberechtigten — dort werden sie herausgerechnet:
 quorum_denominator(round) :=
@@ -207,15 +223,23 @@ herunter, bleiben die Stimmen ausgezogener Personen im Zähler — und die Betei
 100 % steigen. Das ist nicht bloß hässlich: die Kernmetrik des Produkts ist die
 **Beteiligungsquote**, und eine Metrik, die 114 % anzeigen kann, ist keine.
 
-Die Stimme bleibt trotzdem **im Score** (`score_votes`), weil der Score die Meinung des Gremiums
+~~Die Stimme bleibt trotzdem **im Score** (`score_votes`), weil der Score die Meinung des Gremiums
 zum Zeitpunkt der Beratung abbildet. Beides zugleich ist kein Widerspruch, sondern die Trennung von
-*„was wurde geurteilt"* und *„wie viele der heute Zuständigen haben sich beteiligt"*.
+*„was wurde geurteilt"* und *„wie viele der heute Zuständigen haben sich beteiligt"*.~~
+*Überholt durch die Menschenentscheidung vom 2026-10-05 (Q-6/R-4):* `score_votes` zählt nur noch
+Stimmen aus dem Nenner, Score und Quote beruhen auf derselben Menge. U-27 („aus Punktestand
+auszunehmen") ist damit bestätigt.
 
 **Beim Schließen einfrieren** verhindert den umgekehrten Effekt: zieht ein halbes Jahr später jemand
 aus, dürfen sich die Quoten einer abgeschlossenen Runde nicht rückwirkend ändern.
 
-> **Auszug während einer offenen Runde — entschieden** (vormals O-2, Querprüfung V0.2):
-> **die Stimme bleibt im Score, die Person fällt aus Zähler und Nenner.** Genau die Rechnung oben.
+> **Auszug während einer offenen Runde — entschieden** (vormals O-2, Querprüfung V0.2) und
+> **am 2026-10-05 von der Menschenentscheidung Q-6/R-4 geändert: die Stimme eines ehemaligen
+> Mitglieds verlässt Score, Zähler und Nenner zugleich; bei Reaktivierung zählt sie wieder.**
+> Genau die Rechnung oben. Eine abgeschlossene Runde muss beim Schließen Nenner und Menge der
+> zählenden Stimmen einfrieren (offen, kein Schließpfad vorhanden, siehe Register).
+>
+> **Vormals — entschieden: die Stimme bleibt im Score, die Person fällt aus Zähler und Nenner.**
 >
 > Die Gegenposition — Stimme in offenen Runden ebenfalls herausrechnen, weil die Person die
 > Entscheidung nicht mehr mitträgt — wurde aus drei Gründen verworfen:
@@ -229,8 +253,10 @@ aus, dürfen sich die Quoten einer abgeschlossenen Runde nicht rückwirkend änd
 > 3. Praktisch kann das Entfernen von Stimmen Kandidaten **unter das Quorum drücken** und sie sichtbar
 >    aus der Rangliste reißen — für die Betroffenen ein Rückschritt ohne Ursache.
 >
-> **UI-Anforderung daraus:** die Einzelansicht markiert „1 Stimme von einem ehemaligen Mitglied".
-> Sichtbarkeit statt Korrektur — dieselbe Logik wie beim Veto (absenken, nicht löschen).
+> **UI-Anforderung daraus (vormals):** die Einzelansicht markiert „1 Stimme von einem ehemaligen
+> Mitglied". Sichtbarkeit statt Korrektur — dieselbe Logik wie beim Veto (absenken, nicht löschen).
+> *Nach Q-6 wird der Hinweis „x Stimmen entfernt …" der Einzelansicht (F5 Änderung 2) der sichtbare
+> Anlass, den P-3 verlangt.*
 
 ### 5.4 V-4 — Ergebnisse verdeckt bis zur eigenen Stimmabgabe
 
@@ -240,7 +266,7 @@ can_see_results(session, application, stage) :=
   ∧ ¬ is_self_subject(session, application)                 // V-1 hat Vorrang
   ∧ (
       ¬ settings_of(round).hide_results_until_voted          // Einstellung aus
-      ∨ ¬ can_vote(session, round_of(application), stage)    // wer nicht stimmen darf, wartet nicht
+      ∨ ¬ is_round_voter(session, round_of(application))     // wer nie Stimmberechtigter der Runde ist, wartet nicht
       ∨ ∃ v ∈ Vote : v.application_id = application.id
             ∧ v.stage = stage
             ∧ v.resident_profile_id = session.profile_id
@@ -248,11 +274,22 @@ can_see_results(session, application, stage) :=
     )
 ```
 
+`is_round_voter(session, round)` ist die Mitgliedschaft in der Runde, **ohne** Rundenstatus und
+`stage`: ein `RoundParticipation`-Eintrag der Sitzung mit `removed_at = null` und `can_vote = true`.
+Sie ist von `can_vote` getrennt, das zusätzlich `round.status = 'open'` und `stage_open` verlangt
+(Menschenentscheidung R-7, 2026-10-05).
+
 Drei Details, die leicht falsch laufen:
 
-1. **Der Ausschluss für Nicht-Stimmberechtigte ist notwendig, nicht kulant.** Ohne ihn würde der
-   Haushalts-Account (der nicht abstimmen kann) die Ergebnisse **nie** sehen — und könnte nicht
-   moderieren. Dasselbe gilt für ehemalige Mitglieder in abgeschlossenen Runden, sofern sie
+1. **Der Ausschluss für Nicht-Stimmberechtigte ist notwendig, nicht kulant — und er gilt nur für
+   wen nie abstimmt.** Ohne ihn würde der Haushalts-Account (der nicht abstimmen kann) die
+   Ergebnisse **nie** sehen — und könnte nicht moderieren. *(Neu gefasst 2026-10-05, Menschenentscheidung
+   R-7:)* Das Prädikat `¬ can_vote(session, round_of(application), stage)` hätte auch einer
+   Person die Ergebnisse gezeigt, die nur **nicht mehr** abstimmen kann (Runde pausiert, `Application`
+   nicht mehr `new`/`screened`) — und damit „abstimmen, dann sehen" umgangen. Diese Zeilen bleiben
+   verdeckt („Verdeckt — du hast hier nicht abgestimmt"). Die Ausnahme behält ihren Zweck: wer
+   überhaupt kein Stimmberechtigter der Runde ist. In v0.1 sieht eine solche Sitzung keine Rangliste
+   (V-2), die Ausnahme greift dort noch nicht. Dasselbe gilt für ehemalige Mitglieder, sofern sie
    überhaupt noch Zugriff hätten (haben sie nach V-3 nicht).
 2. **`stage`-Granularität.** Wer in Runde 1 abgestimmt hat, hat damit **nicht** die Ergebnisse von
    Runde 2 freigeschaltet. Die Prüfung läuft pro `stage`, nicht pro Bewerbung.
