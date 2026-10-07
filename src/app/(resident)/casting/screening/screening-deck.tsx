@@ -20,13 +20,11 @@ import type { ScaleWeights } from "@/modules/deliberation/round-rules";
 import { VOTE_VALUES, type VoteValue } from "@/modules/deliberation/vote-values";
 import { HORIZONTAL_RATIO, SLOP_PX, releaseDecision } from "@/ui/swipe";
 import { SubmitButton } from "@/ui/submit-button";
-import { de } from "@/ui/strings";
+import { useStrings } from "@/ui/strings/provider";
 import { CardBody } from "../candidate-card-body";
 import { WeightsList } from "../weights-list";
 import { castVoteAction, type CastVoteResult } from "./actions";
 import { canGoBack, canGoForward, deckReducer, initialDeckState } from "./deck-state";
-
-const t = de.screening;
 
 // One colour class per level (a red-to-green scale from the design system's --vote-* tokens, see
 // globals.css). Colour never stands alone: every level also has its symbol and its label, and the
@@ -78,6 +76,7 @@ export function RatingBar({
   busy: boolean;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
 }) {
+  const t = useStrings().screening;
   return (
     <form onSubmit={onSubmit} className="rating-bar" aria-label={t.ratingGroupLabel}>
       {VOTE_VALUES.map((v) => {
@@ -123,6 +122,8 @@ export function ScreeningDeck({
   weights: ScaleWeights;
   cards: ScreeningCard[];
 }) {
+  const s = useStrings();
+  const t = s.screening;
   const router = useRouter();
   const [state, dispatch] = useReducer(deckReducer, cards, (initial) => initialDeckState(initial.map((c) => c.applicationId)));
   const [byId] = useState(() => new Map(cards.map((c) => [c.applicationId, c])));
@@ -331,7 +332,7 @@ export function ScreeningDeck({
         <p className="text-sm" role="status">
           {refusal.kind === "round_not_open"
             ? refusal.status
-              ? t.refusal.roundNotOpen(de.status.round[refusal.status])
+              ? t.refusal.roundNotOpen(s.status.round[refusal.status])
               : t.refusal.roundNotOpenUnknown
             : t.refusal.notEligible}
         </p>

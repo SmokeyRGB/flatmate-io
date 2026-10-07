@@ -58,7 +58,7 @@ describe("Round participant list", () => {
     const { accountId: movedOutAccountId } = await claimResidentProfile(
       hh.context,
       movedOutProfile.id,
-      "test-password-not-real-1234",
+      "test-password-not-real-1234", "de",
     );
     accountIds.push(movedOutAccountId);
 
@@ -66,7 +66,7 @@ describe("Round participant list", () => {
     const { accountId: removedAccountId } = await claimResidentProfile(
       hh.context,
       removedProfile.id,
-      "test-password-not-real-1234",
+      "test-password-not-real-1234", "de",
     );
     accountIds.push(removedAccountId);
 

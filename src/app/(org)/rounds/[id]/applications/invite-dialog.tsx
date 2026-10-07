@@ -2,13 +2,12 @@
 
 import { X } from "lucide-react";
 import { useActionState, useEffect, useId, useRef, useState } from "react";
-import { de } from "@/ui/strings";
+import { useStrings } from "@/ui/strings/provider";
 import { SubmitButton } from "@/ui/submit-button";
 import { inviteApplicationAction, type InviteFormState } from "./invite-actions";
 import { displayName, inviteText } from "./invite-text";
 import { NoticeTextPanel } from "./notice";
 
-const t = de.invite;
 const initialState: InviteFormState = { status: "idle" };
 
 // What the dialog needs: the two ids its form posts and the name for the greeting. No message, no
@@ -43,6 +42,8 @@ export function InviteDialog({
   // Only for the render tests, which cannot press the trigger: mount the body from the start.
   defaultOpen?: boolean;
 }) {
+  const s = useStrings();
+  const t = s.invite;
   const dialogRef = useRef<HTMLDialogElement>(null);
   const headingId = useId();
   const [opening, setOpening] = useState(defaultOpen ? 1 : 0);
@@ -71,7 +72,7 @@ export function InviteDialog({
           <button
             type="button"
             onClick={close}
-            aria-label={de.common.close}
+            aria-label={s.common.close}
             className="-m-1 rounded-full p-1 text-muted-foreground transition hover:bg-muted"
           >
             <X className="size-5" />
@@ -90,6 +91,7 @@ function InviteBody({
   name,
   onDone,
 }: InviteDialogProps & { name: string; onDone: () => void }) {
+  const t = useStrings().invite;
   const [state, formAction] = useActionState(inviteApplicationAction, initialState);
   const [edited, setEdited] = useState<string | null>(null);
   const panelId = useId();

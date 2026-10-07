@@ -6,7 +6,8 @@ import {
   type listJoinCodeIssuances,
   type ResidentListResult,
 } from "@/modules/identity/repository";
-import { de } from "@/ui/strings";
+import type { Strings } from "@/ui/strings";
+import { DATE_LOCALES, type Locale } from "@/ui/strings/locales";
 import { LinkPendingHint } from "@/ui/link-pending-hint";
 import { SubmitButton } from "@/ui/submit-button";
 import {
@@ -24,12 +25,10 @@ import { DeletePreparedProfileForm } from "./delete-prepared-profile-form";
 import { JoinCodeCopyButtons } from "./join-code-copy-buttons";
 import { RemoveMemberForm } from "./remove-member-form";
 
-const t = de.members;
-
 type JoinCodeIssuanceRow = Awaited<ReturnType<typeof listJoinCodeIssuances>>[number];
 
-function formatGermanDate(date: Date): string {
-  return date.toLocaleDateString("de-DE", { day: "numeric", month: "numeric", year: "numeric" });
+function formatDate(date: Date, locale: Locale): string {
+  return date.toLocaleDateString(DATE_LOCALES[locale], { day: "numeric", month: "numeric", year: "numeric" });
 }
 
 // design.md Decision 6 / spec.md "The moderating person governs the links": a link's state is
@@ -44,16 +43,17 @@ function formatGermanDate(date: Date): string {
 // computes exactly one `now` up front and threads it through every helper on this page, so a
 // link's live/dead split, its status label, and the removed-joiner caution can never disagree
 // about what moment "now" was, even if this render straddles an expiry or usage boundary.
-function joinCodeStatusLabel(issuance: JoinCodeIssuanceRow, now: Date): string {
+function joinCodeStatusLabel(issuance: JoinCodeIssuanceRow, now: Date, s: Strings, locale: Locale): string {
+  const t = s.members;
   switch (joinCodeState(issuance, now)) {
     case "deleted":
-      return t.joinCode.deletedOn(formatGermanDate(issuance.deletedAt as Date));
+      return t.joinCode.deletedOn(formatDate(issuance.deletedAt as Date, locale));
     case "expired":
-      return t.joinCode.expiredOn(formatGermanDate(issuance.expiresAt));
+      return t.joinCode.expiredOn(formatDate(issuance.expiresAt, locale));
     case "used_up":
       return t.joinCode.usedUp;
     case "live":
-      return t.joinCode.validUntil(formatGermanDate(issuance.expiresAt));
+      return t.joinCode.validUntil(formatDate(issuance.expiresAt, locale));
   }
 }
 
@@ -66,7 +66,10 @@ function renderJoinCodeCard(
   now: Date,
   profileNameById: Map<string, string>,
   callerIsHouseholdAccount: boolean,
+  s: Strings,
+  locale: Locale,
 ) {
+  const t = s.members;
   const isDeleted = issuance.deletedAt !== null;
   const url = buildJoinUrl(host, issuance.code);
   // founding-link-moderator D4: the founder's own link, only while it can still be used. Once it
@@ -92,7 +95,7 @@ function renderJoinCodeCard(
   return (
     <li key={issuance.id} className="card space-y-2">
       <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
-        <span>{joinCodeStatusLabel(issuance, now)}</span>
+        <span>{joinCodeStatusLabel(issuance, now, s, locale)}</span>
         <span className="text-muted-foreground">{t.joinCode.usageCount(issuance.uses, issuance.maxUses)}</span>
       </div>
 
@@ -179,7 +182,13 @@ export function MembersView({
   host,
   now,
   callerIsHouseholdAccount,
+  strings: s,
+  locale,
 }: {
+  // language-switch: the page hands over its request's table and language. A plain prop, not a
+  // hook: this is a sync server-tree component that tests render directly.
+  strings: Strings;
+  locale: Locale;
   residentList: ResidentListResult;
   joinCodeIssuances: JoinCodeIssuanceRow[];
   host: string | null;
@@ -188,6 +197,7 @@ export function MembersView({
   // caller-neutral copy instead.
   callerIsHouseholdAccount: boolean;
 }) {
+  const t = s.members;
   const {
     members,
     canManageMembers,
@@ -247,7 +257,7 @@ export function MembersView({
 
   const backLink = (
     <Link href="/organization" className="back-link">
-      <ArrowLeft className="size-4" /> {de.nav.organisation}
+      <ArrowLeft className="size-4" /> {s.nav.organisation}
       <LinkPendingHint />
     </Link>
   );
@@ -308,7 +318,7 @@ export function MembersView({
         <p className="text-sm text-muted-foreground">{t.joinCode.empty}</p>
       ) : (
         <>
-          <ul className="space-y-3">{liveIssuances.map((issuance) => renderJoinCodeCard(issuance, host, now, profileNameById, callerIsHouseholdAccount))}</ul>
+          <ul className="space-y-3">{liveIssuances.map((issuance) => renderJoinCodeCard(issuance, host, now, profileNameById, callerIsHouseholdAccount, s, locale))}</ul>
 
           {/* design.md Decision 9 (revised 2026-09-23, human decision from the 8.3 walkthrough):
               dead links (expired, used up or deleted) are still listed — "Ein toter Link
@@ -321,7 +331,7 @@ export function MembersView({
               <summary className="cursor-pointer text-sm text-muted-foreground">
                 {t.joinCode.deadLinksSummary(deadIssuances.length)}
               </summary>
-              <ul className="space-y-3 pt-3">{deadIssuances.map((issuance) => renderJoinCodeCard(issuance, host, now, profileNameById, callerIsHouseholdAccount))}</ul>
+              <ul className="space-y-3 pt-3">{deadIssuances.map((issuance) => renderJoinCodeCard(issuance, host, now, profileNameById, callerIsHouseholdAccount, s, locale))}</ul>
             </details>
           )}
         </>
@@ -372,7 +382,7 @@ export function MembersView({
                 )}
                 {m.status === "moved_out" && (
                   <span className="badge">
-                    <DoorOpen className="size-3" /> {de.status.movedOut}
+                    <DoorOpen className="size-3" /> {s.status.movedOut}
                   </span>
                 )}
               </div>
@@ -439,7 +449,7 @@ export function MembersView({
                     <form action={reactivateMemberAction}>
                       <input type="hidden" name="accountId" value={m.accountId} />
                       <SubmitButton className="btn btn-secondary" icon={<UserPlus className="size-4" />}>
-                        {de.common.reactivate}
+                        {s.common.reactivate}
                       </SubmitButton>
                     </form>
                   </div>
@@ -455,7 +465,7 @@ export function MembersView({
               <div className="mt-3 space-y-2">
                 <p className="field-helper">{t.joinCode.resetLinkIssuedHeading}</p>
                 <p className="text-xs text-muted-foreground">
-                  {joinCodeStatusLabel(resetIssuance, now)}
+                  {joinCodeStatusLabel(resetIssuance, now, s, locale)}
                 </p>
                 <p className="font-mono text-sm font-semibold">{resetIssuance.code}</p>
                 <JoinCodeCopyButtons
@@ -489,7 +499,7 @@ export function MembersView({
                 {boundIssuance && (
                   <div className="space-y-1">
                     <p className="field-helper">{t.joinCode.issuedForProfileHeading}</p>
-                    <p className="text-xs text-muted-foreground">{joinCodeStatusLabel(boundIssuance, now)}</p>
+                    <p className="text-xs text-muted-foreground">{joinCodeStatusLabel(boundIssuance, now, s, locale)}</p>
                     <p className="font-mono text-sm font-semibold">{boundIssuance.code}</p>
                     <JoinCodeCopyButtons
                       code={boundIssuance.code}

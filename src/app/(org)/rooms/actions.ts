@@ -10,7 +10,7 @@ import {
   transitionRoomStatus,
 } from "@/modules/casting/repository";
 import type { RoomStatus } from "@/modules/casting/room-transitions";
-import { de } from "@/ui/strings";
+import { getStringsFor } from "@/ui/strings/request";
 
 async function requireRoomsAccess() {
   const current = await getCurrentSession();
@@ -30,8 +30,9 @@ export async function createRoomAction(
   formData: FormData,
 ): Promise<CreateRoomFormState> {
   const current = await requireRoomsAccess();
+  const s = await getStringsFor(current);
   const label = String(formData.get("label") ?? "").trim();
-  if (!label) return { error: de.rooms.create.labelRequired };
+  if (!label) return { error: s.rooms.create.labelRequired };
   try {
     await createRoom(current.context, label, {
       accountId: current.context.accountId,
@@ -41,7 +42,7 @@ export async function createRoomAction(
     // A throw here would swap the page for Next's error screen and lose the dialog. The class
     // name only: a driver error can echo the inserted row, and the label is free text (G-D7).
     console.error("createRoomAction failed:", err instanceof Error ? err.name : typeof err);
-    return { error: de.rooms.create.genericFailure };
+    return { error: s.rooms.create.genericFailure };
   }
   revalidatePath("/rooms");
   return { error: null };

@@ -39,7 +39,7 @@ describe("a sign-in that cannot reach the provider says so (design.md D3/D9/D11)
     hh = await registerTestHousehold();
     const actor = { accountId: hh.accountId, profileId: null };
     const profile = await createResidentProfile(hh.context, "TokenLost", actor);
-    const claimed = await claimResidentProfile(hh.context, profile.id, PASSWORD);
+    const claimed = await claimResidentProfile(hh.context, profile.id, PASSWORD, "de");
     residentAccountId = claimed.accountId;
     accountIds.push(residentAccountId);
 
@@ -71,7 +71,7 @@ describe("a sign-in that cannot reach the provider says so (design.md D3/D9/D11)
     hh = await registerTestHousehold();
     const actor = { accountId: hh.accountId, profileId: null };
     const profile = await createResidentProfile(hh.context, "LookupLost", actor);
-    const claimed = await claimResidentProfile(hh.context, profile.id, PASSWORD);
+    const claimed = await claimResidentProfile(hh.context, profile.id, PASSWORD, "de");
     residentAccountId = claimed.accountId;
     accountIds.push(residentAccountId);
 
@@ -136,7 +136,7 @@ describe("a sign-in that cannot reach the provider says so (design.md D3/D9/D11)
     hh = await registerTestHousehold();
     const actor = { accountId: hh.accountId, profileId: null };
     const profile = await createResidentProfile(hh.context, "ParityKnown", actor);
-    const claimed = await claimResidentProfile(hh.context, profile.id, PASSWORD);
+    const claimed = await claimResidentProfile(hh.context, profile.id, PASSWORD, "de");
     residentAccountId = claimed.accountId;
     // Deliberately deleted below for case (c) — not pushed to accountIds (nothing to clean up
     // afterwards; the delete IS the test's own setup for that case).

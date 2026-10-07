@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { renderToStaticMarkup } from "react-dom/server";
+import { renderWithStrings } from "../../helpers/render-with-strings";
 import { createElement } from "react";
 import { de } from "@/ui/strings";
 
@@ -12,7 +12,7 @@ const { isRoomOpenableForRound } = await import("@/modules/casting/repository");
 const { roomStatusEnum } = await import("@/modules/casting/schema");
 
 function render(rooms: { id: string; label: string; castable: boolean }[]) {
-  return renderToStaticMarkup(createElement(RoundForm, { rooms }));
+  return renderWithStrings(createElement(RoundForm, { rooms }));
 }
 
 const isLocked = (html: string) => /<button[^>]*disabled/.test(html);

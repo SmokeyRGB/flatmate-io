@@ -63,7 +63,7 @@ describe("Member removal is final (U-27, design.md Decision 1)", () => {
     hh = await registerTestHousehold();
     const actor = { accountId: hh.accountId, profileId: null };
     const profile = await createResidentProfile(hh.context, "Intruder", actor);
-    const { accountId } = await claimResidentProfile(hh.context, profile.id, "test-password-not-real-1234");
+    const { accountId } = await claimResidentProfile(hh.context, profile.id, "test-password-not-real-1234", "de");
     accountIds.push(accountId);
 
     await removeMember(hh.context, hh.accountId, accountId, "Intruder");
@@ -82,7 +82,7 @@ describe("Member removal is final (U-27, design.md Decision 1)", () => {
     hh = await registerTestHousehold();
     const actor = { accountId: hh.accountId, profileId: null };
     const profile = await createResidentProfile(hh.context, "MovedOutThenRemoved", actor);
-    const { accountId } = await claimResidentProfile(hh.context, profile.id, "test-password-not-real-1234");
+    const { accountId } = await claimResidentProfile(hh.context, profile.id, "test-password-not-real-1234", "de");
     accountIds.push(accountId);
 
     await setMovedOut(hh.context, hh.accountId, accountId);
@@ -110,7 +110,7 @@ describe("Member removal is final (U-27, design.md Decision 1)", () => {
     hh = await registerTestHousehold();
     const actor = { accountId: hh.accountId, profileId: null };
     const profile = await createResidentProfile(hh.context, "CannotComeBack", actor);
-    const { accountId } = await claimResidentProfile(hh.context, profile.id, "test-password-not-real-1234");
+    const { accountId } = await claimResidentProfile(hh.context, profile.id, "test-password-not-real-1234", "de");
     accountIds.push(accountId);
 
     await removeMember(hh.context, hh.accountId, accountId, "CannotComeBack");
@@ -130,7 +130,7 @@ describe("Member removal is final (U-27, design.md Decision 1)", () => {
     hh = await registerTestHousehold();
     const actor = { accountId: hh.accountId, profileId: null };
     const profile = await createResidentProfile(hh.context, "ComingBack", actor);
-    const { accountId } = await claimResidentProfile(hh.context, profile.id, "test-password-not-real-1234");
+    const { accountId } = await claimResidentProfile(hh.context, profile.id, "test-password-not-real-1234", "de");
     accountIds.push(accountId);
 
     await setMovedOut(hh.context, hh.accountId, accountId);
@@ -160,7 +160,7 @@ describe("Member removal is final (U-27, design.md Decision 1)", () => {
     const { accountId: accountReactivated } = await claimResidentProfile(
       hh.context,
       profileReactivated.id,
-      "test-password-not-real-1234",
+      "test-password-not-real-1234", "de",
     );
     accountIds.push(accountReactivated);
 
@@ -174,7 +174,7 @@ describe("Member removal is final (U-27, design.md Decision 1)", () => {
     const { accountId: accountRemoved } = await claimResidentProfile(
       hh.context,
       profileRemoved.id,
-      "test-password-not-real-1234",
+      "test-password-not-real-1234", "de",
     );
     accountIds.push(accountRemoved);
 
@@ -190,7 +190,7 @@ describe("Member removal is final (U-27, design.md Decision 1)", () => {
     hh = await registerTestHousehold();
     const actor = { accountId: hh.accountId, profileId: null };
     const profile = await createResidentProfile(hh.context, "OnlyOne", actor);
-    const { accountId } = await claimResidentProfile(hh.context, profile.id, "test-password-not-real-1234");
+    const { accountId } = await claimResidentProfile(hh.context, profile.id, "test-password-not-real-1234", "de");
     accountIds.push(accountId);
 
     await removeMember(hh.context, hh.accountId, accountId, "OnlyOne");
@@ -204,7 +204,7 @@ describe("Member removal is final (U-27, design.md Decision 1)", () => {
     hh = await registerTestHousehold();
     const actor = { accountId: hh.accountId, profileId: null };
     const profile = await createResidentProfile(hh.context, "StillListed", actor);
-    const { accountId } = await claimResidentProfile(hh.context, profile.id, "test-password-not-real-1234");
+    const { accountId } = await claimResidentProfile(hh.context, profile.id, "test-password-not-real-1234", "de");
     accountIds.push(accountId);
 
     await setMovedOut(hh.context, hh.accountId, accountId);
@@ -243,7 +243,7 @@ describe("Deleting a prepared profile", () => {
     ).toBe(true);
     const deletedLinkEvents = await eventsFor(hh, "household.join_code_deleted");
     expect(deletedLinkEvents.some((e) => e.subjectId === link.id)).toBe(true);
-    await expect(claimResidentProfile(hh.context, profile.id, "test-password-not-real-1234")).rejects.toThrow();
+    await expect(claimResidentProfile(hh.context, profile.id, "test-password-not-real-1234", "de")).rejects.toThrow();
     await expect(removePreparedProfile(hh.context, hh.accountId, profile.id)).rejects.toThrow(
       ResidentProfileNotPreparedError,
     );

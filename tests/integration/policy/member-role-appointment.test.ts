@@ -41,7 +41,7 @@ describe("Moderator appointment (EC-1.7)", () => {
     hh = await registerTestHousehold();
     const actor = { accountId: hh.accountId, profileId: null };
     const profile = await createResidentProfile(hh.context, "Resident1", actor);
-    const claimed = await claimResidentProfile(hh.context, profile.id, "test-password-not-real-1234");
+    const claimed = await claimResidentProfile(hh.context, profile.id, "test-password-not-real-1234", "de");
     accountId = claimed.accountId;
     expect(claimed.membership.role).toBe("member");
 
@@ -56,7 +56,7 @@ describe("Moderator appointment (EC-1.7)", () => {
     hh = await registerTestHousehold();
     const actor = { accountId: hh.accountId, profileId: null };
     const profile = await createResidentProfile(hh.context, "Resident1", actor);
-    const claimed = await claimResidentProfile(hh.context, profile.id, "test-password-not-real-1234");
+    const claimed = await claimResidentProfile(hh.context, profile.id, "test-password-not-real-1234", "de");
     memberAccountId = claimed.accountId;
 
     // PR #19 review: authorization derives from the authenticated session, so this refusal must
@@ -93,7 +93,7 @@ describe("Moderator appointment by a moderator (appoint_moderator)", () => {
     memberAccountId = moderator.accountId;
     const actor = { accountId: hh.accountId, profileId: null };
     const profile = await createResidentProfile(hh.context, "Appointee", actor);
-    const claimed = await claimResidentProfile(hh.context, profile.id, "test-password-not-real-1234");
+    const claimed = await claimResidentProfile(hh.context, profile.id, "test-password-not-real-1234", "de");
     accountId = claimed.accountId;
 
     await setMemberRole(moderator.context, moderator.accountId, claimed.accountId, "moderator");
@@ -132,7 +132,7 @@ describe("Moderator appointment by a moderator (appoint_moderator)", () => {
     hh = await registerTestHousehold();
     const actor = { accountId: hh.accountId, profileId: null };
     const profile = await createResidentProfile(hh.context, "Resident1", actor);
-    const claimed = await claimResidentProfile(hh.context, profile.id, "test-password-not-real-1234");
+    const claimed = await claimResidentProfile(hh.context, profile.id, "test-password-not-real-1234", "de");
     accountId = claimed.accountId;
     const [membershipRow] = await withSessionContext(hh.context, (tx) =>
       tx.execute<{ id: string }>(`select id from membership where account_id = '${claimed.accountId}'::uuid`),

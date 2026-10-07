@@ -1,5 +1,5 @@
 import type { SessionContext } from "@/db/session-context";
-import { de } from "@/ui/strings";
+import { getStrings } from "@/ui/strings/request";
 import { AvatarMenu } from "./avatar-menu";
 import type { Surface } from "./menu-items";
 import { signOutAction } from "./sign-out-action";
@@ -15,17 +15,18 @@ import { householdFor, identityLabelFor, navigationAccessFor } from "./session-d
 // also act on organisation tasks. A session without a profile is sent from Start to the
 // organisation surface, so the row would be a dead end; a plain resident has the navigation.
 export async function AppHeaderRight({ context, surface }: { context: SessionContext; surface: Surface }) {
+  const s = await getStrings();
   const [identity, household, access] = await Promise.all([
     identityLabelFor(context),
     householdFor(context),
     navigationAccessFor(context),
   ]);
 
-  const householdName = household?.name ?? de.org.identityHouseholdFallback;
+  const householdName = household?.name ?? s.org.identityHouseholdFallback;
   const displayName =
     identity.kind === "household"
-      ? de.org.identityHousehold(identity.householdName ?? householdName)
-      : (identity.displayName ?? de.org.identityResidentFallback);
+      ? s.org.identityHousehold(identity.householdName ?? householdName)
+      : (identity.displayName ?? s.org.identityResidentFallback);
 
   return (
     <AvatarMenu

@@ -9,7 +9,7 @@ import {
   undoRegisterHousehold,
 } from "@/modules/identity/auth";
 import { sessionCookieMaxAge, setSessionCookie } from "@/modules/identity/session-cookie";
-import { de } from "@/ui/strings";
+import { getRequestLocale, getStrings } from "@/ui/strings/request";
 
 export interface RegisterFormState {
   error: string | null;
@@ -28,13 +28,14 @@ export async function registerHouseholdAction(
   const email = String(formData.get("email") ?? "").trim();
   const password = String(formData.get("password") ?? "");
   const name = String(formData.get("name") ?? "");
+  const t = await getStrings();
 
-  if (!email) return { error: de.auth.errors.register.missingEmail, fieldError: "email" };
-  if (!password) return { error: de.auth.errors.register.missingPassword, fieldError: "password" };
-  if (!name.trim()) return { error: de.auth.errors.register.missingName, fieldError: "name" };
+  if (!email) return { error: t.auth.errors.register.missingEmail, fieldError: "email" };
+  if (!password) return { error: t.auth.errors.register.missingPassword, fieldError: "password" };
+  if (!name.trim()) return { error: t.auth.errors.register.missingName, fieldError: "name" };
 
   try {
-    const registered = await registerHousehold(email, password, name);
+    const registered = await registerHousehold(email, password, name, await getRequestLocale());
 
     // speckit-bug-fix register-action-not-atomic-with-signin: registerHousehold already committed
     // (Auth user + Household + HouseholdSettings + Account + Membership). signIn requires that
@@ -56,27 +57,27 @@ export async function registerHouseholdAction(
         const code = sessionErr.code;
         switch (code) {
           case "missing_fields":
-            return { error: de.auth.errors.signIn.missingFields, fieldError: null };
+            return { error: t.auth.errors.signIn.missingFields, fieldError: null };
           case "invalid_household":
-            return { error: de.auth.errors.signIn.invalidHousehold, fieldError: null };
+            return { error: t.auth.errors.signIn.invalidHousehold, fieldError: null };
           case "invalid_credentials":
-            return { error: de.auth.errors.signIn.invalidCredentials, fieldError: null };
+            return { error: t.auth.errors.signIn.invalidCredentials, fieldError: null };
           case "no_household":
-            return { error: de.auth.errors.signIn.noHousehold, fieldError: null };
+            return { error: t.auth.errors.signIn.noHousehold, fieldError: null };
           case "no_membership":
-            return { error: de.auth.errors.signIn.noMembership, fieldError: null };
+            return { error: t.auth.errors.signIn.noMembership, fieldError: null };
           case "rate_limited":
             // Never raised on this path (the household sign-in is not rate limited), but the
             // switch is exhaustive on purpose. Same reasoning as provider_unavailable below.
             console.error(sessionErr);
-            return { error: de.auth.errors.register.signupFailed, fieldError: null };
+            return { error: t.auth.errors.register.signupFailed, fieldError: null };
           case "provider_unavailable":
             // auth-provider-deadline design.md D9 (pre-mortem finding 14): undoRegisterHousehold
             // has already run above — the household is gone, so "try signing in again" would send
             // the person to an account that no longer exists. Shows the REGISTRATION's own failure
             // text, not sign-in's, even though a SignInError is what was caught.
             console.error(sessionErr);
-            return { error: de.auth.errors.register.signupFailed, fieldError: null };
+            return { error: t.auth.errors.register.signupFailed, fieldError: null };
           default: {
             const _exhaustive: never = code;
             return _exhaustive;
@@ -86,20 +87,20 @@ export async function registerHouseholdAction(
       // Decision 6: an unanticipated failure (e.g. hashSessionToken's missing-secret case) never
       // shows its own message — only a generic key. The original still reaches the log.
       console.error(sessionErr);
-      return { error: de.auth.errors.genericSignInFailure, fieldError: null };
+      return { error: t.auth.errors.genericSignInFailure, fieldError: null };
     }
   } catch (err) {
     if (err instanceof RegistrationError) {
       switch (err.code) {
         case "missing_email":
-          return { error: de.auth.errors.register.missingEmail, fieldError: "email" };
+          return { error: t.auth.errors.register.missingEmail, fieldError: "email" };
         case "missing_password":
-          return { error: de.auth.errors.register.missingPassword, fieldError: "password" };
+          return { error: t.auth.errors.register.missingPassword, fieldError: "password" };
         case "missing_name":
-          return { error: de.auth.errors.register.missingName, fieldError: "name" };
+          return { error: t.auth.errors.register.missingName, fieldError: "name" };
         case "signup_failed":
           console.error(err);
-          return { error: de.auth.errors.register.signupFailed, fieldError: null };
+          return { error: t.auth.errors.register.signupFailed, fieldError: null };
         default: {
           const _exhaustive: never = err.code;
           return _exhaustive;

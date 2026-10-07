@@ -4,12 +4,10 @@ import { redirect } from "next/navigation";
 import { isUuid } from "@/db/session-context";
 import { getScreeningPass } from "@/modules/deliberation/repository";
 import { getCurrentSession } from "@/modules/identity/session-cookie";
-import { de } from "@/ui/strings";
+import { getStrings } from "@/ui/strings/request";
 import { landingPathFor } from "@/app/landing";
 import { LinkPendingHint } from "@/ui/link-pending-hint";
 import { ScreeningDeck } from "./screening-deck";
-
-const t = de.screening;
 
 // Screen C1, the screening pass. A server page decides the state (deck, empty, or a calm refusal)
 // and hands the deck to one client component, which holds it for the rest of the pass (FR-4.4:
@@ -20,6 +18,8 @@ export default async function ScreeningPage({
 }: {
   searchParams: Promise<{ round?: string | string[] }>;
 }) {
+  const s = await getStrings();
+  const t = s.screening;
   const current = await getCurrentSession();
   if (!current) redirect("/sign-in");
   if (current.context.profileId === null) redirect(landingPathFor(current.context));
@@ -40,7 +40,7 @@ export default async function ScreeningPage({
     heading = t.empty;
     message = t.emptyBody;
   } else if (pass.reason === "round_not_open") {
-    message = t.refusal.roundNotOpen(de.status.round[pass.status]);
+    message = t.refusal.roundNotOpen(s.status.round[pass.status]);
   } else if (pass.reason === "rules_invalid") {
     message = t.refusal.rulesInvalid;
   } else {

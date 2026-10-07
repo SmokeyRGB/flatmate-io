@@ -3,7 +3,7 @@
 import { CircleCheck, X } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { de } from "@/ui/strings";
+import { useStrings } from "@/ui/strings/provider";
 
 const AUTO_DISMISS_MS = 5000;
 
@@ -26,6 +26,7 @@ export function SuccessToast({
   trigger: object | null;
   link?: { href: string; label: string };
 }) {
+  const s = useStrings();
   const [dismissed, setDismissed] = useState<object | null>(null);
   const open = trigger !== null && trigger !== dismissed;
 
@@ -50,7 +51,7 @@ export function SuccessToast({
           <button
             type="button"
             className="toast-close"
-            aria-label={de.common.close}
+            aria-label={s.common.close}
             onClick={() => setDismissed(trigger)}
           >
             <X className="size-4" aria-hidden />

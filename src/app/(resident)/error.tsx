@@ -1,8 +1,6 @@
 "use client";
 
-import { de } from "@/ui/strings";
-
-const t = de.resident.unexpectedError;
+import { useStrings } from "@/ui/strings/provider";
 
 // design.md Decision 11: one shared error boundary for every `(resident)` screen. Mirrors
 // `src/app/(auth)/join/error.tsx` exactly: G-A5-shaped reasoning applies here too (any request
@@ -18,6 +16,7 @@ export default function ResidentErrorBoundary({
   error: Error & { digest?: string };
   retry: () => void;
 }) {
+  const t = useStrings().resident.unexpectedError;
   return (
     <div className="mx-auto max-w-md space-y-4 p-6">
       <div role="alert" className="callout callout-caution">

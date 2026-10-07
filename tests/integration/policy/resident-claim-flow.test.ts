@@ -51,7 +51,7 @@ describe("Resident profile creation and claim, via a bound link (Convergence T08
     });
     const { context: residentContext } = await joinHousehold(link.code, {
       password: "test-password-not-real-1234",
-    });
+    }, "de");
     residentAccountId = residentContext.accountId;
 
     const residentActor = { accountId: residentContext.accountId, profileId: residentContext.profileId };
@@ -74,7 +74,7 @@ describe("Resident profile creation and claim, via a bound link (Convergence T08
       residentProfileId: prepared.id,
     });
 
-    const result = await joinHousehold(link.code, { password: "test-password-not-real-1234" });
+    const result = await joinHousehold(link.code, { password: "test-password-not-real-1234" }, "de");
     claimedAccountId = result.context.accountId;
 
     // The NAMED profile is the one activated — not a second, newly created one.

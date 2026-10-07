@@ -41,12 +41,12 @@ function build(
           label: `Room ${i}`,
         }))
       : organisationTasks;
-  return buildDashboardView(o, awaiting(o, counts), tasks, { organisation }, now);
+  return buildDashboardView(o, awaiting(o, counts), tasks, { organisation }, now, de, "de");
 }
 
 // A map WITHOUT the round's entry: what getAwaitingVoteCounts returns to a caller it refused.
 function buildWithoutEntry(o: StartOverview) {
-  return buildDashboardView(o, new Map(), [], { organisation: false }, NOW);
+  return buildDashboardView(o, new Map(), [], { organisation: false }, NOW, de, "de");
 }
 
 describe("buildDashboardView (start-screen design.md Decision 10, tasks.md 7.4)", () => {
@@ -159,10 +159,10 @@ describe("buildDashboardView (start-screen design.md Decision 10, tasks.md 7.4)"
         standing: { roundId: "r1", stateCounts: { new: 2 } },
       }),
     );
-    expect(standingHeadingOf(view.standing!)).toBe(de.start.standingHeading);
-    expect(standingHeadingOf({ kind: "phase", waiting: true, allRated: false, distribution: [] })).toBeNull();
-    expect(standingHeadingOf({ kind: "phase", waiting: false, allRated: true, distribution: [] })).toBeNull();
-    expect(standingHeadingOf({ kind: "noRound" })).toBeNull();
+    expect(standingHeadingOf(view.standing!, de)).toBe(de.start.standingHeading);
+    expect(standingHeadingOf({ kind: "phase", waiting: true, allRated: false, distribution: [] }, de)).toBeNull();
+    expect(standingHeadingOf({ kind: "phase", waiting: false, allRated: true, distribution: [] }, de)).toBeNull();
+    expect(standingHeadingOf({ kind: "noRound" }, de)).toBeNull();
   });
 
   it("a round with no main-path application reads as waiting for applications", () => {

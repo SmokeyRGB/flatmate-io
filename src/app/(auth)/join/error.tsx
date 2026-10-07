@@ -1,8 +1,6 @@
 "use client";
 
-import { de } from "@/ui/strings";
-
-const t = de.join.unexpectedError;
+import { useStrings } from "@/ui/strings/provider";
 
 // design.md Decision 5: sits at the `join/` level, so it covers `/join` AND `/join/[code]` alike —
 // a failed page load, a throw from `signOutAndReturnAction`, or a throw from the manual-entry
@@ -23,6 +21,7 @@ export default function JoinErrorBoundary({
   error: Error & { digest?: string };
   retry: () => void;
 }) {
+  const t = useStrings().join.unexpectedError;
   return (
     <div className="space-y-4">
       <div role="alert" className="callout callout-caution">

@@ -8,11 +8,9 @@ import { assertHasPermission, getHousehold, PermissionDeniedError } from "@/modu
 import { getCurrentSession } from "@/modules/identity/session-cookie";
 import { OrganisationAccessDenied } from "@/app/(org)/organisation-access-denied";
 import { requireOrganisationAccess } from "@/app/(org)/organisation-access";
-import { de } from "@/ui/strings";
+import { getStrings } from "@/ui/strings/request";
 import { LinkPendingHint } from "@/ui/link-pending-hint";
 import { CaptureForm } from "../../new/capture-form";
-
-const t = de.applications.edit;
 
 // Screen O5's correction form (F3 change 3, design D5): O3's three-step form in edit mode,
 // pre-filled and opening on the message, like a capture. Guard order: session, then the read of the application
@@ -25,6 +23,8 @@ export default async function EditApplicationPage({
 }: {
   params: Promise<{ id: string; applicationId: string }>;
 }) {
+  const s = await getStrings();
+  const t = s.applications.edit;
   const { id, applicationId } = await params;
   const current = await getCurrentSession();
   if (!current) redirect("/sign-in");
@@ -32,11 +32,11 @@ export default async function EditApplicationPage({
   // role-permissions design D9: every page of the organisation area first checks the caller's
   // stored permissions on this request (a demoted moderator loses the area on reload); the page's
   // own narrower check below stays.
-  if (!(await requireOrganisationAccess(current))) return <OrganisationAccessDenied />;
+  if (!(await requireOrganisationAccess(current))) return <OrganisationAccessDenied strings={await getStrings()} />;
 
   const back = (
     <Link href={`/rounds/${id}/applications/${applicationId}`} className="back-link">
-      <ArrowLeft className="size-4" /> {de.applications.detail.heading}
+      <ArrowLeft className="size-4" /> {s.applications.detail.heading}
       <LinkPendingHint />
     </Link>
   );
@@ -50,7 +50,7 @@ export default async function EditApplicationPage({
         <div className="mx-auto max-w-md space-y-4 p-6">
           {back}
           <h1 className="font-serif text-2xl font-semibold">{t.heading}</h1>
-          <p className="text-sm text-muted-foreground">{de.applications.states.detailPermissionDenied}</p>
+          <p className="text-sm text-muted-foreground">{s.applications.states.detailPermissionDenied}</p>
         </div>
       );
     }

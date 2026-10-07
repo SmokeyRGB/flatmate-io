@@ -32,7 +32,7 @@ describe("a demotion of the caller committed while its action waits refuses the 
     const { accountId: targetAccountId } = await claimResidentProfile(
       hh.context,
       profile.id,
-      "test-password-not-real-1234",
+      "test-password-not-real-1234", "de",
     );
     accountIds.push(targetAccountId);
 

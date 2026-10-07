@@ -12,7 +12,8 @@ import {
   noticeCategories,
   oneMonthAfter,
 } from "@/modules/casting/application-notice";
-import { de } from "@/ui/strings";
+import { useStrings } from "@/ui/strings/provider";
+import type { Strings } from "@/ui/strings";
 import { SubmitButton } from "@/ui/submit-button";
 import { ThirdPartyNotice } from "../notice";
 import { updateApplicationAction } from "../[applicationId]/edit/actions";
@@ -31,13 +32,10 @@ import {
   type StepMode,
 } from "./capture-steps";
 
-const t = de.applications.capture;
 // The refusal texts by mode: the correction form names correcting where the capture text names
 // capturing (Copilot, PR #41); every other code reads the same in both.
-const CAPTURE_ERRORS = de.applications.errors;
-const EDIT_ERRORS = { ...de.applications.errors, ...de.applications.edit.errors };
-export function errorTextsFor(kind: FormMode["kind"]) {
-  return kind === "edit" ? EDIT_ERRORS : CAPTURE_ERRORS;
+export function errorTextsFor(s: Strings, kind: FormMode["kind"]) {
+  return kind === "edit" ? { ...s.applications.errors, ...s.applications.edit.errors } : s.applications.errors;
 }
 const FORM_ID = "capture-application-form";
 const initialState: CaptureFormState = { status: "idle" };
@@ -106,8 +104,10 @@ export function CaptureForm({
   // ticked, or with some further-details rows.
   initial?: { step?: CaptureStep; thirdParty?: boolean; extraRows?: number };
 }) {
+  const s = useStrings();
+  const t = s.applications.capture;
   const edit = mode.kind === "edit" ? mode : null;
-  const e = errorTextsFor(mode.kind);
+  const e = errorTextsFor(s, mode.kind);
   const stepMode: StepMode = edit ? { kind: "edit", wasThirdParty: edit.stored.thirdParty } : { kind: "capture" };
   const [state, formAction] = useActionState(edit ? updateApplicationAction : captureApplicationAction, initialState);
   const [isPending, startTransition] = useTransition();
@@ -226,7 +226,7 @@ export function CaptureForm({
 
         {step === 1 && (
           <>
-            <p className="text-sm text-muted-foreground">{edit ? de.applications.edit.messageIntro : t.messageIntro}</p>
+            <p className="text-sm text-muted-foreground">{edit ? s.applications.edit.messageIntro : t.messageIntro}</p>
             <div>
               <label htmlFor="message" className="field-label">
                 {t.messageLabel}
@@ -461,9 +461,9 @@ export function CaptureForm({
                 <SubmitButton
                   className="btn btn-primary"
                   pending={isPending}
-                  pendingLabel={edit ? de.applications.edit.savePending : t.savePending}
+                  pendingLabel={edit ? s.applications.edit.savePending : t.savePending}
                 >
-                  {edit ? de.applications.edit.save : t.save}
+                  {edit ? s.applications.edit.save : t.save}
                 </SubmitButton>
               )}
             </div>

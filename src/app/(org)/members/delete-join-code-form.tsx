@@ -2,11 +2,9 @@
 
 import { Trash2 } from "lucide-react";
 import { useId, useRef } from "react";
-import { de } from "@/ui/strings";
+import { useStrings } from "@/ui/strings/provider";
 import { SubmitButton } from "@/ui/submit-button";
 import { deleteJoinCodeAction } from "./actions";
-
-const t = de.members.joinCode;
 
 // design.md Decision 6: "Löschen" sits behind a `.dialog` confirmation — the design system
 // requires one for a hard-to-reverse action, and invalidating outstanding invitations is one —
@@ -14,6 +12,8 @@ const t = de.members.joinCode;
 // field) is reserved for U-27's permanent member removal; reusing it here would flatten a
 // distinction the design system draws on purpose.
 export function DeleteJoinCodeForm({ issuanceId, code }: { issuanceId: string; code: string }) {
+  const s = useStrings();
+  const t = s.members.joinCode;
   const dialogRef = useRef<HTMLDialogElement>(null);
   const headingId = useId();
 
@@ -23,10 +23,10 @@ export function DeleteJoinCodeForm({ issuanceId, code }: { issuanceId: string; c
         type="button"
         onClick={() => dialogRef.current?.showModal()}
         aria-label={t.deleteAriaLabel(code)}
-        title={de.common.delete}
+        title={s.common.delete}
         className="btn-link"
       >
-        <Trash2 className="size-4" /> {de.common.delete}
+        <Trash2 className="size-4" /> {s.common.delete}
       </button>
 
       <dialog ref={dialogRef} className="dialog" aria-labelledby={headingId}>
@@ -35,9 +35,9 @@ export function DeleteJoinCodeForm({ issuanceId, code }: { issuanceId: string; c
 
         <form action={deleteJoinCodeAction} className="mt-4 flex items-center gap-4">
           <input type="hidden" name="issuanceId" value={issuanceId} />
-          <SubmitButton className="btn btn-destructive">{de.common.delete}</SubmitButton>
+          <SubmitButton className="btn btn-destructive">{s.common.delete}</SubmitButton>
           <button type="button" onClick={() => dialogRef.current?.close()} className="btn-link">
-            {de.common.cancel}
+            {s.common.cancel}
           </button>
         </form>
       </dialog>

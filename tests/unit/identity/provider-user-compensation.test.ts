@@ -82,7 +82,7 @@ describe("A provider user created before a failing transaction is deleted again"
     // createUser has already succeeded.
     let caught: unknown;
     try {
-      await registerHousehold(email, PASSWORD, "Test\u0000WG");
+      await registerHousehold(email, PASSWORD, "Test\u0000WG", "de");
     } catch (err) {
       caught = err;
     }
@@ -92,7 +92,7 @@ describe("A provider user created before a failing transaction is deleted again"
 
     expect(await findAuthUserIdByEmail(email)).toBeNull();
 
-    const retried = await registerHousehold(email, PASSWORD, "Test-WG");
+    const retried = await registerHousehold(email, PASSWORD, "Test-WG", "de");
     registered.push(retried.context);
     expect(retried.household.contactEmail).toBe(email);
   });
@@ -122,7 +122,7 @@ describe("A provider user created before a failing transaction is deleted again"
 
     let caught: unknown;
     try {
-      await claimResidentProfile(hh.context, profile.id, PASSWORD);
+      await claimResidentProfile(hh.context, profile.id, PASSWORD, "de");
     } catch (err) {
       caught = err;
     }
@@ -141,7 +141,7 @@ describe("A provider user created before a failing transaction is deleted again"
       tx.delete(membership).where(eq(membership.residentProfileId, profile.id)),
     );
 
-    const claimed = await claimResidentProfile(hh.context, profile.id, PASSWORD);
+    const claimed = await claimResidentProfile(hh.context, profile.id, PASSWORD, "de");
     expect(claimed.membership.residentProfileId).toBe(profile.id);
   });
 
@@ -168,7 +168,7 @@ describe("A provider user created before a failing transaction is deleted again"
     });
     await removed;
 
-    const claim = claimResidentProfile(hh.context, profile.id, PASSWORD);
+    const claim = claimResidentProfile(hh.context, profile.id, PASSWORD, "de");
     let settled = false;
     claim.then(
       () => (settled = true),

@@ -5,6 +5,13 @@
 
 ### A — Zugang
 
+> **Sprachwechsel vor dem Konto (seit 2026-10-07, Menschenentscheidung).** Anmeldung (A2),
+> Registrierung (A1) und Beitritt (A3) tragen oberhalb des Inhalts denselben Schalter wie das
+> Avatar-Menü (`rahmenwerk.md` §4.1): die jeweils andere Sprache unter ihrem eigenen Namen. Die
+> Wahl wird nur auf diesem Gerät gemerkt, und erst nach einer bewussten Wahl; wer nicht gewählt
+> hat, sieht Englisch, wenn der Browser Englisch vor Deutsch nennt, sonst Deutsch. Ein neues Konto
+> beginnt in der Sprache, in der der Bildschirm angezeigt wurde.
+
 #### A1 · Registrierung (Haushalt)
 
 | | |

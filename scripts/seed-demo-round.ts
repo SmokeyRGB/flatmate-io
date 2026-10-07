@@ -75,7 +75,7 @@ async function main() {
     if (claimed.has(name)) continue;
     const prepared = members.find((m) => m.displayName === name && m.status === "prepared");
     const profileId = prepared ? prepared.id : (await createResidentProfile(context, name, adminActor)).id;
-    const { accountId } = await claimResidentProfile(context, profileId, password);
+    const { accountId } = await claimResidentProfile(context, profileId, password, "de");
     claimed.set(name, { accountId, profileId });
     console.log(`Claimed missing resident ${name}.`);
   }

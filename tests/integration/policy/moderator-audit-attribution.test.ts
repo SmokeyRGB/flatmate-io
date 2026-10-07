@@ -68,7 +68,7 @@ async function claimedMember(household: TestHousehold, displayName: string) {
     accountId: household.accountId,
     profileId: null,
   });
-  const claimed = await claimResidentProfile(household.context, profile.id, "test-password-not-real-1234");
+  const claimed = await claimResidentProfile(household.context, profile.id, "test-password-not-real-1234", "de");
   accountIds.push(claimed.accountId);
   return { profileId: profile.id, accountId: claimed.accountId };
 }

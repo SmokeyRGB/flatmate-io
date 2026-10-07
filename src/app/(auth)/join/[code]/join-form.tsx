@@ -1,15 +1,13 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { de } from "@/ui/strings";
+import { useStrings } from "@/ui/strings/provider";
 import { joinHouseholdAction, type JoinFormState } from "./actions";
 import { HandEntryWayBack, SignOutAndReturnForm } from "./join-ways-forward";
 import { PasswordInput } from "@/ui/password-input";
 import { SubmitButton } from "@/ui/submit-button";
 
 const initialState: JoinFormState = { error: null, fieldError: null, refusal: null };
-const t = de.join;
-
 // FR-2.10/FR-2.10a/FR-2.11: exactly two required fields (name, password) plus a visibly optional
 // email — no third required field, no password confirmation. `code` travels as a HIDDEN FORM
 // FIELD (G-A5, design.md Decision 10), never a query parameter. No passkey enrolment and no
@@ -36,6 +34,7 @@ export function JoinForm({
   passwordMinLength: number;
   boundDisplayName?: string | null;
 }) {
+  const t = useStrings().join;
   const [draft, setDraft] = useState({ displayName: "", email: "", rememberMe: true });
   const [state, formAction] = useActionState(joinHouseholdAction, initialState);
 

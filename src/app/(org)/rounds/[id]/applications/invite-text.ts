@@ -1,3 +1,7 @@
+// Outbound text (language-switch D7): the invitation is addressed to a person outside the app, so
+// it stays German whatever language the viewer chose (vocabulary spec, "Text for people outside the
+// app stays German"). This file and notice.tsx are the only places outside src/ui/strings that
+// import the German table directly.
 import { de } from "@/ui/strings";
 
 // F5 candidate-invite (design D4). The pure half of the invitation dialog: no React, no I/O. The

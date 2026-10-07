@@ -1,22 +1,22 @@
 "use client";
 
 import { useActionState } from "react";
-import { de } from "@/ui/strings";
+import { useStrings } from "@/ui/strings/provider";
 import { changeEmailAction, type EmailFormState } from "./actions";
 import { SuccessToast } from "@/ui/success-toast";
 import { SubmitButton } from "@/ui/submit-button";
 
 const initialState: EmailFormState = { error: null, saved: false };
-const t = de.account.email;
-
 // design.md Decision 8: `currentEmail` pre-fills the field with the server's own current value —
 // not a typed draft from a previous submission (the action state itself carries no such value).
 export function EmailForm({ currentEmail }: { currentEmail: string | null }) {
+  const s = useStrings();
+  const t = s.account.email;
   const [state, formAction] = useActionState(changeEmailAction, initialState);
 
   return (
     // noValidate: the server action is the one validator, so every refusal is our German text
-    // (de.ts), never the browser's own tooltip in the browser's language (walkthrough 2026-09-24).
+    // (s.ts), never the browser's own tooltip in the browser's language (walkthrough 2026-09-24).
     <form action={formAction} className="space-y-2" noValidate>
       <div>
         <label htmlFor="email" className="field-label">

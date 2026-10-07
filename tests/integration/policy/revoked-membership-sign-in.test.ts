@@ -161,7 +161,7 @@ async function createProfile(
   name: string,
 ): Promise<{ profileId: string; accountId: string }> {
   const profile = await createResidentProfile(hh.context, name, actor);
-  const { accountId } = await claimResidentProfile(hh.context, profile.id, PASSWORD);
+  const { accountId } = await claimResidentProfile(hh.context, profile.id, PASSWORD, "de");
   return { profileId: profile.id, accountId };
 }
 

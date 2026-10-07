@@ -36,7 +36,7 @@ export async function setupPipeline(track: TestHousehold[]): Promise<PipelineSet
 // `accountIds` so the caller's afterEach deletes the Auth user.
 export async function claimPlainMember(hh: TestHousehold, name: string, accountIds: string[]) {
   const profile = await createResidentProfile(hh.context, name, { accountId: hh.accountId, profileId: null });
-  const { accountId } = await claimResidentProfile(hh.context, profile.id, "test-password-not-real-1234");
+  const { accountId } = await claimResidentProfile(hh.context, profile.id, "test-password-not-real-1234", "de");
   accountIds.push(accountId);
   return {
     accountId,

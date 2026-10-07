@@ -31,7 +31,7 @@ describe("signIn resident-mode: no-such-resident vs wrong-password enumeration",
     const actor = { accountId: hh.accountId, profileId: null };
 
     const profile = await createResidentProfile(hh.context, "Enumeration-Target", actor);
-    const { accountId } = await claimResidentProfile(hh.context, profile.id, "test-password-not-real-1234");
+    const { accountId } = await claimResidentProfile(hh.context, profile.id, "test-password-not-real-1234", "de");
     accountIds.push(accountId);
 
     const unknownNameError: SignInError = await signIn({
@@ -62,7 +62,7 @@ describe("signIn resident-mode: no-such-resident vs wrong-password enumeration",
     hh = await registerTestHousehold();
     const actor = { accountId: hh.accountId, profileId: null };
     const profile = await createResidentProfile(hh.context, "Parity-Target", actor);
-    const { accountId } = await claimResidentProfile(hh.context, profile.id, "test-password-not-real-1234");
+    const { accountId } = await claimResidentProfile(hh.context, profile.id, "test-password-not-real-1234", "de");
     accountIds.push(accountId);
 
     function pathTemplate(url: string): string {

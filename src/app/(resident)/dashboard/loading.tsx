@@ -1,4 +1,4 @@
-import { de } from "@/ui/strings";
+import { LoadingStatus } from "@/ui/loading-status";
 import { SkeletonHeading, SkeletonText } from "@/ui/skeletons";
 
 // design.md Decision 11 (G-N6): heading bar, one featured-card outline, one quiet-card outline —
@@ -8,9 +8,7 @@ import { SkeletonHeading, SkeletonText } from "@/ui/skeletons";
 export default function DashboardLoading() {
   return (
     <div className="mx-auto max-w-2xl space-y-6 p-6" aria-busy="true">
-      <p role="status" className="sr-only">
-        {de.common.loading}
-      </p>
+      <LoadingStatus />
       <div className="space-y-6" aria-hidden="true">
         <div className="space-y-2">
           <SkeletonHeading />

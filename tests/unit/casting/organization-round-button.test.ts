@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { renderToStaticMarkup } from "react-dom/server";
+import { renderWithStrings } from "../../helpers/render-with-strings";
 import { de } from "@/ui/strings";
 
 // Design D13 (application-capture): the household account runs no rounds (03-PRD.md §4.0.1,
@@ -55,7 +55,7 @@ vi.mock("@/modules/identity/repository", async () => {
 const { default: OrganizationPage } = await import("@/app/(org)/organization/page");
 
 async function render() {
-  return renderToStaticMarkup(await OrganizationPage({ searchParams: Promise.resolve({}) }));
+  return renderWithStrings(await OrganizationPage({ searchParams: Promise.resolve({}) }));
 }
 
 describe("O1: the way to open a round is offered only to a session holding manage_rounds", () => {

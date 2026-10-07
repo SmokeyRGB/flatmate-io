@@ -1,10 +1,10 @@
 import { createElement } from "react";
-import { renderToStaticMarkup } from "react-dom/server";
+import { renderWithStrings } from "../../helpers/render-with-strings";
 import { describe, expect, it, vi } from "vitest";
 import type { ScreeningCard } from "@/modules/deliberation/repository";
 import { de } from "@/ui/strings";
 
-// F4 change 1 tasks 7.7: the deck's markup, rendered with createElement + renderToStaticMarkup
+// F4 change 1 tasks 7.7: the deck's markup, rendered with createElement + renderWithStrings
 // (the repo has no testing-library and vitest collects only tests/**/*.test.ts in the node
 // environment; the pattern of tests/unit/casting/capture-page.test.ts).
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }));
@@ -21,7 +21,7 @@ const WEIGHTS = { no: 0, rather_not: 1, good: 4, definitely: 5 };
 
 async function renderDeck() {
   const { ScreeningDeck } = await import("@/app/(resident)/casting/screening/screening-deck");
-  return renderToStaticMarkup(
+  return renderWithStrings(
     createElement(ScreeningDeck, { roundId: "r1", roundTitle: "Herbstrunde", weights: WEIGHTS, cards: CARDS }),
   );
 }
@@ -127,7 +127,7 @@ describe("ScreeningDeck markup", () => {
 describe("RatingBar", () => {
   it("marks the selected rating with aria-pressed and a non-colour signal, on that one button only", async () => {
     const { RatingBar } = await import("@/app/(resident)/casting/screening/screening-deck");
-    const markup = renderToStaticMarkup(
+    const markup = renderWithStrings(
       createElement(RatingBar, { selected: "good", chosen: null, busy: false, onSubmit: () => {} }),
     );
     const buttons = buttonsOf(ratingFormOf(markup));
@@ -140,7 +140,7 @@ describe("RatingBar", () => {
 
   it("marks nothing when the card is unrated", async () => {
     const { RatingBar } = await import("@/app/(resident)/casting/screening/screening-deck");
-    const markup = renderToStaticMarkup(
+    const markup = renderWithStrings(
       createElement(RatingBar, { selected: undefined, chosen: null, busy: false, onSubmit: () => {} }),
     );
     expect(markup).not.toContain('aria-pressed="true"');

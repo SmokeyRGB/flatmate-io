@@ -1,5 +1,5 @@
 import { createElement } from "react";
-import { renderToStaticMarkup } from "react-dom/server";
+import { renderWithStrings } from "../../helpers/render-with-strings";
 import { describe, expect, it, vi } from "vitest";
 import type { CandidateDetail } from "@/modules/deliberation/repository";
 import { explainScore } from "@/modules/deliberation/ranking";
@@ -69,8 +69,8 @@ function unscored(over: Partial<Unscored> = {}): Unscored {
 }
 
 async function render(detail: CandidateDetail, canInvite = false, mode: "sheet" | "page" = "sheet") {
-  const { CandidateDetailBody } = await import("@/app/(resident)/casting/candidate-detail-view");
-  return renderToStaticMarkup(createElement(CandidateDetailBody, { detail, canInvite, mode }));
+  const { CandidateDetailBody } = await import("@/app/(resident)/casting/candidate-detail-body");
+  return renderWithStrings(createElement(CandidateDetailBody, { detail, canInvite, mode }));
 }
 
 const textOf = (html: string) => html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();

@@ -4,9 +4,10 @@ import { Home, LogOut, Settings, User, Users } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef } from "react";
-import { de } from "@/ui/strings";
+import { useLocale, useStrings } from "@/ui/strings/provider";
 import { LinkPendingHint } from "@/ui/link-pending-hint";
 import { SubmitButton } from "@/ui/submit-button";
+import { LanguageToggle } from "./language-toggle";
 import { menuItems, type MenuItem, type Surface } from "./menu-items";
 
 const ICONS = { Users, Home } as const;
@@ -32,15 +33,19 @@ export function AvatarMenu({
   surface: Surface;
   signOutAction: (formData: FormData) => void | Promise<void>;
 }) {
+  const s = useStrings();
   const detailsRef = useRef<HTMLDetailsElement>(null);
-  const items: MenuItem[] = menuItems(access, surface);
+  const items: MenuItem[] = menuItems(access, surface, s);
   const pathname = usePathname();
+  const locale = useLocale();
 
   // Closes on navigation — the layout stays mounted across route changes, so the <details> would
-  // otherwise stay open after following one of its own links.
+  // otherwise stay open after following one of its own links. Also closes once a language switch
+  // has taken effect (the path stays the same then); not on submit, which would hide the toggle's
+  // pending feedback.
   useEffect(() => {
     if (detailsRef.current) detailsRef.current.open = false;
-  }, [pathname]);
+  }, [pathname, locale]);
 
   useEffect(() => {
     const details = detailsRef.current;
@@ -76,7 +81,7 @@ export function AvatarMenu({
 
   return (
     <details ref={detailsRef} className="avatar-menu">
-      <summary aria-label={de.nav.menuFor(displayName)}>
+      <summary aria-label={s.nav.menuFor(displayName)}>
         <User className="size-4" />
         {displayName}
       </summary>
@@ -97,12 +102,13 @@ export function AvatarMenu({
         })}
         <div className="avatar-menu-divider" />
         <Link href="/account" className="avatar-menu-item">
-          <Settings className="size-4" /> {de.nav.accountSettings}
+          <Settings className="size-4" /> {s.nav.accountSettings}
           <LinkPendingHint />
         </Link>
+        <LanguageToggle className="avatar-menu-item" />
         <form action={signOutAction}>
           <SubmitButton className="avatar-menu-item" icon={<LogOut className="size-4" />}>
-            {de.common.signOut}
+            {s.common.signOut}
           </SubmitButton>
         </form>
       </div>

@@ -52,7 +52,7 @@ const DEMO_EMAIL = "demo-household@example.test";
 const PASSWORD = process.env.DEMO_PASSWORD ?? randomBytes(18).toString("base64url");
 
 async function main() {
-  const { household, context } = await registerHousehold(DEMO_EMAIL, PASSWORD, "Demo-WG");
+  const { household, context } = await registerHousehold(DEMO_EMAIL, PASSWORD, "Demo-WG", "de");
   const adminActor = { accountId: context.accountId, profileId: null };
 
   // Appointed moderator explicitly — setMemberRole stores the moderator's permission set on the
@@ -65,7 +65,7 @@ async function main() {
   // voters and quorum (share 0.5) needs 2 votes. Robin stays prepared, below.
   async function claim(displayName: string) {
     const profile = await createResidentProfile(context, displayName, adminActor);
-    const { accountId } = await claimResidentProfile(context, profile.id, PASSWORD);
+    const { accountId } = await claimResidentProfile(context, profile.id, PASSWORD, "de");
     return {
       accountId,
       profileId: profile.id,

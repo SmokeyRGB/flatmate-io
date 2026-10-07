@@ -11,6 +11,7 @@ import {
   signInWithPasswordWithResend,
   supabaseAdmin,
 } from "./auth-provider";
+import type { Locale } from "@/ui/strings/locales";
 import type { CurrentSession } from "./session-cookie";
 import {
   appointedPermissions,
@@ -158,7 +159,9 @@ export class RegistrationError extends Error {
 //     cannot answer most likely never committed, and the only alternative residual is an address
 //     blocked for good. Rows are left without their Auth user only when the commit landed AND
 //     the database failed again straight after; that household is unreachable, and it is logged.
-export async function registerHousehold(email: string, password: string, name: string) {
+// language-switch D6: `locale` is the language the register screen was displayed in; the new account
+// starts with it.
+export async function registerHousehold(email: string, password: string, name: string, locale: Locale) {
   if (!email) throw new RegistrationError("email is required", "missing_email");
   if (!password) throw new RegistrationError("password is required", "missing_password");
   const trimmedName = name.trim();
@@ -230,6 +233,7 @@ export async function registerHousehold(email: string, password: string, name: s
         id: accountId,
         householdId,
         email,
+        locale,
       });
 
       // FR-1.7: the household account has is_resident = false and never occupies a profile
@@ -361,6 +365,7 @@ export async function claimResidentProfile(
   context: SessionContext,
   residentProfileId: string,
   password: string,
+  locale: Locale,
 ) {
   await withSessionContext(context, async (tx) => {
     const [profile] = await tx
@@ -414,7 +419,7 @@ export async function claimResidentProfile(
         throw new ClaimError(`ResidentProfile ${residentProfileId} is not prepared for claiming`, "not_prepared");
       }
 
-      await tx.insert(account).values({ id: accountId, householdId: context.householdId });
+      await tx.insert(account).values({ id: accountId, householdId: context.householdId, locale });
 
       // Human decision, 2026-09-22: no permission is inferred from being first, or from anything
       // else about how a membership came about (docs/domain/identity.md §2.1's Rolle-Vorbelegung box).
@@ -913,6 +918,7 @@ export interface JoinHouseholdResult {
 export async function joinHousehold(
   code: string,
   input: JoinHouseholdInput,
+  locale: Locale, // language-switch D6: the language the join screen was displayed in
   options: { rememberMe?: boolean; currentSession?: CurrentSession | null } = {},
 ): Promise<JoinHouseholdResult> {
   const displayNameInput = input.displayName?.trim() ?? "";
@@ -1129,6 +1135,7 @@ export async function joinHousehold(
         householdId: resolved.householdId,
         email, // the optional supplied email, or null — this DB column, unlike the provider
         // address above, has always stored exactly this and is unaffected by design.md Decision 3
+        locale,
       });
 
       // founding-link-moderator D2: is the link just claimed the household's founding link? Read

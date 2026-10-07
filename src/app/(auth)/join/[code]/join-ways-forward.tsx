@@ -1,10 +1,10 @@
+"use client";
+
 import Link from "next/link";
-import { de } from "@/ui/strings";
+import { useStrings } from "@/ui/strings/provider";
 import { LinkPendingHint } from "@/ui/link-pending-hint";
 import { SubmitButton } from "@/ui/submit-button";
 import { signOutAndReturnAction } from "./actions";
-
-const t = de.join;
 
 // design.md Decision 10: shared by BOTH the page's own state rendering (page.tsx, an opened link
 // that is already refused) and the form's inline refusal rendering (join-form.tsx, a refusal that
@@ -14,6 +14,7 @@ const t = de.join;
 // The invalid-link refusal's second way back (FR-2.27): never prefills the damaged code — that is
 // the part that is wrong, and prefilling it would need a query string (G-A5).
 export function HandEntryWayBack() {
+  const t = useStrings().join;
   return (
     <Link href="/join" className="btn btn-secondary">
       {t.handEntryWayBack}
@@ -26,6 +27,7 @@ export function HandEntryWayBack() {
 // enforces that, design.md Decision 7 — this form adds no check of its own) and returns to this
 // same invitation. The code travels in the request BODY as a hidden field, never a query string.
 export function SignOutAndReturnForm({ code }: { code: string }) {
+  const t = useStrings().join;
   return (
     <form action={signOutAndReturnAction}>
       <input type="hidden" name="code" value={code} />

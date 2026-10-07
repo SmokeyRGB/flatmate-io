@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { renderToStaticMarkup } from "react-dom/server";
+import { renderWithStrings } from "../../helpers/render-with-strings";
 import { de } from "@/ui/strings";
 
 // F3 change 2: the round page offers "Bewerbung erfassen" only to a resident profile that holds
@@ -77,7 +77,7 @@ async function render(searchParams: { saved?: string } = {}) {
     params: Promise.resolve({ id: ROUND_ID }),
     searchParams: Promise.resolve(searchParams),
   });
-  return renderToStaticMarkup(element);
+  return renderWithStrings(element);
 }
 
 const SAVED_ID = "55555555-5555-5555-5555-555555555555";

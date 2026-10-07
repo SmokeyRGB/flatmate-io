@@ -36,7 +36,7 @@ describe("joinHousehold puts a supplied email at the provider (design.md Decisio
       displayName: "EmailJoiner",
       password: PASSWORD,
       email,
-    });
+    }, "de");
     accountIds.push(result.context.accountId);
 
     const { data } = await adminClient().auth.admin.getUserById(result.context.accountId);
@@ -61,7 +61,7 @@ describe("joinHousehold puts a supplied email at the provider (design.md Decisio
         displayName: "TakenEmailJoiner",
         password: PASSWORD,
         email: hh.email, // the household account's own address — already in use at the provider
-      });
+      }, "de");
     } catch (err) {
       caught = err;
     }
@@ -97,7 +97,7 @@ describe("joinHousehold puts a supplied email at the provider (design.md Decisio
         displayName: "MalformedEmailJoiner",
         password: PASSWORD,
         email: "not-an-email",
-      });
+      }, "de");
     } catch (err) {
       caught = err;
     }
@@ -134,7 +134,7 @@ describe("joinHousehold puts a supplied email at the provider (design.md Decisio
       displayName: "MixedCaseJoiner",
       password: PASSWORD,
       email: email.toUpperCase(),
-    });
+    }, "de");
     accountIds.push(result.context.accountId);
 
     const { data } = await adminClient().auth.admin.getUserById(result.context.accountId);

@@ -35,7 +35,7 @@ describe("signIn resident_email (identity/sign-in)", () => {
       accountId: hh.accountId,
       profileId: null,
     });
-    const { accountId } = await claimResidentProfile(hh.context, profile.id, PASSWORD);
+    const { accountId } = await claimResidentProfile(hh.context, profile.id, PASSWORD, "de");
     accountIds.push(accountId);
     // Copilot review round 4 (PR #23), FIX 1: changeResidentEmail now looks up `session` by
     // `current.sessionId` — a placeholder "n/a" sessionId fails that lookup with a driver-level

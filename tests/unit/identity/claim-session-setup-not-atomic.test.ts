@@ -50,7 +50,7 @@ describe("A bound join whose session setup fails leaves the profile prepared, no
     delete process.env.SESSION_TOKEN_HASH_SECRET;
 
     await expect(
-      joinHousehold(link.code, { password: "test-password-not-real-1234" }),
+      joinHousehold(link.code, { password: "test-password-not-real-1234" }, "de"),
     ).rejects.toThrow();
 
     // Rolled back in full: the profile is prepared again (never left stuck "active" with a
@@ -77,7 +77,7 @@ describe("A bound join whose session setup fails leaves the profile prepared, no
     // profile.
     process.env.SESSION_TOKEN_HASH_SECRET = originalSecret ?? "test-secret-for-claim-retry";
 
-    const result = await joinHousehold(link.code, { password: "test-password-not-real-1234" });
+    const result = await joinHousehold(link.code, { password: "test-password-not-real-1234" }, "de");
     accountIds.push(result.context.accountId);
     expect(result.context.profileId).toBe(prepared.id);
 

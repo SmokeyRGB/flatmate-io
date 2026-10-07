@@ -46,7 +46,7 @@ describe("manage_rounds is a role default (identity/permissions capability), not
     const { accountId: firstAcc, membership: firstMembership } = await claimResidentProfile(
       hh.context,
       first.id,
-      "test-password-not-real-1234",
+      "test-password-not-real-1234", "de",
     );
     firstAccountId = firstAcc;
     expect(firstMembership.permissions).not.toContain("manage_rounds");
@@ -56,7 +56,7 @@ describe("manage_rounds is a role default (identity/permissions capability), not
     const { accountId: secondAcc, membership: secondMembership } = await claimResidentProfile(
       hh.context,
       second.id,
-      "test-password-not-real-1234",
+      "test-password-not-real-1234", "de",
     );
     secondAccountId = secondAcc;
     expect(secondMembership.permissions).not.toContain("manage_rounds");
@@ -71,7 +71,7 @@ describe("manage_rounds is a role default (identity/permissions capability), not
     const { accountId, membership: memberMembership } = await claimResidentProfile(
       hh.context,
       profile.id,
-      "test-password-not-real-1234",
+      "test-password-not-real-1234", "de",
     );
     firstAccountId = accountId;
     expect(memberMembership.permissions).toEqual([...RESIDENT_PERMISSIONS]);

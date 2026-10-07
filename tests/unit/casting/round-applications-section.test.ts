@@ -31,8 +31,10 @@ const ID_A = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const ID_B = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
 const ID_C = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
 
-function render(props: Parameters<typeof ApplicationsSection>[0]) {
-  return renderToStaticMarkup(createElement(ApplicationsSection, props));
+type WithoutStrings<T> = T extends unknown ? Omit<T, "strings"> : never;
+
+function render(props: WithoutStrings<Parameters<typeof ApplicationsSection>[0]>) {
+  return renderToStaticMarkup(createElement(ApplicationsSection, { strings: de, ...props }));
 }
 
 describe("ApplicationsSection: the grouped list", () => {

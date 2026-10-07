@@ -18,12 +18,12 @@ describe("registerHousehold requires a household name", () => {
   // created), so no cleanup is needed for them.
   it("refuses an empty name with missing_name", async () => {
     await expect(
-      registerHousehold(testEmail(), "test-password-not-real-1234", ""),
+      registerHousehold(testEmail(), "test-password-not-real-1234", "", "de"),
     ).rejects.toMatchObject({ code: "missing_name" });
   });
 
   it("refuses a whitespace-only name the same way, and it is a RegistrationError instance", async () => {
-    const attempt = registerHousehold(testEmail(), "test-password-not-real-1234", "   ");
+    const attempt = registerHousehold(testEmail(), "test-password-not-real-1234", "   ", "de");
     await expect(attempt).rejects.toMatchObject({ code: "missing_name" });
     await expect(attempt).rejects.toBeInstanceOf(RegistrationError);
   });

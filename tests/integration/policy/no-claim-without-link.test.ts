@@ -44,7 +44,7 @@ describe("No route claims a prepared profile without a link naming it (design.md
     // code is the closest thing to "no link at all": knowing the household's id (not secret,
     // C-1.4) and the exact name administration gave a prepared profile buys nothing without it.
     await expect(
-      joinHousehold("NEVER-ISSUED-FOR-SAM", { displayName: "Sam", password: "test-password-not-real-1234" }),
+      joinHousehold("NEVER-ISSUED-FOR-SAM", { displayName: "Sam", password: "test-password-not-real-1234" }, "de"),
     ).rejects.toMatchObject({ code: "invalid_link" });
 
     const [untouched] = await withSessionContext(hh.context, (tx) =>
@@ -72,7 +72,7 @@ describe("No route claims a prepared profile without a link naming it (design.md
     expect(neutralLink.residentProfileId).toBeNull();
 
     await expect(
-      joinHousehold(neutralLink.code, { displayName: "Sam", password: "test-password-not-real-1234" }),
+      joinHousehold(neutralLink.code, { displayName: "Sam", password: "test-password-not-real-1234" }, "de"),
     ).rejects.toMatchObject({ code: "name_taken" });
 
     const [stillPrepared] = await withSessionContext(hh.context, (tx) =>

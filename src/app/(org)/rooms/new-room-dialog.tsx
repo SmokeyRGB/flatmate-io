@@ -2,17 +2,17 @@
 
 import { Plus, X } from "lucide-react";
 import { useActionState, useEffect, useId, useRef, useState } from "react";
-import { de } from "@/ui/strings";
+import { useStrings } from "@/ui/strings/provider";
 import { SubmitButton } from "@/ui/submit-button";
 import { createRoomAction, type CreateRoomFormState } from "./actions";
 
 const initialState: CreateRoomFormState = { error: null };
-const t = de.rooms.create;
-
 // Screen O14's "Neues Zimmer": opens a `.dialog` modal instead of an inline field beside the
 // heading, so the room's attributes have room to grow (a size in m², say) without crowding the
 // list. Each attribute gets its own labelled row in NewRoomForm's fields stack.
 export function NewRoomDialog() {
+  const s = useStrings();
+  const t = s.rooms.create;
   const dialogRef = useRef<HTMLDialogElement>(null);
   const headingId = useId();
   // Each opening mounts a fresh NewRoomForm (key below), so its input, its useActionState result
@@ -31,7 +31,7 @@ export function NewRoomDialog() {
         }}
         className="btn btn-primary shrink-0"
       >
-        <Plus className="size-4" /> {de.rooms.addSubmit}
+        <Plus className="size-4" /> {s.rooms.addSubmit}
       </button>
 
       <dialog ref={dialogRef} className="dialog" aria-labelledby={headingId}>
@@ -43,7 +43,7 @@ export function NewRoomDialog() {
           <button
             type="button"
             onClick={close}
-            aria-label={de.common.close}
+            aria-label={s.common.close}
             className="-m-1 rounded-full p-1 text-muted-foreground transition hover:bg-muted"
           >
             <X className="size-5" />
@@ -65,6 +65,8 @@ function NewRoomForm({
   onCreated: () => void;
   onCancel: () => void;
 }) {
+  const s = useStrings();
+  const t = s.rooms.create;
   const [state, formAction] = useActionState(createRoomAction, initialState);
 
   useEffect(() => {
@@ -102,7 +104,7 @@ function NewRoomForm({
           {t.submit}
         </SubmitButton>
         <button type="button" onClick={onCancel} className="btn-link">
-          {de.common.cancel}
+          {s.common.cancel}
         </button>
       </div>
     </form>

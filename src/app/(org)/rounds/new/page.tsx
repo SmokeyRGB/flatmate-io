@@ -6,21 +6,21 @@ import { assertHasPermission, PermissionDeniedError } from "@/modules/identity/r
 import { getCurrentSession } from "@/modules/identity/session-cookie";
 import { OrganisationAccessDenied } from "@/app/(org)/organisation-access-denied";
 import { requireOrganisationAccess } from "@/app/(org)/organisation-access";
-import { de } from "@/ui/strings";
+import { getStrings } from "@/ui/strings/request";
 import { LinkPendingHint } from "@/ui/link-pending-hint";
 import { RoundForm } from "./round-form";
 
-const t = de.rounds.new;
-
 // Screen O2.
 export default async function NewRoundPage() {
+  const s = await getStrings();
+  const t = s.rounds.new;
   const current = await getCurrentSession();
   if (!current) redirect("/sign-in");
 
   // role-permissions design D9: every page of the organisation area first checks the caller's
   // stored permissions on this request (a demoted moderator loses the area on reload); the page's
   // own narrower check below stays.
-  if (!(await requireOrganisationAccess(current))) return <OrganisationAccessDenied />;
+  if (!(await requireOrganisationAccess(current))) return <OrganisationAccessDenied strings={await getStrings()} />;
 
   // rounds-new-page-missing-permission-guard: this page had no authorization check at all, only
   // an authentication one — any signed-in resident could reach and see the create/open form even
@@ -33,7 +33,7 @@ export default async function NewRoundPage() {
       return (
         <div className="mx-auto max-w-md space-y-4 p-6">
           <Link href="/organization" className="back-link">
-            <ArrowLeft className="size-4" /> {de.nav.organisation}
+            <ArrowLeft className="size-4" /> {s.nav.organisation}
             <LinkPendingHint />
           </Link>
           <h1 className="font-serif text-2xl font-semibold">{t.heading}</h1>
@@ -49,7 +49,7 @@ export default async function NewRoundPage() {
   return (
     <div className="mx-auto max-w-md space-y-6 p-6">
       <Link href="/organization" className="back-link">
-        <ArrowLeft className="size-4" /> {de.nav.organisation}
+        <ArrowLeft className="size-4" /> {s.nav.organisation}
         <LinkPendingHint />
       </Link>
       <h1 className="font-serif text-2xl font-semibold">{t.heading}</h1>

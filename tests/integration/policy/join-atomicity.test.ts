@@ -29,7 +29,7 @@ describe("Join atomicity (EC-2.1, design.md Decision 2)", () => {
     const displayNames = ["JoinerA", "JoinerB"];
     const results = await Promise.allSettled(
       displayNames.map((displayName) =>
-        joinHousehold(link.code, { displayName, password: "test-password-not-real-1234" }),
+        joinHousehold(link.code, { displayName, password: "test-password-not-real-1234" }, "de"),
       ),
     );
     const winnerName = displayNames[results.findIndex((r) => r.status === "fulfilled")];

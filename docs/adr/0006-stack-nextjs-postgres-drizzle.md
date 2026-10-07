@@ -111,6 +111,15 @@ Arbeit nicht ab und kann sie nicht abnehmen.
 > und **kein** Auftrag, Mehrsprachigkeit in v0.1 zu bauen — nur eine Randbedingung, die verhindert,
 > dass die spätere Erweiterung eine Textsuche-und-Ersetze-Migration wird.
 
+> **Ergänzung 2026-10-07 — die zweite Tabelle besteht.** Die Randbedingung vom 2026-09-16 hat getragen:
+> Neben der deutschen Tabelle gibt es jetzt eine englische, beide mit derselben Form (ein
+> Typvertrag, den die englische erfüllen muss), und `Account.locale` (`de` oder `en`, durch einen
+> CHECK der Datenbank begrenzt) wählt die Tabelle je Konto. Die Aussage, es sei **kein** Auftrag,
+> Mehrsprachigkeit in v0.1 zu bauen, ist damit **durch die Entscheidung des Menschen vom 2026-10-07
+> überholt** (für den englischen Pitch; `../03-PRD.md` §4.5). Es bleibt bei „keine Festlegung auf ein
+> bestimmtes i18n-Paket": die Sprache hängt am Konto, nicht an der URL. Die Statuszeile dieses
+> Records bleibt unverändert, der Stack ist nicht berührt.
+
 ### Konsequenzen
 
 **Positiv**

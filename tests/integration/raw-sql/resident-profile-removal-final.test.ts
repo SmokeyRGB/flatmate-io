@@ -29,7 +29,7 @@ describe("[G-C7 raw SQL] a removed resident_profile cannot leave `removed`, even
     const household = await registerTestHousehold();
     const actor = { accountId: household.accountId, profileId: null };
     const profile = await createResidentProfile(household.context, name, actor);
-    const { accountId } = await claimResidentProfile(household.context, profile.id, "test-password-not-real-1234");
+    const { accountId } = await claimResidentProfile(household.context, profile.id, "test-password-not-real-1234", "de");
     accountIds.push(accountId);
     await removeMember(household.context, household.accountId, accountId, name);
     return { hh: household, profileId: profile.id };
@@ -91,7 +91,7 @@ describe("[G-C7 raw SQL] a removed resident_profile cannot leave `removed`, even
     hh = await registerTestHousehold();
     const actor = { accountId: hh.accountId, profileId: null };
     const profile = await createResidentProfile(hh.context, "RawSqlSoftTier", actor);
-    const { accountId } = await claimResidentProfile(hh.context, profile.id, "test-password-not-real-1234");
+    const { accountId } = await claimResidentProfile(hh.context, profile.id, "test-password-not-real-1234", "de");
     accountIds.push(accountId);
 
     await expect(

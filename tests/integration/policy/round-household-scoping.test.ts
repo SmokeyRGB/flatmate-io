@@ -37,7 +37,7 @@ describe("casting_round/round_participation household isolation — policy layer
     const { accountId: residentAccountId } = await claimResidentProfile(
       b.context,
       profileB.id,
-      "test-password-not-real-1234",
+      "test-password-not-real-1234", "de",
     );
     accountIds.push(residentAccountId);
 

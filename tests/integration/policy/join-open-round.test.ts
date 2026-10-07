@@ -51,7 +51,7 @@ describe("Joining and open rounds (EC-2.2/EC-2.3)", () => {
     const result = await joinHousehold(link.code, {
       displayName: "Jonas",
       password: "test-password-not-real-1234",
-    });
+    }, "de");
     accountIds.push(result.context.accountId);
 
     const participants = await activeParticipants(hh, round.id);
@@ -67,7 +67,7 @@ describe("Joining and open rounds (EC-2.2/EC-2.3)", () => {
     const result = await joinHousehold(link.code, {
       displayName: "Jonas",
       password: "test-password-not-real-1234",
-    });
+    }, "de");
     accountIds.push(result.context.accountId);
 
     expect(result.context.profileId).toBeTruthy();

@@ -20,13 +20,13 @@ describe("joinHousehold: a malformed/unknown code never crashes", () => {
       joinHousehold("definitely not a real join code!! %$#", {
         displayName: "Someone",
         password: "correct horse battery staple",
-      }),
+      }, "de"),
     ).rejects.toMatchObject({ code: "invalid_link" });
   });
 
   it("still requires a password, checked before any code lookup", async () => {
     await expect(
-      joinHousehold("NEVER-EXISTS-CODE-CHECK", { displayName: "Someone", password: "" }),
+      joinHousehold("NEVER-EXISTS-CODE-CHECK", { displayName: "Someone", password: "" }, "de"),
     ).rejects.toMatchObject({ code: "missing_fields" });
   });
 
@@ -36,7 +36,7 @@ describe("joinHousehold: a malformed/unknown code never crashes", () => {
     // the refusal is still invalid_link — the missing-name check (which only applies to a NEUTRAL
     // link) never even gets a chance to fire first.
     await expect(
-      joinHousehold("NEVER-EXISTS-CODE-CHECK", { password: "correct horse battery staple" }),
+      joinHousehold("NEVER-EXISTS-CODE-CHECK", { password: "correct horse battery staple" }, "de"),
     ).rejects.toMatchObject({ code: "invalid_link" });
   });
 });

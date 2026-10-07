@@ -5,7 +5,8 @@ import {
   type OpenTask,
 } from "@/modules/casting/task-precedence";
 import type { OrganisationTask, StartOpenRound, StartOverview } from "@/modules/casting/repository";
-import { de } from "@/ui/strings";
+import type { Strings } from "@/ui/strings";
+import { DATE_LOCALES, type Locale } from "@/ui/strings/locales";
 
 // start-screen design.md Decision 10/tasks.md 7.4/8.3: B1's pure mapping from `getStartOverview` +
 // `listOrganisationTasks()` + `now` to a view model — deliberately no counter field
@@ -34,9 +35,9 @@ export type DashboardStandingView =
 
 // The neutral heading for a phase standing that is neither waiting nor fully rated, so the
 // distribution never stands without a headline. allRated and waiting keep their own.
-export function standingHeadingOf(standing: DashboardStandingView): string | null {
+export function standingHeadingOf(standing: DashboardStandingView, s: Strings): string | null {
   if (standing.kind !== "phase" || standing.allRated || standing.waiting) return null;
-  return de.start.standingHeading;
+  return s.start.standingHeading;
 }
 
 export interface DashboardBridgeView {
@@ -61,8 +62,8 @@ export interface DashboardView {
 
 // The household's own calendar day, not the server's: a deadline just after midnight CEST is the
 // previous day in UTC, and B1 would name the wrong date in the one reason text P-3 needs right.
-function formatGermanDate(date: Date): string {
-  return date.toLocaleDateString("de-DE", {
+function formatDate(date: Date, locale: Locale): string {
+  return date.toLocaleDateString(DATE_LOCALES[locale], {
     day: "numeric",
     month: "long",
     year: "numeric",
@@ -72,20 +73,26 @@ function formatGermanDate(date: Date): string {
 
 // The page's own clock decision (design.md Decision 5): the module comparing dates has none of
 // its own, `now` is always the caller's.
-function reasonForRound(round: StartOpenRound, now: Date): string {
-  if (round.phaseDeadlineAt === null) return de.start.reasonUndated(round.title);
-  if (round.phaseDeadlineAt.getTime() < now.getTime()) return de.start.reasonOverdue;
-  return de.start.reasonDated(formatGermanDate(round.phaseDeadlineAt));
+function reasonForRound(round: StartOpenRound, now: Date, s: Strings, locale: Locale): string {
+  if (round.phaseDeadlineAt === null) return s.start.reasonUndated(round.title);
+  if (round.phaseDeadlineAt.getTime() < now.getTime()) return s.start.reasonOverdue;
+  return s.start.reasonDated(formatDate(round.phaseDeadlineAt, locale));
 }
 
 // The count comes from deliberation's getAwaitingVoteCounts (F4 change 1, D3), passed in as a map
 // keyed by round; a round missing from it counts 0. Each round's task leads to that round's pass.
 export type AwaitingVotes = ReadonlyMap<string, number>;
 
-function taskViewFor(round: StartOpenRound, awaitingVotes: AwaitingVotes, now: Date): DashboardTaskView {
+function taskViewFor(
+  round: StartOpenRound,
+  awaitingVotes: AwaitingVotes,
+  now: Date,
+  s: Strings,
+  locale: Locale,
+): DashboardTaskView {
   return {
-    heading: de.start.voteTaskHeading(awaitingVotes.get(round.roundId) ?? 0),
-    reason: reasonForRound(round, now),
+    heading: s.start.voteTaskHeading(awaitingVotes.get(round.roundId) ?? 0),
+    reason: reasonForRound(round, now, s, locale),
     href: `/casting/screening?round=${round.roundId}`,
   };
 }
@@ -96,6 +103,8 @@ export function buildDashboardView(
   organisationTasks: OrganisationTask[],
   access: { organisation: boolean },
   now: Date,
+  s: Strings,
+  locale: Locale,
 ): DashboardView {
   // v0.1's only task type is T-5 (a vote task) — one per open round with a positive count and the
   // right to vote (EC-2.12: no vote task without can_vote).
@@ -113,12 +122,12 @@ export function buildDashboardView(
   const primaryTask = ordered[0] ?? null;
   const rowTasks = ordered.slice(1, 4);
   const folded = Math.max(0, ordered.length - 4);
-  const foldedTasks = ordered.slice(4).map((t) => taskViewFor(byRoundId.get(t.key) as StartOpenRound, awaitingVotes, now));
+  const foldedTasks = ordered.slice(4).map((t) => taskViewFor(byRoundId.get(t.key) as StartOpenRound, awaitingVotes, now, s, locale));
 
   const primary = primaryTask
-    ? taskViewFor(byRoundId.get(primaryTask.key) as StartOpenRound, awaitingVotes, now)
+    ? taskViewFor(byRoundId.get(primaryTask.key) as StartOpenRound, awaitingVotes, now, s, locale)
     : null;
-  const rows = rowTasks.map((t) => taskViewFor(byRoundId.get(t.key) as StartOpenRound, awaitingVotes, now));
+  const rows = rowTasks.map((t) => taskViewFor(byRoundId.get(t.key) as StartOpenRound, awaitingVotes, now, s, locale));
 
   // design.md Decision 10: the primary card's place is taken by the standing card when there is
   // no primary — never both, never neither (spec "never a blank surface").
@@ -143,7 +152,7 @@ export function buildDashboardView(
         waiting: phaseOf(stateCounts) === "waiting_for_applications",
         allRated: mayVote && openForVoting && awaitingVotes.get(roundId) === 0,
         distribution: distributionOf(stateCounts).map((d) => ({
-          label: de.start.distribution[d.bucket](d.count),
+          label: s.start.distribution[d.bucket](d.count),
           count: d.count,
         })),
       };
@@ -156,15 +165,15 @@ export function buildDashboardView(
     // The first-round task has its own body: it is the organisation tab's own text, read from the
     // one place it is defined, so Start and the tab say the same thing.
     const bodyText = organisationTasks.some((t) => t.kind === "open_first_round")
-      ? de.org.dashboard.openFirstRoundBody
-      : de.start.bridge.body;
+      ? s.org.dashboard.openFirstRoundBody
+      : s.start.bridge.body;
     bridge = {
       heading:
         organisationTaskCount === 0
-          ? de.start.bridge.allDone
+          ? s.start.bridge.allDone
           : organisationTaskCount === 1
-            ? de.start.bridge.headingSingular
-            : de.start.bridge.headingPlural(organisationTaskCount),
+            ? s.start.bridge.headingSingular
+            : s.start.bridge.headingPlural(organisationTaskCount),
       body: organisationTaskCount === 0 ? "" : bodyText,
       buttonHref: "/organization",
     };

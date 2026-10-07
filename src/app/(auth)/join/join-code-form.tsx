@@ -1,13 +1,11 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { de } from "@/ui/strings";
+import { useStrings } from "@/ui/strings/provider";
 import { SubmitButton } from "@/ui/submit-button";
 import { enterJoinCodeAction, type JoinCodeFormState } from "./actions";
 
 const initialState: JoinCodeFormState = { error: null };
-const t = de.join.joinByCode;
-
 // design.md Decision 4, applied to this one-field form: `draft` is the browser's own copy of what
 // was typed, filled by the form's `action` wrapper BEFORE the useActionState dispatch, in the same
 // transition. React 19 resets a form's uncontrolled fields after every action that does not throw
@@ -18,6 +16,7 @@ const t = de.join.joinByCode;
 // G-A5/Decision 1: POST only — no `method="get"`, no `next/form`, which would turn the field into a
 // query string.
 export function JoinCodeForm() {
+  const t = useStrings().join.joinByCode;
   const [draft, setDraft] = useState("");
   const [state, formAction] = useActionState(enterJoinCodeAction, initialState);
 

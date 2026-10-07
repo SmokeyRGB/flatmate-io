@@ -3,10 +3,9 @@
 import { Check, CircleHelp, Copy } from "lucide-react";
 import { useId, useState } from "react";
 import type { NoticeCategory } from "@/modules/casting/application-notice";
+import { useStrings } from "@/ui/strings/provider";
 import { de } from "@/ui/strings";
 import { SubmitButton } from "@/ui/submit-button";
-
-const t = de.applications.notice;
 
 // The privacy notices of an application (Compliance §4.5, FR-3.11-3.13, FR-3.23, S-16). These
 // pieces share this file:
@@ -48,6 +47,7 @@ export function NoticeTextPanel({
   // The `[Link]` paragraph belongs to a privacy notice; the invitation text has no link in it.
   linkHint?: boolean;
 }) {
+  const t = useStrings().applications.notice;
   const [copied, setCopied] = useState(false);
 
   async function copy() {
@@ -69,6 +69,7 @@ export function NoticeTextPanel({
       <textarea
         id={`${panelId}-text`}
         rows={8}
+        lang="de" // outbound text stays German on an English screen (D7): screen readers switch voice
         className="field-input"
         value={text}
         onChange={(event) => onChange(event.target.value)}
@@ -95,6 +96,7 @@ export function NoticeTextPanel({
 // 2026-09-29). The question is the button's hover text AND its accessible name, and a tap opens
 // the explanation: nothing depends on hovering (rahmenwerk.md §4.1.0, touch devices).
 function WhyButton({ open, controls, onToggle }: { open: boolean; controls: string; onToggle: () => void }) {
+  const t = useStrings().applications.notice;
   return (
     <button
       type="button"
@@ -111,6 +113,7 @@ function WhyButton({ open, controls, onToggle }: { open: boolean; controls: stri
 }
 
 function WhyText({ id }: { id: string }) {
+  const t = useStrings().applications.notice;
   return (
     <p id={id} className="text-sm">
       {t.why}
@@ -153,11 +156,16 @@ export function ThirdPartyNotice({
   defaultOpen?: boolean;
   defaultWhyOpen?: boolean;
 }) {
+  const t = useStrings().applications.notice;
   const name = applicantName.trim();
-  const seed = t.thirdPartyText({
-    name: name === "" ? t.nameFallback : name,
+  // Outbound text (language-switch D7, vocabulary spec "Text for people outside the app stays
+  // German"): the suggested notice is what the household sends to the applicant in its own name, so
+  // its words come from the German table whatever language the viewer reads the app in.
+  const outbound = de.applications.notice;
+  const seed = outbound.thirdPartyText({
+    name: name === "" ? outbound.nameFallback : name,
     household,
-    categories: categories.map((c) => t.categories[c]).join(", "),
+    categories: categories.map((c) => outbound.categories[c]).join(", "),
   });
   const [open, setOpen] = useState(defaultOpen);
   const [whyOpen, setWhyOpen] = useState(defaultWhyOpen);
@@ -225,6 +233,7 @@ export function ApplicantNotice({
   defaultOpen?: boolean;
   defaultWhyOpen?: boolean;
 }) {
+  const t = useStrings().applications.notice;
   const [open, setOpen] = useState(defaultOpen);
   const [whyOpen, setWhyOpen] = useState(defaultWhyOpen);
   const [edited, setEdited] = useState<string | null>(null);
@@ -249,7 +258,7 @@ export function ApplicantNotice({
       {open && (
         <NoticeTextPanel
           panelId={panelId}
-          text={edited ?? t.applicantText}
+          text={edited ?? de.applications.notice.applicantText} // outbound text: stays German (D7)
           edited={edited !== null}
           onChange={setEdited}
           onRegenerate={() => setEdited(null)}

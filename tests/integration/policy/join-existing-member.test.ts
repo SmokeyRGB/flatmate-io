@@ -31,7 +31,7 @@ describe("Joining while already signed in (EC-2.4/EC-2.5)", () => {
     await expect(
       joinHousehold(
         link.code,
-        { displayName: "Should Not Exist", password: "test-password-not-real-1234" },
+        { displayName: "Should Not Exist", password: "test-password-not-real-1234" }, "de",
         { currentSession: { sessionId: randomUUID(), context: hhA.context } },
       ),
     ).rejects.toMatchObject({ code: "already_member" });
@@ -48,7 +48,7 @@ describe("Joining while already signed in (EC-2.4/EC-2.5)", () => {
     await expect(
       joinHousehold(
         link.code,
-        { displayName: "X", password: "test-password-not-real-1234" },
+        { displayName: "X", password: "test-password-not-real-1234" }, "de",
         { currentSession: { sessionId: randomUUID(), context: hhA.context } },
       ),
     ).rejects.toBeInstanceOf(JoinError);
@@ -63,7 +63,7 @@ describe("Joining while already signed in (EC-2.4/EC-2.5)", () => {
     await expect(
       joinHousehold(
         linkA.code,
-        { displayName: "X", password: "test-password-not-real-1234" },
+        { displayName: "X", password: "test-password-not-real-1234" }, "de",
         { currentSession: { sessionId: randomUUID(), context: hhB.context } },
       ),
     ).rejects.toMatchObject({ code: "other_household" });
@@ -76,7 +76,7 @@ describe("Joining while already signed in (EC-2.4/EC-2.5)", () => {
     const result = await joinHousehold(link.code, {
       displayName: "Ordinary",
       password: "test-password-not-real-1234",
-    });
+    }, "de");
     extraAccountId = result.context.accountId;
 
     const rows = await withSessionContext(hhA.context, (tx) =>

@@ -1,5 +1,5 @@
 import { createElement } from "react";
-import { renderToStaticMarkup } from "react-dom/server";
+import { renderWithStrings } from "../../helpers/render-with-strings";
 import { describe, expect, it, vi } from "vitest";
 import { de } from "@/ui/strings";
 
@@ -12,7 +12,7 @@ const { NewRoomDialog } = await import("@/app/(org)/rooms/new-room-dialog");
 
 describe("NewRoomDialog", () => {
   it("the <dialog> is named by its heading", () => {
-    const html = renderToStaticMarkup(createElement(NewRoomDialog));
+    const html = renderWithStrings(createElement(NewRoomDialog));
     const labelledBy = /<dialog\b[^>]*aria-labelledby="([^"]+)"/.exec(html)?.[1];
     expect(labelledBy).toBeTruthy();
     const heading = new RegExp(`<h2[^>]* id="${labelledBy!}"[^>]*>([^<]+)</h2>`).exec(html);

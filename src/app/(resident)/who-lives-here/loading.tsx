@@ -1,4 +1,4 @@
-import { de } from "@/ui/strings";
+import { LoadingStatus } from "@/ui/loading-status";
 import { SkeletonHeading, SkeletonList } from "@/ui/skeletons";
 
 // design.md D3/D6: who-lives-here/page.tsx's shape — back-link, heading, the caution callout, and
@@ -6,9 +6,7 @@ import { SkeletonHeading, SkeletonList } from "@/ui/skeletons";
 export default function WhoLivesHereLoading() {
   return (
     <div className="mx-auto max-w-md space-y-4 p-6" aria-busy="true">
-      <p role="status" className="sr-only">
-        {de.common.loading}
-      </p>
+      <LoadingStatus />
       <div className="space-y-4" aria-hidden="true">
         <SkeletonHeading />
         <div className="skeleton h-12 w-full rounded-xl" />

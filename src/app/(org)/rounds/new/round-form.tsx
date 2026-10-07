@@ -2,14 +2,13 @@
 
 import Link from "next/link";
 import { useActionState } from "react";
-import { de } from "@/ui/strings";
+import { useStrings } from "@/ui/strings/provider";
 import { SubmitButton } from "@/ui/submit-button";
 import { createAndOpenRoundAction, type CreateRoundFormState } from "./actions";
 
 const initialState: CreateRoundFormState = { error: null };
-const t = de.rounds.new;
-
 export function RoundForm({ rooms }: { rooms: { id: string; label: string; castable: boolean }[] }) {
+  const t = useStrings().rounds.new;
   const [state, formAction] = useActionState(createAndOpenRoundAction, initialState);
   // The notice below is for zero rooms only. The button also locks when rooms exist but none can
   // be cast for (occupied / not available), the case openRoundTx refuses with rooms_unavailable.

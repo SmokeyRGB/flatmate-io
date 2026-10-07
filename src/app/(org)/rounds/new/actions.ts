@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { assertHasPermission, PermissionDeniedError } from "@/modules/identity/repository";
 import { getCurrentSession } from "@/modules/identity/session-cookie";
 import { createAndOpenRound, RoundOpenPreconditionError } from "@/modules/casting/repository";
-import { de } from "@/ui/strings";
+import { getStringsFor } from "@/ui/strings/request";
 
 export interface CreateRoundFormState {
   error: string | null;
@@ -18,6 +18,7 @@ export async function createAndOpenRoundAction(
 ): Promise<CreateRoundFormState> {
   const current = await getCurrentSession();
   if (!current) throw new Error("Not signed in");
+  const s = await getStringsFor(current);
 
   const title = String(formData.get("title") ?? "").trim() || "New round";
   const roomIds = formData.getAll("roomIds").map(String).filter(Boolean);
@@ -39,16 +40,16 @@ export async function createAndOpenRoundAction(
     if (err instanceof RoundOpenPreconditionError) {
       switch (err.code) {
         case "no_rooms_selected":
-          return { error: de.rounds.errors.noRoomsSelected };
+          return { error: s.rounds.errors.noRoomsSelected };
         case "rooms_unavailable":
-          return { error: de.rounds.errors.roomsUnavailable };
+          return { error: s.rounds.errors.roomsUnavailable };
         case "no_eligible_residents":
-          return { error: de.rounds.errors.noEligibleResidents };
+          return { error: s.rounds.errors.noEligibleResidents };
         case "not_in_draft":
           // Carries a raw round id in its `message` — never shown, only logged (spec.md "No
           // model term reaches a resident untranslated").
           console.error(err);
-          return { error: de.rounds.errors.genericPreconditionFailure };
+          return { error: s.rounds.errors.genericPreconditionFailure };
         default: {
           const _exhaustive: never = err.code;
           return _exhaustive;
@@ -59,7 +60,7 @@ export async function createAndOpenRoundAction(
       // Left uncoded (tasks.md 2.3) — every call site resolves to the same "not allowed" outcome
       // for the user; mapped by class to one generic key instead of the raw `Missing permission:
       // …` message, which would otherwise leak a permission slug (a model term).
-      return { error: de.rounds.errors.permissionDenied };
+      return { error: s.rounds.errors.permissionDenied };
     }
     throw err;
   }

@@ -83,7 +83,7 @@ Risiken: `01-Problem-Framing.md` und `02-SRD.md`. Rechtliche Analyse:
 | **Zugehörige Anforderung** | `02-SRD.md` §5.3, Scope-Zeilen **S-01 bis S-51** (S-42 bis S-46 aus dem Spec-Update vom 02.09.2026, S-47 bis S-51 aus diesem UX-Nachzug) · Rahmenentscheidungen **E-01 bis E-27** · Designprinzipien **P-1 bis P-5** |
 | **Design** | Siehe `07-Screen-Inventar.md` — Aufgabenmodell, Rahmenwerk und ~41 Bildschirme. Kein Mockup in v1 |
 | **Plattform** | Web, **mobile-first**, installierbare PWA (ADR-011). Kein App-Store, keine native App in v1 (P-2) |
-| **Sprache** | UI deutsch in v1. Mehrsprachigkeit ist **nicht** aktiviert (siehe Hinweis vor §4.6) |
+| **Sprache** | UI deutsch **oder** englisch, je Konto wählbar *(Menschenentscheidung 2026-10-07, für den englischen Pitch; siehe Hinweis vor §4.6)*. Weitere Sprachen sind **nicht** aktiviert |
 | **Betriebsmodell** | Betrieb durch das Vorhaben selbst, EU-Hosting (ADR-006). Non-Profit / spendenfinanziert, für Bewohnende dauerhaft kostenlos (E-23). DSGVO-Rollen: **`Household` = Verantwortlicher, Flatmate.io = Auftragsverarbeiter** |
 | **Kernfunktion** | Eine WG erfasst Bewerbungen kanalunabhängig, bewertet sie in einem Karten-Screening mit vierstufiger Skala, sieht eine erklärbare Rangliste mit sichtbarem Quorum, findet Termine über ein Verfügbarkeitsraster mit nachrechenbaren Vorschlägen, hält Casting-Notizen für Abwesende fest, stimmt in einer zweiten Runde mit Veto über die Zusage ab und führt die `Application` über eine explizite, rückwärts begehbare Zustandsmaschine bis `moved_in` |
 | **Nutzergruppen (v1)** | Haushalts-Account · Moderator · Bewohnender · ehemaliger Bewohnender · Bewerbender ohne Konto (§4.0.1) |
@@ -1338,11 +1338,16 @@ aber **nie** auf dem primären-CTA-Platz und **nie** über einer Aufgabe mit ges
 
 ---
 
-> **Zu §4.5 Mehrsprachigkeit / Lokalisierung:** nicht aktiviert. Die Oberfläche ist in v1
-> ausschließlich deutsch (Beachhead: deutschsprachige WGs und Wohnprojekte). Der Abschnitt
-> wird bewusst leer gelassen statt künstlich gefüllt. **Zu beachten für v2:** Bewerbungstexte
-> können in jeder Sprache eintreffen — der regelbasierte Paste-Parser ist auf deutsche
-> Muster ausgelegt, und das ist eine bekannte Grenze, kein Fehler.
+> **Zu §4.5 Mehrsprachigkeit / Lokalisierung:** begrenzt aktiviert. Die Oberfläche ist in v0.1
+> **deutsch oder englisch, je Konto wählbar** — entschieden vom Menschen am 2026-10-07 für den
+> englischen Pitch (Beachhead bleibt: deutschsprachige WGs und Wohnprojekte; Deutsch ist die
+> Voreinstellung). Die Wahl gehört zum Konto, nicht zum Gerät, und ändert nie, was andere
+> Mitglieder derselben WG sehen; vor dem Konto (Anmelden, Registrieren, Beitreten) gilt die Wahl
+> des Geräts, sonst die Sprachvorgabe des Browsers. Text, der die App verlässt (der vorgeschlagene
+> Einladungstext, die Datenschutzhinweise für Bewerbende), bleibt deutsch. Weitere Sprachen sind
+> nicht aktiviert; der Abschnitt bleibt im Übrigen bewusst leer. **Zu beachten für v2:**
+> Bewerbungstexte können in jeder Sprache eintreffen — der regelbasierte Paste-Parser ist auf
+> deutsche Muster ausgelegt, und das ist eine bekannte Grenze, kein Fehler.
 
 ### 4.6 Inhaltsregeln für Freitext und Notizen
 

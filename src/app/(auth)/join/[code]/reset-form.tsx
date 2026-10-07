@@ -1,20 +1,19 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { de } from "@/ui/strings";
+import { useStrings } from "@/ui/strings/provider";
 import { redeemPasswordResetAction, type ResetFormState } from "./actions";
 import { HandEntryWayBack } from "./join-ways-forward";
 import { PasswordInput } from "@/ui/password-input";
 import { SubmitButton } from "@/ui/submit-button";
 
 const initialState: ResetFormState = { error: null, fieldError: null, refusal: null };
-const t = de.join;
-
 // identity/password-reset (O-16, screens/A-zugang.md A3 bound shape): one password field, the
 // stay-signed-in choice, no name and no email (spec: "SHALL NOT ask for a name or an email").
 // design.md Decision 4: `draft` restores "stay signed in" across a refused submission the same way
 // JoinForm's own draft does — the password itself is never captured into it.
 export function ResetForm({ code, passwordMinLength }: { code: string; passwordMinLength: number }) {
+  const t = useStrings().join;
   const [draft, setDraft] = useState({ rememberMe: true });
   const [state, formAction] = useActionState(redeemPasswordResetAction, initialState);
 

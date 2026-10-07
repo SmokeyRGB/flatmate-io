@@ -38,7 +38,7 @@ describe("The join-code list flags a link a removed member joined through", () =
       displayName: "SoonRemoved",
       password: "test-password-not-real-1234",
       email: "",
-    });
+    }, "de");
     accountIds.push(joiner.context.accountId);
 
     let issuance = await findIssuance(hh, link.id);
@@ -66,7 +66,7 @@ describe("The join-code list flags a link a removed member joined through", () =
       displayName: "ExpiredLinkJoiner",
       password: "test-password-not-real-1234",
       email: "",
-    });
+    }, "de");
     accountIds.push(joiner.context.accountId);
     await removeMember(hh.context, hh.accountId, joiner.context.accountId, "ExpiredLinkJoiner");
 
@@ -91,7 +91,7 @@ describe("The join-code list flags a link a removed member joined through", () =
       displayName: "DeletedLinkJoiner",
       password: "test-password-not-real-1234",
       email: "",
-    });
+    }, "de");
     accountIds.push(joiner.context.accountId);
     await removeMember(hh.context, hh.accountId, joiner.context.accountId, "DeletedLinkJoiner");
 

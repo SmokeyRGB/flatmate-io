@@ -8,13 +8,11 @@ import {
   PermissionDeniedError,
 } from "@/modules/identity/repository";
 import { getCurrentSession } from "@/modules/identity/session-cookie";
-import { de } from "@/ui/strings";
+import { getStrings } from "@/ui/strings/request";
 import { LinkPendingHint } from "@/ui/link-pending-hint";
 import { OrganisationAccessDenied } from "../organisation-access-denied";
 import { requireOrganisationAccess } from "../organisation-access";
 import { SettingsForm } from "./settings-form";
-
-const t = de.settings;
 
 // Screen O20. The four voting-procedure fields (FR-1.21: editable while a round runs, an open
 // round keeps its snapshot) plus the two FR-1.24 exceptions
@@ -30,12 +28,14 @@ export default async function SettingsPage({
 }: {
   searchParams: Promise<{ note?: string }>;
 }) {
+  const s = await getStrings();
+  const t = s.settings;
   const { note } = await searchParams;
   const current = await getCurrentSession();
   if (!current) redirect("/sign-in");
 
   // role-permissions design D9: the organisation area check first, on this request.
-  if (!(await requireOrganisationAccess(current))) return <OrganisationAccessDenied />;
+  if (!(await requireOrganisationAccess(current))) return <OrganisationAccessDenied strings={await getStrings()} />;
 
   // O20's access rule (docs/screens/O-organisation.md) is the stored permission
   // `manage_voting_procedure` (the household account; a moderator only as an individually granted
@@ -59,7 +59,7 @@ export default async function SettingsPage({
       return (
         <div className="mx-auto max-w-md space-y-4 p-6">
           <Link href="/organization" className="back-link">
-            <ArrowLeft className="size-4" /> {de.nav.organisation}
+            <ArrowLeft className="size-4" /> {s.nav.organisation}
             <LinkPendingHint />
           </Link>
           <h1 className="font-serif text-2xl font-semibold">{t.heading}</h1>
@@ -74,12 +74,12 @@ export default async function SettingsPage({
   return (
     <div className="mx-auto max-w-md space-y-6 p-6">
       <Link href="/organization" className="back-link">
-        <ArrowLeft className="size-4" /> {de.nav.organisation}
+        <ArrowLeft className="size-4" /> {s.nav.organisation}
         <LinkPendingHint />
       </Link>
       {note === "already_member" && (
         <div role="note" className="callout callout-info">
-          {de.join.alreadyMemberNote}
+          {s.join.alreadyMemberNote}
         </div>
       )}
       <h1 className="font-serif text-2xl font-semibold">{t.heading}</h1>

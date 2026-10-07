@@ -45,7 +45,7 @@ describe("Resident list actions are audited", () => {
     const { accountId: targetAccountId } = await claimResidentProfile(
       hh.context,
       profile.id,
-      "test-password-not-real-1234",
+      "test-password-not-real-1234", "de",
     );
     accountIds.push(targetAccountId);
 
@@ -64,7 +64,7 @@ describe("Resident list actions are audited", () => {
     const { accountId: targetAccountId } = await claimResidentProfile(
       hh.context,
       profile.id,
-      "test-password-not-real-1234",
+      "test-password-not-real-1234", "de",
     );
     accountIds.push(targetAccountId);
 

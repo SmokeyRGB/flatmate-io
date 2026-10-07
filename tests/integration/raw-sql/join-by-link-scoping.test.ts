@@ -29,7 +29,7 @@ describe("Join-by-link household isolation — raw SQL (G-C7)", () => {
       displayName: "Jonas",
       password: "test-password-not-real-1234",
       email: "",
-    });
+    }, "de");
     joinerAccountId = result.context.accountId;
     const joinedProfileId = result.context.profileId!;
     const joinedAccountId = result.context.accountId;

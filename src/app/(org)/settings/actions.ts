@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { updateHouseholdSettings } from "@/modules/casting/repository";
 import { getCurrentSession } from "@/modules/identity/session-cookie";
-import { de } from "@/ui/strings";
+import { getStringsFor } from "@/ui/strings/request";
 
 export interface SettingsFormState {
   error: string | null;
@@ -17,6 +17,7 @@ export async function updateSettingsAction(
 ): Promise<SettingsFormState> {
   const current = await getCurrentSession();
   if (!current) throw new Error("Not signed in");
+  const s = await getStringsFor(current);
 
   const quorumShare = String(formData.get("quorumShare") ?? "");
   // A form always submits a checkbox's state: absent means unchecked (design D7).
@@ -31,7 +32,7 @@ export async function updateSettingsAction(
     // instead; the real message still reaches the log.
     if (err instanceof Error) {
       console.error(err);
-      return { error: de.settings.errors.genericSaveFailure, saved: false };
+      return { error: s.settings.errors.genericSaveFailure, saved: false };
     }
     throw err;
   }

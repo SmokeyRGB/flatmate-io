@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { renderToStaticMarkup } from "react-dom/server";
+import { renderWithStrings } from "../../helpers/render-with-strings";
 import type { SessionContext } from "@/db/session-context";
 import { claimResidentProfile } from "@/modules/identity/auth";
 import { createResidentProfile, setMemberRole } from "@/modules/identity/repository";
@@ -77,7 +77,7 @@ afterEach(async () => {
 async function claim(household: TestHousehold, name: string) {
   const actor = { accountId: household.accountId, profileId: null };
   const profile = await createResidentProfile(household.context, name, actor);
-  const { accountId } = await claimResidentProfile(household.context, profile.id, "test-password-not-real-1234");
+  const { accountId } = await claimResidentProfile(household.context, profile.id, "test-password-not-real-1234", "de");
   accountIds.push(accountId);
   return {
     accountId,
@@ -105,7 +105,7 @@ const PAGES: Record<string, () => Promise<unknown>> = {
 };
 
 async function html(page: () => Promise<unknown>): Promise<string> {
-  return renderToStaticMarkup((await page()) as Parameters<typeof renderToStaticMarkup>[0]);
+  return renderWithStrings((await page()) as Parameters<typeof renderWithStrings>[0]);
 }
 
 // Every page shows the organisation area's access message, except the members page, which keeps

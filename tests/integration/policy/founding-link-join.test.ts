@@ -83,7 +83,7 @@ describe("A join through the founding link makes a moderator (D2)", () => {
     hh = await registerTestHousehold();
     const founding = await foundingLinkOf(hh);
 
-    const result = await joinHousehold(founding.code, { displayName: testName("Frieda"), password: PASSWORD });
+    const result = await joinHousehold(founding.code, { displayName: testName("Frieda"), password: PASSWORD }, "de");
     accountIds.push(result.context.accountId);
 
     const row = await membershipOf(hh, result.context.accountId);
@@ -114,7 +114,7 @@ describe("A join through the founding link makes a moderator (D2)", () => {
   it("holds manage_rounds and change_application_state and can open a round right away", async () => {
     hh = await registerTestHousehold();
     const founding = await foundingLinkOf(hh);
-    const result = await joinHousehold(founding.code, { displayName: testName("Frieda"), password: PASSWORD });
+    const result = await joinHousehold(founding.code, { displayName: testName("Frieda"), password: PASSWORD }, "de");
     accountIds.push(result.context.accountId);
 
     const row = await membershipOf(hh, result.context.accountId);
@@ -131,7 +131,7 @@ describe("A join through the founding link makes a moderator (D2)", () => {
   it("an ordinary neutral link of the same household still gives role member and exactly vote", async () => {
     hh = await registerTestHousehold();
     const ordinary = await issueJoinCode(hh.context, hh.accountId, { validDays: 7, maxUses: 1 });
-    const result = await joinHousehold(ordinary.code, { displayName: testName("Max"), password: PASSWORD });
+    const result = await joinHousehold(ordinary.code, { displayName: testName("Max"), password: PASSWORD }, "de");
     accountIds.push(result.context.accountId);
 
     const row = await membershipOf(hh, result.context.accountId);
@@ -144,7 +144,7 @@ describe("A join through the founding link makes a moderator (D2)", () => {
   it("appointedPermissions equals, as a set, what setMemberRole stores for a freshly joined member", async () => {
     hh = await registerTestHousehold();
     const ordinary = await issueJoinCode(hh.context, hh.accountId, { validDays: 7, maxUses: 1 });
-    const result = await joinHousehold(ordinary.code, { displayName: testName("Max"), password: PASSWORD });
+    const result = await joinHousehold(ordinary.code, { displayName: testName("Max"), password: PASSWORD }, "de");
     accountIds.push(result.context.accountId);
 
     await setMemberRole(hh.context, hh.accountId, result.context.accountId, "moderator");
@@ -160,8 +160,8 @@ describe("A join through the founding link makes a moderator (D2)", () => {
     const founding = await foundingLinkOf(hh);
 
     const attempts = await Promise.allSettled([
-      joinHousehold(founding.code, { displayName: testName("Anna"), password: PASSWORD }),
-      joinHousehold(founding.code, { displayName: testName("Bert"), password: PASSWORD }),
+      joinHousehold(founding.code, { displayName: testName("Anna"), password: PASSWORD }, "de"),
+      joinHousehold(founding.code, { displayName: testName("Bert"), password: PASSWORD }, "de"),
     ]);
     for (const a of attempts) if (a.status === "fulfilled") accountIds.push(a.value.context.accountId);
 
@@ -193,7 +193,7 @@ describe("The household account redeems its own founding link (D3)", () => {
 
     const result = await joinHousehold(
       founding.code,
-      { displayName: testName("Frieda"), password: PASSWORD },
+      { displayName: testName("Frieda"), password: PASSWORD }, "de",
       { currentSession: current },
     );
     accountIds.push(result.context.accountId);
@@ -217,7 +217,7 @@ describe("The household account redeems its own founding link (D3)", () => {
     const name = testName("Nobody");
 
     await expect(
-      joinHousehold(ordinary.code, { displayName: name, password: PASSWORD }, { currentSession: current }),
+      joinHousehold(ordinary.code, { displayName: name, password: PASSWORD }, "de", { currentSession: current }),
     ).rejects.toMatchObject({ code: "already_member" });
 
     expect((await sessionRow(hh, current.sessionId)).revokedAt).toBeNull();
@@ -239,10 +239,10 @@ describe("The household account redeems its own founding link (D3)", () => {
     const attempts = await Promise.allSettled([
       joinHousehold(
         founding.code,
-        { displayName: testName("Anna"), password: PASSWORD },
+        { displayName: testName("Anna"), password: PASSWORD }, "de",
         { currentSession: current },
       ),
-      joinHousehold(founding.code, { displayName: testName("Bert"), password: PASSWORD }),
+      joinHousehold(founding.code, { displayName: testName("Bert"), password: PASSWORD }, "de"),
     ]);
     for (const a of attempts) if (a.status === "fulfilled") accountIds.push(a.value.context.accountId);
 
@@ -260,7 +260,7 @@ describe("The household account redeems its own founding link (D3)", () => {
   it("a resident session of the same household on the founding link is refused with already_member", async () => {
     hh = await registerTestHousehold();
     const ordinary = await issueJoinCode(hh.context, hh.accountId, { validDays: 7, maxUses: 1 });
-    const resident = await joinHousehold(ordinary.code, { displayName: testName("Max"), password: PASSWORD });
+    const resident = await joinHousehold(ordinary.code, { displayName: testName("Max"), password: PASSWORD }, "de");
     accountIds.push(resident.context.accountId);
     const founding = await foundingLinkOf(hh);
     const asResident: { sessionId: string; context: SessionContext } = {
@@ -271,7 +271,7 @@ describe("The household account redeems its own founding link (D3)", () => {
     await expect(
       joinHousehold(
         founding.code,
-        { displayName: testName("Zoe"), password: PASSWORD },
+        { displayName: testName("Zoe"), password: PASSWORD }, "de",
         { currentSession: asResident },
       ),
     ).rejects.toMatchObject({ code: "already_member" });
@@ -286,13 +286,13 @@ describe("getLiveFoundingLinkPath (D4)", () => {
     hh = await registerTestHousehold();
     const founding = await foundingLinkOf(hh);
     const ordinary = await issueJoinCode(hh.context, hh.accountId, { validDays: 7, maxUses: 1 });
-    const resident = await joinHousehold(ordinary.code, { displayName: testName("Max"), password: PASSWORD });
+    const resident = await joinHousehold(ordinary.code, { displayName: testName("Max"), password: PASSWORD }, "de");
     accountIds.push(resident.context.accountId);
 
     expect(await getLiveFoundingLinkPath(hh.context)).toBe(`/join/${founding.code}`);
     expect(await getLiveFoundingLinkPath(resident.context)).toBeNull();
 
-    const founder = await joinHousehold(founding.code, { displayName: testName("Frieda"), password: PASSWORD });
+    const founder = await joinHousehold(founding.code, { displayName: testName("Frieda"), password: PASSWORD }, "de");
     accountIds.push(founder.context.accountId);
     expect(await getLiveFoundingLinkPath(hh.context)).toBeNull();
   });
@@ -304,7 +304,7 @@ describe("isHouseholdAccount and the founding join (R1)", () => {
   it("is true for the household account, false for a resident, false for a non-resident moderator", async () => {
     hh = await registerTestHousehold();
     const ordinary = await issueJoinCode(hh.context, hh.accountId, { validDays: 7, maxUses: 1 });
-    const resident = await joinHousehold(ordinary.code, { displayName: testName("Max"), password: PASSWORD });
+    const resident = await joinHousehold(ordinary.code, { displayName: testName("Max"), password: PASSWORD }, "de");
     accountIds.push(resident.context.accountId);
     const nonResidentModerator = await createNonResidentModerator(hh);
 
@@ -338,7 +338,7 @@ describe("isHouseholdAccount and the founding join (R1)", () => {
     await expect(
       joinHousehold(
         founding.code,
-        { displayName: testName("Zoe"), password: PASSWORD },
+        { displayName: testName("Zoe"), password: PASSWORD }, "de",
         { currentSession: { sessionId: sessionInserted.id, context: moderator.context } },
       ),
     ).rejects.toMatchObject({ code: "already_member" });

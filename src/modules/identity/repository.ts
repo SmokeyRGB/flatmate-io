@@ -9,6 +9,7 @@ import { withSessionContext, type SessionContext } from "@/db/session-context";
 // identity-moveout-session-revocation-not-atomic).
 type Tx = Parameters<Parameters<typeof withSessionContext>[1]>[0];
 import { recordActivityEvent } from "@/modules/audit/repository";
+import { isLocale, type Locale } from "@/ui/strings/locales";
 import {
   account,
   HOUSEHOLD_SIGN_IN_CODE_GROUP_LENGTH,
@@ -613,6 +614,34 @@ export async function getOwnAccountEmail(context: SessionContext): Promise<strin
   });
 }
 
+// language-switch D5: a person changes their own UI language, nobody else's. Self-service: no
+// permission is needed and none is granted. The UPDATE is keyed on `context.accountId` (derived
+// from the authenticated session) and takes no account-id parameter, so a caller cannot name another
+// account. Both guards sit here, the repository function, not in the action that calls it today.
+export type SetOwnLocaleErrorCode = "invalid_locale" | "no_account";
+
+export class SetOwnLocaleError extends Error {
+  readonly code: SetOwnLocaleErrorCode;
+  constructor(code: SetOwnLocaleErrorCode) {
+    super(`setOwnLocale refused: ${code}`);
+    this.name = "SetOwnLocaleError";
+    this.code = code;
+  }
+}
+
+export async function setOwnLocale(context: SessionContext, locale: Locale): Promise<void> {
+  // The type says Locale, but the value can come from form data through a cast: check at runtime.
+  if (!isLocale(locale)) throw new SetOwnLocaleError("invalid_locale");
+  await withSessionContext(context, async (tx) => {
+    const updated = await tx
+      .update(account)
+      .set({ locale })
+      .where(and(eq(account.id, context.accountId), eq(account.householdId, context.householdId)))
+      .returning({ id: account.id });
+    if (updated.length === 0) throw new SetOwnLocaleError("no_account");
+  });
+}
+
 // AC-1.6: "the interface states which identity I am signed in as." A household-account session
 // (profileId null) states the household's name; a resident session states their display name.
 //
@@ -709,10 +738,15 @@ export async function getHouseholdSettings(context: SessionContext) {
 // the device-memory writer (the session's own remember_me and its household's sign-in code), so the
 // layout needs no second transaction. The join keys on the session's own household_id, and
 // `household`'s RLS policy scopes it to the bootstrap context's household as well.
+// language-switch D2: it also carries the account's own UI language, so the root layout learns
+// which dictionary to use without a second query. The `account` join carries its own household
+// predicate: with no foreign keys, the pairing between the session's account_id and the account row
+// is otherwise unenforced.
 export type ResolvedSession = {
   context: SessionContext;
   rememberMe: boolean;
   householdSignInCode: string;
+  locale: Locale;
 };
 
 export async function resolveSessionContext(
@@ -727,9 +761,15 @@ export async function resolveSessionContext(
         actingProfileId: session.actingProfileId,
         rememberMe: session.rememberMe,
         householdSignInCode: household.signInCode,
+        locale: account.locale,
       })
       .from(session)
       .innerJoin(household, eq(household.id, session.householdId))
+      // LEFT, not inner: the language is a courtesy, never a condition of the session. A session
+      // whose account row is missing (no foreign keys keep one honest) must still resolve, in German,
+      // exactly as it did before this join existed. The household predicate stays: with no foreign
+      // keys, the pairing is otherwise unenforced.
+      .leftJoin(account, and(eq(account.id, session.accountId), eq(account.householdId, session.householdId)))
       .where(
         and(
           eq(session.id, sessionId),
@@ -743,6 +783,7 @@ export async function resolveSessionContext(
       context: { accountId: row.accountId, householdId, profileId: row.actingProfileId },
       rememberMe: row.rememberMe,
       householdSignInCode: row.householdSignInCode,
+      locale: isLocale(row.locale) ? row.locale : "de",
     };
   });
 }
