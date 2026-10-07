@@ -1,23 +1,23 @@
 "use client";
 
 import { useActionState } from "react";
-import { de } from "@/ui/strings";
+import { useStrings } from "@/ui/strings/provider";
 import { changePasswordAction, type PasswordFormState } from "./actions";
 import { PasswordInput } from "@/ui/password-input";
 import { SuccessToast } from "@/ui/success-toast";
 import { SubmitButton } from "@/ui/submit-button";
 
 const initialState: PasswordFormState = { error: null, saved: false };
-const t = de.account.password;
-
 // design.md Decision 8: no typed value survives into action state — neither password ever has a
 // `defaultValue` and both fields are empty after every submit, success or refusal alike.
 export function PasswordForm({ passwordMinLength }: { passwordMinLength: number }) {
+  const s = useStrings();
+  const t = s.account.password;
   const [state, formAction] = useActionState(changePasswordAction, initialState);
 
   return (
     // noValidate: the server action is the one validator, so every refusal is our German text
-    // (de.ts), never the browser's own tooltip in the browser's language (walkthrough 2026-09-24).
+    // (s.ts), never the browser's own tooltip in the browser's language (walkthrough 2026-09-24).
     <form action={formAction} className="space-y-2" noValidate>
       <div>
         <label htmlFor="currentPassword" className="field-label">

@@ -32,7 +32,7 @@ describe("moved-out resident's pre-existing session (V-3)", () => {
     const actor = { accountId: hh.accountId, profileId: null };
 
     const profile = await createResidentProfile(hh.context, "AboutToMove", actor);
-    const { accountId } = await claimResidentProfile(hh.context, profile.id, "test-password-not-real-1234");
+    const { accountId } = await claimResidentProfile(hh.context, profile.id, "test-password-not-real-1234", "de");
     accountIds.push(accountId);
 
     const { session: residentSession } = await signIn({
@@ -58,7 +58,7 @@ describe("moved-out resident's pre-existing session (V-3)", () => {
     const actor = { accountId: hh.accountId, profileId: null };
 
     const profile = await createResidentProfile(hh.context, "Intruder", actor);
-    const { accountId } = await claimResidentProfile(hh.context, profile.id, "test-password-not-real-1234");
+    const { accountId } = await claimResidentProfile(hh.context, profile.id, "test-password-not-real-1234", "de");
     accountIds.push(accountId);
 
     const { session: residentSession } = await signIn({

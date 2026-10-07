@@ -13,7 +13,7 @@ import {
 async function claim(hh: TestHousehold, name: string) {
   const actor = { accountId: hh.accountId, profileId: null };
   const profile = await createResidentProfile(hh.context, name, actor);
-  const { accountId } = await claimResidentProfile(hh.context, profile.id, "test-password-not-real-1234");
+  const { accountId } = await claimResidentProfile(hh.context, profile.id, "test-password-not-real-1234", "de");
   return { profileId: profile.id, accountId };
 }
 

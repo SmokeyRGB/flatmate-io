@@ -23,7 +23,7 @@ import {
   sessionCookieMaxAge,
   setSessionCookie,
 } from "@/modules/identity/session-cookie";
-import { de } from "@/ui/strings";
+import { getLocaleFor, getStringsFor } from "@/ui/strings/request";
 import { getClientIp } from "@/app/request-ip";
 
 // design.md Decision 10: `refusal` names the ONE OTHER way-forward component this refusal needs
@@ -37,8 +37,6 @@ export interface JoinFormState {
   refusal: "invalid_link" | "other_household" | null;
 }
 
-const t = de.join;
-
 // design.md Decision 10: a `useActionState` reducer — validate up front, `return { error }` for
 // known domain failures, re-throw everything else, `redirect()` OUTSIDE the try (Next implements
 // it by throwing, and this action's own try/catch would otherwise swallow that throw).
@@ -49,6 +47,9 @@ export async function joinHouseholdAction(
   _prevState: JoinFormState,
   formData: FormData,
 ): Promise<JoinFormState> {
+  // One session read serves both the language and joinHousehold's own `currentSession`.
+  const current = await getCurrentSession();
+  const t = (await getStringsFor(current)).join;
   const code = String(formData.get("code") ?? "");
   // design.md Decision 13: `displayName` may be absent entirely — a bound link's form (join-form
   // tsx) renders no name field at all, so `formData.get` returns null rather than an empty
@@ -84,12 +85,11 @@ export async function joinHouseholdAction(
     return { error: t.errors.rateLimited, fieldError: null, refusal: null };
   }
 
-  const current = await getCurrentSession();
-
   try {
     const result = await joinHousehold(
       code,
       { displayName, password, email: email || null },
+      await getLocaleFor(current), // language-switch D6: the account starts in the language the screen showed
       { rememberMe, currentSession: current ?? null },
     );
     await setSessionCookie(
@@ -225,6 +225,9 @@ export async function redeemPasswordResetAction(
   _prevState: ResetFormState,
   formData: FormData,
 ): Promise<ResetFormState> {
+  // Resolved first: the one session read serves the language and the redemption's `currentSession`.
+  const current = await getCurrentSession();
+  const t = (await getStringsFor(current)).join;
   const code = String(formData.get("code") ?? "");
   const password = String(formData.get("password") ?? "");
   const rememberMe = formData.get("rememberMe") === "on";
@@ -241,8 +244,6 @@ export async function redeemPasswordResetAction(
   // leave a valid, orphaned session row behind. redeemPasswordReset itself does the revoke
   // (own session only, via repository.ts's revokeSession) once the redemption has unconditionally
   // succeeded, mirroring joinHousehold's own `options.currentSession`.
-  const current = await getCurrentSession();
-
   try {
     const result = await redeemPasswordReset(code, { password }, { rememberMe, currentSession: current });
 

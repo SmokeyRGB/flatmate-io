@@ -1,11 +1,12 @@
-import { de } from "@/ui/strings";
+"use client";
 
-const t = de.casting;
+import { useStrings } from "@/ui/strings/provider";
 
 // The circular progress ring: the score inside, a text equivalent for the whole (FR-5.10, AC-5.28).
 // `pathLength` normalises the circle to 100, so the dash is the score itself. Shared by the
 // scoreboard rows and the candidate detail (the second use, candidate-detail design D8).
 export function ScoreRing({ score, n }: { score: number; n: number }) {
+  const t = useStrings().casting;
   return (
     <div className="score-ring" role="img" aria-label={t.ringLabel(score, n)}>
       <svg viewBox="0 0 44 44" aria-hidden="true">

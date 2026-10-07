@@ -56,7 +56,7 @@ describe("ResidentProfile display_name uniqueness", () => {
     const actor = { accountId: hh.accountId, profileId: null };
 
     const first = await createResidentProfile(hh.context, "Removable", actor);
-    const { accountId } = await claimResidentProfile(hh.context, first.id, "test-password-not-real-1234");
+    const { accountId } = await claimResidentProfile(hh.context, first.id, "test-password-not-real-1234", "de");
     accountIds.push(accountId);
     await removeMember(hh.context, hh.accountId, accountId, "Removable");
 
@@ -71,7 +71,7 @@ describe("ResidentProfile display_name uniqueness", () => {
     const actor = { accountId: hh.accountId, profileId: null };
 
     const first = await createResidentProfile(hh.context, "RemovedThenRejoined", actor);
-    const { accountId } = await claimResidentProfile(hh.context, first.id, "test-password-not-real-1234");
+    const { accountId } = await claimResidentProfile(hh.context, first.id, "test-password-not-real-1234", "de");
     accountIds.push(accountId);
     await removeMember(hh.context, hh.accountId, accountId, "RemovedThenRejoined");
 
@@ -80,7 +80,7 @@ describe("ResidentProfile display_name uniqueness", () => {
       displayName: "RemovedThenRejoined",
       password: "test-password-not-real-1234",
       email: "",
-    });
+    }, "de");
     accountIds.push(result.context.accountId);
 
     expect(result.context.profileId).toBeTruthy();
@@ -95,7 +95,7 @@ describe("ResidentProfile display_name uniqueness", () => {
     const actor = { accountId: hh.accountId, profileId: null };
 
     const first = await createResidentProfile(hh.context, "GoneForGood", actor);
-    const { accountId } = await claimResidentProfile(hh.context, first.id, "test-password-not-real-1234");
+    const { accountId } = await claimResidentProfile(hh.context, first.id, "test-password-not-real-1234", "de");
     accountIds.push(accountId);
     await removeMember(hh.context, hh.accountId, accountId, "GoneForGood");
 

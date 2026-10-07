@@ -2,13 +2,11 @@
 
 import { redirect } from "next/navigation";
 import { buildJoinUrl, isWellFormedJoinCode, normalizeJoinCode } from "@/modules/identity/repository";
-import { de } from "@/ui/strings";
+import { getStrings } from "@/ui/strings/request";
 
 export interface JoinCodeFormState {
   error: string | null;
 }
-
-const t = de.join;
 
 // design.md Decision 1: `/join` RESOLVES NOTHING — it only normalises the typed code and, if it
 // could be a code at all, redirects to the invitation route that does the actual (non-consuming)
@@ -30,6 +28,7 @@ export async function enterJoinCodeAction(
   const normalised = normalizeJoinCode(raw);
 
   if (!isWellFormedJoinCode(normalised)) {
+    const t = (await getStrings()).join;
     return { error: t.joinByCode.codeInvalid };
   }
 

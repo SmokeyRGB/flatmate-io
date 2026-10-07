@@ -40,7 +40,7 @@ describe("signIn's name path asks the provider for its current address (D1)", ()
       accountId: hh.accountId,
       profileId: null,
     });
-    const { accountId } = await claimResidentProfile(hh.context, profile.id, PASSWORD);
+    const { accountId } = await claimResidentProfile(hh.context, profile.id, PASSWORD, "de");
     accountIds.push(accountId);
 
     // Simulate the pre-change state directly (never through changeResidentEmail, so the Auth user

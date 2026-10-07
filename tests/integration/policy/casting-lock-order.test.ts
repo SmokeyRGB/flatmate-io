@@ -121,7 +121,7 @@ async function claimedThenMovedOut(
   const { accountId } = await claimResidentProfile(
     household.context,
     profile.id,
-    "test-password-not-real-1234",
+    "test-password-not-real-1234", "de",
   );
   extraAccountIds.push(accountId);
   await setMovedOut(household.context, household.accountId, accountId);
@@ -457,7 +457,7 @@ describe("Casting lock order", () => {
       const real = joinHousehold(link.code, {
         displayName: `Late ${randomUUID().slice(0, 8)}`,
         password: "test-password-not-real-1234",
-      }).finally(() => {
+      }, "de").finally(() => {
         settled = true;
       });
       const deadline = Date.now() + 20_000;
@@ -584,7 +584,7 @@ describe("Casting lock order", () => {
     const { accountId } = await claimResidentProfile(
       household.context,
       profile.id,
-      "test-password-not-real-1234",
+      "test-password-not-real-1234", "de",
     );
     extraAccountIds.push(accountId);
     await openRound(moderator.context, round.id, modActor);
@@ -617,7 +617,7 @@ describe("Casting lock order", () => {
     const { accountId } = await claimResidentProfile(
       household.context,
       profile.id,
-      "test-password-not-real-1234",
+      "test-password-not-real-1234", "de",
     );
     extraAccountIds.push(accountId);
     await openRound(moderator.context, round.id, modActor);

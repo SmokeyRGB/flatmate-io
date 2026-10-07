@@ -2,14 +2,12 @@
 
 import { Info } from "lucide-react";
 import { useActionState } from "react";
-import { de } from "@/ui/strings";
+import { useStrings } from "@/ui/strings/provider";
 import { SubmitButton } from "@/ui/submit-button";
 import { SuccessToast } from "@/ui/success-toast";
 import { updateSettingsAction, type SettingsFormState } from "./actions";
 
 const initialState: SettingsFormState = { error: null, saved: false };
-const t = de.settings;
-
 export function SettingsForm({
   quorumShare,
   revealVoteAuthorship = false,
@@ -21,6 +19,7 @@ export function SettingsForm({
   revealVoteAuthorship?: boolean;
   openRoundTitle: string | null;
 }) {
+  const t = useStrings().settings;
   const [state, formAction] = useActionState(updateSettingsAction, initialState);
 
   return (

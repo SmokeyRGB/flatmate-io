@@ -1,4 +1,4 @@
-import { de } from "@/ui/strings";
+import { LoadingStatus } from "@/ui/loading-status";
 import { SkeletonForm, SkeletonHeading, SkeletonText } from "@/ui/skeletons";
 
 // design.md D3/D6: shaped like join-code-form.tsx's own card (a heading, a helper line, one
@@ -6,9 +6,7 @@ import { SkeletonForm, SkeletonHeading, SkeletonText } from "@/ui/skeletons";
 export default function JoinCodeLoading() {
   return (
     <div className="space-y-6" aria-busy="true">
-      <p role="status" className="sr-only">
-        {de.common.loading}
-      </p>
+      <LoadingStatus />
       <div className="space-y-6" aria-hidden="true">
         <SkeletonHeading width="w-2/3" />
         <SkeletonText width="w-full" />

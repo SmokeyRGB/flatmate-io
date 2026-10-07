@@ -102,14 +102,14 @@ describe("[raw SQL] the migration's own backfill statement (drizzle/0017, design
 
     // Fixture A: an old-bug hard removal — SHOULD be promoted to `removed`.
     const profileA = await createResidentProfile(hh.context, "OldBugRemoval", actor);
-    const { accountId: accountA } = await claimResidentProfile(hh.context, profileA.id, "test-password-not-real-1234");
+    const { accountId: accountA } = await claimResidentProfile(hh.context, profileA.id, "test-password-not-real-1234", "de");
     accountIds.push(accountA);
     const membershipA = await membershipRowFor(hh, accountA);
     await simulateOldBugRemoval(hh, profileA.id, membershipA.id);
 
     // Fixture B: a genuine move-out — latest event is membership.revoked. Must NOT be promoted.
     const profileB = await createResidentProfile(hh.context, "GenuineMoveOut", actor);
-    const { accountId: accountB } = await claimResidentProfile(hh.context, profileB.id, "test-password-not-real-1234");
+    const { accountId: accountB } = await claimResidentProfile(hh.context, profileB.id, "test-password-not-real-1234", "de");
     accountIds.push(accountB);
     await setMovedOut(hh.context, hh.accountId, accountB);
 
@@ -119,7 +119,7 @@ describe("[raw SQL] the migration's own backfill statement (drizzle/0017, design
     // reactivatable" / "a member marked moved out, or reactivated after an earlier removal, SHALL
     // be left as they are").
     const profileC = await createResidentProfile(hh.context, "RemovedThenReactivatedThenMovedOut", actor);
-    const { accountId: accountC } = await claimResidentProfile(hh.context, profileC.id, "test-password-not-real-1234");
+    const { accountId: accountC } = await claimResidentProfile(hh.context, profileC.id, "test-password-not-real-1234", "de");
     accountIds.push(accountC);
     const membershipC = await membershipRowFor(hh, accountC);
     await simulateOldBugRemoval(hh, profileC.id, membershipC.id);

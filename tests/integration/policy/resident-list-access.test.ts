@@ -26,7 +26,7 @@ afterEach(async () => {
 async function claim(household: TestHousehold, name: string) {
   const actor = { accountId: household.accountId, profileId: null };
   const profile = await createResidentProfile(household.context, name, actor);
-  const { accountId } = await claimResidentProfile(household.context, profile.id, "test-password-not-real-1234");
+  const { accountId } = await claimResidentProfile(household.context, profile.id, "test-password-not-real-1234", "de");
   accountIds.push(accountId);
   return {
     accountId,

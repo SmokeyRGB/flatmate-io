@@ -1,13 +1,13 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { createElement } from "react";
-import { renderToStaticMarkup } from "react-dom/server";
+import { renderWithStrings } from "../../helpers/render-with-strings";
 import { describe, expect, it } from "vitest";
 import { ApplicantNotice, ThirdPartyNotice } from "@/app/(org)/rounds/[id]/applications/notice";
 import { de } from "@/ui/strings";
 
 function render(overrides: Partial<Parameters<typeof ThirdPartyNotice>[0]> = {}) {
-  return renderToStaticMarkup(
+  return renderWithStrings(
     createElement(ThirdPartyNotice, {
       applicantName: "Testbewerbung Lea",
       household: "Testhaushalt",
@@ -154,7 +154,7 @@ describe("the quiet Art. 14 notice (AC-3.8, AC-3.10)", () => {
 
 // F3 change 3, task 6.4 (FR-3.23, AC-3.20): the optional notice on EVERY application's detail.
 describe("the notice on every application (FR-3.23, AC-3.20)", () => {
-  const renderApplicant = (defaultOpen = false) => renderToStaticMarkup(createElement(ApplicantNotice, { defaultOpen }));
+  const renderApplicant = (defaultOpen = false) => renderWithStrings(createElement(ApplicantNotice, { defaultOpen }));
 
   // Break: seed ApplicantNotice with the third-party text, and this fails.
   it("ApplicantNotice is collapsed first and, opened, holds the Stufe 1 text and not the third-party sentence", () => {
@@ -195,7 +195,7 @@ describe("the notice on every application (FR-3.23, AC-3.20)", () => {
       renderApplicant(true),
       render({ why: true }),
       renderOpen({ why: true }),
-      renderToStaticMarkup(createElement(ApplicantNotice, { why: true, defaultWhyOpen: true })),
+      renderWithStrings(createElement(ApplicantNotice, { why: true, defaultWhyOpen: true })),
       render({ why: true, defaultWhyOpen: true }),
     ];
     for (const html of pieces) {
@@ -217,7 +217,7 @@ describe("the notice on every application (FR-3.23, AC-3.20)", () => {
 
   it("the why toggle is a round (?) icon in each notice's button row: the question is its name and hover text, not visible text", () => {
     for (const html of [
-      renderToStaticMarkup(createElement(ApplicantNotice, { why: true })),
+      renderWithStrings(createElement(ApplicantNotice, { why: true })),
       render({ why: true }),
     ]) {
       const button = whyButton(html);
@@ -229,14 +229,14 @@ describe("the notice on every application (FR-3.23, AC-3.20)", () => {
       expect(inner.replace(/<[^>]*>/g, "").trim()).toBe("");
     }
     // The applicant notice without `why` has no (?).
-    expect(whyButton(renderToStaticMarkup(createElement(ApplicantNotice)))).toBeUndefined();
+    expect(whyButton(renderWithStrings(createElement(ApplicantNotice)))).toBeUndefined();
   });
 
   it("the explanation opens in place: closed shows only the (?), open shows the sentences and no link", () => {
     for (const [closed, open] of [
       [
-        renderToStaticMarkup(createElement(ApplicantNotice, { why: true })),
-        renderToStaticMarkup(createElement(ApplicantNotice, { why: true, defaultWhyOpen: true })),
+        renderWithStrings(createElement(ApplicantNotice, { why: true })),
+        renderWithStrings(createElement(ApplicantNotice, { why: true, defaultWhyOpen: true })),
       ],
       [render({ why: true }), render({ why: true, defaultWhyOpen: true })],
     ]) {

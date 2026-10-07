@@ -1,7 +1,9 @@
 import "server-only";
 import { cookies } from "next/headers";
+import { cache } from "react";
 import { resolveSessionContext } from "./repository";
 import { isUuid, type SessionContext } from "@/db/session-context";
+import type { Locale } from "@/ui/strings/locales";
 
 const COOKIE_NAME = "flatmate_session";
 
@@ -50,6 +52,8 @@ export interface CurrentSession {
 export interface ReadSession extends CurrentSession {
   rememberMe: boolean;
   householdSignInCode: string;
+  // language-switch D2: the account's own UI language.
+  locale: Locale;
 }
 
 // FR-1.6/AC-1.6: reads the fixed acting identity for the current request. Returns null if there is
@@ -74,3 +78,9 @@ export async function getCurrentSession(): Promise<ReadSession | null> {
   if (!resolved) return null;
   return { sessionId, ...resolved };
 }
+
+// language-switch D2: one session resolution per render, shared by the root layout (through
+// getRequestLocale) and the (resident) and (org) layouts. React `cache` is per request, so it can
+// never serve a stale session across a cookie change. Pages and actions keep calling the uncached
+// getCurrentSession() above.
+export const getRenderSession = cache(getCurrentSession);

@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { getStartOverview, listOrganisationTasks } from "@/modules/casting/repository";
 import { getAwaitingVoteCounts } from "@/modules/deliberation/repository";
 import { getCurrentSession } from "@/modules/identity/session-cookie";
-import { de } from "@/ui/strings";
+import { getRequestLocale, getStrings } from "@/ui/strings/request";
 import { landingPathFor } from "@/app/landing";
 import { LinkPendingHint } from "@/ui/link-pending-hint";
 import { householdFor, identityLabelFor, navigationAccessFor } from "@/app/_frame/session-data";
@@ -19,6 +19,8 @@ export default async function DashboardPage({
 }: {
   searchParams: Promise<{ note?: string }>;
 }) {
+  const s = await getStrings();
+  const locale = await getRequestLocale();
   const { note } = await searchParams;
   const current = await getCurrentSession();
   if (!current) redirect("/sign-in");
@@ -35,48 +37,48 @@ export default async function DashboardPage({
 
   // Same fallbacks as the (resident) layout's avatar menu, so one screen never shows two answers.
   const displayName =
-    identity.kind === "resident" ? (identity.displayName ?? de.org.identityResidentFallback) : de.org.identityResidentFallback;
-  const householdName = household?.name ?? de.org.identityHouseholdFallback;
-  const view = buildDashboardView(overview, awaitingVotes, organisationTasks, access, new Date());
+    identity.kind === "resident" ? (identity.displayName ?? s.org.identityResidentFallback) : s.org.identityResidentFallback;
+  const householdName = household?.name ?? s.org.identityHouseholdFallback;
+  const view = buildDashboardView(overview, awaitingVotes, organisationTasks, access, new Date(), s, locale);
 
   return (
     <div className="mx-auto max-w-2xl space-y-6 p-6">
       <div>
-        <h1 className="font-serif text-2xl font-semibold">{de.start.greeting(displayName)}</h1>
+        <h1 className="font-serif text-2xl font-semibold">{s.start.greeting(displayName)}</h1>
         <p className="text-sm text-muted-foreground">{householdName}</p>
       </div>
 
       {note === "already_member" && (
         <div role="note" className="callout callout-info">
-          {de.join.alreadyMemberNote}
+          {s.join.alreadyMemberNote}
         </div>
       )}
 
       {view.primary ? (
         <div className="card card-featured">
           <div className="card-band">
-            <p className="eyebrow">{de.start.eyebrowAsNext}</p>
+            <p className="eyebrow">{s.start.eyebrowAsNext}</p>
           </div>
           <div className="card-featured-body space-y-3">
             <p className="text-lg font-semibold">{view.primary.heading}</p>
             <p className="text-sm text-muted-foreground">{view.primary.reason}</p>
             <Link href={view.primary.href} className="btn btn-primary">
-              {de.start.voteTaskButton} <ArrowRight className="size-4" />
+              {s.start.voteTaskButton} <ArrowRight className="size-4" />
               <LinkPendingHint />
             </Link>
           </div>
         </div>
       ) : (
         <div className="card space-y-2">
-          {view.standing?.kind === "noRound" && <p className="text-sm">{de.start.noRoundSentence}</p>}
+          {view.standing?.kind === "noRound" && <p className="text-sm">{s.start.noRoundSentence}</p>}
           {view.standing?.kind === "runningWithoutYou" && (
-            <p className="text-sm">{de.start.runningWithoutYouSentence}</p>
+            <p className="text-sm">{s.start.runningWithoutYouSentence}</p>
           )}
           {view.standing?.kind === "phase" && (
             <>
-              {view.standing.allRated && <p className="text-lg font-semibold">{de.start.allRated}</p>}
-              {view.standing.waiting && <p className="text-lg font-semibold">{de.start.waitingForApplications}</p>}
-              {standingHeadingOf(view.standing) && <p className="text-lg font-semibold">{standingHeadingOf(view.standing)}</p>}
+              {view.standing.allRated && <p className="text-lg font-semibold">{s.start.allRated}</p>}
+              {view.standing.waiting && <p className="text-lg font-semibold">{s.start.waitingForApplications}</p>}
+              {standingHeadingOf(view.standing, s) && <p className="text-lg font-semibold">{standingHeadingOf(view.standing, s)}</p>}
               {view.standing.distribution.length > 0 && (
                 <p className="text-sm text-muted-foreground">
                   {view.standing.distribution.map((d) => d.label).join(" · ")}
@@ -107,7 +109,7 @@ export default async function DashboardPage({
       {view.folded > 0 && (
         <details>
           <summary className="cursor-pointer text-sm text-muted-foreground">
-            {de.start.andNMore(view.folded)}
+            {s.start.andNMore(view.folded)}
           </summary>
           <ul className="mt-2 space-y-2">
             {view.foldedTasks.map((task, i) => (
@@ -128,11 +130,11 @@ export default async function DashboardPage({
 
       {view.bridge && (
         <div className="card card-quiet">
-          <p className="eyebrow">{de.start.bridge.eyebrow}</p>
+          <p className="eyebrow">{s.start.bridge.eyebrow}</p>
           <p className="mt-1 text-lg font-semibold">{view.bridge.heading}</p>
           {view.bridge.body && <p className="mt-1 text-sm">{view.bridge.body}</p>}
           <Link href={view.bridge.buttonHref} className="btn btn-primary mt-3">
-            {de.start.bridge.button}
+            {s.start.bridge.button}
             <LinkPendingHint />
           </Link>
         </div>

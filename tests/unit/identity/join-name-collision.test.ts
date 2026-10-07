@@ -23,11 +23,11 @@ describe("Join name collision (AC-2.17/EC-2.11)", () => {
     const first = await joinHousehold(linkA.code, {
       displayName: "Jonas",
       password: "test-password-not-real-1234",
-    });
+    }, "de");
     accountIds.push(first.context.accountId);
 
     await expect(
-      joinHousehold(linkA.code, { displayName: "Jonas", password: "test-password-not-real-1234" }),
+      joinHousehold(linkA.code, { displayName: "Jonas", password: "test-password-not-real-1234" }, "de"),
     ).rejects.toMatchObject({ code: "name_taken" });
   });
 
@@ -37,11 +37,11 @@ describe("Join name collision (AC-2.17/EC-2.11)", () => {
     const first = await joinHousehold(link.code, {
       displayName: "Jonas",
       password: "test-password-not-real-1234",
-    });
+    }, "de");
     accountIds.push(first.context.accountId);
 
     await expect(
-      joinHousehold(link.code, { displayName: "Jonas", password: "test-password-not-real-1234" }),
+      joinHousehold(link.code, { displayName: "Jonas", password: "test-password-not-real-1234" }, "de"),
     ).rejects.toBeInstanceOf(JoinError);
   });
 
@@ -51,11 +51,11 @@ describe("Join name collision (AC-2.17/EC-2.11)", () => {
     const first = await joinHousehold(link.code, {
       displayName: "Jonas",
       password: "test-password-not-real-1234",
-    });
+    }, "de");
     accountIds.push(first.context.accountId);
 
     await expect(
-      joinHousehold(link.code, { displayName: " Jonas ", password: "test-password-not-real-1234" }),
+      joinHousehold(link.code, { displayName: " Jonas ", password: "test-password-not-real-1234" }, "de"),
     ).rejects.toMatchObject({ code: "name_taken" });
   });
 
@@ -65,13 +65,13 @@ describe("Join name collision (AC-2.17/EC-2.11)", () => {
     const first = await joinHousehold(link.code, {
       displayName: "Jonas",
       password: "test-password-not-real-1234",
-    });
+    }, "de");
     accountIds.push(first.context.accountId);
 
     const second = await joinHousehold(link.code, {
       displayName: "jonas",
       password: "test-password-not-real-1234",
-    });
+    }, "de");
     accountIds.push(second.context.accountId);
     expect(second.context.profileId).not.toBe(first.context.profileId);
   });

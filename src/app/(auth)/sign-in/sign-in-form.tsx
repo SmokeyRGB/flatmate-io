@@ -3,19 +3,19 @@
 import Link from "next/link";
 import { useActionState, useEffect, useRef, useState } from "react";
 import { browserLocalStorage, readStoredHouseholdCode } from "@/app/household-code-storage";
-import { de } from "@/ui/strings";
+import { useStrings } from "@/ui/strings/provider";
 import { signInAction, type SignInFormState } from "./actions";
 import { PasswordInput } from "@/ui/password-input";
 import { SubmitButton } from "@/ui/submit-button";
 import { LinkPendingHint } from "@/ui/link-pending-hint";
 
 const initialState: SignInFormState = { error: null };
-const t = de.auth.signIn;
-
 // AC-1.6: two entry modes, household (email+password) and resident (household, display_name,
 // password) — ADR-013's fixed-identity model means picking a mode here IS choosing the identity
 // for the whole session; there is no in-session switch afterwards.
 export function SignInForm() {
+  const s = useStrings();
+  const t = s.auth.signIn;
   const [mode, setMode] = useState<"household" | "resident">("household");
   // resident-settings (human decision 2026-09-24, walkthrough): on the resident tab, a resident
   // with an email may use it instead of household + name. The tab still decides the identity:
@@ -161,7 +161,7 @@ export function SignInForm() {
             defaultChecked={draft.rememberMe}
           />
           <label htmlFor="rememberMe" className="field-label">
-            {de.join.rememberMeLabel}
+            {s.join.rememberMeLabel}
           </label>
         </div>
 

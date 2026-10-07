@@ -11,10 +11,8 @@ import {
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
 } from "react";
-import { de } from "@/ui/strings";
+import { useStrings } from "@/ui/strings/provider";
 import { HORIZONTAL_RATIO, SLOP_PX, releaseDecision } from "@/ui/swipe";
-
-const t = de.casting.detail;
 
 // The card that slides over the scoreboard (F5 candidate-detail design D1/D10). It is the frame of
 // the intercepted route and nothing else: the content, the skeleton and the refusal all render
@@ -33,6 +31,7 @@ const t = de.casting.detail;
 //   the exit transition suppressed, a short drag springs back. `touch-action: pan-y` keeps vertical
 //   scrolling inside the card native, so a vertical scroll is never a swipe.
 export function DetailSheet({ children }: { children: ReactNode }) {
+  const t = useStrings().casting.detail;
   const router = useRouter();
   const panelRef = useRef<HTMLDivElement>(null);
   // Set before router.back() after a swipe: the panel is already off-screen, so the exit slide must

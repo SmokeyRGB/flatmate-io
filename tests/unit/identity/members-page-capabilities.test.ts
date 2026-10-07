@@ -1,5 +1,5 @@
 import { createElement } from "react";
-import { renderToStaticMarkup } from "react-dom/server";
+import { renderWithStrings } from "../../helpers/render-with-strings";
 import { describe, expect, it, vi } from "vitest";
 import type { ResidentListResult } from "@/modules/identity/repository";
 import { de } from "@/ui/strings";
@@ -68,13 +68,15 @@ const liveIssuance = {
 
 function render(flags: Flags): string {
   const residentList: ResidentListResult = { members, ...flags, leadWithJoinCode: false };
-  return renderToStaticMarkup(
+  return renderWithStrings(
     createElement(MembersView, {
       residentList,
       joinCodeIssuances: flags.canManageJoinCodes ? [liveIssuance] : [],
       host: "example.test",
       now: NOW,
       callerIsHouseholdAccount: true,
+      strings: de,
+      locale: "de",
     }),
   );
 }
@@ -149,13 +151,15 @@ describe("the reset link on a member row", () => {
     ...over,
   });
   const renderWith = (issuances: Issuance[], list = members) =>
-    renderToStaticMarkup(
+    renderWithStrings(
       createElement(MembersView, {
         residentList: { members: list, ...NONE, canIssueResetLink: true, leadWithJoinCode: false },
         joinCodeIssuances: issuances,
         host: "example.test",
         now: NOW,
         callerIsHouseholdAccount: true,
+        strings: de,
+        locale: "de",
       }),
     );
 
@@ -216,7 +220,7 @@ describe("every confirmation dialog on the members screen has an accessible name
 
 describe("the members screen with no resident yet", () => {
   it("leads with the add-resident form, before the join-link section", () => {
-    const html = renderToStaticMarkup(
+    const html = renderWithStrings(
       createElement(MembersView, {
         residentList: {
           members: [],
@@ -231,6 +235,8 @@ describe("the members screen with no resident yet", () => {
         host: "example.test",
         now: NOW,
         callerIsHouseholdAccount: true,
+        strings: de,
+        locale: "de",
       }),
     );
     const form = html.indexOf(de.members.addResidentSubmit);
@@ -252,13 +258,15 @@ describe("the founding link on the members screen", () => {
     ...over,
   });
   const renderWith = (issuances: Issuance[], callerIsHouseholdAccount = true) =>
-    renderToStaticMarkup(
+    renderWithStrings(
       createElement(MembersView, {
         residentList: { members, ...NONE, canManageJoinCodes: true, leadWithJoinCode: false },
         joinCodeIssuances: issuances,
         host: "example.test",
         now: NOW,
         callerIsHouseholdAccount,
+        strings: de,
+        locale: "de",
       }),
     );
 

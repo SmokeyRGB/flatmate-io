@@ -1,4 +1,4 @@
-import { de } from "@/ui/strings";
+import { LoadingStatus } from "@/ui/loading-status";
 import { SkeletonHeading, SkeletonList } from "@/ui/skeletons";
 
 // design.md D3/D6, application-pipeline D2: rounds/[id]/page.tsx's shape — one panel-round holding
@@ -6,9 +6,7 @@ import { SkeletonHeading, SkeletonList } from "@/ui/skeletons";
 export default function RoundDetailLoading() {
   return (
     <div className="mx-auto max-w-2xl space-y-6 p-6" aria-busy="true">
-      <p role="status" className="sr-only">
-        {de.common.loading}
-      </p>
+      <LoadingStatus />
       <div className="space-y-6" aria-hidden="true">
         <div className="panel-round space-y-5">
           <SkeletonHeading />

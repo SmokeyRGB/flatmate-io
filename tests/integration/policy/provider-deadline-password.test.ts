@@ -31,7 +31,7 @@ async function claimResident(household: TestHousehold, name: string) {
     accountId: household.accountId,
     profileId: null,
   });
-  const { accountId } = await claimResidentProfile(household.context, profile.id, PASSWORD);
+  const { accountId } = await claimResidentProfile(household.context, profile.id, PASSWORD, "de");
   accountIds.push(accountId);
   return { profileId: profile.id, accountId };
 }

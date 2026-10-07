@@ -75,7 +75,7 @@ describe("Join code moderator boundary (FR-1.27/U-30)", () => {
     const { accountId: modAccountId } = await claimResidentProfile(
       hhA.context,
       modProfile.id,
-      "test-password-not-real-1234",
+      "test-password-not-real-1234", "de",
     );
     accountIds.push(modAccountId);
     // Appointed through setMemberRole so the moderator's permission set is stored with the role
@@ -86,7 +86,7 @@ describe("Join code moderator boundary (FR-1.27/U-30)", () => {
     const { accountId: memberAccountId } = await claimResidentProfile(
       hhA.context,
       memberProfile.id,
-      "test-password-not-real-1234",
+      "test-password-not-real-1234", "de",
     );
     accountIds.push(memberAccountId);
 
@@ -132,7 +132,7 @@ describe("Join code moderator boundary (FR-1.27/U-30)", () => {
     const { accountId: memberAccountId } = await claimResidentProfile(
       hhA.context,
       memberProfile.id,
-      "test-password-not-real-1234",
+      "test-password-not-real-1234", "de",
     );
     accountIds.push(memberAccountId);
     const memberContext = {
@@ -159,7 +159,7 @@ describe("a moderator's join-link list hides the reset links the household accou
     const { accountId: modAccountId } = await claimResidentProfile(
       hhA.context,
       modProfile.id,
-      "test-password-not-real-1234",
+      "test-password-not-real-1234", "de",
     );
     accountIds.push(modAccountId);
     await setMemberRole(hhA.context, hhA.accountId, modAccountId, "moderator");
@@ -167,7 +167,7 @@ describe("a moderator's join-link list hides the reset links the household accou
     const { accountId: targetAccountId } = await claimResidentProfile(
       hhA.context,
       target.id,
-      "test-password-not-real-1234",
+      "test-password-not-real-1234", "de",
     );
     accountIds.push(targetAccountId);
 

@@ -12,7 +12,7 @@ import {
 } from "@/modules/identity/repository";
 import { isUuid } from "@/db/session-context";
 import { getCurrentSession } from "@/modules/identity/session-cookie";
-import { de } from "@/ui/strings";
+import { getStrings } from "@/ui/strings/request";
 import { LinkPendingHint } from "@/ui/link-pending-hint";
 import { ApplicationsSection, type ApplicationsView } from "./applications-section";
 import { SavedToast } from "./saved-toast";
@@ -26,6 +26,7 @@ export default async function RoundDetailPage({
   params: Promise<{ id: string }>;
   searchParams?: Promise<{ saved?: string }>;
 }) {
+  const s = await getStrings();
   const { id } = await params;
   // ?saved=<application id> after a capture. Anything that is not a uuid is ignored (no toast, no
   // link): the value comes from the URL, so it is never trusted as a path segment.
@@ -86,7 +87,7 @@ export default async function RoundDetailPage({
   return (
     <div className="mx-auto max-w-2xl space-y-6 p-6">
       <Link href="/organization" className="back-link">
-        <ArrowLeft className="size-4" /> {de.nav.organisation}
+        <ArrowLeft className="size-4" /> {s.nav.organisation}
         <LinkPendingHint />
       </Link>
 
@@ -94,17 +95,17 @@ export default async function RoundDetailPage({
       <div className="panel-round space-y-5">
         <div>
           <h1 className="font-serif text-2xl font-semibold">{round.title}</h1>
-          <span className="badge mt-1">{de.status.round[round.status as keyof typeof de.status.round]}</span>
+          <span className="badge mt-1">{s.status.round[round.status as keyof typeof s.status.round]}</span>
         </div>
 
         {savedId && (
           <SavedToast
-            message={de.applications.saved}
-            link={{ href: `/rounds/${id}/applications/${savedId}`, label: de.applications.viewSaved }}
+            message={s.applications.saved}
+            link={{ href: `/rounds/${id}/applications/${savedId}`, label: s.applications.viewSaved }}
           />
         )}
 
-        {section && <ApplicationsSection roundId={id} canCapture={canCapture} {...section} />}
+        {section && <ApplicationsSection strings={s} roundId={id} canCapture={canCapture} {...section} />}
       </div>
 
       {/* ADR-014/G-D15: a household-account session (no profile) never sees participant data —
@@ -113,7 +114,7 @@ export default async function RoundDetailPage({
           the list, so this is a plain section below it. */}
       {current.context.profileId !== null && (
         <section>
-          <h2 className="font-serif text-lg font-medium">{de.rounds.detail.participantsHeading}</h2>
+          <h2 className="font-serif text-lg font-medium">{s.rounds.detail.participantsHeading}</h2>
           {/* FR-1.19/FR-1.28: names only — no join date, contact detail, or action controls. */}
           <ul className="mt-3 space-y-2">
             {participants.map((p, i) => (

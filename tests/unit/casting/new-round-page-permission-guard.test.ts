@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { renderToStaticMarkup } from "react-dom/server";
+import { renderWithStrings } from "../../helpers/render-with-strings";
 import { de } from "@/ui/strings";
 
 // page.tsx pulls in session-cookie.ts (server-only + next/headers) and next/navigation via its
@@ -42,7 +42,7 @@ const { default: NewRoundPage } = await import("@/app/(org)/rounds/new/page");
 describe("NewRoundPage manage_rounds permission guard", () => {
   it("renders a denial and never loads rooms when manage_rounds is missing", async () => {
     const element = await NewRoundPage();
-    const html = renderToStaticMarkup(element);
+    const html = renderWithStrings(element);
 
     // german-ui-vocabulary (design.md Decision 8): asserts through src/ui/strings, never a German
     // literal copied into the test — the table's value can change and this test still passes as

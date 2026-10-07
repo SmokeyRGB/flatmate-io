@@ -10,12 +10,10 @@ import {
   PermissionDeniedError,
 } from "@/modules/identity/repository";
 import { getCurrentSession } from "@/modules/identity/session-cookie";
-import { de } from "@/ui/strings";
+import { getStrings } from "@/ui/strings/request";
 import { LinkPendingHint } from "@/ui/link-pending-hint";
 import { OrganisationAccessDenied } from "../organisation-access-denied";
 import { requireOrganisationAccess } from "../organisation-access";
-
-const t = de.org.dashboard;
 
 // Screen O1, now at `/organization` (start-screen change: moved off `/dashboard`, which is B1,
 // Start, everywhere from here on). EC-1.5: exactly one round is presented as "active"; the rest
@@ -30,13 +28,15 @@ export default async function OrganizationPage({
 }: {
   searchParams: Promise<{ note?: string }>;
 }) {
+  const s = await getStrings();
+  const t = s.org.dashboard;
   const { note } = await searchParams;
   const current = await getCurrentSession();
   if (!current) redirect("/sign-in");
 
   // role-permissions design D9: every page of the organisation area checks the caller's stored
   // permissions on this request, so a demoted moderator sees the access message on reload.
-  if (!(await requireOrganisationAccess(current))) return <OrganisationAccessDenied />;
+  if (!(await requireOrganisationAccess(current))) return <OrganisationAccessDenied strings={await getStrings()} />;
 
   const rounds = await listRoundsForSession(current.context);
   const [active, ...rest] = rounds;
@@ -81,13 +81,13 @@ export default async function OrganizationPage({
           2026-09-24). The household account has no Start, since its landing is O20. */}
       {current.context.profileId !== null && (
         <Link href="/dashboard" className="back-link">
-          <ArrowLeft className="size-4" /> {de.nav.start}
+          <ArrowLeft className="size-4" /> {s.nav.start}
           <LinkPendingHint />
         </Link>
       )}
       {note === "already_member" && (
         <div role="note" className="callout callout-info">
-          {de.join.alreadyMemberNote}
+          {s.join.alreadyMemberNote}
         </div>
       )}
       <h1 className="font-serif text-2xl font-semibold">{t.heading}</h1>
@@ -96,7 +96,7 @@ export default async function OrganizationPage({
         <Link href={`/rounds/${active.id}`} className="card block transition hover:shadow-none">
           <p className="eyebrow">{t.activeRoundEyebrow}</p>
           <p className="mt-1 text-lg font-medium">{active.title}</p>
-          <span className="badge mt-2">{de.status.round[active.status as keyof typeof de.status.round]}</span>
+          <span className="badge mt-2">{s.status.round[active.status as keyof typeof s.status.round]}</span>
           <LinkPendingHint />
         </Link>
       ) : foundingJoinPath ? (
@@ -149,7 +149,7 @@ export default async function OrganizationPage({
             {rest.map((r: { id: string; title: string; status: string }) => (
               <li key={r.id} className="text-sm text-muted-foreground">
                 <Link href={`/rounds/${r.id}`} className="btn-link">
-                  {r.title} — {de.status.round[r.status as keyof typeof de.status.round]}
+                  {r.title} — {s.status.round[r.status as keyof typeof s.status.round]}
                   <LinkPendingHint />
                 </Link>
               </li>

@@ -6,30 +6,30 @@ import { listRooms } from "@/modules/casting/repository";
 import { getCurrentSession } from "@/modules/identity/session-cookie";
 import { OrganisationAccessDenied } from "@/app/(org)/organisation-access-denied";
 import { requireOrganisationAccess } from "@/app/(org)/organisation-access";
-import { de } from "@/ui/strings";
+import { getStrings } from "@/ui/strings/request";
 import { LinkPendingHint } from "@/ui/link-pending-hint";
 import { SubmitButton } from "@/ui/submit-button";
 import { removeRoomAction, renameRoomAction, transitionRoomAction } from "./actions";
 import { NewRoomDialog } from "./new-room-dialog";
 
-const t = de.rooms;
-
 // Screen O14. FR-1.9–FR-1.11: create/rename/remove rooms; each room's state is its own.
 export default async function RoomsPage() {
+  const s = await getStrings();
+  const t = s.rooms;
   const current = await getCurrentSession();
   if (!current) redirect("/sign-in");
 
   // role-permissions design D9: every page of the organisation area first checks the caller's
   // stored permissions on this request (a demoted moderator loses the area on reload); the page's
   // own narrower check below stays.
-  if (!(await requireOrganisationAccess(current))) return <OrganisationAccessDenied />;
+  if (!(await requireOrganisationAccess(current))) return <OrganisationAccessDenied strings={await getStrings()} />;
 
   const rooms = await listRooms(current.context);
 
   return (
     <div className="mx-auto max-w-2xl space-y-6 p-6">
       <Link href="/organization" className="back-link">
-        <ArrowLeft className="size-4" /> {de.nav.organisation}
+        <ArrowLeft className="size-4" /> {s.nav.organisation}
         <LinkPendingHint />
       </Link>
       <div className="flex items-center justify-between gap-4">
@@ -42,14 +42,14 @@ export default async function RoomsPage() {
           <li key={r.id} className="card">
             <div className="flex items-center justify-between">
               <span className="font-medium">{r.label}</span>
-              <span className="badge">{de.status.room[r.status]}</span>
+              <span className="badge">{s.status.room[r.status]}</span>
             </div>
 
             <div className="mt-3 flex flex-wrap gap-2">
               <form action={renameRoomAction} className="flex gap-1">
                 <input type="hidden" name="roomId" value={r.id} />
                 <input name="label" defaultValue={r.label} className="field-input py-1 text-sm" />
-                <SubmitButton className="btn-link shrink-0">{de.common.rename}</SubmitButton>
+                <SubmitButton className="btn-link shrink-0">{s.common.rename}</SubmitButton>
               </form>
 
               <form action={transitionRoomAction} className="flex gap-1">
@@ -57,9 +57,9 @@ export default async function RoomsPage() {
                 <select name="toStatus" defaultValue={r.status} className="field-input py-1 text-sm">
                   {/* Options are this room's own legal targets (plus its current status), not
                       every F1-reachable target across all rooms — see f1TargetStatusesFor. */}
-                  {f1TargetStatusesFor(r.status).map((s) => (
-                    <option key={s} value={s}>
-                      {de.status.room[s]}
+                  {f1TargetStatusesFor(r.status).map((target) => (
+                    <option key={target} value={target}>
+                      {s.status.room[target]}
                     </option>
                   ))}
                 </select>

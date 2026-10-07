@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { groupApplicationsByState } from "@/modules/casting/application-groups";
 import type { ApplicationState } from "@/modules/casting/transitions";
-import { de } from "@/ui/strings";
+import type { Strings } from "@/ui/strings";
 import { LinkPendingHint } from "@/ui/link-pending-hint";
 
 // The „Bewerbungen" section of the round page (screen O4, F3 change 3, design D2). Server-
@@ -33,15 +33,16 @@ export type ApplicationsView =
   | { view: "load_error" };
 
 export type ApplicationsSectionProps = {
+  // language-switch: a plain prop, not a hook. This is a sync server-tree component that tests
+  // render directly, and the page already holds the request's table.
+  strings: Strings;
   roundId: string;
   // The way to capture: an open round and create_application (the page's existing check).
   canCapture: boolean;
 } & ApplicationsView;
 
-const t = de.applications.list;
-
 // One muted line: the age, then the stored contacts, in a fixed order. Empty when nothing is stored.
-function summaryOf(row: ApplicationListRow): string {
+function summaryOf(row: ApplicationListRow, t: Strings["applications"]["list"]): string {
   const parts: string[] = [];
   if (row.age !== null) parts.push(t.age(row.age));
   for (const contact of [row.contactEmail, row.contactPhone, row.contactOther]) {
@@ -51,10 +52,12 @@ function summaryOf(row: ApplicationListRow): string {
 }
 
 export function ApplicationsSection(props: ApplicationsSectionProps) {
+  const s = props.strings;
+  const t = s.applications.list;
   const captureHref = `/rounds/${props.roundId}/applications/new`;
   const captureLink = (primary: boolean) => (
     <Link href={captureHref} className={primary ? "btn btn-primary" : "btn btn-secondary"}>
-      {de.rounds.detail.captureApplication}
+      {s.rounds.detail.captureApplication}
       <LinkPendingHint />
     </Link>
   );
@@ -65,7 +68,7 @@ export function ApplicationsSection(props: ApplicationsSectionProps) {
         <h2 id="applications-heading" className="font-serif text-lg font-medium">
           {t.heading}
         </h2>
-        <p className="text-sm text-muted-foreground">{de.applications.states.householdAccount}</p>
+        <p className="text-sm text-muted-foreground">{s.applications.states.householdAccount}</p>
       </section>
     );
   }
@@ -109,19 +112,19 @@ export function ApplicationsSection(props: ApplicationsSectionProps) {
       </div>
       {groups.map((group) => (
         <div key={group.state} className="space-y-2">
-          <h3 className="text-sm font-medium">{t.groupLabel(de.status.application[group.state], group.count)}</h3>
+          <h3 className="text-sm font-medium">{t.groupLabel(s.status.application[group.state], group.count)}</h3>
           <ul className="space-y-2">
             {group.rows.map((row) => {
-              const summary = summaryOf(row);
+              const summary = summaryOf(row, t);
               return (
                 <li key={row.id}>
                   <Link href={`/rounds/${props.roundId}/applications/${row.id}`} className="card block py-3 transition hover:shadow-none">
                     <span className="flex flex-wrap items-center gap-2">
                       <span className="font-medium">{row.applicantName}</span>
-                      <span className="badge">{de.status.application[row.state]}</span>
+                      <span className="badge">{s.status.application[row.state]}</span>
                       {row.collectedFrom === "third_party" && (
                         <span className="text-xs text-muted-foreground">
-                          {de.applications.detail.viaSomeoneElse}
+                          {s.applications.detail.viaSomeoneElse}
                         </span>
                       )}
                     </span>

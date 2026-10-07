@@ -13,14 +13,12 @@ import { getCurrentSession } from "@/modules/identity/session-cookie";
 import { OrganisationAccessDenied } from "@/app/(org)/organisation-access-denied";
 import { requireOrganisationAccess } from "@/app/(org)/organisation-access";
 import { holdsPermission } from "@/app/holds-permission";
-import { de } from "@/ui/strings";
+import { getStrings } from "@/ui/strings/request";
 import { LinkPendingHint } from "@/ui/link-pending-hint";
 import { SavedToast } from "../../saved-toast";
 import { InviteDialog } from "../invite-dialog";
 import { INVITABLE_STATES, INVITE_PERMISSION, showInvite } from "../invite-text";
 import { ApplicantNotice, ThirdPartyNotice } from "../notice";
-
-const t = de.applications.detail;
 
 // The organisation's detail of one application (design D5): O5's first cut, which change 3
 // extends. Facts are shown as TEXT only: React escapes them and there is no
@@ -35,19 +33,21 @@ export default async function ApplicationDetailPage({
   params: Promise<{ id: string; applicationId: string }>;
   searchParams?: Promise<{ updated?: string }>;
 }) {
+  const s = await getStrings();
+  const t = s.applications.detail;
   const { id, applicationId } = await params;
   // ?updated=1 after a correction that changed something, ?updated=0 after one that changed nothing.
   // Any other value shows no notice.
   const updatedParam = (await searchParams)?.updated;
   const updatedMessage =
-    updatedParam === "1" ? de.applications.edit.updated : updatedParam === "0" ? de.applications.edit.unchanged : null;
+    updatedParam === "1" ? s.applications.edit.updated : updatedParam === "0" ? s.applications.edit.unchanged : null;
   const current = await getCurrentSession();
   if (!current) redirect("/sign-in");
 
   // role-permissions design D9: every page of the organisation area first checks the caller's
   // stored permissions on this request (a demoted moderator loses the area on reload); the page's
   // own narrower check below stays.
-  if (!(await requireOrganisationAccess(current))) return <OrganisationAccessDenied />;
+  if (!(await requireOrganisationAccess(current))) return <OrganisationAccessDenied strings={await getStrings()} />;
 
   const back = (
     <Link href={`/rounds/${id}`} className="back-link">
@@ -65,7 +65,7 @@ export default async function ApplicationDetailPage({
         <div className="mx-auto max-w-2xl space-y-4 p-6">
           {back}
           <h1 className="font-serif text-2xl font-semibold">{t.heading}</h1>
-          <p className="text-sm text-muted-foreground">{de.applications.states.detailPermissionDenied}</p>
+          <p className="text-sm text-muted-foreground">{s.applications.states.detailPermissionDenied}</p>
         </div>
       );
     }
@@ -119,7 +119,7 @@ export default async function ApplicationDetailPage({
         <div className="flex flex-wrap items-center gap-2">
           {canEdit && (
             <Link href={`/rounds/${id}/applications/${applicationId}/edit`} className="btn btn-secondary">
-              {de.applications.edit.editLink}
+              {s.applications.edit.editLink}
               <LinkPendingHint />
             </Link>
           )}

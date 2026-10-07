@@ -101,7 +101,7 @@ const inFlightHouseholds = new Set<Promise<TestHousehold>>();
 async function registerTestHouseholdInner(deregister: () => void, name: string): Promise<TestHousehold> {
   const email = testEmail();
   const password = "test-password-not-real-1234";
-  const { household: householdRow, context } = await registerHousehold(email, password, name);
+  const { household: householdRow, context } = await registerHousehold(email, password, name, "de");
 
   return {
     context,
@@ -243,7 +243,7 @@ export async function createTestModerator(
 ): Promise<{ context: SessionContext; accountId: string; profileId: string }> {
   const actor = { accountId: hh.accountId, profileId: null };
   const profile = await createResidentProfile(hh.context, displayName, actor);
-  const { accountId } = await claimResidentProfile(hh.context, profile.id, "test-password-not-real-1234");
+  const { accountId } = await claimResidentProfile(hh.context, profile.id, "test-password-not-real-1234", "de");
   await setMemberRole(hh.context, hh.accountId, accountId, "moderator");
   const originalCleanup = hh.cleanup;
   hh.cleanup = async () => {

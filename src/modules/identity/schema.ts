@@ -258,6 +258,9 @@ export const account = pgTable(
       using: HOUSEHOLD_MATCH,
       withCheck: HOUSEHOLD_MATCH,
     }),
+    // language-switch D4: the UI language is German or English, whichever path writes it. Mirrors
+    // LOCALES in src/ui/strings/locales.ts (kept literal here: schema.ts imports nothing from ui).
+    check("account_locale_check", sql`${t.locale} in ('de','en')`),
   ],
 );
 

@@ -49,7 +49,7 @@ describe("a lost createUser answer leaves no account behind (design.md D5)", () 
 
     let caught: unknown;
     try {
-      await joinHousehold(link.code, { displayName: "LostJoiner", password: PASSWORD, email });
+      await joinHousehold(link.code, { displayName: "LostJoiner", password: PASSWORD, email }, "de");
     } catch (err) {
       caught = err;
     }
@@ -80,7 +80,7 @@ describe("a lost createUser answer leaves no account behind (design.md D5)", () 
     injector.restore();
     injector = undefined;
 
-    const retry = await joinHousehold(link.code, { displayName: "LostJoiner", password: PASSWORD, email });
+    const retry = await joinHousehold(link.code, { displayName: "LostJoiner", password: PASSWORD, email }, "de");
     accountIds.push(retry.context.accountId);
   });
 
@@ -100,7 +100,7 @@ describe("a lost createUser answer leaves no account behind (design.md D5)", () 
 
     let caught: unknown;
     try {
-      await joinHousehold(link.code, { password: PASSWORD });
+      await joinHousehold(link.code, { password: PASSWORD }, "de");
     } catch (err) {
       caught = err;
     }
@@ -113,7 +113,7 @@ describe("a lost createUser answer leaves no account behind (design.md D5)", () 
 
     // The bound link is single-use and was never claimed (the transaction never ran) — so it
     // still works, and the retry must not fail as email_taken (the derived address must be free).
-    const retry = await joinHousehold(link.code, { password: PASSWORD });
+    const retry = await joinHousehold(link.code, { password: PASSWORD }, "de");
     accountIds.push(retry.context.accountId);
     expect(retry.context.profileId).toBe(prepared.id);
   });
@@ -126,7 +126,7 @@ describe("a lost createUser answer leaves no account behind (design.md D5)", () 
       { method: "POST", path: /\/auth\/v1\/token$/, occurrence: 1, mode: "drop-before" },
     ]);
 
-    const joined = await joinHousehold(link.code, { displayName: "LostGrantJoiner", password: PASSWORD });
+    const joined = await joinHousehold(link.code, { displayName: "LostGrantJoiner", password: PASSWORD }, "de");
     accountIds.push(joined.context.accountId);
 
     const tokenRequests = injector.seen.filter(
@@ -145,7 +145,7 @@ describe("a lost createUser answer leaves no account behind (design.md D5)", () 
 
     let caught: unknown;
     try {
-      await registerHousehold(email, PASSWORD, "Lost Household");
+      await registerHousehold(email, PASSWORD, "Lost Household", "de");
     } catch (err) {
       caught = err;
     }
@@ -161,7 +161,7 @@ describe("a lost createUser answer leaves no account behind (design.md D5)", () 
     injector.restore();
     injector = undefined;
 
-    const retry = await registerHousehold(email, PASSWORD, "Retried Household");
+    const retry = await registerHousehold(email, PASSWORD, "Retried Household", "de");
     hh = {
       context: retry.context,
       accountId: retry.context.accountId,

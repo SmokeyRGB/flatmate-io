@@ -1,4 +1,4 @@
-import { de } from "@/ui/strings";
+import { LoadingStatus } from "@/ui/loading-status";
 import { SkeletonCircle, SkeletonHeading, SkeletonText } from "@/ui/skeletons";
 
 // The shape of the scoreboard: a heading and three rows, each a ring and two text lines
@@ -6,9 +6,7 @@ import { SkeletonCircle, SkeletonHeading, SkeletonText } from "@/ui/skeletons";
 export default function CastingLoading() {
   return (
     <div className="mx-auto max-w-md space-y-4 p-6" aria-busy="true">
-      <p role="status" className="sr-only">
-        {de.common.loading}
-      </p>
+      <LoadingStatus />
       <div className="space-y-4" aria-hidden="true">
         <SkeletonText width="w-24" />
         <SkeletonHeading width="w-40" />

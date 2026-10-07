@@ -1,7 +1,7 @@
 // loading-feedback design.md D3: shared skeleton shapes built from the existing `.skeleton` class
 // (`--color-muted`, 09-Design-System.md). Server-safe (no "use client"). Each page's own
 // `loading.tsx` composes these into the shape of its content, inside a container that carries
-// `aria-busy="true"` and a visually hidden `de.common.loading` — see any `loading.tsx` for that
+// `aria-busy="true"` and a visually hidden `<LoadingStatus />` (src/ui/loading-status.tsx) — see any `loading.tsx` for that
 // wrapping pattern. These components render only the `aria-hidden` bars themselves.
 
 export function SkeletonHeading({ width = "w-40" }: { width?: string }) {

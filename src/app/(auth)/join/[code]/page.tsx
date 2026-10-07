@@ -4,14 +4,12 @@ import { landingPathFor } from "@/app/landing";
 import { JOIN_PASSWORD_MIN_LENGTH, joinAttemptSourceHash } from "@/modules/identity/auth";
 import { isFoundingLink, isHouseholdAccount, recordJoinAttempt, resolveJoinCode } from "@/modules/identity/repository";
 import { getCurrentSession } from "@/modules/identity/session-cookie";
-import { de } from "@/ui/strings";
+import { getStrings } from "@/ui/strings/request";
 import { JoinForm } from "./join-form";
 import { HandEntryWayBack, SignOutAndReturnForm } from "./join-ways-forward";
 import { decideJoinScreen } from "./join-screen-state";
 import { getClientIp } from "@/app/request-ip";
 import { ResetForm } from "./reset-form";
-
-const t = de.join;
 
 // Screen A3 (`docs/screens/A-zugang.md`), with `rahmenwerk.md` §6's four mandatory states (G-N6).
 // `params` is a Promise in this Next version (see src/app/(org)/rounds/[id]/page.tsx for the
@@ -25,6 +23,7 @@ const t = de.join;
 // state this render shows — this component only renders what that function returns.
 export default async function JoinPage({ params }: { params: Promise<{ code: string }> }) {
   const { code } = await params;
+  const t = (await getStrings()).join;
 
   const current = await getCurrentSession();
 

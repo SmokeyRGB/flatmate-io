@@ -2,11 +2,9 @@
 
 import { Trash2 } from "lucide-react";
 import { useId, useRef } from "react";
-import { de } from "@/ui/strings";
+import { useStrings } from "@/ui/strings/provider";
 import { SubmitButton } from "@/ui/submit-button";
 import { removePreparedProfileAction } from "./actions";
-
-const t = de.members;
 
 // Removing a prepared profile is terminal (prepared -> removed), so it sits behind the same
 // `.dialog` confirmation as DeleteJoinCodeForm, without a typed-name gate.
@@ -17,6 +15,8 @@ export function DeletePreparedProfileForm({
   residentProfileId: string;
   displayName: string;
 }) {
+  const s = useStrings();
+  const t = s.members;
   const dialogRef = useRef<HTMLDialogElement>(null);
   const headingId = useId();
 
@@ -32,9 +32,9 @@ export function DeletePreparedProfileForm({
 
         <form action={removePreparedProfileAction} className="mt-4 flex items-center gap-4">
           <input type="hidden" name="residentProfileId" value={residentProfileId} />
-          <SubmitButton className="btn btn-destructive">{de.common.delete}</SubmitButton>
+          <SubmitButton className="btn btn-destructive">{s.common.delete}</SubmitButton>
           <button type="button" onClick={() => dialogRef.current?.close()} className="btn-link">
-            {de.common.cancel}
+            {s.common.cancel}
           </button>
         </form>
       </dialog>

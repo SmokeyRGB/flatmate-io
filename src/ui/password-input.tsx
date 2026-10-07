@@ -2,7 +2,7 @@
 
 import { Eye, EyeOff } from "lucide-react";
 import { useState } from "react";
-import { de } from "@/ui/strings";
+import { useStrings } from "@/ui/strings/provider";
 
 // A password field with a show/hide toggle (human request, 2026-09-24, resident-settings
 // walkthrough): a new password is typed once, with no confirmation field, so a typo would lock the
@@ -20,8 +20,9 @@ export function PasswordInput({
   required?: boolean;
   autoComplete?: "current-password" | "new-password";
 }) {
+  const s = useStrings();
   const [visible, setVisible] = useState(false);
-  const label = visible ? de.common.hidePassword : de.common.showPassword;
+  const label = visible ? s.common.hidePassword : s.common.showPassword;
 
   return (
     <div className="password-field">

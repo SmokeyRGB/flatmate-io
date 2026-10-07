@@ -2,14 +2,12 @@
 
 import { Info } from "lucide-react";
 import { useActionState, useState } from "react";
-import { de } from "@/ui/strings";
+import { useStrings } from "@/ui/strings/provider";
 import { registerHouseholdAction, type RegisterFormState } from "./actions";
 import { PasswordInput } from "@/ui/password-input";
 import { SubmitButton } from "@/ui/submit-button";
 
 const initialState: RegisterFormState = { error: null, fieldError: null };
-const t = de.auth.register;
-
 // Screen A1 plus its undescribed second step (proposal.md join-by-link Assumption 5, design.md
 // Decision 6): registration is a TWO-STEP form with ONE submit, not a second route. Step 1 is
 // exactly A1's two fields (email, password) — unchanged. Step 2 asks for the household's name.
@@ -17,6 +15,7 @@ const t = de.auth.register;
 // unmounted), so switching steps never loses what was typed and the credentials leave the browser
 // in exactly one request, whichever step the user is looking at when they finally submit.
 export function RegisterForm() {
+  const t = useStrings().auth.register;
   const [state, formAction] = useActionState(registerHouseholdAction, initialState);
   const [step, setStep] = useState<1 | 2>(1);
 

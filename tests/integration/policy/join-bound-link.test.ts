@@ -41,7 +41,7 @@ describe("A bound join link claims the named profile (design.md Decision 13)", (
     expect(link.maxUses).toBe(1); // design.md Decision 13: always forced to 1 for a bound link
     expect(link.residentProfileId).toBe(prepared.id);
 
-    const result = await joinHousehold(link.code, { password: "test-password-not-real-1234" });
+    const result = await joinHousehold(link.code, { password: "test-password-not-real-1234" }, "de");
     accountIds.push(result.context.accountId);
 
     expect(result.context.profileId).toBe(prepared.id);
@@ -79,12 +79,12 @@ describe("A bound join link claims the named profile (design.md Decision 13)", (
     });
     expect(second.id).not.toBe(first.id); // both were issued: that is not what is refused
 
-    const claimed = await joinHousehold(first.code, { password: "test-password-not-real-1234" });
+    const claimed = await joinHousehold(first.code, { password: "test-password-not-real-1234" }, "de");
     accountIds.push(claimed.context.accountId);
 
     // FR-2.8's single message, not a reason: from the visitor's side the link simply does not work.
     await expect(
-      joinHousehold(second.code, { password: "test-password-not-real-1234" }),
+      joinHousehold(second.code, { password: "test-password-not-real-1234" }, "de"),
     ).rejects.toMatchObject({ code: "invalid_link" });
 
     // One profile, still one membership, and the claim did not run twice.
@@ -106,7 +106,7 @@ describe("A bound join link claims the named profile (design.md Decision 13)", (
     const result = await joinHousehold(link.code, {
       displayName: "Neutral Joiner",
       password: "test-password-not-real-1234",
-    });
+    }, "de");
     accountIds.push(result.context.accountId);
 
     const [profile] = await withSessionContext(hh.context, (tx) =>
@@ -125,7 +125,7 @@ describe("A bound join link claims the named profile (design.md Decision 13)", (
       residentProfileId: prepared.id,
     });
 
-    const first = await joinHousehold(link.code, { password: "test-password-not-real-1234" });
+    const first = await joinHousehold(link.code, { password: "test-password-not-real-1234" }, "de");
     accountIds.push(first.context.accountId);
 
     // Proposal Assumption 0b / design.md Decision 13: no bespoke wording for a spent BOUND link —
@@ -133,9 +133,9 @@ describe("A bound join link claims the named profile (design.md Decision 13)", (
     // second, distinguishable message the way screens/A-zugang.md A4 deliberately does for the
     // unrelated v0.2 ApplicationInviteToken.
     await expect(
-      joinHousehold(link.code, { password: "test-password-not-real-1234" }),
+      joinHousehold(link.code, { password: "test-password-not-real-1234" }, "de"),
     ).rejects.toMatchObject({ code: "invalid_link" });
-    await expect(joinHousehold(link.code, { password: "x" })).rejects.toBeInstanceOf(JoinError);
+    await expect(joinHousehold(link.code, { password: "x" }, "de")).rejects.toBeInstanceOf(JoinError);
   });
 
   it("cannot name a profile of another household", async () => {
@@ -162,7 +162,7 @@ describe("A bound join link claims the named profile (design.md Decision 13)", (
       maxUses: 1,
       residentProfileId: prepared.id,
     });
-    const claimed = await joinHousehold(firstLink.code, { password: "test-password-not-real-1234" });
+    const claimed = await joinHousehold(firstLink.code, { password: "test-password-not-real-1234" }, "de");
     accountIds.push(claimed.context.accountId);
 
     // The profile is active now — a second link cannot be bound to it.
@@ -200,7 +200,7 @@ describe("A bound join link claims the named profile (design.md Decision 13)", (
     });
     expect(secondLink.residentProfileId).toBe(prepared.id);
 
-    const result = await joinHousehold(secondLink.code, { password: "test-password-not-real-1234" });
+    const result = await joinHousehold(secondLink.code, { password: "test-password-not-real-1234" }, "de");
     accountIds.push(result.context.accountId);
     expect(result.context.profileId).toBe(prepared.id);
   });

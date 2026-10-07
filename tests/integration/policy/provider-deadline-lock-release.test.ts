@@ -34,7 +34,7 @@ describe("a lost provider request releases its locks within the deadline, not 30
       accountId: hh.accountId,
       profileId: null,
     });
-    const claimed = await claimResidentProfile(hh.context, profile.id, PASSWORD);
+    const claimed = await claimResidentProfile(hh.context, profile.id, PASSWORD, "de");
     residentAccountId = claimed.accountId;
     accountIds.push(residentAccountId);
 

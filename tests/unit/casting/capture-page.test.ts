@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createElement } from "react";
-import { renderToStaticMarkup } from "react-dom/server";
+import { renderWithStrings } from "../../helpers/render-with-strings";
 import { de } from "@/ui/strings";
 import { formatDateDe, isDeadlinePassed, oneMonthAfter } from "@/modules/casting/application-notice";
 import { matchArt9Term } from "../../../scripts/lint/data-inventory";
@@ -65,7 +65,7 @@ const { CaptureForm } = await import("@/app/(org)/rounds/[id]/applications/new/c
 // The three steps of the form (design D6). The page renders step 1; the others are reached by
 // buttons, so the form takes an `initial` seam for these renders.
 function renderStep(step: 1 | 2 | 3, extra: { thirdParty?: boolean; extraRows?: number } = {}) {
-  return renderToStaticMarkup(
+  return renderWithStrings(
     createElement(CaptureForm, {
       roundId: ROUND_ID,
       household: "Testhaushalt",
@@ -77,7 +77,7 @@ function renderStep(step: 1 | 2 | 3, extra: { thirdParty?: boolean; extraRows?: 
 
 async function render() {
   const element = await CaptureApplicationPage({ params: Promise.resolve({ id: ROUND_ID }) });
-  return renderToStaticMarkup(element);
+  return renderWithStrings(element);
 }
 
 interface FormControl {
@@ -272,7 +272,7 @@ describe("the correction form: O3 in edit mode", () => {
   function renderEdit(
     overrides: { thirdParty?: boolean; capturedAt?: string; step?: 1 | 2 | 3; switchTo?: boolean } = {},
   ) {
-    return renderToStaticMarkup(
+    return renderWithStrings(
       createElement(CaptureForm, {
         roundId: ROUND_ID,
         household: "Testhaushalt",
@@ -331,11 +331,11 @@ describe("the correction form: O3 in edit mode", () => {
   // capturing. Break: use the capture texts in edit mode, and this fails.
   it("speaks of correcting: its refusals and its intro never say „erfassen“", async () => {
     const { errorTextsFor } = await import("@/app/(org)/rounds/[id]/applications/new/capture-form");
-    const editTexts = errorTextsFor("edit");
+    const editTexts = errorTextsFor(de, "edit");
     expect(editTexts.permission_denied).toBe(de.applications.edit.errors.permission_denied);
     expect(editTexts.profile_required).toBe(de.applications.edit.errors.profile_required);
     for (const text of Object.values(editTexts)) expect(text).not.toMatch(/erfass/i);
-    expect(errorTextsFor("capture").permission_denied).toBe(de.applications.errors.permission_denied);
+    expect(errorTextsFor(de, "capture").permission_denied).toBe(de.applications.errors.permission_denied);
 
     const html = renderEdit();
     expect(html).toContain(de.applications.edit.messageIntro);

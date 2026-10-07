@@ -69,7 +69,7 @@ async function householdWithResident(): Promise<{ hh: TestHousehold; name: strin
   households.push(hh);
   const name = `Sic-${randomUUID().slice(0, 8)}`;
   const profile = await createResidentProfile(hh.context, name, { accountId: hh.accountId, profileId: null });
-  const { accountId } = await claimResidentProfile(hh.context, profile.id, PASSWORD);
+  const { accountId } = await claimResidentProfile(hh.context, profile.id, PASSWORD, "de");
   accountIds.push(accountId);
   const code = await getHouseholdSignInCode(hh.context);
   if (!code) throw new Error("household has no sign-in code");

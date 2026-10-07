@@ -1,7 +1,7 @@
-import { VOTE_VALUES, type VoteValue } from "@/modules/deliberation/vote-values";
-import { de } from "@/ui/strings";
+"use client";
 
-const t = de.casting.detail;
+import { VOTE_VALUES, type VoteValue } from "@/modules/deliberation/vote-values";
+import { useStrings } from "@/ui/strings/provider";
 
 // In the voting buttons' order, weakest to strongest, left to right (human correction 2026-10-07):
 // „1× Nein, 0× Eher nicht, 1× Finde gut, 2× Unbedingt". VOTE_VALUES is that order, used as it is.
@@ -25,7 +25,9 @@ export function DistributionBar({
   distribution: Record<VoteValue, number>;
   authorship: Record<VoteValue, string[]> | null;
 }) {
-  const text = VOTE_VALUES.map((v) => t.distributionPart(distribution[v], de.screening.ratings[v])).join(", ");
+  const s = useStrings();
+  const t = s.casting.detail;
+  const text = VOTE_VALUES.map((v) => t.distributionPart(distribution[v], s.screening.ratings[v])).join(", ");
   return (
     <div className="space-y-2">
       <div className="distribution-bar" role="img" aria-label={t.distributionLabel(text)}>
@@ -42,7 +44,7 @@ export function DistributionBar({
           <ul className="space-y-0.5 text-sm">
             {VOTE_VALUES.map((v) => (
               <li key={v}>
-                <span className="font-medium">{de.screening.ratings[v]}:</span>{" "}
+                <span className="font-medium">{s.screening.ratings[v]}:</span>{" "}
                 {authorship[v].length > 0 ? authorship[v].join(", ") : t.nobody}
               </li>
             ))}

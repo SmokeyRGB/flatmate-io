@@ -33,7 +33,7 @@ describe("getCurrentHouseholdMembers (screen B5, FR-1.31)", () => {
     const { accountId: activeAccountId } = await claimResidentProfile(
       hh.context,
       activeProfile.id,
-      "test-password-not-real-1234",
+      "test-password-not-real-1234", "de",
     );
     accountIds.push(activeAccountId);
 
@@ -41,7 +41,7 @@ describe("getCurrentHouseholdMembers (screen B5, FR-1.31)", () => {
     const { accountId: movedOutAccountId } = await claimResidentProfile(
       hh.context,
       movedOutProfile.id,
-      "test-password-not-real-1234",
+      "test-password-not-real-1234", "de",
     );
     accountIds.push(movedOutAccountId);
     await setMovedOut(hh.context, hh.accountId, movedOutAccountId);

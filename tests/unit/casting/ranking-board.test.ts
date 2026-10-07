@@ -1,11 +1,11 @@
 import { createElement } from "react";
-import { renderToStaticMarkup } from "react-dom/server";
+import { renderWithStrings } from "../../helpers/render-with-strings";
 import { describe, expect, it, vi } from "vitest";
 import type { Ranking } from "@/modules/deliberation/repository";
 import { de } from "@/ui/strings";
 
 // F5 change 1 tasks 7.7: the scoreboard's markup, rendered with createElement +
-// renderToStaticMarkup (the pattern of tests/unit/screening/screening-deck.test.ts). Names are
+// renderWithStrings (the pattern of tests/unit/screening/screening-deck.test.ts). Names are
 // digit-free synthetic ones, so every digit in a row's text comes from the row's own numbers.
 vi.mock("server-only", () => ({}));
 vi.mock("@/app/(org)/rounds/[id]/applications/invite-actions", () => ({ inviteApplicationAction: vi.fn() }));
@@ -40,7 +40,7 @@ function board(over: Partial<Board> = {}): Board {
 
 async function render(ranking: Ranking, canInvite?: boolean): Promise<string> {
   const { RankingBoard } = await import("@/app/(resident)/casting/ranking-board");
-  return renderToStaticMarkup(createElement(RankingBoard, { ranking, canInvite }));
+  return renderWithStrings(createElement(RankingBoard, { ranking, canInvite }));
 }
 
 const textOf = (html: string) => html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();

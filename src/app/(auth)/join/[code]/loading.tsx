@@ -1,4 +1,4 @@
-import { de } from "@/ui/strings";
+import { LoadingStatus } from "@/ui/loading-status";
 import { SkeletonForm } from "@/ui/skeletons";
 
 // design.md Decision 6: A3's Laden state. Shown before the link is resolved, so it cannot know
@@ -14,9 +14,7 @@ import { SkeletonForm } from "@/ui/skeletons";
 export default function JoinLoading() {
   return (
     <div className="space-y-6" aria-busy="true">
-      <p role="status" className="sr-only">
-        {de.join.loading}
-      </p>
+      <LoadingStatus variant="join" />
       <div className="space-y-6" aria-hidden="true">
         <div className="skeleton h-8 w-2/3" />
         <div className="skeleton h-7 w-1/2 rounded-full" />

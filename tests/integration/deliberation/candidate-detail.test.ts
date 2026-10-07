@@ -40,7 +40,7 @@ const accountIds: string[] = [];
 
 async function registerSharedHousehold(): Promise<TestHousehold> {
   const email = testEmail();
-  const { household, context } = await registerHousehold(email, "test-password-not-real-1234", "WG");
+  const { household, context } = await registerHousehold(email, "test-password-not-real-1234", "WG", "de");
   const hh: TestHousehold = {
     context,
     accountId: context.accountId,

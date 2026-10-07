@@ -1,5 +1,5 @@
 import { createElement } from "react";
-import { renderToStaticMarkup } from "react-dom/server";
+import { renderWithStrings } from "../../helpers/render-with-strings";
 import { describe, expect, it, vi } from "vitest";
 import { de } from "@/ui/strings";
 
@@ -16,7 +16,7 @@ vi.mock("@/app/(org)/settings/actions", () => ({ updateSettingsAction: vi.fn() }
 const { SettingsForm } = await import("@/app/(org)/settings/settings-form");
 
 const render = (revealVoteAuthorship: boolean) =>
-  renderToStaticMarkup(
+  renderWithStrings(
     createElement(SettingsForm, { quorumShare: "0.5", revealVoteAuthorship, openRoundTitle: null }),
   );
 

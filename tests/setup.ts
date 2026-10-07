@@ -1,5 +1,5 @@
 import { config } from "dotenv";
-import { afterEach } from "vitest";
+import { afterEach, vi } from "vitest";
 import { assertSafeSupabaseEnv } from "../scripts/env-guard";
 import { JOIN_TEST_CLIENT_IP_HEADER } from "./helpers/join-client-ip";
 import { withLostResponseDeadline } from "./helpers/lost-response-fetch";
@@ -15,6 +15,23 @@ config({ path: ".env.local", quiet: true });
 // ALLOWED_SUPABASE_REFS) and CI's loopback stack, and refuses anything else before the dynamic
 // ./helpers/identity import below can open a connection.
 assertSafeSupabaseEnv(process.env, "tests");
+
+// language-switch design D10: the request-scoped language resolver reads cookies() and headers(),
+// which exist only inside a request. Unit tests that render a page or run an action directly
+// would throw there, and every existing test asserts through `de.*`, so the default is German.
+// The resolver's own test (tests/unit/ui/request-locale.test.ts) uses vi.importActual.
+vi.mock("@/ui/strings/request", async () => {
+  const { de } = await import("@/ui/strings/de");
+  const { en } = await import("@/ui/strings/en");
+  return {
+    LOCALE_COOKIE: "flatmate_locale",
+    getRequestLocale: async () => "de",
+    getDeviceLocale: async () => "de",
+    getLocaleFor: async (session: { locale?: string } | null) => session?.locale ?? "de",
+    getStringsFor: async (session: { locale?: string } | null) => (session?.locale === "en" ? en : de),
+    getStrings: async () => de,
+  };
+});
 
 // A Supabase request whose response never comes gets a deadline and, where that is safe, a
 // second copy, instead of hanging until the 60s test timeout (tests/helpers/lost-response-fetch.ts

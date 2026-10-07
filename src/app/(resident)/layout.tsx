@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { AppHeader } from "@/app/_frame/app-header";
 import { landingPathFor } from "@/app/landing";
-import { getCurrentSession } from "@/modules/identity/session-cookie";
+import { getRenderSession } from "@/modules/identity/session-cookie";
 import { BottomNav } from "./bottom-nav";
 import { HouseholdCodeMemory } from "./household-code-memory";
 
@@ -16,7 +16,7 @@ import { HouseholdCodeMemory } from "./household-code-memory";
 // route group still waits for this one call. The identity/household/navigation-access reads sit in
 // AppHeader's own <Suspense> boundary, off the layout's blocking path. BottomNav needs no data.
 export default async function ResidentLayout({ children }: { children: React.ReactNode }) {
-  const current = await getCurrentSession();
+  const current = await getRenderSession();
   if (!current) redirect("/sign-in");
   if (current.context.profileId === null) redirect(landingPathFor(current.context));
 

@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { de } from "@/ui/strings";
+import { LoadingStatus } from "@/ui/loading-status";
 import { SkeletonCard, SkeletonCircle, SkeletonText } from "@/ui/skeletons";
 
 // The shape of the candidate detail while it loads: the card, then a ring with two lines, then the
@@ -9,9 +9,7 @@ import { SkeletonCard, SkeletonCircle, SkeletonText } from "@/ui/skeletons";
 export function CandidateDetailSkeleton({ lead }: { lead?: ReactNode }) {
   return (
     <div className="space-y-4" aria-busy="true">
-      <p role="status" className="sr-only">
-        {de.common.loading}
-      </p>
+      <LoadingStatus />
       <div className="space-y-4" aria-hidden="true">
         {lead}
         <SkeletonCard lines={3} />

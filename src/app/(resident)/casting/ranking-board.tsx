@@ -1,23 +1,24 @@
+"use client";
+
 import { EyeOff } from "lucide-react";
 import Link from "next/link";
 import { InviteDialog } from "@/app/(org)/rounds/[id]/applications/invite-dialog";
 import type { RankedGroup, Ranking } from "@/modules/deliberation/repository";
 import { LinkPendingHint } from "@/ui/link-pending-hint";
-import { de } from "@/ui/strings";
+import type { Strings } from "@/ui/strings";
+import { useStrings } from "@/ui/strings/provider";
 import { Refusal } from "./refusal";
 import { ScoreRing } from "./score-ring";
 import { WeightsList } from "./weights-list";
-
-const t = de.casting;
 
 type BoardRanking = Extract<Ranking, { kind: "board" }>;
 type Row = { applicationId: string; applicantName: string };
 
 // F5 change 1, screen D1: the scoreboard. A pure render of what `getRanking` returned, so every
 // visibility rule has already been applied in the repository (V-1, V-2, V-4); nothing here decides
-// who may see what. A server component. Its one client island is `InviteDialog` („Einladen",
-// F5 `candidate-invite`); apart from that, nothing on it is interactive except the "(?)" pop-over,
-// which is native (as in the screening deck).
+// who may see what. A client component only so it can read the language with useStrings
+// (language-switch D3). Apart from `InviteDialog` („Einladen", F5 `candidate-invite`), nothing on it
+// is interactive except the "(?)" pop-over, which is native (as in the screening deck).
 //
 // There are no rank numbers anywhere (FR-5.10), no distribution (Q-10) and no word about a person
 // (C-10, AC-5.28). A row without a score carries no ring and no numeral of its own, only the
@@ -27,10 +28,12 @@ type Row = { applicationId: string; applicantName: string };
 // Only the „Score" group receives it, so an invited or hidden row never carries „Einladen". The
 // dialog gets the row's id and name, which the row already holds, and nothing else.
 export function RankingBoard({ ranking, canInvite = false }: { ranking: Ranking; canInvite?: boolean }) {
+  const s = useStrings();
+  const t = s.casting;
   if (ranking.kind === "none") return <EmptyState title={null} />;
   if (ranking.kind === "refused") {
     if (ranking.reason === "round_not_available") {
-      return <Refusal text={t.refusal.notAvailable(de.status.round[ranking.status])} />;
+      return <Refusal text={t.refusal.notAvailable(s.status.round[ranking.status])} />;
     }
     return <Refusal text={ranking.reason === "rules_invalid" ? t.refusal.rulesInvalid : t.refusal.notEligible} />;
   }
@@ -148,6 +151,7 @@ function Rows({
   showState?: boolean;
   className?: string;
 }) {
+  const t = useStrings().casting;
   return (
     <ul className={className}>
       {group.scored.map((row) => (
@@ -195,8 +199,9 @@ function DetailLink({ applicationId, children }: { applicationId: string; childr
   );
 }
 
-export function StateLine({ state }: { state: keyof typeof de.status.application }) {
-  return <p className="text-xs text-muted-foreground">{de.status.application[state]}</p>;
+export function StateLine({ state }: { state: keyof Strings["status"]["application"] }) {
+  const s = useStrings();
+  return <p className="text-xs text-muted-foreground">{s.status.application[state]}</p>;
 }
 
 // The group a row sits in says whether it is invited, so the row carries only the name.
@@ -208,6 +213,7 @@ function RowName({ row }: { row: Row }) {
 // numbers, one tap away without leaving the screen (PRD 4.1.6, P-3). The trigger is a plain
 // type="button", as in the deck, so it is never read as a submit.
 function RulesPopover({ ranking }: { ranking: BoardRanking }) {
+  const t = useStrings().casting;
   return (
     <>
       <button type="button" className="deck-help" popoverTarget="ranking-rules-popover" aria-label={t.rulesToggleLabel}>
@@ -224,6 +230,7 @@ function RulesPopover({ ranking }: { ranking: BoardRanking }) {
 }
 
 function EmptyState({ title }: { title: string | null }) {
+  const t = useStrings().casting;
   return (
     <div className="space-y-3">
       <p className="text-sm text-muted-foreground">{t.empty(title)}</p>

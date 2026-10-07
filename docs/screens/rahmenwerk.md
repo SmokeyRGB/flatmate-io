@@ -188,7 +188,9 @@ zwischen „was steht an" (Start, §2) und „wie steht die Bewerbungslage" (Cas
 
 1. **Avatar-Menü** → „Organisation" — ein reiner Navigationspunkt, sichtbar nur für Konten, deren
    `role`/`permissions` dort etwas hergeben. **Kein Identitätswechsel** (ADR-013): er führt auf eine
-   Fläche, er ändert nicht, wer handelt.
+   Fläche, er ändert nicht, wer handelt. Dasselbe Menü trägt eine **Sprachzeile** (seit 2026-10-07):
+   sie bietet die jeweils andere Sprache unter ihrem eigenen Namen an („Deutsch" / „English") und
+   ändert nur die Sprache des eigenen Kontos — für jedes Konto und auf beiden Flächen, ohne Recht.
 2. **CTA aus der Benachrichtigung** bzw. aus der Moderations-Brücke im Dashboard (§2.3) — direkt
    auf die Handlung, nicht auf eine Übersicht
 
@@ -362,6 +364,12 @@ bzw. den Fließtext ausgeschrieben, wo eine Regel greift; die Standardregel gilt
 | Selbst-Redaktion (S-31) | „Bewertungen über deine eigene Bewerbung siehst du nicht — das ist eine feste Regel, kein Zufall." |
 | `former_resident` | „Ehemalige Bewohner:innen" — Stimme bleibt gespeichert, zählt nicht mehr zum Quorum. **Kein Lesezugriff, kein Login (V-3)** — im Lovable-Prototyp fälschlich als weiterhin einloggbar/mitlesend umgesetzt; diese Tabelle übernimmt nur den Anzeigetext, nicht dieses Verhalten |
 
+> **Nachtrag 2026-10-07 (Menschenentscheidung).** Es gibt jetzt eine zweite Tabelle, `en`, mit
+> derselben Form; die Sprache wird je Konto gewählt (`../03-PRD.md` §4.5). **Dieser Paragraf bindet
+> die deutsche Tabelle.** Ein verbindliches englisches Gegenstück zu jedem §8.6-Eintrag gibt es
+> nicht (`../review-log.md`, geparkt); die englische Tabelle hält nur die Unterscheidungen, die das
+> Deutsche macht (z. B. „Ausgezogen" ≠ „Entfernen", „Löschen" nie „widerrufen").
+>
 > **Architekturhinweis (2026-09-16).** v0.1 liefert nur diese `de`-Tabelle, aber die Struktur soll
 > von Anfang an **eine Schlüssel→Text-Tabelle sein, kein Text inline im Code** — auch englischsprachige
 > WGs in deutschsprachigen Ländern sind ein plausibler Bedarf für später. Kein Mehrsprachigkeitssystem

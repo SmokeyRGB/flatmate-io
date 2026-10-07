@@ -16,7 +16,7 @@ import {
   setMovedOut,
 } from "@/modules/identity/repository";
 import { getCurrentSession } from "@/modules/identity/session-cookie";
-import { de } from "@/ui/strings";
+import { getStringsFor } from "@/ui/strings/request";
 
 export interface RemoveMemberFormState {
   error: string | null;
@@ -50,6 +50,7 @@ export async function removeMemberAction(
 ): Promise<RemoveMemberFormState> {
   const current = await getCurrentSession();
   if (!current) throw new Error("Not signed in");
+  const s = await getStringsFor(current);
   const targetAccountId = String(formData.get("accountId") ?? "");
   const confirmDisplayName = String(formData.get("confirmDisplayName") ?? "");
   if (!targetAccountId) return { error: null };
@@ -59,7 +60,7 @@ export async function removeMemberAction(
   } catch (err) {
     if (err instanceof DisplayNameConfirmationMismatchError) {
       // One throw site, one message (tasks.md 2.3) — mapped by class to a fixed key.
-      return { error: de.members.errors.nameMismatch };
+      return { error: s.members.errors.nameMismatch };
     }
     // FR-008 / spec.md's Edge Cases (003-remove-resident-modal): unlike this action's siblings,
     // the remove dialog explicitly promises an inline error for ANY failure — including the
@@ -67,7 +68,7 @@ export async function removeMemberAction(
     // already acted on it) — never Next's default crash screen. Deliberately generic (not
     // err.message): the underlying errors are internal repository messages (e.g. "Membership
     // not found for account <uuid>"), not written for a moderator to read.
-    return { error: de.members.errors.genericRemoveFailure };
+    return { error: s.members.errors.genericRemoveFailure };
   }
 
   revalidatePath("/members");
@@ -165,6 +166,7 @@ export async function issueJoinCodeForProfileAction(formData: FormData): Promise
 export async function issuePasswordResetLinkAction(formData: FormData): Promise<void> {
   const current = await getCurrentSession();
   if (!current) throw new Error("Not signed in");
+  const s = await getStringsFor(current);
   const residentProfileId = String(formData.get("residentProfileId") ?? "");
   if (!residentProfileId) return;
 
@@ -175,7 +177,7 @@ export async function issuePasswordResetLinkAction(formData: FormData): Promise<
       // One throw site, one message (design.md Decision 6's precedent) — surfaced the same way
       // removeMemberAction's own genericRemoveFailure is, since this action has no reducer of its
       // own to carry a coded error into.
-      throw new Error(de.members.joinCode.errors.notEligibleForReset);
+      throw new Error(s.members.joinCode.errors.notEligibleForReset);
     }
     throw err;
   }

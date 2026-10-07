@@ -1,4 +1,4 @@
-import { de } from "@/ui/strings";
+import { getStrings } from "@/ui/strings/request";
 import { SignInForm } from "./sign-in-form";
 
 // Copilot review round 2 (PR #23): auth.ts's redeemPasswordReset can throw
@@ -12,16 +12,17 @@ export default async function SignInPage({
   searchParams: Promise<{ note?: string }>;
 }) {
   const { note } = await searchParams;
+  const t = await getStrings();
   return (
     <>
       {note === "password_reset" && (
         <div role="note" className="callout callout-info">
-          {de.auth.signIn.passwordResetNote}
+          {t.auth.signIn.passwordResetNote}
         </div>
       )}
       {note === "password_reset_unknown" && (
         <div role="note" className="callout callout-info">
-          {de.auth.signIn.passwordResetUnknownNote}
+          {t.auth.signIn.passwordResetUnknownNote}
         </div>
       )}
       <SignInForm />

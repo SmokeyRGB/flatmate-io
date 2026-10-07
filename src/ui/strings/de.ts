@@ -1063,6 +1063,13 @@ export const de = {
       retry: "Erneut versuchen",
     },
   },
+  // language-switch D8/A2: each language is named in its own language in BOTH tables, so a person
+  // who cannot read the current one still finds theirs. `toggleLabel` is the control's accessible
+  // name; the visible text is the endonym of the language the toggle switches TO.
+  language: {
+    names: { de: "Deutsch", en: "English" },
+    toggleLabel: "Sprache wechseln",
+  },
   document: {
     description: "Das Tool, mit dem die WG entscheidet.",
   },

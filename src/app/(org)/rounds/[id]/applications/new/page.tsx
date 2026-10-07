@@ -11,12 +11,9 @@ import {
 import { getCurrentSession } from "@/modules/identity/session-cookie";
 import { OrganisationAccessDenied } from "@/app/(org)/organisation-access-denied";
 import { requireOrganisationAccess } from "@/app/(org)/organisation-access";
-import { de } from "@/ui/strings";
+import { getStrings } from "@/ui/strings/request";
 import { LinkPendingHint } from "@/ui/link-pending-hint";
 import { CaptureForm } from "./capture-form";
-
-const t = de.applications.capture;
-const s = de.applications.states;
 
 // Screen O3, capture by hand. Guard order (design D6): session, then the round (an unknown or
 // foreign id is "not found"), then WHO may (a profile-less session and a resident without
@@ -24,6 +21,9 @@ const s = de.applications.states;
 // open, and only then the form. The same checks run again at save, in the repository, in the
 // write's own transaction: this page only decides what to SHOW.
 export default async function CaptureApplicationPage({ params }: { params: Promise<{ id: string }> }) {
+  const strings = await getStrings();
+  const t = strings.applications.capture;
+  const s = strings.applications.states;
   const { id } = await params;
   const current = await getCurrentSession();
   if (!current) redirect("/sign-in");
@@ -31,7 +31,7 @@ export default async function CaptureApplicationPage({ params }: { params: Promi
   // role-permissions design D9: every page of the organisation area first checks the caller's
   // stored permissions on this request (a demoted moderator loses the area on reload); the page's
   // own narrower check below stays.
-  if (!(await requireOrganisationAccess(current))) return <OrganisationAccessDenied />;
+  if (!(await requireOrganisationAccess(current))) return <OrganisationAccessDenied strings={await getStrings()} />;
 
   const round = await getRoundForSession(current.context, id);
   if (!round) notFound();

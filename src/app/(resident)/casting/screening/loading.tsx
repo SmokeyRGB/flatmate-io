@@ -1,4 +1,4 @@
-import { de } from "@/ui/strings";
+import { LoadingStatus } from "@/ui/loading-status";
 import { SkeletonText } from "@/ui/skeletons";
 
 // The shape of the deck: a thin progress bar, one tall card, and a row of four pill buttons at the
@@ -6,9 +6,7 @@ import { SkeletonText } from "@/ui/skeletons";
 export default function ScreeningLoading() {
   return (
     <div className="deck-screen mx-auto flex max-w-md flex-col gap-3 px-4 pt-3" aria-busy="true">
-      <p role="status" className="sr-only">
-        {de.common.loading}
-      </p>
+      <LoadingStatus />
       <SkeletonText width="w-full" />
       <div className="skeleton min-h-0 w-full flex-1 rounded-2xl" aria-hidden="true" />
       <div className="rating-bar" aria-hidden="true">

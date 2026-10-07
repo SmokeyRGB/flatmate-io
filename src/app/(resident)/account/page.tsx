@@ -4,19 +4,19 @@ import { redirect } from "next/navigation";
 import { JOIN_PASSWORD_MIN_LENGTH } from "@/modules/identity/auth";
 import { getHouseholdSignInCode, getOwnAccountEmail } from "@/modules/identity/repository";
 import { getCurrentSession } from "@/modules/identity/session-cookie";
-import { de } from "@/ui/strings";
+import { getStrings } from "@/ui/strings/request";
 import { LinkPendingHint } from "@/ui/link-pending-hint";
 import { SubmitButton } from "@/ui/submit-button";
 import { signOutAction } from "@/app/_frame/sign-out-action";
 import { EmailForm } from "./email-form";
 import { PasswordForm } from "./password-form";
 
-const t = de.account;
-
 // Screen E1 (`screens/E-einstellungen.md`), replacing change 4's placeholder. Three sections:
 // email (FR-2.17), password (FR-2.10a), sign-out. No push section (S-28/S-45 are v0.2) and no
 // passkey (ADR-007 needs a confirmed email, which v0.1 cannot produce).
 export default async function AccountPage() {
+  const s = await getStrings();
+  const t = s.account;
   const current = await getCurrentSession();
   if (!current) redirect("/sign-in");
 
@@ -89,7 +89,7 @@ export default async function AccountPage() {
       <section className="card space-y-3">
         <h2 className="font-serif text-lg font-semibold">{t.signOut.heading}</h2>
         <form action={signOutAction}>
-          <SubmitButton className="btn btn-secondary w-full">{de.common.signOut}</SubmitButton>
+          <SubmitButton className="btn btn-secondary w-full">{s.common.signOut}</SubmitButton>
         </form>
       </section>
     </div>

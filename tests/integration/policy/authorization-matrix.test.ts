@@ -33,7 +33,7 @@ import {
 async function registerSharedHousehold(name = "WG"): Promise<TestHousehold> {
   const email = testEmail();
   const password = "test-password-not-real-1234";
-  const { household: householdRow, context } = await registerHousehold(email, password, name);
+  const { household: householdRow, context } = await registerHousehold(email, password, name, "de");
   return {
     context,
     accountId: context.accountId,
@@ -144,6 +144,9 @@ const NOT_APPLICABLE_DELIBERATION: Record<string, string> = {
 
 const NOT_APPLICABLE_IDENTITY: Record<string, string> = {
   isDisplayNameTaken: "read-only",
+  setOwnLocale:
+    "self-service, own account only, keyed on context.accountId; the value grants nothing " +
+    "(language-switch D5)",
   appointedPermissions: "pure helper — no DB, no session (the sorted union with the moderator set)",
   isFoundingLink: "read-only",
   isHouseholdAccount: "read-only (identifies the caller by its stored household-only permissions)",
@@ -177,8 +180,9 @@ const NOT_APPLICABLE_IDENTITY: Record<string, string> = {
   getHouseholdSettings: "read-only",
   resolveSessionContext:
     "pre-session bootstrap — reconstructs a SessionContext from a cookie's session id, before any " +
-    "session exists; also returns that session's own remember_me and its household's sign-in code " +
-    "(tested in household-sign-in-code-visibility.test.ts)",
+    "session exists; also returns that session's own remember_me, its household's sign-in code and " +
+    "the account's own UI language (tested in household-sign-in-code-visibility.test.ts and " +
+    "set-own-locale.test.ts)",
   getResidentList:
     "read; checks the member-administration permissions inline; visibility tested in resident-list-access.test.ts",
   getCurrentHouseholdMembers: "read-only",
@@ -224,7 +228,7 @@ const KNOWN_OPEN_IDENTITY: Record<string, string> = {};
 async function claim(hh: TestHousehold, name: string, accountIds: string[]) {
   const actor = { accountId: hh.accountId, profileId: null };
   const profile = await identityRepo.createResidentProfile(hh.context, name, actor);
-  const { accountId } = await claimResidentProfile(hh.context, profile.id, "test-password-not-real-1234");
+  const { accountId } = await claimResidentProfile(hh.context, profile.id, "test-password-not-real-1234", "de");
   accountIds.push(accountId);
   return { profileId: profile.id, accountId, displayName: name };
 }

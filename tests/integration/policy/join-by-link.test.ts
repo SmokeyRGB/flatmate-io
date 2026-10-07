@@ -36,7 +36,7 @@ describe("joinHousehold — happy path (FR-2.18/FR-2.6/FR-2.19)", () => {
       displayName: "Jonas",
       password: "test-password-not-real-1234",
       email: "",
-    });
+    }, "de");
     joinerAccountId = result.context.accountId;
 
     expect(result.context.householdId).toBe(hh.householdId);
@@ -92,7 +92,7 @@ describe("joinHousehold — happy path (FR-2.18/FR-2.6/FR-2.19)", () => {
       displayName: "Lea",
       password: "test-password-not-real-1234",
       email: EMAIL_LEA,
-    });
+    }, "de");
     joinerAccountId = result.context.accountId;
 
     const [accountRow] = await withSessionContext(hh.context, (tx) =>

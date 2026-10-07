@@ -1,11 +1,11 @@
 import { createElement } from "react";
-import { renderToStaticMarkup } from "react-dom/server";
+import { renderWithStrings } from "../../helpers/render-with-strings";
 import { describe, expect, it, vi } from "vitest";
 import { inviteText } from "@/app/(org)/rounds/[id]/applications/invite-text";
 import { de } from "@/ui/strings";
 
 // F5 candidate-invite task 4.6: the invitation dialog's markup, rendered with createElement +
-// renderToStaticMarkup (the pattern of new-room-dialog.test.ts). The server action is stubbed: this
+// renderWithStrings (the pattern of new-room-dialog.test.ts). The server action is stubbed: this
 // file renders, it does not submit. Every string is read from `de`.
 vi.mock("server-only", () => ({}));
 vi.mock("next/headers", () => ({ cookies: vi.fn() }));
@@ -24,7 +24,7 @@ const BASE = {
 };
 
 function render(over: Partial<Parameters<typeof InviteDialog>[0]> = {}) {
-  return renderToStaticMarkup(createElement(InviteDialog, { ...BASE, ...over }));
+  return renderWithStrings(createElement(InviteDialog, { ...BASE, ...over }));
 }
 
 const escapeHtml = (s: string) =>

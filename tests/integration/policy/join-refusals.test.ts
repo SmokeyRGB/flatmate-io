@@ -45,7 +45,7 @@ describe("Join refusals are indistinguishable (FR-2.7/FR-2.8/EC-2.7)", () => {
     hh = await registerTestHousehold();
     const expired = await insertIssuance(hh, { expiresAt: new Date(Date.now() - 1000) });
     await expect(
-      joinHousehold(expired.code, { displayName: "X", password: "test-password-not-real-1234" }),
+      joinHousehold(expired.code, { displayName: "X", password: "test-password-not-real-1234" }, "de"),
     ).rejects.toMatchObject({ code: "invalid_link" });
   });
 
@@ -53,7 +53,7 @@ describe("Join refusals are indistinguishable (FR-2.7/FR-2.8/EC-2.7)", () => {
     hh = await registerTestHousehold();
     const usedUp = await insertIssuance(hh, { uses: 1, maxUses: 1 });
     await expect(
-      joinHousehold(usedUp.code, { displayName: "X", password: "test-password-not-real-1234" }),
+      joinHousehold(usedUp.code, { displayName: "X", password: "test-password-not-real-1234" }, "de"),
     ).rejects.toMatchObject({ code: "invalid_link" });
   });
 
@@ -62,21 +62,21 @@ describe("Join refusals are indistinguishable (FR-2.7/FR-2.8/EC-2.7)", () => {
     const link = await issueJoinCode(hh.context, hh.accountId, { validDays: 7, maxUses: 1 });
     await deleteJoinCode(hh.context, hh.accountId, link.id);
     await expect(
-      joinHousehold(link.code, { displayName: "X", password: "test-password-not-real-1234" }),
+      joinHousehold(link.code, { displayName: "X", password: "test-password-not-real-1234" }, "de"),
     ).rejects.toMatchObject({ code: "invalid_link" });
   });
 
   it("refuses a never-existed code with invalid_link", async () => {
     hh = await registerTestHousehold();
     await expect(
-      joinHousehold("NEVER-EXISTED", { displayName: "X", password: "test-password-not-real-1234" }),
+      joinHousehold("NEVER-EXISTED", { displayName: "X", password: "test-password-not-real-1234" }, "de"),
     ).rejects.toMatchObject({ code: "invalid_link" });
   });
 
   it("is a JoinError instance in every one of the four cases", async () => {
     hh = await registerTestHousehold();
     await expect(
-      joinHousehold("NEVER-EXISTED", { displayName: "X", password: "test-password-not-real-1234" }),
+      joinHousehold("NEVER-EXISTED", { displayName: "X", password: "test-password-not-real-1234" }, "de"),
     ).rejects.toBeInstanceOf(JoinError);
   });
 
@@ -95,7 +95,7 @@ describe("Join refusals are indistinguishable (FR-2.7/FR-2.8/EC-2.7)", () => {
     await deleteJoinCode(hh.context, hh.accountId, link.id);
 
     await expect(
-      joinHousehold(link.code, { displayName: "EC29", password: "test-password-not-real-1234" }),
+      joinHousehold(link.code, { displayName: "EC29", password: "test-password-not-real-1234" }, "de"),
     ).rejects.toMatchObject({ code: "invalid_link" });
 
     // No account was created for this attempt — nothing under hh's household should have this

@@ -5,15 +5,13 @@ import { isUuid } from "@/db/session-context";
 import { getStartOverview } from "@/modules/casting/repository";
 import { getAwaitingVoteCounts, getRanking } from "@/modules/deliberation/repository";
 import { getCurrentSession } from "@/modules/identity/session-cookie";
-import { de } from "@/ui/strings";
+import { getStrings } from "@/ui/strings/request";
 import { landingPathFor } from "@/app/landing";
 import { LinkPendingHint } from "@/ui/link-pending-hint";
 import { holdsPermission } from "@/app/holds-permission";
 import { INVITE_PERMISSION } from "@/app/(org)/rounds/[id]/applications/invite-text";
 import { shouldOpenScreening } from "../dashboard/dashboard-view";
 import { RankingBoard } from "./ranking-board";
-
-const t = de.casting;
 
 // The Casting tab (spec `ui/resident-frame`): takes a resident with applications awaiting their
 // vote straight to the screening step; otherwise it is the D1 scoreboard (F5 change 1, spec
@@ -30,6 +28,7 @@ export default async function CastingPage({
 }: {
   searchParams: Promise<{ round?: string | string[] }>;
 }) {
+  const t = (await getStrings()).casting;
   const current = await getCurrentSession();
   if (!current) redirect("/sign-in");
   if (current.context.profileId === null) redirect(landingPathFor(current.context));

@@ -3,10 +3,8 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getCurrentHouseholdMembers } from "@/modules/identity/repository";
 import { getCurrentSession } from "@/modules/identity/session-cookie";
-import { de } from "@/ui/strings";
+import { getStrings } from "@/ui/strings/request";
 import { LinkPendingHint } from "@/ui/link-pending-hint";
-
-const t = de.whoLivesHere;
 
 // Screen B5 (docs/screens/B-start.md), FR-1.31/U-30. Distinct from O16 (administration, full
 // parity for admin+moderator) and from the round participant list (FR-1.19) — no actions, no
@@ -18,12 +16,14 @@ const t = de.whoLivesHere;
 // its own landing before this page ever runs, so getCurrentHouseholdMembers' own resident-only
 // refusal (FR-1.31) is unreachable here and does not need a second check.
 export default async function WhoLivesHerePage() {
+  const s = await getStrings();
+  const t = s.whoLivesHere;
   const current = await getCurrentSession();
   if (!current) redirect("/sign-in");
 
   const backLink = (
     <Link href="/dashboard" className="back-link">
-      <ArrowLeft className="size-4" /> {de.nav.start}
+      <ArrowLeft className="size-4" /> {s.nav.start}
       <LinkPendingHint />
     </Link>
   );

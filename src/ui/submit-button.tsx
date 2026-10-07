@@ -2,7 +2,7 @@
 
 import type { ButtonHTMLAttributes, ReactNode } from "react";
 import { useFormStatus } from "react-dom";
-import { de } from "@/ui/strings";
+import { useStrings } from "@/ui/strings/provider";
 
 type SubmitButtonProps = {
   children: ReactNode;
@@ -44,6 +44,7 @@ export function SubmitButton({
   pending: pendingOverride,
   ...rest
 }: SubmitButtonProps) {
+  const s = useStrings();
   const formStatus = useFormStatus();
   const pending = pendingOverride ?? formStatus.pending;
   const disabledNotPending = Boolean(disabled) && !pending;
@@ -85,7 +86,7 @@ export function SubmitButton({
           as presentational, so a live region inside it isn't reliably announced), and a live
           region must exist before its text changes. */}
       <span role="status" className="sr-only">
-        {pending ? de.common.pending : ""}
+        {pending ? s.common.pending : ""}
       </span>
     </>
   );

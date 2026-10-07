@@ -8,9 +8,7 @@ import {
   changeResidentPassword,
 } from "@/modules/identity/auth";
 import { getCurrentSession } from "@/modules/identity/session-cookie";
-import { de } from "@/ui/strings";
-
-const t = de.account;
+import { getStringsFor } from "@/ui/strings/request";
 
 // design.md Decision 8: no typed value (email) survives into this state — `next dev` prints the
 // previous action state on the next submit, which is change 3's lesson 1.
@@ -25,6 +23,7 @@ export async function changeEmailAction(
 ): Promise<EmailFormState> {
   const current = await getCurrentSession();
   if (!current) throw new Error("Not signed in");
+  const t = (await getStringsFor(current)).account;
   const email = String(formData.get("email") ?? "");
 
   try {
@@ -88,6 +87,7 @@ export async function changePasswordAction(
 ): Promise<PasswordFormState> {
   const current = await getCurrentSession();
   if (!current) throw new Error("Not signed in");
+  const t = (await getStringsFor(current)).account;
   const currentPassword = String(formData.get("currentPassword") ?? "");
   const newPassword = String(formData.get("newPassword") ?? "");
 

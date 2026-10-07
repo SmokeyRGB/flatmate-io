@@ -1,4 +1,4 @@
-import { de } from "@/ui/strings";
+import { LoadingStatus } from "@/ui/loading-status";
 import { SkeletonHeading, SkeletonText } from "@/ui/skeletons";
 
 // design.md Decision 11 (G-N6): a skeleton in the shape of heading and body, no spinner.
@@ -7,9 +7,7 @@ import { SkeletonHeading, SkeletonText } from "@/ui/skeletons";
 export default function AccountLoading() {
   return (
     <div className="mx-auto max-w-md space-y-4 p-6" aria-busy="true">
-      <p role="status" className="sr-only">
-        {de.common.loading}
-      </p>
+      <LoadingStatus />
       <div className="space-y-4" aria-hidden="true">
         <SkeletonText width="w-24" />
         <SkeletonHeading width="w-40" />

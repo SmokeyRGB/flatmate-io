@@ -2,13 +2,11 @@
 
 import { Trash2, TriangleAlert } from "lucide-react";
 import { useActionState, useEffect, useId, useRef, useState } from "react";
-import { de } from "@/ui/strings";
+import { useStrings } from "@/ui/strings/provider";
 import { SubmitButton } from "@/ui/submit-button";
 import { removeMemberAction, type RemoveMemberFormState } from "./actions";
 
 const initialState: RemoveMemberFormState = { error: null };
-const t = de.members.remove;
-
 // FR-1.26/U-27 hard tier: requires typing the exact display name, not a plain click. Presented as
 // a modal dialog per docs/09-Design-System.md's "Dialogs & confirmations" — title, consequence
 // explanation, a nested cautionary callout, the typed-name field (placeholder previews the
@@ -16,6 +14,7 @@ const t = de.members.remove;
 // until the name matches — not the always-visible inline control this replaces
 // (003-remove-resident-modal).
 export function RemoveMemberForm({ accountId, displayName }: { accountId: string; displayName: string }) {
+  const t = useStrings().members.remove;
   const [state, formAction] = useActionState(removeMemberAction, initialState);
   const [typedName, setTypedName] = useState("");
   const dialogRef = useRef<HTMLDialogElement>(null);
