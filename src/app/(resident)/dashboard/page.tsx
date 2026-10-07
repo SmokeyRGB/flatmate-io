@@ -7,7 +7,7 @@ import { getCurrentSession } from "@/modules/identity/session-cookie";
 import { de } from "@/ui/strings";
 import { landingPathFor } from "@/app/landing";
 import { LinkPendingHint } from "@/ui/link-pending-hint";
-import { householdFor, identityLabelFor, navigationAccessFor } from "../session-data";
+import { householdFor, identityLabelFor, navigationAccessFor } from "@/app/_frame/session-data";
 import { buildDashboardView, standingHeadingOf } from "./dashboard-view";
 
 // Screen B1 — the resident's Start screen (FR-2.18, FR-2.20-2.24). A household-account session

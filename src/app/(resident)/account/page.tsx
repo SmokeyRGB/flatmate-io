@@ -7,7 +7,7 @@ import { getCurrentSession } from "@/modules/identity/session-cookie";
 import { de } from "@/ui/strings";
 import { LinkPendingHint } from "@/ui/link-pending-hint";
 import { SubmitButton } from "@/ui/submit-button";
-import { signOutAction } from "../../(org)/sign-out-action";
+import { signOutAction } from "@/app/_frame/sign-out-action";
 import { EmailForm } from "./email-form";
 import { PasswordForm } from "./password-form";
 
