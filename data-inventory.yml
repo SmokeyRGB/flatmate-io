@@ -195,6 +195,7 @@ tables:
       favorite_budget_factor: { category: "⚙️" }
       hide_results_until_voted: { category: "⚙️" }
       quorum_share: { category: "⚙️" }
+      reveal_vote_authorship: { category: "⚙️" }
       updated_at: { category: "⚙️" }
       updated_by_account_id: { category: "🟠", purpose: "Zurechenbarkeit", legal_basis: "Art. 6(1)(f) DSGVO", retention: "bis HouseholdSettings-Löschung" }
 

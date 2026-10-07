@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   computeRanking,
+  explainScore,
   quorumNeeded,
   type RankingCandidate,
   type RankingInput,
@@ -265,3 +266,70 @@ describe("leading rows (R-6, Q-15)", () => {
 // - replace the BigInt score with Math.round on floats -> the "x.5 rounds up, exactly" case fails;
 // - replace `needed` with Math.ceil(share * d) on floats -> the 0.07 over 100 case fails;
 // - give unscored rows `score: 0` -> the AC-5.4 case fails.
+
+// F5 candidate-detail D4: the arithmetic of the "(?)" must end on the ring's exact score.
+describe("explainScore (FR-5.5, AC-5.6, P-3)", () => {
+
+  it("the spec's first worked example: (0 + 3 + 3 + 5) / 4 = 2.75, then 55, both exact", () => {
+    const e = explainScore(DEFAULT_WEIGHTS, ["no", "good", "good", "definitely"]);
+    expect(e.terms).toEqual(["0", "3", "3", "5"]);
+    expect(e.n).toBe(4);
+    expect(e.mean.text).toBe("2.75");
+    expect(e.mean.exact).toBe(true);
+    expect(e.percent.text).toBe("55");
+    expect(e.percent.exact).toBe(true);
+    expect(e.score).toBe(55);
+  });
+
+  it("the spec's second worked example: 3, 3, 5 is about 3.67 and 73.33, score 73, both inexact", () => {
+    const e = explainScore(DEFAULT_WEIGHTS, ["good", "good", "definitely"]);
+    expect(e.mean.text).toBe("3.67");
+    expect(e.mean.exact).toBe(false);
+    expect(e.percent.text).toBe("73.33");
+    expect(e.percent.exact).toBe(false);
+    expect(e.score).toBe(73);
+  });
+
+  it("2.75 is exact and 11/3 is not", () => {
+    expect(explainScore(DEFAULT_WEIGHTS, ["no", "good", "good", "definitely"]).mean.exact).toBe(true);
+    expect(explainScore(DEFAULT_WEIGHTS, ["good", "good", "definitely"]).mean.exact).toBe(false);
+  });
+
+  it("an exact x.5 percentage is shown as such and rounds up", () => {
+    const w: ScaleWeights = { no: 0, rather_not: 2.9, good: 2.9, definitely: 4 };
+    const e = explainScore(w, ["rather_not", "good"]);
+    expect(e.percent.text).toBe("72.5");
+    expect(e.percent.exact).toBe(true);
+    expect(e.score).toBe(73);
+  });
+
+  it("agrees with computeRanking over every multiset of 1..6 votes, decimal weights and x.5 included", () => {
+    const weightSets: ScaleWeights[] = [
+      DEFAULT_WEIGHTS,
+      { no: 0, rather_not: 1, good: 4.5, definitely: 5 },
+      { no: 0, rather_not: 0.5, good: 2.5, definitely: 5 },
+      { no: 0, rather_not: 2.9, good: 2.9, definitely: 4 },
+      { no: 1, rather_not: 1, good: 1, definitely: 1 },
+      { no: 0, rather_not: 0.07, good: 0.33, definitely: 7 },
+    ];
+    const kinds: VoteValue[] = ["no", "rather_not", "good", "definitely"];
+    let checked = 0;
+    const walk = (weights: ScaleWeights, picked: VoteValue[], from: number, size: number) => {
+      if (picked.length === size) {
+        const { scored } = computeRanking({
+          weights,
+          quorumShare: toScaled("0.01")!,
+          denominator: 1,
+          openRoomCount: 0,
+          candidates: [{ id: "x", order: 0, values: picked }],
+        });
+        expect(explainScore(weights, picked).score, JSON.stringify([weights, picked])).toBe(scored[0].score);
+        checked += 1;
+        return;
+      }
+      for (let i = from; i < kinds.length; i++) walk(weights, [...picked, kinds[i]], i, size);
+    };
+    for (const weights of weightSets) for (let size = 1; size <= 6; size++) walk(weights, [], 0, size);
+    expect(checked).toBe(weightSets.length * (4 + 10 + 20 + 35 + 56 + 84));
+  });
+});

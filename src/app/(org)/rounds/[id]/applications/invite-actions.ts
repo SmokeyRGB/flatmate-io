@@ -51,5 +51,8 @@ export async function inviteApplicationAction(
   revalidatePath("/casting");
   revalidatePath(`/rounds/${roundId}`);
   revalidatePath(`/rounds/${roundId}/applications/${applicationId}`);
+  // The candidate detail (F5 candidate-detail D1): a full-page card refreshes; an open sheet re-renders
+  // with the current tree on the action's refresh.
+  revalidatePath(`/casting/candidate/${applicationId}`);
   return { status: "ok" };
 }

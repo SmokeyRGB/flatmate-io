@@ -338,6 +338,9 @@ export const householdSettings = pgTable(
     favoriteBudgetFactor: numeric("favorite_budget_factor").notNull().default("1.5"),
     hideResultsUntilVoted: boolean("hide_results_until_voted").notNull().default(true),
     quorumShare: numeric("quorum_share").notNull().default("0.5"),
+    // The fifth voting-procedure field (F5 candidate-detail, R-1): whether a candidate's detail names
+    // the voters. Frozen into each round's snapshot like the other four.
+    revealVoteAuthorship: boolean("reveal_vote_authorship").notNull().default(false),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
     updatedByAccountId: uuid("updated_by_account_id").notNull(),
   },

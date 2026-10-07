@@ -638,3 +638,110 @@ describe("getRanking: who may ask, and a stale context (V-2)", () => {
     });
   });
 });
+
+// ---------------------------------------------------------------------------------------------
+// F5 candidate-detail D9 (human decision 2026-10-07, amending Q-4): the three end states stay on the
+// board in `closed`, until deleted. `archived` does not.
+describe("getRanking: the applications out of the running stay on the board (candidate-detail D9)", () => {
+  let s: PipelineSetup;
+  let viewer: Awaited<ReturnType<typeof claimPlainMember>>;
+  let rejected: Awaited<ReturnType<typeof insertApplicationAt>>;
+  let withdrawn: Awaited<ReturnType<typeof insertApplicationAt>>;
+  let declined: Awaited<ReturnType<typeof insertApplicationAt>>;
+
+  beforeAll(async () => {
+    const hh = await registerSharedHousehold();
+    const moderator = await createTestModerator(hh);
+    const room = await createRoom(hh.context, "Room A", hhActor(hh));
+    await transitionRoomStatus(hh.context, room.id, "open", hhActor(hh));
+    const round = await createAndOpenRound(moderator.context, "Round", [room.id], {
+      accountId: moderator.accountId,
+      profileId: moderator.profileId,
+    });
+    s = { hh, moderator, roundId: round.id };
+    viewer = await claimPlainMember(hh, "Ausgeblendet", accountIds);
+    rejected = await insertApplicationAt(s, "new", { createdAt: at(1) });
+    withdrawn = await insertApplicationAt(s, "new", { createdAt: at(2) });
+    declined = await insertApplicationAt(s, "new", { createdAt: at(3) });
+    // One vote of the moderator on the rejected one: it is scored (one counted vote reaches quorum
+    // with two voters), so a `closed.scored` row exists while a room is open.
+    await cast(s, s.moderator.context, rejected.id, "definitely");
+    const m = s.moderator.context;
+    await transitionApplication(m, rejected.id, "rejected_by_household");
+    await transitionApplication(m, withdrawn.id, "withdrawn");
+    await transitionApplication(m, declined.id, "screened");
+    await transitionApplication(m, declined.id, "invited");
+    await transitionApplication(m, declined.id, "declined_by_applicant");
+  });
+
+  it("each of the three end states appears in `closed`, with its state, and in no other group", async () => {
+    const ranking = await board(viewer.context, s.roundId);
+    const closedRows = [...ranking.closed.scored, ...ranking.closed.unscored];
+    expect(Object.fromEntries(closedRows.map((r) => [r.applicationId, r.state]))).toEqual({
+      [rejected.id]: "rejected_by_household",
+      [withdrawn.id]: "withdrawn",
+      [declined.id]: "declined_by_applicant",
+    });
+    const elsewhere = [
+      ...ranking.decided.scored,
+      ...ranking.decided.unscored,
+      ...ranking.invited.scored,
+      ...ranking.invited.unscored,
+      ...ranking.hidden,
+    ].map((r) => r.applicationId);
+    for (const id of [rejected.id, withdrawn.id, declined.id]) expect(elsewhere).not.toContain(id);
+  });
+
+  it("a candidate the viewer never voted on is visible in `closed` with hiding on, results included", async () => {
+    const ranking = await board(viewer.context, s.roundId);
+    expect(ranking.openRoomCount).toBe(1);
+    expect(ranking.closed.scored.find((r) => r.applicationId === rejected.id)).toMatchObject({ score: 100, n: 1 });
+    expect(ranking.closed.unscored.find((r) => r.applicationId === withdrawn.id)).toMatchObject({ n: 0 });
+  });
+
+  it("`closed` rows never have leading: true, even with an open room", async () => {
+    const ranking = await board(viewer.context, s.roundId);
+    expect(ranking.openRoomCount).toBeGreaterThan(0);
+    expect(ranking.closed.scored.length).toBeGreaterThan(0);
+    expect(ranking.closed.scored.every((r) => r.leading === false)).toBe(true);
+  });
+
+  it("the viewer's own application in an end state is absent from every group (V-1)", async () => {
+    const own = await insertApplicationAt(s, "rejected_by_household", {
+      createdAt: at(4),
+      becameResidentId: viewer.profileId,
+    });
+    const ranking = await board(viewer.context, s.roundId);
+    expect(JSON.stringify(ranking)).not.toContain(own.id);
+  });
+
+  it("`archived` is absent from the board", async () => {
+    const archived = await insertApplicationAt(s, "archived", { createdAt: at(5) });
+    const ranking = await board(viewer.context, s.roundId);
+    expect(JSON.stringify(ranking)).not.toContain(archived.id);
+  });
+
+  it("reopened: a withdrawn candidate the viewer did not vote on is in `closed`, and hidden again once moved back to new", async () => {
+    const app = await insertApplicationAt(s, "new", { createdAt: at(6) });
+    await transitionApplication(s.moderator.context, app.id, "withdrawn");
+    const closed = await board(viewer.context, s.roundId);
+    expect([...closed.closed.scored, ...closed.closed.unscored].map((r) => r.applicationId)).toContain(app.id);
+    await transitionApplication(s.moderator.context, app.id, "new");
+    const reopened = await board(viewer.context, s.roundId);
+    expect(idsOf(reopened.hidden)).toContain(app.id);
+    expect([...reopened.closed.scored, ...reopened.closed.unscored].map((r) => r.applicationId)).not.toContain(app.id);
+  });
+});
+
+describe("getRanking: a round with only end-state applications is a board (candidate-detail D9)", () => {
+  it("is a board with a `closed` row and nothing else, not `none`", async () => {
+    const s = await sharedPipeline();
+    const viewer = await claimPlainMember(s.hh, "Nurzu", accountIds);
+    const only = await insertApplicationAt(s, "withdrawn", { createdAt: at(1) });
+    const ranking = await board(viewer.context, s.roundId);
+    expect(ranking.closed.unscored.map((r) => r.applicationId)).toEqual([only.id]);
+    expect(ranking.decided).toEqual({ scored: [], unscored: [] });
+    expect(ranking.invited).toEqual({ scored: [], unscored: [] });
+    expect(ranking.hidden).toEqual([]);
+  });
+});

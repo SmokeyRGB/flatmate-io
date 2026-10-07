@@ -27,6 +27,7 @@ const SUBMIT_BUTTON_FILE = "src/ui/submit-button.tsx";
 // The lint's short, named exemption list (D6) — a page that genuinely needs no loading state.
 export const PAGE_LOADING_EXEMPTIONS: Record<string, string> = {
   "src/app/page.tsx": "redirects only, renders nothing",
+  "src/app/(resident)/casting/@detail/[...rest]/page.tsx": "renders null; closes the detail slot",
 };
 
 function isPage(name: string): boolean {

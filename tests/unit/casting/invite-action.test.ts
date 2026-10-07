@@ -58,7 +58,7 @@ afterEach(() => {
 });
 
 describe("inviteApplicationAction", () => {
-  it("invites with the session's context and the two ids only, then revalidates the three paths", async () => {
+  it("invites with the session's context and the two ids only, then revalidates the four paths", async () => {
     const fd = formData({ roundId: ROUND_ID, applicationId: APPLICATION_ID, text: "SENTINEL-TEXT" });
     await expect(inviteApplicationAction(idle, fd)).resolves.toEqual({ status: "ok" });
     expect(inviteApplication).toHaveBeenCalledOnce();
@@ -67,13 +67,14 @@ describe("inviteApplicationAction", () => {
       "/casting",
       `/rounds/${ROUND_ID}`,
       `/rounds/${ROUND_ID}/applications/${APPLICATION_ID}`,
+      `/casting/candidate/${APPLICATION_ID}`,
     ]);
   });
 
   it("an already invited application is success too", async () => {
     inviteApplication.mockResolvedValue({ alreadyInvited: true });
     await expect(inviteApplicationAction(idle, formData())).resolves.toEqual({ status: "ok" });
-    expect(revalidatePath).toHaveBeenCalledTimes(3);
+    expect(revalidatePath).toHaveBeenCalledTimes(4);
   });
 
   it.each([

@@ -71,6 +71,8 @@ export interface RoundRules {
   weights: ScaleWeights;
   quorumShare: Scaled;
   hideResultsUntilVoted: boolean;
+  // Whether a candidate's detail names the voters (F5 candidate-detail, R-1). Frozen per round.
+  revealVoteAuthorship: boolean;
 }
 
 // Reads all three frozen rules the ranking needs from a round's snapshot (FR-5.4, FR-5.6,
@@ -88,5 +90,16 @@ export function parseRoundRules(snapshot: unknown): RoundRules | null {
   // 0 < share <= 1
   if (quorumShare.units <= BigInt(0) || quorumShare.units > pow10(quorumShare.scale)) return null;
   if (typeof record.hideResultsUntilVoted !== "boolean") return null;
-  return { weights, quorumShare, hideResultsUntilVoted: record.hideResultsUntilVoted };
+  // An ABSENT key is off, and is not a fallback in the EC-5.5 sense: a round opened before
+  // drizzle/0035 had no such setting, and "off" is the state of the world at opening (the column's
+  // own default), not a guess at a rule that was in force. A PRESENT key that is not a boolean is an
+  // unreadable rule, so the whole snapshot is refused.
+  const reveal = record.revealVoteAuthorship;
+  if (reveal !== undefined && typeof reveal !== "boolean") return null;
+  return {
+    weights,
+    quorumShare,
+    hideResultsUntilVoted: record.hideResultsUntilVoted,
+    revealVoteAuthorship: reveal === true,
+  };
 }

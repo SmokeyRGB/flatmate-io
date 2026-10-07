@@ -358,7 +358,7 @@ bzw. den Fließtext ausgeschrieben, wo eine Regel greift; die Standardregel gilt
 | `Notification.type = vote_pending` | „{N} Bewerbungen warten auf deine Stimme" |
 | `Notification.type = appointment_confirmed` | „Termin bestätigt: {Datum, Uhrzeit}" |
 | `Notification.type = retention_warning` | „{Name} wird in 14 Tagen automatisch gelöscht, falls nichts geschieht" |
-| `reveal_vote_authorship` | Haushaltseinstellung „Stimmen-Urheberschaft in der Rangliste zeigen" (Default aus) |
+| `reveal_vote_authorship` | Haushaltseinstellung „Stimmen-Urheberschaft zeigen" (Default aus) |
 | Selbst-Redaktion (S-31) | „Bewertungen über deine eigene Bewerbung siehst du nicht — das ist eine feste Regel, kein Zufall." |
 | `former_resident` | „Ehemalige Bewohner:innen" — Stimme bleibt gespeichert, zählt nicht mehr zum Quorum. **Kein Lesezugriff, kein Login (V-3)** — im Lovable-Prototyp fälschlich als weiterhin einloggbar/mitlesend umgesetzt; diese Tabelle übernimmt nur den Anzeigetext, nicht dieses Verhalten |
 

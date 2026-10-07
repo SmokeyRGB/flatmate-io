@@ -645,6 +645,11 @@ export const de = {
       `Änderungen gelten für Runden, die du danach eröffnest. „${roundTitle}" läuft weiter ` +
       `mit den Regeln, mit denen sie eröffnet wurde.`,
     quorumShareLabel: "Quorum-Anteil",
+    // F5 candidate-detail D7 (human, 2026-10-07): the label is fixed; the hint names the anchoring
+    // trade-off (screens/O-organisation.md, Abstimmungsverfahren).
+    revealVoteAuthorshipLabel: "Stimmen-Urheberschaft zeigen",
+    revealVoteAuthorshipHint:
+      "Dann seht ihr in der Einzelansicht einer Bewerbung, wer wie abgestimmt hat. Das kann spätere Stimmen beeinflussen, weil sich viele an anderen orientieren.",
     save: "Speichern",
     savePending: "Wird gespeichert…",
     saved: "Gespeichert.",
@@ -866,6 +871,36 @@ export const de = {
       notEligible: "Diese Runde kannst du gerade nicht einsehen.",
       rulesInvalid: "Die Regeln dieser Runde lassen sich gerade nicht lesen. Bitte melde dich bei der Verwaltung.",
       notAvailable: (statusLabel: string) => `Die Rangliste dieser Runde ist gerade nicht verfügbar (Stand: ${statusLabel}).`,
+    },
+    // F5 candidate-detail D9 (human decision 2026-10-07): the group of applications out of the
+    // running, collapsed. It says neither that the person is finished nor anything judging (C-10).
+    closedHeading: "Ausgeblendet",
+    closedCount: (n: number) => `(${n})`,
+    // F5 candidate-detail, screen D2 (the candidate's card).
+    detail: {
+      back: "Zurück zur Rangliste",
+      close: "Schließen",
+      closeLabel: "Karte schließen",
+      sheetTitle: "Details zur Bewerbung",
+      // One part of the distribution's text equivalent: „2× Unbedingt".
+      distributionPart: (n: number, ratingLabel: string) => `${n}× ${ratingLabel}`,
+      distributionLabel: (text: string) => `Verteilung der Stimmen: ${text}`,
+      participation: (n: number, denominator: number) => `${n} von ${denominator} haben abgestimmt`,
+      formerNote: (x: number) =>
+        x === 1
+          ? "1 Stimme entfernt, weil sie von ehemaligen Bewohnenden stammt"
+          : `${x} Stimmen entfernt, weil sie von ehemaligen Bewohnenden stammen`,
+      needed: (stillNeeded: number, needed: number) =>
+        `Noch ${votesLabel(stillNeeded)} nötig — für ein faires Bild braucht es mindestens ${votesLabel(needed)}.`,
+      hiddenExplanation: "Das Ergebnis siehst du, sobald du selbst abgestimmt hast.",
+      hiddenAction: "Jetzt abstimmen",
+      votersHeading: "Haben abgestimmt",
+      authorshipHeading: "Wer wie abgestimmt hat",
+      nobody: "niemand",
+      notFound: "Sorry, diese Bewerbung finde ich hier nicht.",
+      arithmeticToggleLabel: "So entsteht der Score",
+      arithmeticHeading: "So wurde dieser Score berechnet",
+      roundedUp: "(x,5 aufgerundet)",
     },
   },
   // F4 change 1: screen C1, the screening pass. The four labels are the settled German ones

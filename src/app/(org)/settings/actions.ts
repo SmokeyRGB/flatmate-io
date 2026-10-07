@@ -19,10 +19,12 @@ export async function updateSettingsAction(
   if (!current) throw new Error("Not signed in");
 
   const quorumShare = String(formData.get("quorumShare") ?? "");
+  // A form always submits a checkbox's state: absent means unchecked (design D7).
+  const revealVoteAuthorship = formData.get("revealVoteAuthorship") === "on";
   const actor = { accountId: current.context.accountId, profileId: current.context.profileId };
 
   try {
-    await updateHouseholdSettings(current.context, { quorumShare }, actor);
+    await updateHouseholdSettings(current.context, { quorumShare, revealVoteAuthorship }, actor);
   } catch (err) {
     // german-ui-vocabulary: this used to pass `err.message` straight through, which leaks
     // PermissionDeniedError's raw permission slug to the resident. Mapped to one generic key
