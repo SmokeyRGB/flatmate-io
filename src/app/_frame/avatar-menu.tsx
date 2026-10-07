@@ -7,7 +7,7 @@ import { useEffect, useRef } from "react";
 import { de } from "@/ui/strings";
 import { LinkPendingHint } from "@/ui/link-pending-hint";
 import { SubmitButton } from "@/ui/submit-button";
-import { menuItems, type MenuItem } from "./menu-items";
+import { menuItems, type MenuItem, type Surface } from "./menu-items";
 
 const ICONS = { Users, Home } as const;
 
@@ -23,15 +23,17 @@ export function AvatarMenu({
   displayName,
   householdName,
   access,
+  surface,
   signOutAction,
 }: {
   displayName: string;
   householdName: string;
   access: { dashboard: boolean; organisation: boolean; membersList: boolean };
+  surface: Surface;
   signOutAction: (formData: FormData) => void | Promise<void>;
 }) {
   const detailsRef = useRef<HTMLDetailsElement>(null);
-  const items: MenuItem[] = menuItems(access);
+  const items: MenuItem[] = menuItems(access, surface);
   const pathname = usePathname();
 
   // Closes on navigation — the layout stays mounted across route changes, so the <details> would

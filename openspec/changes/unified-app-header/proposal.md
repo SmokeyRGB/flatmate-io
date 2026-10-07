@@ -14,8 +14,9 @@ so that rebuild lands on the final frame.
 - The mark links to Start (`/dashboard`) on every authenticated screen. On the `(auth)` screens
   (sign-in, register, join) it stays an unlinked pill: there is no session there to return to.
 - The profile menu appears on organisation screens too, replacing the "Angemeldet als" bar and its
-  separate "Abmelden" link. It gains a "Dashboard" row so the way back from Organisation mirrors
-  the way in ("Zur Organisation"). The row is offered only to a session that has a resident
+  separate "Abmelden" link. It gains a "Zum Dashboard" row so the way back from Organisation mirrors
+  the way in ("Zur Organisation"); only one of the two is ever shown, the one that leads to the
+  other surface (human decision 2026-10-07, after the first PR check). The row is offered only to a session that has a resident
   profile AND may act on organisation tasks (human decision 2026-10-07: a plain resident has the
   Start/Casting navigation and needs no such row). For the household account and a non-resident
   moderator, Start itself redirects to `/organization`, so the row would be a dead end.

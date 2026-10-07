@@ -1,6 +1,7 @@
 import type { SessionContext } from "@/db/session-context";
 import { de } from "@/ui/strings";
 import { AvatarMenu } from "./avatar-menu";
+import type { Surface } from "./menu-items";
 import { signOutAction } from "./sign-out-action";
 import { householdFor, identityLabelFor, navigationAccessFor } from "./session-data";
 
@@ -13,7 +14,7 @@ import { householdFor, identityLabelFor, navigationAccessFor } from "./session-d
 // unified-app-header D3: "Dashboard" is offered only to a session with a resident profile that may
 // also act on organisation tasks. A session without a profile is sent from Start to the
 // organisation surface, so the row would be a dead end; a plain resident has the navigation.
-export async function AppHeaderRight({ context }: { context: SessionContext }) {
+export async function AppHeaderRight({ context, surface }: { context: SessionContext; surface: Surface }) {
   const [identity, household, access] = await Promise.all([
     identityLabelFor(context),
     householdFor(context),
@@ -31,6 +32,7 @@ export async function AppHeaderRight({ context }: { context: SessionContext }) {
       displayName={displayName}
       householdName={householdName}
       access={{ ...access, dashboard: context.profileId !== null && access.organisation }}
+      surface={surface}
       signOutAction={signOutAction}
     />
   );

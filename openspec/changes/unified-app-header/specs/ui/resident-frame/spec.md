@@ -28,11 +28,13 @@ Tab"*, K-3, K-6); `09-Design-System.md` (Navigation).
 Every signed-in screen, resident or organisation, SHALL carry a profile menu that opens as a
 drop-down panel below its trigger. Opened, it SHALL first state who is signed in and in which
 household: a resident by display name, the household account as its household name marked as
-administration. Then it SHALL offer "Dashboard", the way back to Start, only to a user who has a
-resident profile and may act on organisation tasks (a plain resident has the navigation for that).
-Then it SHALL offer the household's people list, chosen by what the user may
-see: the members list for someone who may see it, and "who lives here" for everyone else, never
-both. Then "Organisation", only to a user who may act on organisation tasks. After a divider it
+administration. Then, on an organisation screen only, it SHALL offer "Zum Dashboard", the way back
+to Start, to a user who has a resident profile and may act on organisation tasks (a plain resident
+has the navigation for that). Then it SHALL offer the household's people list, chosen by what the
+user may see: the members list for someone who may see it, and "who lives here" for everyone else,
+never both. Then, on a resident screen only, "Zur Organisation", to a user who may act on
+organisation tasks. The menu SHALL never offer both switches at once: it offers the one that leads
+to the other surface. After a divider it
 SHALL offer the user's own settings, which are not the household's settings, and signing out. The
 menu SHALL be operable by keyboard. Signing out from it SHALL end only the user's own session.
 Navigating between the organisation surface and Start SHALL NOT change who is acting. Sources:
@@ -50,22 +52,28 @@ AC-1.6; `screens/B-start.md` B5; `screens/E-einstellungen.md` E1 (*„Aus dem Av
 
 #### Scenario: A plain resident's menu
 - **WHEN** a plain resident opens the profile menu
-- **THEN** it offers "who lives here", their own settings and signing out, and none of "Dashboard",
-  the members list or "Organisation" (a plain resident reaches Start from the navigation)
+- **THEN** on either surface it offers "who lives here", their own settings and signing out, and
+  none of "Zum Dashboard", the members list or "Zur Organisation" (a plain resident reaches Start
+  from the navigation)
 
 #### Scenario: A moderator's menu
-- **WHEN** a moderator opens the profile menu
-- **THEN** it offers "Dashboard", the members list instead of "who lives here", "Organisation",
-  their own settings and signing out
+- **WHEN** a moderator opens the profile menu on a resident screen
+- **THEN** it offers the members list instead of "who lives here", "Zur Organisation", their own
+  settings and signing out, and not "Zum Dashboard"
+
+#### Scenario: A moderator's menu on an organisation screen
+- **WHEN** a moderator opens the profile menu on an organisation screen
+- **THEN** it offers "Zum Dashboard", the members list, their own settings and signing out, and
+  not "Zur Organisation"
 
 #### Scenario: Back to Start from the organisation surface
 - **WHEN** a resident with organisation rights opens the profile menu on an organisation screen
-  and chooses "Dashboard"
+  and chooses "Zum Dashboard"
 - **THEN** they arrive on Start
 
 #### Scenario: No Dashboard without a profile
 - **WHEN** a session without a resident profile opens the profile menu
-- **THEN** "Dashboard" is not offered
+- **THEN** "Zum Dashboard" is not offered
 
 #### Scenario: The mark leads to Start
 - **WHEN** a signed-in user chooses the product mark on any resident or organisation screen

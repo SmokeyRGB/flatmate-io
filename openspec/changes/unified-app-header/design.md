@@ -38,6 +38,11 @@ touching `docs/`; the O1 rebuild (F3 change 5); the `(auth)` layout.
    navigation already covers it (human decision 2026-10-07). Alternative: show it to every profile:
    rejected for that reason; show it to the household account too: rejected, it would land on the
    page it is already on.
+   **Surface-aware (human decision 2026-10-07, after the first PR check):** the menu offers one
+   switch only. Each layout passes `surface` ("resident" | "organisation") to `AppHeader`; the
+   "Zum Dashboard" row shows only on `organisation`, "Zur Organisation" only on `resident`.
+   Alternative: derive it from `usePathname`: rejected, because route groups are not in the path
+   and `/members` is reachable from both surfaces; the layout knows its own surface.
 4. **Household label**: `AppHeaderRight` maps identity kind `household` to
    `de.org.identityHousehold(householdName)`, resident to `displayName ?? identityResidentFallback`
    (the logic `OrgHeaderIdentity` had). The menu's second line (household name) stays; for the

@@ -16,6 +16,11 @@
 - [x] 3.2 `(org)/layout.tsx`: render `AppHeader` (no nav slot); drop the bar, the sign-out form and the now-unused imports
 - [x] 3.3 Delete `(org)/org-header.tsx`
 
+## 3b. Follow-up: one switch at a time (PR #60 check)
+
+- [x] 3b.1 `menuItems(access, surface)`: "Zum Dashboard" only on `organisation`, "Zur Organisation" only on `resident`; `surface` passed from each layout through `AppHeader` and `AppHeaderRight` to `AvatarMenu`; rename string `nav.dashboard` to `nav.toDashboard` ("Zum Dashboard")
+- [x] 3b.2 `tests/unit/start/menu-items.test.ts`: cover both surfaces. Deliberate break: ignore `surface` in `menuItems`; the moderator-on-resident-screen case must fail
+
 ## 4. Tests and verification
 
 - [x] 4.1 `tests/unit/start/menu-items.test.ts`: add `access.dashboard` to every case; assert Dashboard is first when true and absent for a plain member (`dashboard: false`). Deliberate break: hard-code `dashboard` to true; report having seen the plain-member case fail

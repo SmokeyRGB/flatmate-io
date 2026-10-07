@@ -44,8 +44,8 @@ export const de = {
     // start-screen: the resident frame's bottom bar / header nav (rahmenwerk.md §4.1) and every
     // back-link that now points at B1 instead of O1.
     start: "Start",
-    // The menu row back to Start, named like the URL; the bottom bar keeps calling it "Start".
-    dashboard: "Dashboard",
+    // The menu row back to Start from the organisation surface, mirroring "Zur Organisation".
+    toDashboard: "Zum Dashboard",
     // Accessible name of the product mark, which links to Start on every signed-in screen.
     homeLink: "flatmate.io, zur Startseite",
     casting: "Casting",

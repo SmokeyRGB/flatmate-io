@@ -26,7 +26,7 @@ export default async function ResidentLayout({ children }: { children: React.Rea
           `md:` static, so it becomes the header's text links (09-Design-System.md, Navigation).
           Rendered after <main> it was static at the page's foot on desktop (walkthrough
           finding, 2026-09-24). */}
-      <AppHeader context={current.context} nav={<BottomNav />} />
+      <AppHeader context={current.context} surface="resident" nav={<BottomNav />} />
       <main className="flex-1 pb-20 md:pb-6">{children}</main>
       {/* household-sign-in-code D6: the device-memory writer; both values came with the session
           read above, so it renders nothing and waits for nothing. */}
