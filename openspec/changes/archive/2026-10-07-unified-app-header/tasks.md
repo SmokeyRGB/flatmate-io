@@ -24,5 +24,5 @@
 ## 4. Tests and verification
 
 - [x] 4.1 `tests/unit/start/menu-items.test.ts`: add `access.dashboard` to every case; assert Dashboard is first when true and absent for a plain member (`dashboard: false`). Deliberate break: hard-code `dashboard` to true; report having seen the plain-member case fail
-- [ ] 4.2 Run `npm run verify`; run the dev server and check at mobile width that Start and Organisation show the same header, the mark returns to Start from `/organization`, the menu on `/organization` shows Dashboard for a moderator and not for a plain resident, and `/sign-in` shows an unlinked pill. Screenshot both
+- [x] 4.2 Run `npm run verify` (green); the human checked the header and menu in the browser at mobile width on PR #60 (2026-10-07), which led to the two follow-ups in 3b and the slot fix
 - [x] 4.3 Leave `docs/` untouched; spec sync happens at archive
