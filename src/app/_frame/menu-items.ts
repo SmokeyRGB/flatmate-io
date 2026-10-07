@@ -19,15 +19,16 @@ export function menuItems(
   access: { dashboard: boolean; organisation: boolean; membersList: boolean },
   surface: Surface,
 ): MenuItem[] {
-  const items: MenuItem[] = [];
-  if (surface === "organisation" && access.dashboard) {
-    items.push({ key: "dashboard", label: de.nav.toDashboard, href: "/dashboard", icon: "Home" });
-  }
-  items.push(
+  const items: MenuItem[] = [
     access.membersList
       ? { key: "people", label: de.nav.members, href: "/members", icon: "Users" }
       : { key: "people", label: de.nav.whoLivesHere, href: "/who-lives-here", icon: "Users" },
-  );
+  ];
+  // The switch is always the row after the people list, so it sits in the same place on both
+  // surfaces (human decision 2026-10-07).
+  if (surface === "organisation" && access.dashboard) {
+    items.push({ key: "dashboard", label: de.nav.toDashboard, href: "/dashboard", icon: "Home" });
+  }
   if (surface === "resident" && access.organisation) {
     items.push({ key: "organisation", label: de.nav.toOrganisation, href: "/organization", icon: "Home" });
   }

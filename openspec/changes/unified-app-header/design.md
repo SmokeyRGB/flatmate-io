@@ -34,7 +34,7 @@ touching `docs/`; the O1 rebuild (F3 change 5); the `(auth)` layout.
    `access.dashboard` (`menuItems` stays pure). `profileId` is the session fact the `(resident)`
    layout itself redirects on and `access.organisation` is the stored-permission read the
    "Organisation" row already uses; neither is a role comparison (`scripts/lint/role-reads.ts`).
-   The row comes first, mirroring the way in. A plain resident gets none: the Start/Casting
+   The row sits right after the people list, the same slot "Zur Organisation" has on the resident side. A plain resident gets none: the Start/Casting
    navigation already covers it (human decision 2026-10-07). Alternative: show it to every profile:
    rejected for that reason; show it to the household account too: rejected, it would land on the
    page it is already on.

@@ -6,7 +6,7 @@
 ## 2. Shared header
 
 - [x] 2.1 `src/ui/strings/de.ts`: add `nav.dashboard` and `nav.homeLink`; remove `org.signedInAsPrefix`
-- [x] 2.2 `_frame/menu-items.ts`: add a `dashboard` key (`/dashboard`, Home icon, first row) offered when `access.dashboard` is true; `_frame/avatar-menu.tsx` takes and forwards it
+- [x] 2.2 `_frame/menu-items.ts`: add a `dashboard` key (`/dashboard`, Home icon, directly after the people row) offered when `access.dashboard` is true; `_frame/avatar-menu.tsx` takes and forwards it
 - [x] 2.3 `_frame/app-header-right.tsx`: pass `dashboard: context.profileId !== null && access.organisation`; label the household identity with `de.org.identityHousehold(...)`
 - [x] 2.4 New `_frame/app-header.tsx`: the mark as a `Link` to `/dashboard` (`aria-label` `nav.homeLink`, `LinkPendingHint`), an optional nav slot, `AppHeaderRight` in `<Suspense fallback={<HeaderSkeleton/>}>`
 

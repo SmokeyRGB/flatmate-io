@@ -28,14 +28,13 @@ Tab"*, K-3, K-6); `09-Design-System.md` (Navigation).
 Every signed-in screen, resident or organisation, SHALL carry a profile menu that opens as a
 drop-down panel below its trigger. Opened, it SHALL first state who is signed in and in which
 household: a resident by display name, the household account as its household name marked as
-administration. Then, on an organisation screen only, it SHALL offer "Zum Dashboard", the way back
-to Start, to a user who has a resident profile and may act on organisation tasks (a plain resident
-has the navigation for that). Then it SHALL offer the household's people list, chosen by what the
-user may see: the members list for someone who may see it, and "who lives here" for everyone else,
-never both. Then, on a resident screen only, "Zur Organisation", to a user who may act on
-organisation tasks. The menu SHALL never offer both switches at once: it offers the one that leads
-to the other surface. After a divider it
-SHALL offer the user's own settings, which are not the household's settings, and signing out. The
+administration. Then it SHALL offer the household's people list, chosen by what the user may see:
+the members list for someone who may see it, and "who lives here" for everyone else, never both.
+Then, directly after it, it SHALL offer one switch to the other surface, in the same position on
+both: on a resident screen "Zur Organisation", to a user who may act on organisation tasks; on an
+organisation screen "Zum Dashboard", the way back to Start, to a user who has a resident profile
+and may act on organisation tasks (a plain resident has the navigation for that). The menu SHALL
+never offer both switches at once. After a divider it SHALL offer the user's own settings, which are not the household's settings, and signing out. The
 menu SHALL be operable by keyboard. Signing out from it SHALL end only the user's own session.
 Navigating between the organisation surface and Start SHALL NOT change who is acting. Sources:
 `rahmenwerk.md` §4.1 (*„Avatar-Menü → „Organisation" … **Kein Identitätswechsel** (ADR-013)"*),

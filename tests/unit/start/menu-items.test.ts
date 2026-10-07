@@ -13,10 +13,10 @@ describe("menuItems (start-screen design.md Decision 10, unified-app-header D3)"
     expect(items.map((i) => i.key)).toEqual(["people", "organisation"]);
   });
 
-  it("moderator on an organisation screen: Zum Dashboard first, no Zur Organisation", () => {
+  it("moderator on an organisation screen: Zum Dashboard after Mitglieder (same slot as Zur Organisation), no Zur Organisation", () => {
     const items = menuItems({ dashboard: true, organisation: true, membersList: true }, "organisation");
-    expect(items.map((i) => i.key)).toEqual(["dashboard", "people"]);
-    expect(items[0].href).toBe("/dashboard");
+    expect(items.map((i) => i.key)).toEqual(["people", "dashboard"]);
+    expect(items[1].href).toBe("/dashboard");
   });
 
   it("a member with any permission on a resident screen: Wer hier wohnt + Zur Organisation, never both list links", () => {
