@@ -27,7 +27,7 @@ export function AvatarMenu({
 }: {
   displayName: string;
   householdName: string;
-  access: { organisation: boolean; membersList: boolean };
+  access: { dashboard: boolean; organisation: boolean; membersList: boolean };
   signOutAction: (formData: FormData) => void | Promise<void>;
 }) {
   const detailsRef = useRef<HTMLDetailsElement>(null);

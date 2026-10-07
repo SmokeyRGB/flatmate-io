@@ -68,7 +68,7 @@ describe("pending-feedback lint (ui/pending-feedback)", () => {
   it("passes a commented-out <button>", () => {
     fixtureDir = mkdtempSync(join(tmpdir(), "flatmate-lint-"));
     writeFixture(
-      "src/app/(resident)/avatar-menu.tsx",
+      "src/app/_frame/avatar-menu.tsx",
       `// old: \`<button>\` used to live here\n/* <button type="submit">dead</button> */\nexport const x = 1;`,
     );
 

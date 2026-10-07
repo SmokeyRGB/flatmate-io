@@ -44,6 +44,10 @@ export const de = {
     // start-screen: the resident frame's bottom bar / header nav (rahmenwerk.md §4.1) and every
     // back-link that now points at B1 instead of O1.
     start: "Start",
+    // The menu row back to Start, named like the URL; the bottom bar keeps calling it "Start".
+    dashboard: "Dashboard",
+    // Accessible name of the product mark, which links to Start on every signed-in screen.
+    homeLink: "flatmate.io, zur Startseite",
     casting: "Casting",
     whoLivesHere: "Wer hier wohnt",
     members: "Mitglieder",
@@ -193,7 +197,6 @@ export const de = {
     },
   },
   org: {
-    signedInAsPrefix: "Angemeldet als",
     // AC-1.6: the interface states which identity a session is acting as. identity/repository.ts's
     // getIdentityLabel returns structured data, not a display string, so the German composition
     // lives here rather than as an English literal in the repository layer.

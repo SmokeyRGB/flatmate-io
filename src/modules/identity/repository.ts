@@ -1813,7 +1813,7 @@ export async function triggerSubjectAccessExport(
 // to context.accountId as well: through this function, a session can only be revoked by its own
 // account. RLS guarantees household isolation only (ADR-004); within a household this rule is
 // application-level, like every role and ownership rule — raw SQL as app_runtime inside the
-// household is not bound by it (PR #19 review). sign-out-action.ts's only call site already
+// household is not bound by it (PR #19 review). src/app/_frame/sign-out-action.ts's only call site already
 // passes the caller's own sessionId, so its behaviour is unchanged.
 //
 // revokeSession review fix: filtered the UPDATE on revokedAt IS NULL, matching the repo's

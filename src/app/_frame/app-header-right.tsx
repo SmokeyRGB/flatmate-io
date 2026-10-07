@@ -1,33 +1,36 @@
 import type { SessionContext } from "@/db/session-context";
 import { de } from "@/ui/strings";
-import { signOutAction } from "../(org)/sign-out-action";
 import { AvatarMenu } from "./avatar-menu";
+import { signOutAction } from "./sign-out-action";
 import { householdFor, identityLabelFor, navigationAccessFor } from "./session-data";
 
-// loading-feedback design.md D4: split out of (resident)/layout.tsx so the identity, household and
+// loading-feedback design.md D4: split out of the layouts so the identity, household and
 // navigation-access reads sit inside a <Suspense> boundary instead of on the layout's own blocking
 // path — the session check and its redirects stay in the layout (D4: "entering a route group
 // still waits for that one call"). `context` is the layout's own already-resolved session, passed
-// down rather than re-read here. `BottomNav` needs no data and stays outside this boundary
-// (design.md D4).
-export async function ResidentHeaderRight({ context }: { context: SessionContext }) {
+// down rather than re-read here.
+//
+// unified-app-header D3: "Dashboard" is offered only to a session with a resident profile that may
+// also act on organisation tasks. A session without a profile is sent from Start to the
+// organisation surface, so the row would be a dead end; a plain resident has the navigation.
+export async function AppHeaderRight({ context }: { context: SessionContext }) {
   const [identity, household, access] = await Promise.all([
     identityLabelFor(context),
     householdFor(context),
     navigationAccessFor(context),
   ]);
 
-  const displayName =
-    identity.kind === "resident"
-      ? (identity.displayName ?? de.org.identityResidentFallback)
-      : de.org.identityResidentFallback;
   const householdName = household?.name ?? de.org.identityHouseholdFallback;
+  const displayName =
+    identity.kind === "household"
+      ? de.org.identityHousehold(identity.householdName ?? householdName)
+      : (identity.displayName ?? de.org.identityResidentFallback);
 
   return (
     <AvatarMenu
       displayName={displayName}
       householdName={householdName}
-      access={access}
+      access={{ ...access, dashboard: context.profileId !== null && access.organisation }}
       signOutAction={signOutAction}
     />
   );

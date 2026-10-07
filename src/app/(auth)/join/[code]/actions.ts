@@ -179,7 +179,7 @@ export async function joinHouseholdAction(
 }
 
 // design.md Decision 7 (EC-2.5's Keine-Berechtigung way forward): in exactly
-// src/app/(org)/sign-out-action.ts's shape — revokeSession enforces ownership itself (it refuses a
+// src/app/_frame/sign-out-action.ts's shape — revokeSession enforces ownership itself (it refuses a
 // session that is not the caller's own), so this action adds no authorization check of its own
 // (G-C unchanged) and cannot widen it. redirect() stays OUTSIDE the try/finally, same reasoning as
 // sign-out-action.ts: Next implements it by throwing, and keeping it outside makes that explicit.
