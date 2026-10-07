@@ -122,7 +122,23 @@ describe("parseRoundRules (EC-5.5, EC-5.6, Q-7)", () => {
       weights: valid,
       quorumShare: { units: BigInt(5), scale: 1 },
       hideResultsUntilVoted: true,
+      revealVoteAuthorship: false,
     });
+  });
+
+  // F5 candidate-detail D5: a snapshot written before the setting existed has no key, which reads as
+  // off (the state of the world at opening, not a fallback for an unreadable rule); a key that is
+  // present but not a boolean makes the snapshot unreadable.
+  it("reads a missing revealVoteAuthorship as off and passes booleans through", () => {
+    expect(parseRoundRules(snapshot())?.revealVoteAuthorship).toBe(false);
+    expect(parseRoundRules(snapshot({ revealVoteAuthorship: true }))?.revealVoteAuthorship).toBe(true);
+    expect(parseRoundRules(snapshot({ revealVoteAuthorship: false }))?.revealVoteAuthorship).toBe(false);
+  });
+
+  it("refuses a revealVoteAuthorship that is present but not a boolean", () => {
+    for (const revealVoteAuthorship of ["true", 1, null]) {
+      expect(parseRoundRules(snapshot({ revealVoteAuthorship })), String(revealVoteAuthorship)).toBeNull();
+    }
   });
 
   it("accepts the share as string or number, with or without trailing zeros, and 1", () => {

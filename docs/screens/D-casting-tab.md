@@ -30,6 +30,12 @@
     Ring, aber ohne Hervorhebung. Wer eingeladen ist, wird nicht mehr entschieden. Die Gruppe kann
     später ein eigener Reiter werden (siehe die Idee „Casting-Tab nach Stufe unterteilt" im
     Register).
+  - **„Ausgeblendet"** (Bewerbungen `rejected_by_household`, `declined_by_applicant`, `withdrawn`;
+    Menschenentscheidung 2026-10-07, ändert Q-4: „A rejected application should still be visible in
+    the round, and scoreboard, until deleted"): **eingeklappt vorbelegt**, darunter die Zahl der
+    Zeilen neben der Überschrift. Jede Zeile nennt ihren Zustand, trägt keinen „Einladen"-Knopf und
+    keine Hervorhebung. `archived` bleibt aus der Rangliste (Aufbewahrungsende). Die Gruppe zählt
+    für den leeren Zustand mit; es gibt damit vier Gruppen statt drei.
   - **„Verdeckt"**: Zeilen **grau darunter**, mit durchgestrichenem Auge (eye-off) und dem einen
     Hinweis „Verdeckt — du hast hier nicht abgestimmt" (R-7, neu gefasst 2026-10-06): verdeckt sind
     nur noch Bewerbungen in `new`/`screened`, auf die die Person nicht abgestimmt hat. Hat eine
@@ -45,7 +51,8 @@
   nie der Inhalt der Stimme. Ausnahme von der „kein Pranger"-Regel aus `02-SRD.md` §10, dort mit
   Begründung dokumentiert. B4 (Teilnehmendenliste) bleibt davon unberührt und zeigt weiterhin
   keinen Abstimmungsstatus.
-- Zugriff auf D2, ~~D3~~, D4 *(D3 gestrichen, Q-9)*
+- Zugriff auf D2 (jede Zeile mit Score oder Hinweis „Noch kein Score" öffnet D2, auch in „Eingeladen" und
+  „Ausgeblendet"; verdeckte Zeilen nicht), ~~D3~~, D4 *(D3 gestrichen, Q-9)*
 - Einstieg in B4 über „5 von 7 haben abgestimmt"
 
 **Abweichende Zustände**
@@ -68,7 +75,11 @@
 
 - Lädt Stimmen, Notizen und Aggregat erneut mit Policy-Prüfung — übernimmt nichts ungeprüft aus D1
 - Zugriff auf C4 (Notiz schreiben/lesen)
-- Verteilung der vier Stufen als Aggregat (`03-PRD.md` §4.1.6), Rechenweg des Scores und „5 von 7" je Bewerbung (Q-5, Q-10; F5 Änderungen 2 und 3). **Optional, Haushaltseinstellung
+- Verteilung der vier Stufen als Aggregat (`03-PRD.md` §4.1.6), Rechenweg des Scores und „5 von 7" je Bewerbung (Q-5, Q-10; F5 Änderung `candidate-detail`). **Unter Quorum** zeigt D2 weder Ring noch Verteilung
+  noch eine Wertung, nur „noch x Stimmen nötig" und „x von y haben abgestimmt"; Namen erscheinen dort
+  nur mit eingeschalteter Einstellung (ohne Wertung). **Form (2026-10-07):** aus D1 geöffnet gleitet
+  die Karte von rechts über die Rangliste und lässt sich nach rechts wegwischen; bei direktem Link
+  oder Neuladen ist sie eine volle Seite. **Optional, Haushaltseinstellung
   `reveal_vote_authorship` (Default aus, `domain/identity.md`):** zeigt zusätzlich zum Aggregat je
   Stimme den Namen der abstimmenden Person. Selbst-Redaktion (G-D1) hat in jedem Fall Vorrang —
   die Einstellung ändert nichts an den Leseregeln für die eigene, verknüpfte Bewerbung. Der

@@ -2,7 +2,10 @@ import { EyeOff } from "lucide-react";
 import Link from "next/link";
 import { InviteDialog } from "@/app/(org)/rounds/[id]/applications/invite-dialog";
 import type { RankedGroup, Ranking } from "@/modules/deliberation/repository";
+import { LinkPendingHint } from "@/ui/link-pending-hint";
 import { de } from "@/ui/strings";
+import { Refusal } from "./refusal";
+import { ScoreRing } from "./score-ring";
 import { WeightsList } from "./weights-list";
 
 const t = de.casting;
@@ -31,12 +34,14 @@ export function RankingBoard({ ranking, canInvite = false }: { ranking: Ranking;
     }
     return <Refusal text={ranking.reason === "rules_invalid" ? t.refusal.rulesInvalid : t.refusal.notEligible} />;
   }
-  const { decided, invited, hidden } = ranking;
+  const { decided, invited, closed, hidden } = ranking;
+  const closedCount = closed.scored.length + closed.unscored.length;
   const total =
     decided.scored.length +
     decided.unscored.length +
     invited.scored.length +
     invited.unscored.length +
+    closedCount +
     hidden.length;
   if (total === 0) return <EmptyState title={ranking.round.title} />;
   return (
@@ -64,6 +69,23 @@ export function RankingBoard({ ranking, canInvite = false }: { ranking: Ranking;
         openRoomCount={ranking.openRoomCount}
         roundId={ranking.round.id}
       />
+      {/* The applications out of the running stay until deleted (candidate-detail D9, human decision
+          2026-10-07): a native <details>, closed by default, so it needs no client JavaScript and is
+          keyboard-operable. Its rows name their state and carry no „Einladen". */}
+      {closedCount > 0 && (
+        <details className="closed-group">
+          <summary className="cursor-pointer text-sm font-semibold text-muted-foreground">
+            {t.closedHeading} {t.closedCount(closedCount)}
+          </summary>
+          <Rows
+            group={closed}
+            openRoomCount={ranking.openRoomCount}
+            roundId={ranking.round.id}
+            showState
+            className="mt-3 space-y-3"
+          />
+        </details>
+      )}
       {hidden.length > 0 && (
         <section className="space-y-3">
           <h2 className="text-sm font-semibold text-muted-foreground">{t.hiddenHeading}</h2>
@@ -84,8 +106,8 @@ export function RankingBoard({ ranking, canInvite = false }: { ranking: Ranking;
   );
 }
 
-// One group of the board: its heading and its scored rows, then its unscored rows. A group with no
-// row renders nothing, not even a heading.
+// One group of the board: its heading and its rows. A group with no row renders nothing, not even a
+// heading.
 function Group({
   heading,
   group,
@@ -103,65 +125,83 @@ function Group({
   return (
     <section className="space-y-3">
       <h2 className="text-sm font-semibold text-muted-foreground">{heading}</h2>
-      <ul className="space-y-3">
-        {group.scored.map((row) => (
-          <li key={row.applicationId} className={`card ranking-row${row.leading ? " ranking-leading" : ""}`}>
+      <Rows group={group} openRoomCount={openRoomCount} roundId={roundId} canInvite={canInvite} />
+    </section>
+  );
+}
+
+// A group's scored rows, then its unscored rows. The name and the ring are one link to the
+// candidate's detail (F5 candidate-detail, D2); „Einladen" stays a sibling of the link, so the
+// dialog never sits inside it. `showState` names the row's state, for the group out of the running.
+function Rows({
+  group,
+  openRoomCount,
+  roundId,
+  canInvite = false,
+  showState = false,
+  className = "space-y-3",
+}: {
+  group: RankedGroup;
+  openRoomCount: number;
+  roundId: string;
+  canInvite?: boolean;
+  showState?: boolean;
+  className?: string;
+}) {
+  return (
+    <ul className={className}>
+      {group.scored.map((row) => (
+        <li key={row.applicationId} className={`card ranking-row${row.leading ? " ranking-leading" : ""}`}>
+          <DetailLink applicationId={row.applicationId}>
             <ScoreRing score={row.score} n={row.n} />
             <div className="min-w-0 flex-1">
               <RowName row={row} />
+              {showState && <StateLine state={row.state} />}
               <p className="text-xs text-muted-foreground">{t.scoreOf(row.n)}</p>
               {row.leading && <span className="sr-only">{t.leadingLabel(openRoomCount)}</span>}
             </div>
-            {canInvite && (
-              <InviteDialog roundId={roundId} applicationId={row.applicationId} applicantName={row.applicantName} />
-            )}
-          </li>
-        ))}
-        {group.unscored.map((row) => (
-          <li key={row.applicationId} className="card ranking-row">
+          </DetailLink>
+          {canInvite && (
+            <InviteDialog roundId={roundId} applicationId={row.applicationId} applicantName={row.applicantName} />
+          )}
+        </li>
+      ))}
+      {group.unscored.map((row) => (
+        <li key={row.applicationId} className="card ranking-row">
+          <DetailLink applicationId={row.applicationId}>
             <div className="min-w-0 flex-1">
               <RowName row={row} />
+              {showState && <StateLine state={row.state} />}
               <p className="text-sm text-muted-foreground">{t.unscored(row.needed, row.n)}</p>
             </div>
-            {canInvite && (
-              <InviteDialog roundId={roundId} applicationId={row.applicationId} applicantName={row.applicantName} />
-            )}
-          </li>
-        ))}
-      </ul>
-    </section>
+          </DetailLink>
+          {canInvite && (
+            <InviteDialog roundId={roundId} applicationId={row.applicationId} applicantName={row.applicantName} />
+          )}
+        </li>
+      ))}
+    </ul>
   );
+}
+
+// The row's link to its detail. A plain link: a tap from the board is intercepted into the sliding
+// card (casting/@detail), a direct address renders the full page.
+function DetailLink({ applicationId, children }: { applicationId: string; children: React.ReactNode }) {
+  return (
+    <Link href={`/casting/candidate/${applicationId}`} className="ranking-link">
+      {children}
+      <LinkPendingHint />
+    </Link>
+  );
+}
+
+export function StateLine({ state }: { state: keyof typeof de.status.application }) {
+  return <p className="text-xs text-muted-foreground">{de.status.application[state]}</p>;
 }
 
 // The group a row sits in says whether it is invited, so the row carries only the name.
 function RowName({ row }: { row: Row }) {
   return <p className="truncate font-medium">{row.applicantName}</p>;
-}
-
-// The circular progress ring: the score inside, a text equivalent for the whole (FR-5.10, AC-5.28).
-// `pathLength` normalises the circle to 100, so the dash is the score itself.
-function ScoreRing({ score, n }: { score: number; n: number }) {
-  return (
-    <div className="score-ring" role="img" aria-label={t.ringLabel(score, n)}>
-      <svg viewBox="0 0 44 44" aria-hidden="true">
-        <circle className="score-ring-track" cx="22" cy="22" r="19" fill="none" strokeWidth="4" />
-        <circle
-          className="score-ring-fill"
-          cx="22"
-          cy="22"
-          r="19"
-          fill="none"
-          strokeWidth="4"
-          strokeLinecap="round"
-          pathLength={100}
-          strokeDasharray={`${score} 100`}
-        />
-      </svg>
-      <span className="score-ring-value" aria-hidden="true">
-        {score}
-      </span>
-    </div>
-  );
 }
 
 // "(?)": the round's frozen weights, the formula and the quorum rule with the round's real
@@ -192,8 +232,4 @@ function EmptyState({ title }: { title: string | null }) {
       </Link>
     </div>
   );
-}
-
-function Refusal({ text }: { text: string }) {
-  return <p className="text-sm text-muted-foreground">{text}</p>;
 }

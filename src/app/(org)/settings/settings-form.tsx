@@ -12,9 +12,13 @@ const t = de.settings;
 
 export function SettingsForm({
   quorumShare,
+  revealVoteAuthorship = false,
   openRoundTitle,
 }: {
   quorumShare: string;
+  // Optional so the existing feedback test (which renders only the quorum field) stays unedited;
+  // the page always passes the stored value.
+  revealVoteAuthorship?: boolean;
   openRoundTitle: string | null;
 }) {
   const [state, formAction] = useActionState(updateSettingsAction, initialState);
@@ -37,6 +41,22 @@ export function SettingsForm({
               {t.quorumShareLabel}
             </label>
             <input id="quorumShare" name="quorumShare" defaultValue={quorumShare} className="field-input" />
+          </div>
+
+          <div>
+            <label htmlFor="revealVoteAuthorship" className="flex items-center gap-2 font-medium">
+              <input
+                id="revealVoteAuthorship"
+                name="revealVoteAuthorship"
+                type="checkbox"
+                defaultChecked={revealVoteAuthorship}
+                aria-describedby="revealVoteAuthorshipHint"
+              />
+              {t.revealVoteAuthorshipLabel}
+            </label>
+            <p id="revealVoteAuthorshipHint" className="mt-1 text-sm text-muted-foreground">
+              {t.revealVoteAuthorshipHint}
+            </p>
           </div>
 
           {state.error && <p className="field-error">{state.error}</p>}

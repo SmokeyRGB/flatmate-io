@@ -4,6 +4,7 @@ import {
   ProfileRequiredError,
   ROUND_STATUSES,
   getRoundTallyBasisTx,
+  getVoteCandidateCardTx,
   listVoteCandidatesTx,
   listVoterRoundsTx,
   type RoundStatus,
@@ -17,8 +18,8 @@ import {
   assertHasPermissionTx,
   assertHoldsAnyPermissionTx,
 } from "@/modules/identity/repository";
-import { computeRanking, quorumNeeded } from "./ranking";
-import { parseRoundRules, parseScaleWeights, type ScaleWeights } from "./round-rules";
+import { computeRanking, explainScore, quorumNeeded, type ScoreExplanation } from "./ranking";
+import { parseRoundRules, parseScaleWeights, type RoundRules, type ScaleWeights } from "./round-rules";
 import { vote } from "./schema";
 import { VOTE_VALUES, type VoteValue } from "./vote-values";
 
@@ -292,6 +293,9 @@ export type Ranking =
       // (nobody can vote on them any more), and the rows the viewer may not see yet.
       decided: RankedGroup;
       invited: RankedGroup;
+      // The applications out of the running (rejected, declined, withdrawn), kept on the board until
+      // deleted (candidate-detail D9, human decision 2026-10-07). Ranked like `invited`: no highlight.
+      closed: RankedGroup;
       hidden: HiddenRow[];
     }
   | { kind: "none" }
@@ -317,7 +321,6 @@ export type Ranking =
 // voter is in that same set, so numerator <= denominator always holds.
 export async function getRanking(context: SessionContext, roundId: string | null): Promise<Ranking> {
   if (context.profileId === null) throw new ProfileRequiredError("getRanking");
-  const viewerId = context.profileId;
   return withSessionContext(context, async (tx): Promise<Ranking> => {
     try {
       await assertHasPermissionTx(tx, context, "vote");
@@ -343,70 +346,10 @@ export async function getRanking(context: SessionContext, roundId: string | null
     const rules = parseRoundRules(round.settingsSnapshot);
     if (rules === null) return { kind: "refused", reason: "rules_invalid" };
 
-    // ORDER IS THE CONSISTENCY ARGUMENT (Copilot round on PR #54; no stricter isolation level,
-    // since REPEATABLE READ would turn assertHasPermissionTx's FOR SHARE on the membership row
-    // into a 40001 whenever a concurrent move-out updates it). Step 1: ONE statement reads every
-    // non-withdrawn `invite` vote of the round, scoped by household and round only. Step 2: the
-    // candidates, with their state, are read AFTER it. A row is revealed only if its state, read
-    // in step 2, is no longer new/screened. Every vote in the result was committed before that
-    // read, and no vote can be cast on an invited application (`vote_guard`), so a revealed row
-    // never carries a vote cast after the viewer could have been anchored by it. A vote committed
-    // between the two reads is simply absent: conservative, never a leak. Reveal (the viewer's own
-    // votes) and scoring (the counted votes) both come from this one vote statement, so a
-    // castVote committing mid-read cannot show a row without its new vote or the reverse.
-    const allVotes = await tx
-      .select({
-        applicationId: vote.applicationId,
-        residentProfileId: vote.residentProfileId,
-        value: vote.value,
-      })
-      .from(vote)
-      .where(
-        and(
-          eq(vote.householdId, context.householdId),
-          eq(vote.roundId, round.roundId),
-          eq(vote.stage, "invite"),
-          isNull(vote.withdrawnAt),
-        ),
-      );
+    const tally = await readRoundTallyTx(tx, context, round.roundId, rules);
+    if (tally === null) return { kind: "refused", reason: "not_eligible" };
+    const { candidates, denominator, countedValues, isVisible } = tally;
 
-    const candidates = await listVoteCandidatesTx(tx, context, [round.roundId], { scope: "board", fields: "names" });
-
-    // The candidate and tally reads are separate statements under READ COMMITTED, so a move-out of
-    // the viewer committing in between makes the port return null: refused, never thrown. An empty
-    // set cannot reach here (the port returns null when the viewer is not in it), so a zero
-    // denominator is this same refusal (EC-5.7), never `rules_invalid`.
-    const basis = await getRoundTallyBasisTx(tx, context, round.roundId);
-    if (basis === null) return { kind: "refused", reason: "not_eligible" };
-    const counted = new Set(basis.countedVoterIds);
-    const denominator = basis.countedVoterIds.length;
-
-    // Only votes on the port's candidates may reach the result: nothing about another application
-    // (the viewer's own included, V-1) can be counted, revealed or listed. A vote counts only if
-    // its voter is in the tally basis' set, so numerator <= denominator always holds.
-    const candidateIds = new Set(candidates.map((c) => c.applicationId));
-    const ownVoted = new Set<string>();
-    const countedValues = new Map<string, VoteValue[]>();
-    for (const v of allVotes) {
-      if (!candidateIds.has(v.applicationId)) continue;
-      if (v.residentProfileId === viewerId) ownVoted.add(v.applicationId);
-      if (counted.has(v.residentProfileId)) {
-        const list = countedValues.get(v.applicationId) ?? [];
-        list.push(v.value);
-        countedValues.set(v.applicationId, list);
-      }
-    }
-
-    // V-4, per candidate (design D4 step 8, D10). A candidate is visible when hiding is off, when
-    // the viewer holds a vote on it, or when it is no longer `new`/`screened`: `vote_guard`
-    // refuses every vote on it then, so there is nothing left to protect. A paused round reveals
-    // nothing by itself, because voting resumes. A candidate that is not visible carries no
-    // vote-derived field and is listed oldest first (the port's order), never by anything derived
-    // from votes.
-    const isVisible = (c: (typeof candidates)[number]) =>
-      !rules.hideResultsUntilVoted ||
-      ownVoted.has(c.applicationId) ||
-      (c.state !== "new" && c.state !== "screened");
     const visible = candidates.filter(isVisible);
     const hidden: HiddenRow[] = candidates
       .filter((c) => !isVisible(c))
@@ -414,7 +357,7 @@ export async function getRanking(context: SessionContext, roundId: string | null
 
     // The sort is a total order on per-candidate keys, so ranking only a subset keeps the relative
     // order. Each group is ranked on its own: the highlight slots (Q-15) go to the decided group
-    // only, and an invited row never takes one (N = 0 there).
+    // only, and an invited or closed row never takes one (N = 0 there).
     const byId = new Map(visible.map((c) => [c.applicationId, c]));
     const orderOf = new Map(candidates.map((c, i) => [c.applicationId, i]));
     const rankGroup = (group: typeof visible, slots: number): RankedGroup => {
@@ -428,7 +371,7 @@ export async function getRanking(context: SessionContext, roundId: string | null
         candidates: group.map((c) => ({
           id: c.applicationId,
           order: orderOf.get(c.applicationId)!,
-          values: countedValues.get(c.applicationId) ?? [],
+          values: (countedValues.get(c.applicationId) ?? []).map((v) => v.value),
         })),
       });
       return {
@@ -455,20 +398,291 @@ export async function getRanking(context: SessionContext, roundId: string | null
         }),
       };
     };
+    // "Decided" is an explicit new/screened test, so the end states cannot fall into it (D9).
+    const isDecided = (c: VoteCandidate) => c.state === "new" || c.state === "screened";
     return {
       kind: "board",
       round: { id: round.roundId, title: round.title, status: round.status },
       rules: { weights: rules.weights, needed: quorumNeeded(rules.quorumShare, denominator), denominator },
-      openRoomCount: basis.openRoomCount,
-      decided: rankGroup(
-        visible.filter((c) => c.state !== "invited"),
-        basis.openRoomCount,
-      ),
+      openRoomCount: tally.openRoomCount,
+      decided: rankGroup(visible.filter(isDecided), tally.openRoomCount),
       invited: rankGroup(
         visible.filter((c) => c.state === "invited"),
         0,
       ),
+      closed: rankGroup(
+        visible.filter((c) => CLOSED_STATES.includes(c.state)),
+        0,
+      ),
       hidden,
+    };
+  });
+}
+
+// The applications out of the running (candidate-detail D9, human decision 2026-10-07).
+const CLOSED_STATES: VoteCandidate["state"][] = ["rejected_by_household", "declined_by_applicant", "withdrawn"];
+
+interface RoundTally {
+  // The board-scope candidates, oldest first (the port's order).
+  candidates: VoteCandidate[];
+  denominator: number;
+  openRoomCount: number;
+  // The counted voters (the quorum denominator's set) with their display names. Names never reach
+  // a board payload; the detail reads them only when the round's frozen flag is on.
+  countedVoters: { id: string; displayName: string }[];
+  // Per candidate: the counted votes, with the voter. A vote counts only if its voter is in the tally
+  // basis' set, so numerator <= denominator always holds.
+  countedValues: Map<string, { voterId: string; value: VoteValue }[]>;
+  // Per candidate: the votes of voters who are no longer counted (former members, Q-6).
+  formerCounts: Map<string, number>;
+  ownVoted: Set<string>;
+  isVisible: (c: VoteCandidate) => boolean;
+}
+
+// The core both the scoreboard and the candidate detail run (candidate-detail design D2), so the two
+// can never disagree on visibility or numbers. Null when the tally basis is null (the viewer is no
+// longer a counted voter): the caller refuses `not_eligible`. The statement order is the consistency
+// argument below and was moved here verbatim from getRanking.
+async function readRoundTallyTx(
+  tx: Tx,
+  context: SessionContext,
+  roundId: string,
+  rules: RoundRules,
+): Promise<RoundTally | null> {
+  const viewerId = context.profileId!;
+  // ORDER IS THE CONSISTENCY ARGUMENT (Copilot round on PR #54; no stricter isolation level,
+  // since REPEATABLE READ would turn assertHasPermissionTx's FOR SHARE on the membership row
+  // into a 40001 whenever a concurrent move-out updates it). Step 1: ONE statement reads every
+  // non-withdrawn `invite` vote of the round, scoped by household and round only. Step 2: the
+  // candidates, with their state, are read AFTER it. A row is revealed only if its state, read
+  // in step 2, is no longer new/screened. Every vote in the result was committed before that
+  // read, and no vote can be cast on an invited application (`vote_guard`), so a revealed row
+  // never carries a vote cast after the viewer could have been anchored by it. A vote committed
+  // between the two reads is simply absent: conservative, never a leak. Reveal (the viewer's own
+  // votes) and scoring (the counted votes) both come from this one vote statement, so a
+  // castVote committing mid-read cannot show a row without its new vote or the reverse.
+  const allVotes = await tx
+    .select({
+      applicationId: vote.applicationId,
+      residentProfileId: vote.residentProfileId,
+      value: vote.value,
+    })
+    .from(vote)
+    .where(
+      and(
+        eq(vote.householdId, context.householdId),
+        eq(vote.roundId, roundId),
+        eq(vote.stage, "invite"),
+        isNull(vote.withdrawnAt),
+      ),
+    );
+
+  const candidates = await listVoteCandidatesTx(tx, context, [roundId], { scope: "board", fields: "names" });
+
+  // The candidate and tally reads are separate statements under READ COMMITTED, so a move-out of
+  // the viewer committing in between makes the port return null: refused, never thrown. An empty
+  // set cannot reach here (the port returns null when the viewer is not in it), so a zero
+  // denominator is this same refusal (EC-5.7), never `rules_invalid`.
+  const basis = await getRoundTallyBasisTx(tx, context, roundId);
+  if (basis === null) return null;
+  const counted = new Set(basis.countedVoters.map((v) => v.id));
+
+  // Only votes on the port's candidates may reach the result: nothing about another application
+  // (the viewer's own included, V-1) can be counted, revealed or listed. A vote counts only if
+  // its voter is in the tally basis' set, so numerator <= denominator always holds.
+  const candidateIds = new Set(candidates.map((c) => c.applicationId));
+  const ownVoted = new Set<string>();
+  const countedValues = new Map<string, { voterId: string; value: VoteValue }[]>();
+  const formerCounts = new Map<string, number>();
+  for (const v of allVotes) {
+    if (!candidateIds.has(v.applicationId)) continue;
+    if (v.residentProfileId === viewerId) ownVoted.add(v.applicationId);
+    if (counted.has(v.residentProfileId)) {
+      const list = countedValues.get(v.applicationId) ?? [];
+      list.push({ voterId: v.residentProfileId, value: v.value });
+      countedValues.set(v.applicationId, list);
+    } else {
+      formerCounts.set(v.applicationId, (formerCounts.get(v.applicationId) ?? 0) + 1);
+    }
+  }
+
+  // V-4, per candidate (design D4 step 8, D10). A candidate is visible when hiding is off, when
+  // the viewer holds a vote on it, or when it is no longer `new`/`screened`: `vote_guard`
+  // refuses every vote on it then, so there is nothing left to protect. A paused round reveals
+  // nothing by itself, because voting resumes. A candidate that is not visible carries no
+  // vote-derived field and is listed oldest first (the port's order), never by anything derived
+  // from votes.
+  const isVisible = (c: VoteCandidate) =>
+    !rules.hideResultsUntilVoted ||
+    ownVoted.has(c.applicationId) ||
+    (c.state !== "new" && c.state !== "screened");
+
+  return {
+    candidates,
+    denominator: basis.countedVoters.length,
+    openRoomCount: basis.openRoomCount,
+    countedVoters: basis.countedVoters,
+    countedValues,
+    formerCounts,
+    ownVoted,
+    isVisible,
+  };
+}
+
+// ---------------------------------------------------------------------------------------------
+// The candidate detail (F5 candidate-detail, screen D2). It re-reads everything under the
+// scoreboard's rules: the same D2 core (`readRoundTallyTx`) and the same candidate predicate
+// (`getVoteCandidateCardTx` shares `voteCandidateWhere` with the board list), so the detail and the
+// board can never disagree on visibility or numbers. Voter ids never leave this function; display
+// names leave it only when the ROUND's frozen `revealVoteAuthorship` is on.
+// ---------------------------------------------------------------------------------------------
+
+export type DetailCard = ScreeningCard & { state: VoteCandidate["state"] };
+
+type DetailRound = { id: string; title: string; status: RoundStatus };
+
+export type CandidateDetail =
+  // Exactly these keys: no vote-derived field of any kind (V-4, AC-5.16).
+  | { kind: "hidden"; round: DetailRound; application: { id: string; name: string; state: VoteCandidate["state"] } }
+  // No `score`, no `distribution`, no `explanation` key: a score from too few votes is never shown.
+  | {
+      kind: "unscored";
+      round: DetailRound;
+      application: DetailCard;
+      n: number;
+      needed: number;
+      denominator: number;
+      formerCount: number;
+      // The display names of the counted voters who voted, without any rating; null when the round's
+      // frozen flag is off.
+      voters: string[] | null;
+    }
+  | {
+      kind: "scored";
+      round: DetailRound;
+      application: DetailCard;
+      score: number;
+      n: number;
+      denominator: number;
+      weights: ScaleWeights;
+      distribution: Record<VoteValue, number>;
+      explanation: ScoreExplanation;
+      formerCount: number;
+      // Display names per rating; null when the round's frozen flag is off.
+      authorship: Record<VoteValue, string[]> | null;
+    }
+  | { kind: "refused"; reason: "not_found" | "not_eligible" | "rules_invalid" }
+  | { kind: "refused"; reason: "round_not_available"; status: RoundStatus };
+
+// Matrix row: a read. The stored `vote` permission is checked first inside the transaction, as on
+// the board; a caller without it gets `not_eligible`. Every other refusal that would tell the viewer
+// something about the application (own, foreign, unknown, malformed, not a participant, a state the
+// board does not hold) is the one `not_found` (Q-9). Visibility is tested in
+// tests/integration/deliberation/candidate-detail.test.ts.
+export async function getCandidateDetail(context: SessionContext, applicationId: string): Promise<CandidateDetail> {
+  if (context.profileId === null) throw new ProfileRequiredError("getCandidateDetail");
+  return withSessionContext(context, async (tx): Promise<CandidateDetail> => {
+    try {
+      await assertHasPermissionTx(tx, context, "vote");
+    } catch (err) {
+      if (err instanceof PermissionDeniedError) return { kind: "refused", reason: "not_eligible" };
+      throw err;
+    }
+    if (!isUuid(applicationId)) return { kind: "refused", reason: "not_found" };
+
+    const rounds = await listVoterRoundsTx(tx, context);
+    const card = await getVoteCandidateCardTx(
+      tx,
+      context,
+      rounds.map((r) => r.roundId),
+      applicationId,
+    );
+    if (card === null) return { kind: "refused", reason: "not_found" };
+    const round = rounds.find((r) => r.roundId === card.roundId);
+    if (!round) return { kind: "refused", reason: "not_found" };
+    if (round.status !== "open" && round.status !== "paused") {
+      return { kind: "refused", reason: "round_not_available", status: round.status };
+    }
+    const rules = parseRoundRules(round.settingsSnapshot);
+    if (rules === null) return { kind: "refused", reason: "rules_invalid" };
+
+    const tally = await readRoundTallyTx(tx, context, round.roundId, rules);
+    if (tally === null) return { kind: "refused", reason: "not_eligible" };
+    // Belt and braces: the port and the core use the same predicate, so this only fails when a
+    // concurrent change lands between their two statements.
+    const candidate = tally.candidates.find((c) => c.applicationId === applicationId);
+    if (!candidate) return { kind: "refused", reason: "not_found" };
+
+    const detailRound: DetailRound = { id: round.roundId, title: round.title, status: round.status };
+    if (!tally.isVisible(candidate)) {
+      return {
+        kind: "hidden",
+        round: detailRound,
+        application: { id: card.applicationId, name: card.applicantName, state: candidate.state },
+      };
+    }
+
+    const application: DetailCard = {
+      applicationId: card.applicationId,
+      applicantName: card.applicantName,
+      age: card.age,
+      messageRaw: card.messageRaw,
+      // Passed through as stored: the CHECK of drizzle/0025 is their validator.
+      attributes: card.attributes as ScreeningCard["attributes"],
+      state: candidate.state,
+    };
+    const counted = tally.countedValues.get(applicationId) ?? [];
+    const formerCount = tally.formerCounts.get(applicationId) ?? 0;
+    const names = new Map(tally.countedVoters.map((v) => [v.id, v.displayName]));
+    const collator = new Intl.Collator("de");
+    const namesOf = (voterIds: string[]) => voterIds.map((id) => names.get(id) ?? "").sort(collator.compare);
+
+    // The score is the ranking's own function over this one candidate: score and quorum are
+    // per-candidate, so this equals its board score. It is never re-implemented.
+    const ranked = computeRanking({
+      weights: rules.weights,
+      quorumShare: rules.quorumShare,
+      denominator: tally.denominator,
+      openRoomCount: 0,
+      candidates: [{ id: applicationId, order: 0, values: counted.map((v) => v.value) }],
+    });
+    const scored = ranked.scored[0];
+    if (!scored) {
+      const pending = ranked.unscored[0];
+      return {
+        kind: "unscored",
+        round: detailRound,
+        application,
+        n: pending.n,
+        needed: pending.needed,
+        denominator: tally.denominator,
+        formerCount,
+        voters: rules.revealVoteAuthorship ? namesOf(counted.map((v) => v.voterId)) : null,
+      };
+    }
+    const distribution = Object.fromEntries(
+      VOTE_VALUES.map((value) => [value, counted.filter((v) => v.value === value).length]),
+    ) as Record<VoteValue, number>;
+    const authorship = rules.revealVoteAuthorship
+      ? (Object.fromEntries(
+          VOTE_VALUES.map((value) => [value, namesOf(counted.filter((v) => v.value === value).map((v) => v.voterId))]),
+        ) as Record<VoteValue, string[]>)
+      : null;
+    return {
+      kind: "scored",
+      round: detailRound,
+      application,
+      score: scored.score,
+      n: scored.n,
+      denominator: tally.denominator,
+      weights: rules.weights,
+      distribution,
+      explanation: explainScore(
+        rules.weights,
+        counted.map((v) => v.value),
+      ),
+      formerCount,
+      authorship,
     };
   });
 }

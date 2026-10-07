@@ -586,7 +586,7 @@ Prozess vs. Person, nicht bei „beschreibend vs. empfehlend".
   eröffnete Runden; läuft eine Runde, sagt der Bildschirm das (Regel-Sperre gelockert 2026-10-05,
   E-25). Umfasst u. a.
   `hide_results_until_voted` und, neu (2026-09-16, Prototype-User-Test), `reveal_vote_authorship`
-  — Toggle „Stimmen-Urheberschaft in der Rangliste zeigen", Default aus, mit Hinweistext zum
+  — Toggle „Stimmen-Urheberschaft zeigen", Default aus, mit Hinweistext zum
   Anker-/Bandwagon-Tradeoff (`domain/identity.md`)
 - **Datenschutzseite freigeben** — `PublishedPrivacyNotice` (G-C9); vor Freigabe über keinen
   Codepfad erreichbar

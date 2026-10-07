@@ -919,6 +919,7 @@ async function openRoundTx(tx: Tx, context: SessionContext, roundId: string, act
         favoriteBudgetFactor: settings.favoriteBudgetFactor,
         hideResultsUntilVoted: settings.hideResultsUntilVoted,
         quorumShare: settings.quorumShare,
+        revealVoteAuthorship: settings.revealVoteAuthorship,
       },
     })
     .where(eq(castingRound.id, roundId))
@@ -1187,18 +1188,31 @@ export interface VoteCandidate {
 }
 
 // `scope` is CLOSED, and the state lists live here in casting: "votable" is `new`/`screened` (the
-// deck and task T-5), "board" adds `invited` (the scoreboard, PRD 4.1.6: the round's applications).
+// deck and task T-5), "board" adds `invited` and, since 2026-10-07, the three end states
+// (`rejected_by_household`, `declined_by_applicant`, `withdrawn`): the scoreboard, PRD 4.1.6, the
+// round's applications. That amends human decision Q-4 ("A rejected application should still be
+// visible in the round, and scoreboard, until deleted"); the purpose is the household's own record
+// of whom the round decided about, inside that round, and the limit is deletion (F3 change 4).
+// `archived` stays OUT: it marks data at the end of its retention (domain/zustandsmaschinen.md).
 // A free `states` array was rejected, since any later caller could then pull the names of
-// `rejected_by_household`, `withdrawn` or `archived` applicants through a voter-gated port, which
-// would reopen human decision Q-4 and the Art. 5(1)(c) argument without a design saying so.
-// The board never needs card columns of an `invited` applicant, so "board" with "cards" does not
-// compile.
+// `archived` applicants through a voter-gated port, which would reopen the Art. 5(1)(c) argument
+// without a design saying so.
+// A list read never needs card columns of an `invited` or end-state applicant, so "board" with
+// "cards" does not compile. The candidate detail reads ONE application's card through
+// `getVoteCandidateCardTx` instead (candidate-detail design D3).
 export type VoteCandidateOptions =
   | { scope: "votable"; fields: "ids" | "names" | "cards" }
   | { scope: "board"; fields: "ids" | "names" };
 
 const VOTABLE_STATES: ApplicationState[] = ["new", "screened"];
-const BOARD_STATES: ApplicationState[] = ["new", "screened", "invited"];
+const BOARD_STATES: ApplicationState[] = [
+  "new",
+  "screened",
+  "invited",
+  "rejected_by_household",
+  "declined_by_applicant",
+  "withdrawn",
+];
 
 // THE active-voter condition, written once (design D3, DRY): a participation of the round that is
 // not removed, may vote, belongs to an `active` profile, and every join carries `household_id`.
@@ -1209,6 +1223,25 @@ const ACTIVE_VOTER_FROM = sql`round_participation rp
   JOIN resident_profile rprof ON rprof.id = rp.resident_profile_id AND rprof.household_id = rp.household_id`;
 const activeVoterWhere = (householdId: string) =>
   sql`rp.household_id = ${householdId}::uuid AND rp.removed_at IS NULL AND rp.can_vote AND rprof.status = 'active'`;
+
+// THE candidate predicate, written once (DRY): household, round in the viewer's rounds, state in the
+// scope's list, not the viewer's own application (`IS DISTINCT FROM`, never `ne()`: became_resident_id
+// is NULL for nearly every application), and the active-voter EXISTS. `listVoteCandidatesTx` and
+// `getVoteCandidateCardTx` both use it, so the list and the one-application card cannot drift.
+function voteCandidateWhere(householdId: string, profileId: string, roundIds: string[], states: ApplicationState[]) {
+  return and(
+    eq(application.householdId, householdId),
+    inArray(application.roundId, roundIds),
+    inArray(application.state, states),
+    sql`${application.becameResidentId} IS DISTINCT FROM ${profileId}::uuid`,
+    sql`EXISTS (
+      SELECT 1 FROM ${ACTIVE_VOTER_FROM}
+      WHERE rp.round_id = ${application.roundId}
+        AND rp.resident_profile_id = ${profileId}::uuid
+        AND ${activeVoterWhere(householdId)}
+    )`,
+  );
+}
 
 // The rounds' applications in the requested scope that are not the viewer's own, oldest first. The
 // port re-applies the voter predicate itself: a round for which the viewer is not an active voting
@@ -1230,20 +1263,8 @@ export async function listVoteCandidatesTx(
   if (context.profileId === null) throw new ProfileRequiredError("listVoteCandidatesTx");
   const ids = roundIds.filter((id) => isUuid(id));
   if (ids.length === 0) return [];
-  const profileId = context.profileId;
   const states = options.scope === "board" ? BOARD_STATES : VOTABLE_STATES;
-  const where = and(
-    eq(application.householdId, context.householdId),
-    inArray(application.roundId, ids),
-    inArray(application.state, states),
-    sql`${application.becameResidentId} IS DISTINCT FROM ${profileId}::uuid`,
-    sql`EXISTS (
-      SELECT 1 FROM ${ACTIVE_VOTER_FROM}
-      WHERE rp.round_id = ${application.roundId}
-        AND rp.resident_profile_id = ${profileId}::uuid
-        AND ${activeVoterWhere(context.householdId)}
-    )`,
-  );
+  const where = voteCandidateWhere(context.householdId, context.profileId, ids, states);
   const order = [asc(application.createdAt), asc(application.id)] as const;
   const base = {
     applicationId: application.id,
@@ -1286,10 +1307,66 @@ export async function listVoteCandidatesTx(
   }));
 }
 
+export interface VoteCandidateCardRow {
+  applicationId: string;
+  roundId: string;
+  state: ApplicationState;
+  applicantName: string;
+  age: number | null;
+  messageRaw: string | null;
+  attributes: unknown;
+}
+
+// ONE application's card for the candidate detail (candidate-detail design D3), or null when the
+// viewer may not open it. Its WHERE is the same predicate as the board list's (`voteCandidateWhere`):
+// household, round in `roundIds`, a board state, not the viewer's own application, and the
+// active-voter EXISTS. It selects id, round id, state and the four card columns only: no contact, no
+// `collected_from`, no `source`, no audit column (F4 Q-2). A malformed id gives null with no query.
+//
+// This widens the board's surface twice, on purpose and argued in the design. (1) The board knew only
+// the NAMES of invited and end-state applicants; this adds the card columns, one application at a time,
+// on explicit request, under the same voter predicate: what the residents decide on, within their own
+// round, which they saw in the pass while it was new/screened. (2) The end states are on the board by
+// human decision of 2026-10-07 (above), and their cards are visible too ("full card"). Accepted gap,
+// registered in docs/review-log.md: until F3 change 4 deletes an application, a withdrawn or declined
+// applicant's age, message and attributes stay visible to the round's voters, even after an Art.
+// 7(3)/17/21 request. Authorization matrix: a read, exempt (tested in candidate-detail.test.ts).
+export async function getVoteCandidateCardTx(
+  tx: Tx,
+  context: SessionContext,
+  roundIds: string[],
+  applicationId: string,
+): Promise<VoteCandidateCardRow | null> {
+  if (context.profileId === null) throw new ProfileRequiredError("getVoteCandidateCardTx");
+  if (!isUuid(applicationId)) return null;
+  const ids = roundIds.filter((id) => isUuid(id));
+  if (ids.length === 0) return null;
+  const [row] = await tx
+    .select({
+      applicationId: application.id,
+      roundId: application.roundId,
+      state: application.state,
+      applicantName: application.applicantName,
+      age: application.age,
+      messageRaw: application.messageRaw,
+      attributes: application.attributes,
+    })
+    .from(application)
+    .where(
+      and(
+        eq(application.id, applicationId),
+        voteCandidateWhere(context.householdId, context.profileId, ids, BOARD_STATES),
+      ),
+    )
+    .limit(1);
+  return row ?? null;
+}
+
 export interface RoundTallyBasis {
   // The quorum denominator of invarianten.md 5.3: participations of the round that are not
-  // removed and may vote, whose profile is `active`. Also the set of voters whose votes count.
-  countedVoterIds: string[];
+  // removed and may vote, whose profile is `active`. Also the set of voters whose votes count. The
+  // display name comes from the join the port already makes (candidate-detail design D6).
+  countedVoters: { id: string; displayName: string }[];
   // The round's rooms that are `open` and not deleted, read now (R-6, Q-15).
   openRoomCount: number;
 }
@@ -1309,13 +1386,16 @@ export async function getRoundTallyBasisTx(
 ): Promise<RoundTallyBasis | null> {
   if (context.profileId === null) throw new ProfileRequiredError("getRoundTallyBasisTx");
   if (!isUuid(roundId)) return null;
-  const voters = await tx.execute<{ id: string }>(
-    sql`SELECT rp.resident_profile_id AS id
+  const voters = await tx.execute<{ id: string; display_name: string }>(
+    sql`SELECT rp.resident_profile_id AS id, rprof.display_name AS display_name
       FROM ${ACTIVE_VOTER_FROM}
       WHERE rp.round_id = ${roundId}::uuid AND ${activeVoterWhere(context.householdId)}`,
   );
-  const countedVoterIds = voters.map((r: { id: string }) => r.id);
-  if (!countedVoterIds.includes(context.profileId)) return null;
+  const countedVoters = voters.map((r: { id: string; display_name: string }) => ({
+    id: r.id,
+    displayName: r.display_name,
+  }));
+  if (!countedVoters.some((v: { id: string }) => v.id === context.profileId)) return null;
   const [{ n }] = await tx
     .select({ n: sql<number>`count(*)::int` })
     .from(room)
@@ -1331,7 +1411,7 @@ export async function getRoundTallyBasisTx(
         isNull(room.deletedAt),
       ),
     );
-  return { countedVoterIds, openRoomCount: n };
+  return { countedVoters, openRoomCount: n };
 }
 
 // FR-1.21 (relaxed by human decision 2026-10-05): changing the voting-procedure settings is allowed
@@ -1371,6 +1451,13 @@ export async function updateHouseholdSettings(
     if (patch.favoriteBudgetFactor !== undefined) columnPatch.favoriteBudgetFactor = patch.favoriteBudgetFactor;
     if (patch.hideResultsUntilVoted !== undefined) columnPatch.hideResultsUntilVoted = patch.hideResultsUntilVoted;
     if (patch.quorumShare !== undefined) columnPatch.quorumShare = patch.quorumShare;
+    if (patch.revealVoteAuthorship !== undefined) {
+      // Postgres would cast the strings 'on' or 'yes' to true from a careless caller (design D7).
+      if (typeof patch.revealVoteAuthorship !== "boolean") {
+        throw new Error("revealVoteAuthorship must be a boolean");
+      }
+      columnPatch.revealVoteAuthorship = patch.revealVoteAuthorship;
+    }
     columnPatch.updatedAt = new Date();
     columnPatch.updatedByAccountId = actor.accountId;
 

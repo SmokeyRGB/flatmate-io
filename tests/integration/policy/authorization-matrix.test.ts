@@ -127,6 +127,8 @@ const NOT_APPLICABLE_CASTING: Record<string, string> = {
     "Tx read port; card visibility tested in tests/integration/deliberation/screening-pass.test.ts (non-participant, moved-out, key set); no route caller, asserted below",
   // F5 change 1 (ranking) design D3: the counted voters and open rooms of one round. Same class as
   // the two ports above; it guards by its own result (null unless the viewer is a counted voter).
+  getVoteCandidateCardTx:
+    "Tx read port; one application card for the candidate detail, visibility tested in tests/integration/deliberation/candidate-detail.test.ts (the port alone); no route caller, asserted below",
   getRoundTallyBasisTx:
     "Tx read port; visibility tested in tests/integration/deliberation/screening-pass.test.ts (participant, non-participant) and ranking.test.ts; no route caller, asserted below",
 };
@@ -137,6 +139,7 @@ const NOT_APPLICABLE_DELIBERATION: Record<string, string> = {
   getAwaitingVoteCounts: "read; visibility tested in tests/integration/deliberation/awaiting-vote-counts.test.ts",
   getScreeningPass: "read; visibility tested in tests/integration/deliberation/screening-pass.test.ts",
   getRanking: "read; visibility tested in tests/integration/deliberation/ranking.test.ts",
+  getCandidateDetail: "read; visibility tested in tests/integration/deliberation/candidate-detail.test.ts",
 };
 
 const NOT_APPLICABLE_IDENTITY: Record<string, string> = {
@@ -271,8 +274,8 @@ describe("authorization matrix (M6): every exported casting/identity mutator dec
       expect(callers).toEqual([]);
     });
 
-    it("the three casting query ports have no caller outside casting and deliberation's repository", () => {
-      for (const name of ["listVoterRoundsTx", "listVoteCandidatesTx", "getRoundTallyBasisTx"]) {
+    it("the four casting query ports have no caller outside casting and deliberation's repository", () => {
+      for (const name of ["listVoterRoundsTx", "listVoteCandidatesTx", "getRoundTallyBasisTx", "getVoteCandidateCardTx"]) {
         expect(srcAppReferencesName(name), `${name} is referenced under src/app`).toBe(false);
         const allowed = [
           join(ROOT, "src", "modules", "casting", "repository.ts"),

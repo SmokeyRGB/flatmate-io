@@ -57,6 +57,83 @@ export function quorumNeeded(quorumShare: Scaled, denominator: number): number {
   return Number((product + divisor - BigInt(1)) / divisor);
 }
 
+// The last step of the score, the ONE definition both `computeRanking` and `explainScore` use
+// (candidate-detail design D4, so the arithmetic on a detail can never drift from the ring):
+// round_half_up(mean / max * 100), exactly: floor((2 * sum * 100 + n * max) / (2 * n * max)). `sum`
+// and `max` are on one common scale, `n` is the number of counted votes (> 0).
+function scoreFromSum(sum: bigint, n: number, max: bigint): number {
+  const bigN = BigInt(n);
+  const two = BigInt(2);
+  const hundred = BigInt(100);
+  return Number((two * sum * hundred + bigN * max) / (two * bigN * max));
+}
+
+// A decimal as plain text with a dot ("2.75", "4.5", "55"), so the explanation is JSON-safe (no
+// BigInt reaches a payload) and the screen only has to localise the separator.
+function decimalText(units: bigint, scale: number): string {
+  const digits = units.toString().padStart(scale + 1, "0");
+  const whole = digits.slice(0, digits.length - scale);
+  const fraction = digits.slice(digits.length - scale).replace(/0+$/, "");
+  return fraction === "" ? whole : `${whole}.${fraction}`;
+}
+
+// A decimal shown to `places` places, rounded half up, and whether that rounding lost anything (so
+// the display can say "≈").
+export interface ShownDecimal {
+  text: string;
+  exact: boolean;
+}
+
+function showDecimal(numerator: bigint, denominator: bigint, places: number): ShownDecimal {
+  const scaled = numerator * pow10(places);
+  const two = BigInt(2);
+  const units = (two * scaled + denominator) / (two * denominator);
+  return { text: decimalText(units, places), exact: scaled % denominator === BigInt(0) };
+}
+
+// How one candidate's score came about, for the detail's "(?)" (FR-5.5, AC-5.6, P-3). Pure, and all
+// strings and numbers, so it survives JSON.
+export interface ScoreExplanation {
+  // The weight of each counted vote, weakest rating first, as exact decimal text.
+  terms: string[];
+  n: number;
+  // The highest weight of the round.
+  max: string;
+  // The mean of the terms and the raw percentage, each shown to two places. The percentage is
+  // computed from the EXACT mean, never from the shown one.
+  mean: ShownDecimal;
+  percent: ShownDecimal;
+  score: number;
+}
+
+export function explainScore(weights: ScaleWeights, values: VoteValue[]): ScoreExplanation {
+  const scaledWeights = VOTE_VALUES.map((value) => toScaled(weights[value]));
+  if (scaledWeights.some((w) => w === null)) {
+    throw new Error("explainScore: weights must be validated by parseScaleWeights first");
+  }
+  const common = toCommonScale(scaledWeights as Scaled[]);
+  const unitsByValue = {} as Record<VoteValue, bigint>;
+  VOTE_VALUES.forEach((value, i) => {
+    unitsByValue[value] = common.units[i];
+  });
+  const maxUnits = common.units.reduce((a, b) => (b > a ? b : a), BigInt(0));
+  if (maxUnits <= BigInt(0)) throw new Error("explainScore: max(weights) must be > 0");
+  const n = values.length;
+  if (n === 0) throw new Error("explainScore: a candidate without counted votes has no score");
+
+  const ordered = [...values].sort((a, b) => VOTE_VALUES.indexOf(a) - VOTE_VALUES.indexOf(b));
+  const sum = ordered.reduce((acc, v) => acc + unitsByValue[v], BigInt(0));
+  const bigN = BigInt(n);
+  return {
+    terms: ordered.map((v) => decimalText(unitsByValue[v], common.scale)),
+    n,
+    max: decimalText(maxUnits, common.scale),
+    mean: showDecimal(sum, bigN * pow10(common.scale), 2),
+    percent: showDecimal(sum * BigInt(100), bigN * maxUnits, 2),
+    score: scoreFromSum(sum, n, maxUnits),
+  };
+}
+
 interface Keyed {
   id: string;
   // Constant 0 in this release (no veto exists), kept as key 1 so the comparator never changes shape.
@@ -85,8 +162,6 @@ export function computeRanking(input: RankingInput): { scored: RankedEntry[]; un
   if (max <= BigInt(0)) throw new Error("computeRanking: max(weights) must be > 0");
 
   const needed = quorumNeeded(quorumShare, denominator);
-  const hundred = BigInt(100);
-  const two = BigInt(2);
 
   const ranked: Keyed[] = [];
   const pending: { id: string; order: number; n: number }[] = [];
@@ -102,9 +177,7 @@ export function computeRanking(input: RankingInput): { scored: RankedEntry[]; un
         if (v === "definitely") definitely += 1;
         if (v === "no") no += 1;
       }
-      const bigN = BigInt(n);
-      // round_half_up(mean / max * 100), exactly: floor((2 * sum * 100 + n * max) / (2 * n * max)).
-      const score = Number((two * sum * hundred + bigN * max) / (two * bigN * max));
+      const score = scoreFromSum(sum, n, max);
       ranked.push({ id: c.id, veto: 0, order: c.order, n, score, definitely, no });
     } else {
       pending.push({ id: c.id, order: c.order, n });

@@ -91,7 +91,11 @@ export default async function SettingsPage({
           <p className="text-sm text-muted-foreground">{t.signInCode.hint}</p>
         </section>
       )}
-      <SettingsForm quorumShare={settings?.quorumShare ?? "0.5"} openRoundTitle={openRound?.title ?? null} />
+      <SettingsForm
+        quorumShare={settings?.quorumShare ?? "0.5"}
+        revealVoteAuthorship={settings?.revealVoteAuthorship ?? false}
+        openRoundTitle={openRound?.title ?? null}
+      />
     </div>
   );
 }

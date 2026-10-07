@@ -288,13 +288,18 @@ describe("the card (FR-4.7, Q-2)", () => {
 });
 
 describe("the casting ports for the scoreboard (F5 design D3)", () => {
-  it("scope votable never returns an invited row, and board never a side state", async () => {
+  // Inverted 2026-10-07 (human decision, amending Q-4): the board scope now holds the three end states
+  // too, and still never `archived` (retention expiry) or `offer_made`.
+  it("scope votable never returns an invited row, and board holds the end states but never archived or offer_made", async () => {
     const { s, voter } = await fixture();
     const open = await insertApplicationAt(s, "new", { createdAt: at(1) });
     const screened = await insertApplicationAt(s, "screened", { createdAt: at(2) });
     const invited = await insertApplicationAt(s, "invited", { createdAt: at(3) });
-    await insertApplicationAt(s, "rejected_by_household", { createdAt: at(4) });
-    await insertApplicationAt(s, "withdrawn", { createdAt: at(5) });
+    const rejected = await insertApplicationAt(s, "rejected_by_household", { createdAt: at(4) });
+    const withdrawn = await insertApplicationAt(s, "withdrawn", { createdAt: at(5) });
+    const declined = await insertApplicationAt(s, "declined_by_applicant", { createdAt: at(6) });
+    await insertApplicationAt(s, "archived", { createdAt: at(7) });
+    await insertApplicationAt(s, "offer_made", { createdAt: at(8) });
     const votable = await withSessionContext(voter.context, (tx) =>
       listVoteCandidatesTx(tx, voter.context, [s.roundId], { scope: "votable", fields: "ids" }),
     );
@@ -303,8 +308,22 @@ describe("the casting ports for the scoreboard (F5 design D3)", () => {
     const board = await withSessionContext(voter.context, (tx) =>
       listVoteCandidatesTx(tx, voter.context, [s.roundId], { scope: "board", fields: "names" }),
     );
-    expect(board.map((c) => c.applicationId)).toEqual([open.id, screened.id, invited.id]);
-    expect(board.map((c) => c.state)).toEqual(["new", "screened", "invited"]);
+    expect(board.map((c) => c.applicationId)).toEqual([
+      open.id,
+      screened.id,
+      invited.id,
+      rejected.id,
+      withdrawn.id,
+      declined.id,
+    ]);
+    expect(board.map((c) => c.state)).toEqual([
+      "new",
+      "screened",
+      "invited",
+      "rejected_by_household",
+      "withdrawn",
+      "declined_by_applicant",
+    ]);
   });
 
   it("fields names returns the applicant name at the top level and no card, no contact", async () => {
@@ -334,8 +353,8 @@ describe("the casting ports for the scoreboard (F5 design D3)", () => {
     const { s, voter } = await fixture();
     const basis = await withSessionContext(voter.context, (tx) => getRoundTallyBasisTx(tx, voter.context, s.roundId));
     expect(basis).not.toBeNull();
-    expect(basis!.countedVoterIds).toContain(voter.profileId);
-    expect(basis!.countedVoterIds).toContain(s.moderator.profileId);
+    expect(basis!.countedVoters.map((v) => v.id)).toContain(voter.profileId);
+    expect(basis!.countedVoters.map((v) => v.id)).toContain(s.moderator.profileId);
     // setupPipeline's one room is still planned.
     expect(basis!.openRoomCount).toBe(0);
 

@@ -103,6 +103,7 @@ describe("Voting-procedure settings while a round is open", () => {
       favoriteBudgetFactor: "1.5",
       hideResultsUntilVoted: true,
       quorumShare: "0.5",
+      revealVoteAuthorship: false,
     };
     expect(await snapshotOf(hh, first.id)).toEqual(frozen);
 
@@ -120,8 +121,22 @@ describe("Voting-procedure settings while a round is open", () => {
       favoriteBudgetFactor: "2.5",
       hideResultsUntilVoted: false,
       quorumShare: "0.9",
+      revealVoteAuthorship: false,
     });
     expect(await snapshotOf(hh, first.id)).toEqual(frozen);
+  });
+
+  it("freezes revealVoteAuthorship per round: turning it on after opening leaves the snapshot's false (R-1)", async () => {
+    hh = await registerTestHousehold();
+    const actor = { accountId: hh.accountId, profileId: null };
+    const moderator = await createTestModerator(hh, "Resident1");
+    const modActor = { accountId: moderator.accountId, profileId: moderator.profileId };
+    const room = await createRoom(hh.context, "Room A", actor);
+    const round = await createRound(moderator.context, "First", [room.id], modActor);
+    await openRound(moderator.context, round.id, modActor);
+    expect(await snapshotOf(hh, round.id)).toMatchObject({ revealVoteAuthorship: false });
+    await updateHouseholdSettings(hh.context, { revealVoteAuthorship: true }, actor);
+    expect(await snapshotOf(hh, round.id)).toMatchObject({ revealVoteAuthorship: false });
   });
 
   it("still accepts a change when no round is open (AC-1.15)", async () => {

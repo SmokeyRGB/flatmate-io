@@ -32,6 +32,7 @@ function board(over: Partial<Board> = {}): Board {
       scored: [{ applicationId: "b", applicantName: "Bea", state: "invited", score: 60, n: 3, leading: false }],
       unscored: [],
     },
+    closed: { scored: [], unscored: [] },
     hidden: [{ applicationId: "e", applicantName: "Elsa", state: "invited" }],
     ...over,
   };
@@ -224,5 +225,71 @@ describe("RankingBoard Einladen (spec deliberation/ranking, casting/invitation)"
     expect(dora).not.toContain("score-ring");
     expect(textOf(rowOf(markup, "Anna"))).toContain(t.scoreOf(5));
     expect(markup).not.toContain("<textarea");
+  });
+});
+
+// F5 candidate-detail D8/D9: rows open the detail, and the applications out of the running sit in a
+// collapsed group.
+describe("RankingBoard rows open the detail (candidate-detail)", () => {
+  it("scored and unscored rows link to the detail in all three groups, and hidden rows do not", async () => {
+    const markup = await render(
+      board({
+        closed: {
+          scored: [{ applicationId: "f", applicantName: "Fina", state: "withdrawn", score: 40, n: 2, leading: false }],
+          unscored: [{ applicationId: "g", applicantName: "Gita", state: "rejected_by_household", n: 1, needed: 2 }],
+        },
+      }),
+    );
+    for (const [name, id] of [
+      ["Anna", "a"],
+      ["Dora", "d"],
+      ["Bea", "b"],
+      ["Fina", "f"],
+      ["Gita", "g"],
+    ]) {
+      expect(rowOf(markup, name), name).toContain(`href="/casting/candidate/${id}"`);
+    }
+    expect(rowOf(markup, "Elsa")).not.toContain("<a ");
+    expect(rowOf(markup, "Elsa")).not.toContain("/casting/candidate/");
+  });
+
+  it("the closed group is a <details> without `open`, with its count and the state labels, and no „Einladen“", async () => {
+    const markup = await render(
+      board({
+        closed: {
+          scored: [{ applicationId: "f", applicantName: "Fina", state: "withdrawn", score: 40, n: 2, leading: false }],
+          unscored: [{ applicationId: "g", applicantName: "Gita", state: "rejected_by_household", n: 1, needed: 2 }],
+        },
+      }),
+      true,
+    );
+    const start = markup.indexOf("<details");
+    expect(start).toBeGreaterThan(-1);
+    const details = markup.slice(start, markup.indexOf("</details>", start));
+    expect(details.slice(0, details.indexOf(">"))).not.toMatch(/\bopen\b/);
+    expect(textOf(details)).toContain(`${t.closedHeading} ${t.closedCount(2)}`);
+    expect(textOf(rowOf(details, "Fina"))).toContain(de.status.application.withdrawn);
+    expect(textOf(rowOf(details, "Gita"))).toContain(de.status.application.rejected_by_household);
+    expect(details).not.toContain(de.invite.open);
+    expect(details).not.toContain("ranking-leading");
+    // The group sits below „Eingeladen“.
+    expect(start).toBeGreaterThan(markup.indexOf(`>${t.invitedHeading}</h2>`));
+  });
+
+  it("a board with only closed rows renders the group, not the empty state", async () => {
+    const markup = await render(
+      board({
+        decided: { scored: [], unscored: [] },
+        invited: { scored: [], unscored: [] },
+        hidden: [],
+        closed: { scored: [], unscored: [{ applicationId: "g", applicantName: "Gita", state: "withdrawn", n: 1, needed: 2 }] },
+      }),
+    );
+    expect(markup).toContain("<details");
+    expect(textOf(markup)).not.toContain(t.empty("Herbstrunde"));
+  });
+
+  it("no closed group is rendered without closed rows", async () => {
+    expect(await render(board())).not.toContain("<details");
   });
 });

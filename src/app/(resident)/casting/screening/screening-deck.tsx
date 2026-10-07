@@ -18,22 +18,15 @@ import type { RoundStatus } from "@/modules/casting/repository";
 import type { ScreeningCard } from "@/modules/deliberation/repository";
 import type { ScaleWeights } from "@/modules/deliberation/round-rules";
 import { VOTE_VALUES, type VoteValue } from "@/modules/deliberation/vote-values";
+import { HORIZONTAL_RATIO, SLOP_PX, releaseDecision } from "@/ui/swipe";
 import { SubmitButton } from "@/ui/submit-button";
 import { de } from "@/ui/strings";
+import { CardBody } from "../candidate-card-body";
 import { WeightsList } from "../weights-list";
 import { castVoteAction, type CastVoteResult } from "./actions";
 import { canGoBack, canGoForward, deckReducer, initialDeckState } from "./deck-state";
 
 const t = de.screening;
-
-// Swipe thresholds (design D9): tuned in the walkthrough, so they are constants, not logic.
-const SLOP_PX = 10;
-const HORIZONTAL_RATIO = 1.5;
-const RELEASE_FRACTION = 0.25;
-const RELEASE_MAX_PX = 80;
-// A quick flick counts too: on a phone the natural swipe is short and fast, not a long drag.
-const FLICK_MIN_PX = 30;
-const FLICK_MIN_SPEED = 0.4; // px per ms over the last move
 
 // One colour class per level (a red-to-green scale from the design system's --vote-* tokens, see
 // globals.css). Colour never stands alone: every level also has its symbol and its label, and the
@@ -53,28 +46,6 @@ const ICONS: Record<VoteValue, ReactNode> = {
 };
 
 type Refusal = { kind: "round_not_open"; status: RoundStatus | null } | { kind: "not_eligible" };
-
-function CardBody({ card }: { card: ScreeningCard }) {
-  return (
-    <>
-      <h2 className="font-serif text-xl font-semibold">
-        {card.applicantName}
-        {card.age !== null && <span className="font-sans text-base font-normal text-muted-foreground">, {t.ageYears(card.age)}</span>}
-      </h2>
-      {card.messageRaw && <p className="mt-3 whitespace-pre-wrap text-sm">{card.messageRaw}</p>}
-      {card.attributes && card.attributes.length > 0 && (
-        <dl className="mt-4 space-y-1 text-sm">
-          {card.attributes.map((a, i) => (
-            <div key={i} className="flex gap-2">
-              <dt className="font-medium">{a.label}:</dt>
-              <dd>{a.value}</dd>
-            </div>
-          ))}
-        </dl>
-      )}
-    </>
-  );
-}
 
 // One card of the stack. The previous, current and next card are all rendered with their real
 // content, keyed by application id so React never remounts them mid-animation; only `data-pos`
@@ -288,16 +259,14 @@ export function ScreeningDeck({
       return;
     }
     const width = stackRef.current?.offsetWidth ?? event.currentTarget.offsetWidth;
-    const threshold = Math.min(width * RELEASE_FRACTION, RELEASE_MAX_PX);
-    const far = Math.abs(s.dx) >= threshold;
-    const flick = Math.abs(s.dx) >= FLICK_MIN_PX && s.speed >= FLICK_MIN_SPEED;
-    const commit = cancelled ? far : far || flick;
+    // The release rule is shared with the candidate detail sheet (src/ui/swipe.ts).
+    const { commit, direction } = releaseDecision({ dx: s.dx, speed: s.speed, width, cancelled });
     // The drag ends first; if the move commits, the state change then animates from where the
     // finger let go, otherwise the card springs back.
     setDrag(null);
     if (!commit) return;
     // Right = back, left = forward; forward only if the card is rated (canGoForward).
-    if (s.dx > 0) goBack();
+    if (direction > 0) goBack();
     else goForward();
   }
 
