@@ -113,9 +113,8 @@ NULL` and `RETURNING (xmax = 0) AS inserted`. A plain SELECT pre-read of the cal
   required to read them). Inserts come from a resident session, which always has a profile.
 - Not added to `REDACTABLE_KEYS`: a stage name is not personal data.
 - **Who can see that X voted on Y.** The event's actor plus subject reveals *that* a resident
-  voted, which `reveal_vote_authorship` hides on D2. This adds nothing over raw SQL: any resident
-  can already read `vote` rows of the household under RLS, by ADR-004's layering, where roles
-  within a household are application-level. No app reader of `activity_event` exists. **A future
+  voted, which `reveal_vote_authorship` hides on D2. Only the server's `app_runtime` role ever runs SQL; end users reach events only through app
+  readers, and none exists today. This is NOT a precedent that event visibility is accepted. **A future
   activity feed must filter `vote.*` by the round's frozen `revealVoteAuthorship`.** Record this
   in the spec's Purpose note at sync, not as code now.
 
@@ -192,3 +191,7 @@ None. No schema change and no hand-off. Rollback is a revert.
 
 - Banner heading keeps the code's „… für alle Bewerbungen gevotet!“ (the human set it).
 - A re-rate after a withdrawal is `vote.cast`; withdrawing with no live vote is refused `not_found`.
+
+## Pre-mortem (2026-10-12)
+
+Core lock-order claims verified against Postgres upsert semantics. Findings folded into tasks.md §0: H1 lock probe could pass vacuously under RLS; M1 deterministic 3.2(j); M2/M3 digit-key stale-id/in-flight/repeat; L1 setWhere; L2 exact inserted flags instead of xmax; L3 ratedInPass; L4 callout text colour; L5 matrix case; L6 refusal precedence (spec); L7 D3 wording.

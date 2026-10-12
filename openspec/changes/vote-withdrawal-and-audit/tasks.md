@@ -1,3 +1,19 @@
+> **Pre-mortem amendments (2026-10-12) are binding and override the task text below where they differ: see §0.**
+
+## 0. Pre-mortem amendments
+
+- [ ] 0.1 Read these before any task; each names the task it changes.
+  - **3.3 (H1)**: hold `application FOR UPDATE` under a context WITH a profile (e.g. the moderator's or another resident's context; under the household context 0018 makes it lock 0 rows) and assert it locked exactly 1 row. Run the NOWAIT probe under the VOTER's own context in its own short transaction (the RESTRICTIVE own-profile UPDATE policy makes FOR UPDATE match 0 rows otherwise) and assert it returned 1 row. Also assert the withdraw has not settled within 2000 ms while the lock is held.
+  - **3.2(j) (M1)**: deterministic, no seam: `holdTransaction(voter.context, tx => DELETE FROM vote WHERE id = …)` uncommitted; start withdrawVote (pre-read sees the committed row; the upsert waits on the deleter); release → upsert inserts → `inserted` → throw `not_found` → rollback. Assert `not_found`, zero rows, no event. Drop the invariant-guard fallback.
+  - **4.1/4.2 (M2, M3)**: `rate()` takes the id from `stateRef.current.ids[stateRef.current.index]`, never a render closure; a synchronous in-flight ref is set before dispatch and cleared in `handleResult` (both paths); ignore `event.repeat`; the listener reads `rate` through a ref. `deckKeyAction` is pure and takes `{key, modifiers, repeat, inTextField, popoverOpen, dialogOpen, refusal, inFlight}`; one unit case per guard (modifier, repeat, text field, popover, dialog, refusal, in-flight), plus mapping and ←/→.
+  - **2.1/3.1 (L1, L2)**: use Drizzle `setWhere` (not the deprecated `where`) in `onConflictDoUpdate`. Inserted-flag without `xmax`: withdrawVote `RETURNING (withdrawn_at IS NULL) AS inserted` (trigger forces NULL on INSERT; the SET makes it non-null); castVote `RETURNING (created_at = updated_at) AS inserted` (trigger sets them equal on INSERT; UPDATE stamps clock_timestamp later).
+  - **5.1 (L3)**: use a `ratedInPass` flag set on a successful `rated` (a ref or reducer field), not `Object.keys(state.ratings)` — `dropped` deletes entries.
+  - **5.4 (L4)**: `.callout-celebratory` sets no text colour; give the heading `text-primary` (and the base callout class if one exists).
+  - **3.4 (L5)**: classification is the `DELIBERATION_CASE_NAMES` array (~line 934); add `withdrawVote` there. Cases: no vote → `not_found`; household → `ProfileRequiredError`; and the stronger one: vote, then remove participation (`setRemoved`) → `not_eligible`.
+  - **1.2 (L8)**: the break also fails the `{stage: "invite"}` accept case for `vote.cast`; expected.
+  - **3.2(a) (L9)**: assert `createdAt` exactly equal to the first rating's; `updatedAt >= withdrawnAt` is fine but not the point.
+  - **5.3 (L10)**: importing `SavedToast` from `(org)` is fine; no move needed. Type `searchParams` with `rated?: string | string[]`.
+
 ## 1. Audit: register the vote events
 
 - [ ] 1.1 `src/modules/audit/repository.ts`: add `"vote.cast"`, `"vote.revised"` and

@@ -51,8 +51,8 @@ A withdrawal SHALL be refused exactly where a vote would be refused, with the sa
 round is not open, the resident has no right to vote, the profile is not active, the application
 is their own, or the application is no longer `new`/`screened`. A withdrawal SHALL be refused as
 not found, and change nothing, when the resident holds no live vote on the application, either
-none at all or one already withdrawn. A rating after a withdrawal makes the vote live again.
-Sources: FR-4.14, AC-4.15, EC-4.7, FR-4.15.
+none at all or one already withdrawn. When the resident holds no live vote, not found takes precedence over every other reason. A
+rating after a withdrawal makes the vote live again. Sources: FR-4.14, AC-4.15, EC-4.7, FR-4.15.
 
 #### Scenario: Withdraw, then inspect
 - **WHEN** a resident rated an application `good` and withdraws the rating
