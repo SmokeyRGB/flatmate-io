@@ -26,7 +26,7 @@ npm run lint       # eslint
 npm test          # vitest run
 npx vitest run tests/unit/casting/room-transitions.test.ts   # single file
 npx vitest run -t "test name substring"                       # single test by name
-npm run verify     # the full gate: eslint + tsc + nine guardrail lints + check-refs, then vitest run
+npm run verify     # the full gate: eslint + tsc + nine guardrail lints + depcruise + license check + check-refs, then vitest run
 npm run seed:demo # tsx --env-file=.env.local scripts/seed-demo-household.ts
 ```
 
@@ -74,8 +74,8 @@ bun run format    # prettier --write .
   not built yet. Each module owns a `schema.ts` (Drizzle tables), `repository.ts` (the only file
   outside `src/db/` allowed to touch the raw client), and, where relevant, a `transitions.ts` for
   its state machine. Cross-module access goes through a module's exported functions, never its
-  schema/repository directly — `import-boundary.ts` only enforces the raw-client rule, so respect
-  the module boundary by convention too.
+  schema/repository directly — `dependency-cruiser` enforces that in `npm run verify` (see The
+  stack below).
 - **`src/db/`**: `client.ts` (the one place the raw Postgres/Drizzle client is constructed) and
   `session-context.ts` (the one place the RLS session context is set: `withSessionContext`
   opens the transaction and sets it with one transaction-local `set_config(…, true)` statement,
@@ -189,9 +189,13 @@ quotation marks.
 Next.js/TypeScript, Postgres, Drizzle, Supabase EU with Supabase Auth. Six bounded contexts
 (ADR-001): `identity`, `casting`, `deliberation`, `scheduling`, `audit`, `notifications` — three
 built so far. Tooling per `tools/README.md`: Vitest (RLS tests run twice per G-C7), gitleaks
-(pre-commit via husky + CI). `dependency-cruiser` and `license-checker-rseidelsohn` are recorded
-decisions not yet wired in; the import-boundary/session-context/rls-coverage/guarded-tests checks
-that exist today are hand-written scripts under `scripts/lint/`, not those tools.
+(pre-commit via husky + CI), and `dependency-cruiser` (`.dependency-cruiser.cjs`) and
+`license-checker-rseidelsohn` (production allowlist), both run in `npm run verify`. A new
+cross-module `schema.ts`/`repository.ts` import fails verify. Known violations are baselined in
+`.dependency-cruiser-known-violations.json`; adding an entry needs a human decision (G-G3),
+recorded in a `chore(tooling)` commit (precedents 3030066, adc2410). The
+import-boundary/session-context/rls-coverage/guarded-tests checks are hand-written scripts under
+`scripts/lint/`, not those tools.
 
 ## Working under `openspec/` (OpenSpec)
 
