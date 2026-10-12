@@ -11,6 +11,7 @@ import { LinkPendingHint } from "@/ui/link-pending-hint";
 import { holdsPermission } from "@/app/holds-permission";
 import { INVITE_PERMISSION } from "@/app/(org)/rounds/[id]/applications/invite-text";
 import { shouldOpenScreening } from "../dashboard/dashboard-view";
+import { SavedToast } from "@/app/(org)/rounds/[id]/saved-toast";
 import { RankingBoard } from "./ranking-board";
 
 // The Casting tab (spec `ui/resident-frame`): takes a resident with applications awaiting their
@@ -26,7 +27,7 @@ import { RankingBoard } from "./ranking-board";
 export default async function CastingPage({
   searchParams,
 }: {
-  searchParams: Promise<{ round?: string | string[] }>;
+  searchParams: Promise<{ round?: string | string[]; rated?: string | string[] }>;
 }) {
   const t = (await getStrings()).casting;
   const current = await getCurrentSession();
@@ -39,7 +40,7 @@ export default async function CastingPage({
   ]);
   if (shouldOpenScreening(overview, awaitingVotes)) redirect("/casting/screening");
 
-  const { round } = await searchParams;
+  const { round, rated } = await searchParams;
   const roundId = typeof round === "string" && isUuid(round) ? round : null;
   // „Einladen" is offered from the stored permission, never from a role. The repository function
   // behind it refuses again on its own (F5 candidate-invite, design D5). Read beside the ranking,
@@ -58,6 +59,10 @@ export default async function CastingPage({
       </Link>
       <h1 className="font-serif text-2xl font-semibold">{t.rankingHeading}</h1>
       <RankingBoard ranking={ranking} canInvite={canInvite} />
+      {/* Set by the pass when the resident rated at least one card in it. It sits past the redirect
+          above, so a resident with new work never sees it. It reveals nothing, so a hand-typed
+          ?rated=1 shows only the praise. */}
+      {rated !== undefined && <SavedToast param="rated" tone="celebrate" message={t.ratedToast} />}
     </div>
   );
 }

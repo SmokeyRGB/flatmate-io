@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { SuccessToast } from "@/ui/success-toast";
 
 // Shows the success notice once, when the page is reached with ?saved=<application id> after a capture
-// (or ?updated=1 after a correction: the `param` prop names which). The trigger is created once per
+// (or ?updated=1 after a correction, ?rated=1 after a screening pass: the `param` prop names which). The trigger is created once per
 // mount, so the toast opens on arrival and can be dismissed.
 //
 // The parameter is then taken out of the URL, so a reload or a back-navigation does not announce a
@@ -15,10 +15,12 @@ export function SavedToast({
   message,
   link,
   param = "saved",
+  tone,
 }: {
   message: string;
   link?: { href: string; label: string };
-  param?: "saved" | "updated";
+  param?: "saved" | "updated" | "rated";
+  tone?: "celebrate";
 }) {
   const [trigger] = useState<object>(() => ({}));
   useEffect(() => {
@@ -27,5 +29,5 @@ export function SavedToast({
     url.searchParams.delete(param);
     window.history.replaceState(window.history.state, "", url.pathname + url.search + url.hash);
   }, [param]);
-  return <SuccessToast message={message} trigger={trigger} link={link} />;
+  return <SuccessToast message={message} trigger={trigger} link={link} tone={tone} />;
 }

@@ -11,6 +11,7 @@ import {
 } from "@/modules/casting/schema";
 import { CORRECTABLE_FIELDS } from "@/modules/casting/application-changes";
 import { VOTING_PROCEDURE_FIELDS } from "@/modules/casting/settings-fields";
+import { VOTE_STAGES } from "@/modules/deliberation/vote-values";
 import { membershipRoleEnum, residentProfileStatusEnum } from "@/modules/identity/schema";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -73,6 +74,13 @@ const PAYLOAD_ALLOWLIST: Readonly<Record<string, readonly string[]>> = {
   "account.email_changed": [],
   "account.password_changed": [],
   "account.password_reset_by_admin": [],
+  // F4 change 2 (vote-withdrawal-and-audit, D3): the voting stage only, never the value, old or new
+  // (G-D7). A stage name is not personal data, so none of these is in REDACTABLE_KEYS. The actor
+  // plus subject reveal THAT a resident voted, which `revealVoteAuthorship` hides: a future activity
+  // feed must filter `vote.*` by the round's frozen `revealVoteAuthorship`.
+  "vote.cast": ["stage"],
+  "vote.revised": ["stage"],
+  "vote.withdrawn": ["stage"],
 };
 
 // G-D7 at the write boundary, for VALUES (Copilot, PR #41): the allowlist above only names the keys,
@@ -116,6 +124,9 @@ const PAYLOAD_VALUE_RULES: Readonly<Record<string, Readonly<Record<string, Value
   "household_settings.changed": { field: commaListOf(VOTING_PROCEDURE_FIELDS) },
   "household_settings.changed_while_round_open": { field: oneOf(VOTING_PROCEDURE_FIELDS), roundId: uuidValue },
   "membership.role_changed": { fromRole: oneOf(roles), toRole: oneOf(roles) },
+  "vote.cast": { stage: oneOf(VOTE_STAGES) },
+  "vote.revised": { stage: oneOf(VOTE_STAGES) },
+  "vote.withdrawn": { stage: oneOf(VOTE_STAGES) },
 };
 
 // Exported for the test that every allowlisted key has a rule.

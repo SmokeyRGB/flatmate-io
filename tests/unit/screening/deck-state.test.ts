@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { deckReducer, initialDeckState, type DeckAction, type DeckState } from "@/app/(resident)/casting/screening/deck-state";
+import {
+  deckKeyAction,
+  deckReducer,
+  initialDeckState,
+  type DeckAction,
+  type DeckKeyInput,
+  type DeckState,
+} from "@/app/(resident)/casting/screening/deck-state";
 
 // F4 change 1 tasks 7.2 (design D9): the pass's navigation rules, pure.
 const IDS = ["a", "b", "c", "d"];
@@ -138,4 +145,56 @@ describe("deckReducer", () => {
 
   // Breaks (tasks 7.2): allow `forward` on an unrated card; use `index + 1` in `rated`; omit `done`
   // in `dropped` -> each fails its case above.
+});
+
+// vote-withdrawal-and-audit D4: the keys 1-4 rate, the arrows move, and each guard has its own case.
+describe("deckKeyAction", () => {
+  const free: Omit<DeckKeyInput, "key"> = {
+    modifiers: false,
+    repeat: false,
+    inTextField: false,
+    popoverOpen: false,
+    dialogOpen: false,
+    refusal: false,
+    inFlight: false,
+  };
+  const press = (key: string, over: Partial<DeckKeyInput> = {}) => deckKeyAction({ ...free, key, ...over });
+
+  it("maps 1 to 4 to the buttons' order", () => {
+    expect(press("1")).toEqual({ type: "rate", value: "no" });
+    expect(press("2")).toEqual({ type: "rate", value: "rather_not" });
+    expect(press("3")).toEqual({ type: "rate", value: "good" });
+    expect(press("4")).toEqual({ type: "rate", value: "definitely" });
+  });
+
+  it("ignores every other key", () => {
+    for (const key of ["0", "5", "9", "a", "Enter", " ", "10"]) expect(press(key)).toBeNull();
+  });
+
+  it("keeps the arrows: back and forward", () => {
+    expect(press("ArrowLeft")).toEqual({ type: "back" });
+    expect(press("ArrowRight")).toEqual({ type: "forward" });
+  });
+
+  const guards: [string, Partial<DeckKeyInput>][] = [
+    ["a modifier key", { modifiers: true }],
+    ["a repeating key", { repeat: true }],
+    ["a text field", { inTextField: true }],
+    ["the open pop-over", { popoverOpen: true }],
+    ["an open dialog", { dialogOpen: true }],
+    ["a showing refusal", { refusal: true }],
+    ["a rating in flight", { inFlight: true }],
+  ];
+  for (const [label, over] of guards) {
+    it(`ignores a digit while ${label} applies`, () => {
+      expect(press("3", over)).toBeNull();
+    });
+  }
+
+  it("keeps the arrows' old guards (modifier, text field, pop-over) and no others", () => {
+    expect(press("ArrowLeft", { modifiers: true })).toBeNull();
+    expect(press("ArrowLeft", { inTextField: true })).toBeNull();
+    expect(press("ArrowRight", { popoverOpen: true })).toBeNull();
+    expect(press("ArrowRight", { repeat: true })).toEqual({ type: "forward" });
+  });
 });

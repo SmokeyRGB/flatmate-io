@@ -107,6 +107,35 @@ describe("ActivityEvent payload values (G-D7)", () => {
   }
 });
 
+// F4 change 2 (vote-withdrawal-and-audit, D3): the three vote events carry the stage and nothing
+// else. The value, old or new, is never in a payload (G-D7).
+describe("vote event payloads (G-D7)", () => {
+  const SENTINEL = "definitely";
+  for (const eventType of ["vote.cast", "vote.revised", "vote.withdrawn"]) {
+    it(`${eventType} accepts the stage, or nothing`, () => {
+      expect(() => assertPayloadAllowed(eventType, { stage: "invite" })).not.toThrow();
+      expect(() => assertPayloadAllowed(eventType, {})).not.toThrow();
+    });
+    const refused: [string, Record<string, unknown>][] = [
+      ["the value", { value: SENTINEL }],
+      ["the stage next to a value", { stage: "invite", value: SENTINEL }],
+      ["a stage outside the enum", { stage: SENTINEL }],
+    ];
+    for (const [label, payload] of refused) {
+      it(`${eventType} refuses ${label}, and the error never carries the value`, () => {
+        let caught: unknown;
+        try {
+          assertPayloadAllowed(eventType, payload);
+        } catch (err) {
+          caught = err;
+        }
+        expect(caught).toBeInstanceOf(PayloadValidationError);
+        expect((caught as Error).message).not.toContain(SENTINEL);
+      });
+    }
+  }
+});
+
 // FR-0.13/G-D8: end-of-retention redaction nulls only the 🔴/⚫-classified payload keys for an
 // event_type, leaving everything else — structure, timestamps, the actor/action-kind chain, and
 // any non-sensitive key — readable. Fixed 2026-09-17 (/speckit-converge T046): this test

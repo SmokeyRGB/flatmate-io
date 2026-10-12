@@ -1,4 +1,5 @@
-import { and, eq, inArray, isNull } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, isNull, ne, or, sql } from "drizzle-orm";
+import { recordActivityEvent } from "@/modules/audit/repository";
 import { isUuid, withSessionContext, type SessionContext } from "@/db/session-context";
 import {
   ProfileRequiredError,
@@ -722,7 +723,25 @@ export async function castVote(
         if (err instanceof HouseholdAccountCannotVoteError) throw new VoteError("not_eligible");
         throw err;
       }
-      await tx
+      // Read only to classify the event (design D2). ponytail: unlocked, because locking the vote
+      // row here would break the lock order (application before vote row, drizzle/0028), so two
+      // concurrent writes by the SAME voter (two tabs) can mislabel one event as cast/revised; the
+      // row itself stays correct. Upgrade path: PG 18 `RETURNING OLD`, which needs no pre-read.
+      const [before] = await tx
+        .select({ value: vote.value, withdrawnAt: vote.withdrawnAt })
+        .from(vote)
+        .where(
+          and(
+            eq(vote.applicationId, applicationId),
+            eq(vote.residentProfileId, profileId),
+            eq(vote.stage, "invite"),
+          ),
+        );
+      // BEFORE INSERT vote_guard still runs on the proposed row, so a same-value re-send in a
+      // paused round is refused; the `setWhere` only skips the UPDATE of a no-op (no column moves,
+      // no event). `created_at = updated_at` holds only for the row just inserted: the trigger sets
+      // them equal on INSERT, and an UPDATE stamps a later clock_timestamp().
+      const [written] = await tx
         .insert(vote)
         .values({
           householdId: context.householdId,
@@ -735,7 +754,90 @@ export async function castVote(
         .onConflictDoUpdate({
           target: [vote.applicationId, vote.residentProfileId, vote.stage],
           set: { value: value as VoteValue, withdrawnAt: null },
-        });
+          setWhere: or(ne(vote.value, sql`excluded.value`), isNotNull(vote.withdrawnAt)),
+        })
+        .returning({ inserted: sql<boolean>`(${vote.createdAt} = ${vote.updatedAt})` });
+      if (!written) return;
+      const becameLive = written.inserted || !before || before.withdrawnAt !== null;
+      await recordActivityEvent(tx, {
+        householdId: context.householdId,
+        eventType: becameLive ? "vote.cast" : "vote.revised",
+        subjectType: "application",
+        subjectId: applicationId,
+        actorAccountId: context.accountId,
+        actorProfileId: profileId,
+        payload: { stage: "invite" },
+      });
+    });
+  } catch (err) {
+    if (err instanceof VoteError) throw err;
+    throw toVoteError(err);
+  }
+}
+
+// One withdrawal, one upsert (design D1). It is an INSERT ... ON CONFLICT on purpose: BEFORE INSERT
+// `vote_guard` runs on the proposed row first, applies EVERY vote rule and takes its shared locks
+// (round, participation, profile, application) before the vote row is locked, which is the order
+// drizzle/0028's header binds a vote writer to (deleteApplication locks the application FOR UPDATE
+// first). A plain UPDATE would lock the vote row first and could deadlock against it; a casting
+// port pre-locking the chain would be a second copy of the trigger's order. The pre-read only
+// supplies the INSERT's columns and refuses "nothing to withdraw"; it decides no rule.
+// LOCK ORDER: membership FOR SHARE, then the trigger's chain, then the vote row.
+export async function withdrawVote(context: SessionContext, input: { applicationId: string }): Promise<void> {
+  if (context.profileId === null) throw new ProfileRequiredError("withdrawVote");
+  const profileId = context.profileId;
+  const { applicationId } = input;
+  if (typeof applicationId !== "string" || !isUuid(applicationId)) throw new VoteError("invalid_input");
+  try {
+    await withSessionContext(context, async (tx) => {
+      try {
+        await assertAccountCanVoteTx(tx, context);
+      } catch (err) {
+        if (err instanceof HouseholdAccountCannotVoteError) throw new VoteError("not_eligible");
+        throw err;
+      }
+      const [before] = await tx
+        .select({ roundId: vote.roundId, value: vote.value, withdrawnAt: vote.withdrawnAt })
+        .from(vote)
+        .where(
+          and(
+            eq(vote.applicationId, applicationId),
+            eq(vote.residentProfileId, profileId),
+            eq(vote.stage, "invite"),
+          ),
+        );
+      if (!before || before.withdrawnAt !== null) throw new VoteError("not_found");
+      // (withdrawn_at IS NULL) is true only for a row just inserted: the trigger forces NULL on
+      // INSERT, and the SET below makes it non-null.
+      const [written] = await tx
+        .insert(vote)
+        .values({
+          householdId: context.householdId,
+          roundId: before.roundId,
+          applicationId,
+          residentProfileId: profileId,
+          stage: "invite",
+          value: before.value,
+        })
+        .onConflictDoUpdate({
+          target: [vote.applicationId, vote.residentProfileId, vote.stage],
+          set: { withdrawnAt: sql`clock_timestamp()` },
+          setWhere: isNull(vote.withdrawnAt),
+        })
+        .returning({ inserted: sql<boolean>`(${vote.withdrawnAt} IS NULL)` });
+      // No row: a concurrent withdrawal won. `inserted`: the row vanished since the pre-read (only
+      // deleteApplication or a raw DELETE can do that); throwing rolls the insert back, so a
+      // withdrawal never creates a live vote.
+      if (!written || written.inserted) throw new VoteError("not_found");
+      await recordActivityEvent(tx, {
+        householdId: context.householdId,
+        eventType: "vote.withdrawn",
+        subjectType: "application",
+        subjectId: applicationId,
+        actorAccountId: context.accountId,
+        actorProfileId: profileId,
+        payload: { stage: "invite" },
+      });
     });
   } catch (err) {
     if (err instanceof VoteError) throw err;

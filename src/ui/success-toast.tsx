@@ -21,10 +21,14 @@ export function SuccessToast({
   message,
   trigger,
   link,
+  tone,
 }: {
   message: string;
   trigger: object | null;
   link?: { href: string; label: string };
+  // "celebrate": the check mark draws itself and a few small stars rise around it (CSS only, so
+  // reduced motion drops both). The message stays the same plain, announced text.
+  tone?: "celebrate";
 }) {
   const s = useStrings();
   const [dismissed, setDismissed] = useState<object | null>(null);
@@ -41,7 +45,19 @@ export function SuccessToast({
     <div role="status" aria-live="polite" className="toast-region">
       {open && (
         <div className="toast">
-          <CircleCheck className="size-5 shrink-0 text-primary" aria-hidden />
+          {tone === "celebrate" ? (
+            <span className="toast-celebrate" aria-hidden="true">
+              <svg viewBox="0 0 24 24" className="size-5 text-primary" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10" />
+                <path className="toast-check-path" pathLength={1} d="m8 12.5 3 3 5-6" />
+              </svg>
+              <i className="toast-star toast-star-1" />
+              <i className="toast-star toast-star-2" />
+              <i className="toast-star toast-star-3" />
+            </span>
+          ) : (
+            <CircleCheck className="size-5 shrink-0 text-primary" aria-hidden />
+          )}
           <p className="flex-1">{message}</p>
           {link && (
             <Link href={link.href} className="underline">
