@@ -168,5 +168,22 @@
       "severity": "error",
       "name": "no-cross-module-schema-or-repository"
     }
+  },
+  {
+    "type": "dependency",
+    "from": "src/modules/deliberation/repository.ts",
+    "to": "src/modules/audit/repository.ts",
+    "unresolvedTo": "@/modules/audit/repository",
+    "dependencyTypes": [
+      "aliased",
+      "aliased-tsconfig",
+      "aliased-tsconfig-paths",
+      "local",
+      "import"
+    ],
+    "rule": {
+      "severity": "error",
+      "name": "no-cross-module-schema-or-repository"
+    }
   }
 ]
