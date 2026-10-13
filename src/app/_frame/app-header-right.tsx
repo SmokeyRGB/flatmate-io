@@ -32,7 +32,7 @@ export async function AppHeaderRight({ context, surface }: { context: SessionCon
     <AvatarMenu
       displayName={displayName}
       householdName={householdName}
-      access={{ ...access, dashboard: context.profileId !== null && access.organisation }}
+      access={{ ...access, dashboard: context.profileId !== null && access.organisation, hasProfile: context.profileId !== null }}
       surface={surface}
       signOutAction={signOutAction}
     />

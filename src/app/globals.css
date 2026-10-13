@@ -293,6 +293,61 @@ h3 {
     opacity: 0.75;
   }
 
+  /* organisation-task-list D4: O1's section tiles (an icon in a round chip above the label) and the
+     segmented progress bar. Existing tokens only, so light and dark follow the theme. */
+  .org-tile {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.75rem 0.5rem;
+    min-width: 0;
+    text-align: center;
+    font-size: 0.75rem;
+    font-weight: 500;
+    /* Long German labels („Mitgliederverwaltung") break inside the tile instead of overflowing it. */
+    overflow-wrap: anywhere;
+    hyphens: auto;
+  }
+  .org-tile > :first-child {
+    display: flex;
+    width: 2.25rem;
+    height: 2.25rem;
+    align-items: center;
+    justify-content: center;
+    border-radius: 9999px;
+    background: var(--color-secondary);
+    color: var(--color-primary);
+  }
+  .org-progress {
+    display: flex;
+    gap: 0.375rem;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  .org-progress > li {
+    height: 0.5rem;
+    flex: 1;
+    border-radius: 9999px;
+    background: var(--color-primary);
+  }
+  /* In progress (the current step, or an earlier one still running): diagonal stripes, the common
+     "still going" signal. Same shape as every other segment, no ring, no opacity (a faded primary
+     was indistinguishable from "next" on the dark background, visual QA 2026-10-13). The caption
+     names the current step. */
+  .org-progress > li[data-state="current"],
+  .org-progress > li[data-state="running"] {
+    background: repeating-linear-gradient(
+      -45deg,
+      var(--color-primary) 0 0.3125rem,
+      color-mix(in srgb, var(--color-primary) 35%, var(--color-muted)) 0.3125rem 0.625rem
+    );
+  }
+  .org-progress > li[data-state="next"] {
+    background: var(--color-muted);
+  }
+
   /* start-screen: the resident frame's bottom bar — fixed, icon-only, becomes header text links at
      md: (09-Design-System.md, Navigation). */
   .bottom-nav {

@@ -213,16 +213,59 @@ export const en = {
     },
     dashboard: {
       heading: "Organisation",
-      activeRoundEyebrow: "Current round",
-      asNextEyebrow: "Up next",
       openFirstRoundHeading: "Open your first casting round",
       openFirstRoundBody: "Nothing is running yet — open a round when you have rooms to fill.",
-      openNewRound: "Open new round",
       openAnotherRound: "Open another round",
-      // D13 (application-capture): the household account and any session without manage_rounds is
-      // not offered the way to open a round; runs of the round are the moderation's (S-50/U-20).
-      noRoundYetHeading: "No round yet",
-      noRoundYetBody: "The household's moderators open casting rounds.",
+      // organisation-task-list D5: English twins of the confirmed German wording.
+      tasks: {
+        addRoomHeading: "Add a room",
+        addRoomReason: "A search needs a room first.",
+        inviteFlatmatesHeading: "Invite your flatmates",
+        inviteFlatmatesReason: "Nobody has joined yet.",
+        appointSearchLeadHeading: "Who runs the search?",
+        appointSearchLeadReason: "One person guides the round.",
+        shareLinksHeading: "Share invitation links",
+        shareLinksReason: "The links are ready — send them to your flatmates.",
+        takeOver: "Take it on myself",
+        appointSomeone: "Choose someone",
+        openRoundForRoomHeading: (room: string) => `Start a search for ${room}`,
+        openRoundForRoomReason: "This room is free but in no round.",
+        inviteCandidatesHeading: "Invite to a viewing",
+        inviteCandidatesReason: (round: string) => `Applications lead in “${round}” — you can invite.`,
+      },
+      steps: {
+        opened: "Open the round",
+        collecting: "Collect applications",
+        voting: "Vote",
+        invited: "Send out invitations",
+      },
+      setupSteps: {
+        room: "Room",
+        flatmates: "Flatmates",
+        searchLead: "Search lead",
+        searchStart: "Start the search",
+      },
+      status: {
+        running: (round: string) => `${round} is running.`,
+        noApplication: "No application yet.",
+        almostReady: "Your household is almost ready.",
+        noRound: "No round is running.",
+        applications: (n: number) => (n === 1 ? "1 application" : `${n} applications`),
+        invitedOfThem: (n: number) => `${n} of them invited`,
+      },
+      progressCaption: (n: number, m: number, step: string) => `Step ${n} of ${m} · ${step}`,
+      progressSegment: (step: string, state: string) => `${step}: ${state}`,
+      progressRunningSuffix: (step: string) => `${step} still running`,
+      progressDone: "done",
+      progressCurrent: "now",
+      progressRunning: "still running",
+      progressNext: "to come",
+      goToCasting: "Go to casting",
+      captureApplication: "Capture application",
+      more: "More",
+      allApplications: "All applications",
+      roundPanelEyebrow: "This round",
+      householdEyebrow: "Household",
       // founding-link-moderator D4 (2026-10-06): drafts for the human to confirm. Shown to the
       // household account while the founding link is still unused.
       foundingJoinHeading: "Join your household yourself",
@@ -231,7 +274,7 @@ export const en = {
       foundingJoinButton: "Join now",
       otherRoundsHeading: "Other rounds",
       roomsLink: "Rooms",
-      membersLink: "Members",
+      membersLink: "Member administration",
       settingsLink: "Settings",
       whoLivesHereLink: "Who lives here",
     },
@@ -245,7 +288,7 @@ export const en = {
     // join-by-link design.md Decision 13: `/claim` is gone — a prepared profile is claimed only
     // through a link bound to it (task 12.8's per-profile "Einladung erzeugen" action, rendered
     // below in this same list once the profile exists).
-    addResidentHelperInviteNote: "Then create an invitation for this person below in the list.",
+    addResidentHelperInviteNote: "The invitation is created along with it — then share the link.",
     noOneJoinedYet: "No one has joined yet — share your invitation link to invite the first person.",
     // join-code-protections (O-18, 2026-09-21): O16 now lists several issued links rather than
     // one rotating code — screens/O-organisation.md O16, in the order warning / create form /
@@ -394,8 +437,18 @@ export const en = {
       labelRequired: "Enter a name for the room.",
       genericFailure: "The room could not be created. Please try again.",
     },
-    changeState: "Change status",
+    transitions: {
+      markFree: "Mark as free",
+      pause: "Pause the search",
+      makeFreeAgain: "Make free again",
+      notAvailable: "Not available",
+    },
     remove: "Remove",
+    removeDialog: {
+      heading: (label: string) => `Remove room “${label}”?`,
+      submit: "Remove",
+      submitPending: "Removing…",
+    },
   },
   rounds: {
     new: {
@@ -445,6 +498,8 @@ export const en = {
       // The three steps (design D6): Nachricht, Angaben, Hinweis.
       messageIntro: "Paste the person’s message if you have it. Enter the rest in the next step.",
       next: "Next",
+      // organisation-task-list D9: the third-party step 2 saves nothing yet; saving happens on “Understood”.
+      nextToNotice: "Continue to the notice",
       back: "Back",
       nameLabel: "Name",
       ageLabel: "Age",
@@ -822,7 +877,7 @@ export const en = {
       headingSingular: "1 thing is waiting for you",
       headingPlural: (n: number) => `${n} things are waiting for you`,
       body: "A room is ready for a new round.",
-      allDone: "All done – well done",
+      nothingToOrganise: "Nothing to organise right now",
       button: "To organisation →",
     },
   },

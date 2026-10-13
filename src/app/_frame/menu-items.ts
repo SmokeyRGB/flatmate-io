@@ -16,12 +16,15 @@ export interface MenuItem {
 export type Surface = "resident" | "organisation";
 
 export function menuItems(
-  access: { dashboard: boolean; organisation: boolean; membersList: boolean },
+  access: { dashboard: boolean; organisation: boolean; membersList: boolean; hasProfile: boolean },
   surface: Surface,
   s: Strings,
 ): MenuItem[] {
   const items: MenuItem[] = [
-    access.membersList
+    // fix round F7: chosen by identity, not by the right to see the list. A session with a resident
+    // profile (moderators included) gets "Wer hier wohnt"; the members list is the household
+    // account's, and a moderator reaches it from O1's "Mitgliederverwaltung" tile.
+    access.membersList && !access.hasProfile
       ? { key: "people", label: s.nav.members, href: "/members", icon: "Users" }
       : { key: "people", label: s.nav.whoLivesHere, href: "/who-lives-here", icon: "Users" },
   ];

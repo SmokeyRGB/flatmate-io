@@ -862,7 +862,10 @@ export async function getResidentList(
       .leftJoin(account, eq(account.id, membership.accountId))
       .where(
         and(eq(residentProfile.householdId, context.householdId), ne(residentProfile.status, "removed")),
-      );
+      )
+      // organisation-task-list D8: oldest first, ties by id, so the list does not reorder between
+      // views (without an ORDER BY Postgres returns rows in whatever order the join produced).
+      .orderBy(residentProfile.createdAt, residentProfile.id);
 
     const members: ResidentListEntry[] = rows.map((r) => ({
       id: r.id,
@@ -1738,19 +1741,97 @@ export async function getLiveFoundingLinkPath(context: SessionContext): Promise<
   return withSessionContext(context, async (tx) => {
     const callerRow = await readLiveMembershipTx(tx, context, true);
     if (!callerRow || !membershipHoldsPermission(callerRow, "manage_join_codes")) return null;
-    const [row] = await tx
-      .select({ code: joinCodeIssuance.code })
-      .from(joinCodeIssuance)
-      .where(
-        and(
-          eq(joinCodeIssuance.householdId, context.householdId),
-          eq(joinCodeIssuance.isFoundingLink, true),
-          isNull(joinCodeIssuance.deletedAt),
-          gt(joinCodeIssuance.expiresAt, sql`now()`),
-          lt(joinCodeIssuance.uses, joinCodeIssuance.maxUses),
-        ),
+    return liveFoundingLinkPathTx(tx, context);
+  });
+}
+
+// The unused, undeleted, unexpired founding link's join path. The caller has already checked
+// `manage_join_codes` on the locked membership it holds.
+async function liveFoundingLinkPathTx(tx: Tx, context: SessionContext): Promise<string | null> {
+  const [row] = await tx
+    .select({ code: joinCodeIssuance.code })
+    .from(joinCodeIssuance)
+    .where(
+      and(
+        eq(joinCodeIssuance.householdId, context.householdId),
+        eq(joinCodeIssuance.isFoundingLink, true),
+        isNull(joinCodeIssuance.deletedAt),
+        gt(joinCodeIssuance.expiresAt, sql`now()`),
+        lt(joinCodeIssuance.uses, joinCodeIssuance.maxUses),
+      ),
+    );
+  return row ? buildJoinUrl(null, row.code) : null;
+}
+
+// organisation-task-list D1: the identity half of the organisation task list. Each task is decided
+// by a stored permission on the caller's live membership (read FOR SHARE, like the founding-link
+// read), never by a role: `invite_flatmates` (manage_join_codes) while no live resident membership
+// exists; `appoint_search_lead` (appoint_moderator) while no live membership holds
+// `manage_rounds` (R5: the stored permissions array, so a non-resident moderator counts). The
+// founding link path rides on `appoint_search_lead` when the caller may read it. One transaction,
+// no nesting.
+//
+// Fix round F3/F4: `invite_flatmates` also says whether a flatmate invitation is already out
+// (unused, unexpired, undeleted, not the founding link, which is the founder's own), so the task can
+// ask to share it instead of making one. `appoint_search_lead` is produced only when it has a
+// working way: the founding link, or a live resident membership to appoint (`canAppointMember`).
+export type HouseholdSetupTask =
+  | { kind: "invite_flatmates"; invitationsOutstanding: boolean }
+  | { kind: "appoint_search_lead"; foundingJoinPath: string | null; canAppointMember: boolean };
+
+export async function listHouseholdSetupTasks(context: SessionContext): Promise<HouseholdSetupTask[]> {
+  return withSessionContext(context, async (tx) => {
+    const callerRow = await readLiveMembershipTx(tx, context, true);
+    if (!callerRow) return [];
+    const canInvite = membershipHoldsPermission(callerRow, "manage_join_codes");
+    const canAppoint = membershipHoldsPermission(callerRow, "appoint_moderator");
+    if (!canInvite && !canAppoint) return [];
+
+    const tasks: HouseholdSetupTask[] = [];
+    if (canInvite) {
+      const [{ exists }] = await tx.execute<{ exists: boolean }>(
+        sql`SELECT EXISTS (
+              SELECT 1 FROM membership
+              WHERE household_id = ${context.householdId}::uuid
+                AND revoked_at IS NULL AND is_resident
+            ) AS exists`,
       );
-    return row ? buildJoinUrl(null, row.code) : null;
+      if (!exists) {
+        const [{ outstanding }] = await tx.execute<{ outstanding: boolean }>(
+          sql`SELECT EXISTS (
+                SELECT 1 FROM join_code_issuance
+                WHERE household_id = ${context.householdId}::uuid
+                  AND purpose = 'join' AND NOT is_founding_link AND deleted_at IS NULL
+                  AND expires_at > now() AND uses < max_uses
+              ) AS outstanding`,
+        );
+        tasks.push({ kind: "invite_flatmates", invitationsOutstanding: outstanding });
+      }
+    }
+    if (canAppoint) {
+      const [{ exists }] = await tx.execute<{ exists: boolean }>(
+        sql`SELECT EXISTS (
+              SELECT 1 FROM membership
+              WHERE household_id = ${context.householdId}::uuid
+                AND revoked_at IS NULL AND 'manage_rounds' = ANY(permissions)
+            ) AS exists`,
+      );
+      if (!exists) {
+        const foundingJoinPath = canInvite ? await liveFoundingLinkPathTx(tx, context) : null;
+        const [{ appointable }] = await tx.execute<{ appointable: boolean }>(
+          sql`SELECT EXISTS (
+                SELECT 1 FROM membership
+                WHERE household_id = ${context.householdId}::uuid
+                  AND revoked_at IS NULL AND is_resident
+                  AND NOT ('manage_rounds' = ANY(permissions))
+              ) AS appointable`,
+        );
+        if (foundingJoinPath || appointable) {
+          tasks.push({ kind: "appoint_search_lead", foundingJoinPath, canAppointMember: appointable });
+        }
+      }
+    }
+    return tasks;
   });
 }
 

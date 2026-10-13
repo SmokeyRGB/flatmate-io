@@ -8,6 +8,11 @@
 // "1 Stimme" / "n Stimmen": the one place the singular is decided.
 const votesLabel = (n: number) => (n === 1 ? "1 Stimme" : `${n} Stimmen`);
 
+// organisation-task-list D9: Compliance §4.5's sample text says "von der WG {Haushaltsname}", which
+// doubled to "WG WG Gartenstraße" for a household already named "WG …". Only the prefix is dropped
+// (word boundary, any case); the wording is otherwise untouched.
+const wgPrefixFor = (household: string) => (/^wg\b/i.test(household.trim()) ? "" : "WG ");
+
 export const de = {
   common: {
     // src/ui/password-input.tsx: the eye toggle beside every password field.
@@ -212,16 +217,67 @@ export const de = {
     },
     dashboard: {
       heading: "Organisation",
-      activeRoundEyebrow: "Aktuelle Runde",
-      asNextEyebrow: "Als nächstes",
       openFirstRoundHeading: "Eröffne deine erste Casting-Runde",
       openFirstRoundBody: "Noch läuft nichts — eröffne eine Runde, sobald du Zimmer zum Besetzen hast.",
-      openNewRound: "Neue Runde eröffnen",
       openAnotherRound: "Weitere Runde eröffnen",
-      // D13 (application-capture): the household account and any session without manage_rounds is
-      // not offered the way to open a round; runs of the round are the moderation's (S-50/U-20).
-      noRoundYetHeading: "Noch keine Runde",
-      noRoundYetBody: "Casting-Runden eröffnet die Moderation der WG.",
+      // organisation-task-list D5 (wording confirmed by the human): process wording (C-10), never a
+      // person. A heading is a verb, the reason one line.
+      tasks: {
+        addRoomHeading: "Zimmer anlegen",
+        addRoomReason: "Ohne Zimmer kann keine Suche starten.",
+        inviteFlatmatesHeading: "Mitbewohnende einladen",
+        inviteFlatmatesReason: "Noch niemand ist beigetreten.",
+        appointSearchLeadHeading: "Wer kümmert sich um die Suche?",
+        appointSearchLeadReason: "Eine Person führt durch die Runde.",
+        // fix round F3: a flatmate invitation exists, so the task is to share it.
+        shareLinksHeading: "Einladungslinks teilen",
+        shareLinksReason: "Die Links sind erstellt — schick sie an deine Mitbewohnenden.",
+        takeOver: "Selbst übernehmen",
+        appointSomeone: "Jemanden bestimmen",
+        openRoundForRoomHeading: (room: string) => `Suche für ${room} starten`,
+        openRoundForRoomReason: "Das Zimmer ist frei, aber in keiner Runde.",
+        inviteCandidatesHeading: "Zu Castings einladen",
+        inviteCandidatesReason: (round: string) => `In „${round}“ stehen Bewerbungen vorn — ihr könnt einladen.`,
+      },
+      steps: {
+        opened: "Runde eröffnen",
+        collecting: "Bewerbungen sammeln",
+        voting: "Abstimmen",
+        invited: "Einladungen verschicken",
+      },
+      setupSteps: {
+        room: "Zimmer",
+        flatmates: "Mitbewohnende",
+        searchLead: "Suchleitung",
+        searchStart: "Suche starten",
+      },
+      status: {
+        running: (round: string) => `${round} läuft.`,
+        noApplication: "Noch keine Bewerbung da.",
+        almostReady: "Eure WG ist fast startklar.",
+        noRound: "Gerade läuft keine Runde.",
+        // The status sentence's short counts, in the order of the main path (D4 example
+        // „7 in Sichtung, 1 eingeladen."). Start keeps its own longer sentences.
+        // Human decision 2026-10-13: the total, then how many of them are invited („in Abstimmung"
+        // read oddly). Side states are not counted.
+        applications: (n: number) => (n === 1 ? "1 Bewerbung" : `${n} Bewerbungen`),
+        invitedOfThem: (n: number) => `davon ${n} eingeladen`,
+      },
+      progressCaption: (n: number, m: number, step: string) => `Schritt ${n} von ${m} · ${step}`,
+      progressSegment: (step: string, state: string) => `${step}: ${state}`,
+      // fix round F1: an earlier step still running is named next to the current one.
+      progressRunningSuffix: (step: string) => `${step} läuft noch`,
+      progressDone: "erledigt",
+      progressCurrent: "jetzt dran",
+      progressRunning: "läuft noch",
+      progressNext: "kommt noch",
+      goToCasting: "Zum Casting",
+      captureApplication: "Bewerbung erfassen",
+      more: "Mehr",
+      allApplications: "Alle Bewerbungen",
+      // Human feedback 2026-10-13: round items and household management grouped apart.
+      roundPanelEyebrow: "Diese Runde",
+      householdEyebrow: "Haushalt",
       // founding-link-moderator D4 (2026-10-06): drafts for the human to confirm. Shown to the
       // household account while the founding link is still unused.
       foundingJoinHeading: "Tritt deiner WG selbst bei",
@@ -230,7 +286,7 @@ export const de = {
       foundingJoinButton: "Jetzt beitreten",
       otherRoundsHeading: "Weitere Runden",
       roomsLink: "Zimmer",
-      membersLink: "Mitglieder",
+      membersLink: "Mitgliederverwaltung",
       settingsLink: "Einstellungen",
       whoLivesHereLink: "Wer hier wohnt",
     },
@@ -244,7 +300,7 @@ export const de = {
     // join-by-link design.md Decision 13: `/claim` is gone — a prepared profile is claimed only
     // through a link bound to it (task 12.8's per-profile "Einladung erzeugen" action, rendered
     // below in this same list once the profile exists).
-    addResidentHelperInviteNote: "Erzeuge anschließend unten in der Liste eine Einladung für diese Person.",
+    addResidentHelperInviteNote: "Die Einladung wird gleich mit erstellt — teile danach den Link.",
     noOneJoinedYet: "Noch niemand ist beigetreten — teile deinen Einladungslink, um die erste Person einzuladen.",
     // join-code-protections (O-18, 2026-09-21): O16 now lists several issued links rather than
     // one rotating code — screens/O-organisation.md O16, in the order warning / create form /
@@ -393,8 +449,20 @@ export const de = {
       labelRequired: "Gib eine Bezeichnung für das Zimmer ein.",
       genericFailure: "Das Zimmer konnte nicht angelegt werden. Versuche es erneut.",
     },
-    changeState: "Status ändern",
+    // organisation-task-list D7: each state change is its own named action. Changing a room's state
+    // sends nothing to anyone.
+    transitions: {
+      markFree: "Als frei markieren",
+      pause: "Suche pausieren",
+      makeFreeAgain: "Wieder freigeben",
+      notAvailable: "Nicht verfügbar",
+    },
     remove: "Entfernen",
+    removeDialog: {
+      heading: (label: string) => `Zimmer „${label}“ entfernen?`,
+      submit: "Entfernen",
+      submitPending: "Wird entfernt…",
+    },
   },
   rounds: {
     new: {
@@ -444,6 +512,9 @@ export const de = {
       // The three steps (design D6): Nachricht, Angaben, Hinweis.
       messageIntro: "Füge die Nachricht der Person ein, falls du sie hast. Den Rest tippst du im nächsten Schritt.",
       next: "Weiter",
+      // organisation-task-list D9: step 2 of a third-party capture saves nothing yet, so its button
+      // says where it leads. Saving happens on „Verstanden“.
+      nextToNotice: "Weiter zum Hinweis",
       back: "Zurück",
       nameLabel: "Name",
       ageLabel: "Alter",
@@ -610,7 +681,7 @@ export const de = {
       // 06-Compliance-Anhang.md §4.5 „Stufe 1, Variante Dritterhebung", verbatim except {Name},
       // {Haushaltsname} and {Kategorien}.
       thirdPartyText: (v: { name: string; household: string; categories: string }) =>
-        `Hey ${v.name}, kurze Info von der WG ${v.household}: Deine Bewerbung (${v.categories}) haben wir ` +
+        `Hey ${v.name}, kurze Info von der ${wgPrefixFor(v.household)}${v.household}: Deine Bewerbung (${v.categories}) haben wir ` +
         `über eine andere Person bekommen und für unsere Zimmersuche gespeichert. Spätestens 180 Tage ` +
         `nach Ende der Suche löschen wir alles wieder. Wenn du nicht dabei sein möchtest oder wissen ` +
         `willst, was wir über dich gespeichert haben, sag einfach Bescheid – dann löschen wir es sofort. ` +
@@ -826,7 +897,7 @@ export const de = {
       headingSingular: "1 Sache wartet auf dich",
       headingPlural: (n: number) => `${n} Sachen warten auf dich`,
       body: "Ein Zimmer ist bereit für eine neue Runde.",
-      allDone: "Alles erledigt – gut gemacht",
+      nothingToOrganise: "Gerade ist nichts zu organisieren",
       button: "Zur Organisation →",
     },
   },

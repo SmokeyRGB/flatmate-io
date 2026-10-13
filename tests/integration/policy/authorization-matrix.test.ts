@@ -152,6 +152,7 @@ const NOT_APPLICABLE_IDENTITY: Record<string, string> = {
   isHouseholdAccount: "read-only (identifies the caller by its stored household-only permissions)",
   getLiveFoundingLinkPath:
     "read-only; returns null for a caller without manage_join_codes (the code is a secret)",
+  listHouseholdSetupTasks: "read-only; visibility tested in household-setup-tasks.test.ts",
   resolveAccountHousehold:
     "pre-session bootstrap — the ONE deliberate RLS-bootstrap exception (drizzle/0005): sign-in " +
     "has no household_id yet, discovering it is this call's entire purpose.",

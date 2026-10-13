@@ -6,6 +6,8 @@ import {
   assertHasPermissionTx,
   assertHoldsAllPermissionsTx,
   assertHoldsAnyPermissionTx,
+  getMembershipForAccount,
+  membershipHoldsPermission,
   PermissionDeniedError,
 } from "@/modules/identity/repository";
 import { householdSettings, membership, residentProfile } from "@/modules/identity/schema";
@@ -1514,70 +1516,107 @@ export async function listRoundsForSession(context: SessionContext) {
   });
 }
 
-// The ONE definition of what is open for a moderator, read by Start's moderation bridge and by the
-// organisation tab's first-round card alike, so the two can never disagree.
+// The casting half of the organisation task list. O1 and Start's moderation bridge read it through
+// `loadOrganisationTasks` ((org)/organisation-tasks.ts), which adds the identity and ranking halves,
+// so the two screens cannot disagree.
 export type OrganisationTask =
-  // The household has no round at all, in any status, and a first round can start: either it has
-  // no room yet (the form leads to the rooms page) or some room can be cast for. The first round is
-  // the moderator's next step, so it is the only task until one exists; room tasks start once the
-  // household has any round. When rooms exist but none can be cast for, there is no task.
+  // organisation-task-list D1: the household has no undeleted room. A round cannot be opened
+  // without one (the new-round form refuses with `no_rooms_selected`), so this replaces
+  // `open_first_round` in that case.
+  | { kind: "add_room" }
+  // The household has no round at all, in any status, and some undeleted room can be cast for.
+  // The first round is the moderator's next step, so it is the only round task until one exists;
+  // room tasks start once the household has any round. When rooms exist but none can be cast for,
+  // there is no task.
   | { kind: "open_first_round" }
   // A room open for letting that no draft/open/paused round covers (start-screen design.md
   // Decision 4; the room-covered check is local to this function on purpose).
   | { kind: "open_round_for_room"; roomId: string; label: string };
 
-// start-screen design.md Decision 4/Assumption 3 (tasks.md 3.2): `open_first_round` when the
-// household has no `casting_round` row of any status and either no undeleted room or at least one
-// that `isRoomOpenableForRound` accepts (rooms that are all occupied/not_available give `[]`, since
-// `/rounds/new` would refuse them), otherwise one `open_round_for_room` per room
-// open for letting and not covered by a draft/open/paused round. Returns `[]` for a viewer who
-// does not hold `manage_rounds` — the permission `rounds/new`'s own action already requires — so
-// the bridge's count never promises something the destination action would refuse.
+export interface OrganisationTaskList {
+  tasks: OrganisationTask[];
+  // The open rounds for which an "invite candidates" check is due: the caller holds manage_rounds,
+  // has a resident profile and takes part in the round with the right to vote. Empty otherwise, so
+  // the loader never asks `getRanking` (which refuses a profile-less session) for a household
+  // account (G-D15). The ranking itself is read by the loader: casting cannot import deliberation.
+  rankingRoundIds: string[];
+}
+
+// start-screen design.md Decision 4/Assumption 3, extended by organisation-task-list D1: each task
+// is gated by the permission its action needs, from ONE live-membership read, never by a role:
+// `add_room` (manage_rooms) when no undeleted room exists, `open_first_round` (manage_rounds) when
+// the household has no `casting_round` row of any status and some undeleted room passes
+// `isRoomOpenableForRound`, otherwise one `open_round_for_room` per room open for letting and not
+// covered by a draft/open/paused round. The membership is read before the transaction opens, not
+// inside it: getMembershipForAccount has its own, and nesting throws NestedSessionContextError.
 // Carries no application-derived value, so it is not a G-D15 read (design.md Decision 9's finding
 // is scoped to `application`, not `room`/`casting_round`).
-export async function listOrganisationTasks(context: SessionContext): Promise<OrganisationTask[]> {
-  try {
-    await assertHasPermission(context, context.accountId, "manage_rounds");
-  } catch (err) {
-    if (err instanceof PermissionDeniedError) return [];
-    throw err;
-  }
+export async function listOrganisationTasks(context: SessionContext): Promise<OrganisationTaskList> {
+  const none: OrganisationTaskList = { tasks: [], rankingRoundIds: [] };
+  const member = await getMembershipForAccount(context, context.accountId);
+  if (!member) return none;
+  const canRooms = membershipHoldsPermission(member, "manage_rooms");
+  const canRounds = membershipHoldsPermission(member, "manage_rounds");
+  if (!canRooms && !canRounds) return none;
+  // A stale claim (the session names a profile the live membership no longer has) gets no ranking.
+  const profileId = member.residentProfileId === context.profileId ? context.profileId : null;
 
   return withSessionContext(context, async (tx) => {
-    const anyRound = await tx.execute<{ id: string }>(
-      sql`SELECT cr.id FROM casting_round cr
-          WHERE cr.household_id = ${context.householdId}::uuid
-          LIMIT 1`,
+    const tasks: OrganisationTask[] = [];
+    const roomRows = await tx.execute<{ status: RoomStatus }>(
+      sql`SELECT room.status FROM room
+          WHERE room.household_id = ${context.householdId}::uuid
+            AND room.deleted_at IS NULL`,
     );
-    if (anyRound.length === 0) {
-      const roomRows = await tx.execute<{ status: RoomStatus }>(
-        sql`SELECT room.status FROM room
-            WHERE room.household_id = ${context.householdId}::uuid
-              AND room.deleted_at IS NULL`,
+    if (canRooms && roomRows.length === 0) tasks.push({ kind: "add_room" });
+
+    if (canRounds) {
+      const anyRound = await tx.execute<{ id: string }>(
+        sql`SELECT cr.id FROM casting_round cr
+            WHERE cr.household_id = ${context.householdId}::uuid
+            LIMIT 1`,
       );
-      const canStart =
-        roomRows.length === 0 ||
-        roomRows.some((r: { status: RoomStatus }) => isRoomOpenableForRound(r.status));
-      return canStart ? [{ kind: "open_first_round" as const }] : [];
+      if (anyRound.length === 0) {
+        // Zero rooms gives `add_room` (above, when held), never this: the form would refuse.
+        if (roomRows.some((r: { status: RoomStatus }) => isRoomOpenableForRound(r.status))) {
+          tasks.push({ kind: "open_first_round" });
+        }
+      } else {
+        const rows = await tx.execute<{ id: string; label: string }>(
+          sql`SELECT room.id, room.label
+              FROM room
+              WHERE room.household_id = ${context.householdId}::uuid
+                AND room.status = 'open' AND room.deleted_at IS NULL
+                AND NOT EXISTS (
+                  SELECT 1 FROM casting_round cr
+                  WHERE cr.household_id = ${context.householdId}::uuid
+                    AND cr.status IN ('draft', 'open', 'paused')
+                    AND room.id = ANY(cr.room_ids)
+                )`,
+        );
+        for (const r of rows as { id: string; label: string }[]) {
+          tasks.push({ kind: "open_round_for_room", roomId: r.id, label: r.label });
+        }
+      }
     }
 
-    const rows = await tx.execute<{ id: string; label: string }>(
-      sql`SELECT room.id, room.label
-          FROM room
-          WHERE room.household_id = ${context.householdId}::uuid
-            AND room.status = 'open' AND room.deleted_at IS NULL
-            AND NOT EXISTS (
-              SELECT 1 FROM casting_round cr
-              WHERE cr.household_id = ${context.householdId}::uuid
-                AND cr.status IN ('draft', 'open', 'paused')
-                AND room.id = ANY(cr.room_ids)
-            )`,
-    );
-    return rows.map((r: { id: string; label: string }): OrganisationTask => ({
-      kind: "open_round_for_room" as const,
-      roomId: r.id,
-      label: r.label,
-    }));
+    let rankingRoundIds: string[] = [];
+    if (canRounds && profileId !== null) {
+      const open = await tx.execute<{ round_id: string }>(
+        sql`SELECT cr.id AS round_id
+            FROM round_participation rp
+            JOIN casting_round cr ON cr.id = rp.round_id
+            WHERE rp.resident_profile_id = ${profileId}::uuid
+              AND rp.household_id = ${context.householdId}::uuid
+              AND cr.household_id = ${context.householdId}::uuid
+              AND rp.removed_at IS NULL
+              AND rp.can_vote
+              AND cr.status = 'open'
+            ORDER BY cr.created_at DESC, cr.id`,
+      );
+      rankingRoundIds = (open as { round_id: string }[]).map((r) => r.round_id);
+    }
+    return { tasks, rankingRoundIds };
   });
 }
 

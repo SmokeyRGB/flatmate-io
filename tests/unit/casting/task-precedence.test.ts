@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
   distributionOf,
+  orderOrganisationTasks,
   orderTasks,
   phaseOf,
+  roundStepOf,
+  type OrganisationTaskKind,
   type OpenTask,
 } from "@/modules/casting/task-precedence";
 
@@ -119,5 +122,53 @@ describe("distributionOf", () => {
 
   it("returns an empty array when there are no counts", () => {
     expect(distributionOf({})).toEqual([]);
+  });
+});
+
+// organisation-task-list design D2/D3 (tasks.md 1.1).
+describe("orderOrganisationTasks", () => {
+  const ALL: OrganisationTaskKind[] = [
+    "add_room",
+    "invite_flatmates",
+    "appoint_search_lead",
+    "open_first_round",
+    "open_round_for_room",
+    "invite_candidates",
+  ];
+
+  it("orders the six kinds in the fixed order when given reversed", () => {
+    const reversed = [...ALL].reverse().map((kind) => ({ kind }));
+    expect(orderOrganisationTasks(reversed).map((t) => t.kind)).toEqual(ALL);
+  });
+
+  it("breaks a tie between same-kind tasks by key, whatever the input order", () => {
+    const tasks = [
+      { kind: "open_round_for_room" as const, id: "b" },
+      { kind: "open_round_for_room" as const, id: "a" },
+      { kind: "open_round_for_room" as const, id: "c" },
+    ];
+    const out = orderOrganisationTasks(tasks, (t) => t.id).map((t) => t.id);
+    expect(out).toEqual(["a", "b", "c"]);
+    expect(orderOrganisationTasks([...tasks].reverse(), (t) => t.id).map((t) => t.id)).toEqual(out);
+  });
+
+  it("gives the same output for the same input and does not mutate it", () => {
+    const input = [{ kind: "invite_candidates" as const }, { kind: "add_room" as const }];
+    const snapshot = [...input];
+    expect(orderOrganisationTasks(input)).toEqual(orderOrganisationTasks(input));
+    expect(input).toEqual(snapshot);
+  });
+});
+
+describe("roundStepOf", () => {
+  it("maps the first two phases to waiting and voting", () => {
+    expect(roundStepOf("waiting_for_applications")).toBe("waiting");
+    expect(roundStepOf("voting_round_1")).toBe("voting");
+  });
+
+  it("clamps every later phase to invited", () => {
+    expect(roundStepOf("scheduling")).toBe("invited");
+    expect(roundStepOf("voting_round_2")).toBe("invited");
+    expect(roundStepOf("offer")).toBe("invited");
   });
 });

@@ -109,3 +109,19 @@ describe("Resident list access by stored permission", () => {
     await expect(getResidentList(moderator.context, moderator.accountId)).rejects.toThrow(PermissionDeniedError);
   });
 });
+
+// organisation-task-list D8 / identity/member-administration "Residents are listed in a stable
+// order": oldest first. The names are created out of alphabetical order, so ordering by name would
+// not pass by accident.
+describe("Resident list order", () => {
+  it("lists profiles in creation order on every read", async () => {
+    hh = await registerTestHousehold();
+    const actor = { accountId: hh.accountId, profileId: null };
+    for (const name of ["Mia", "Alex", "Jonas"]) {
+      await createResidentProfile(hh.context, name, actor);
+    }
+    const names = async () => (await getResidentList(hh!.context, hh!.accountId)).members.map((m) => m.displayName);
+    expect(await names()).toEqual(["Mia", "Alex", "Jonas"]);
+    expect(await names()).toEqual(["Mia", "Alex", "Jonas"]);
+  });
+});

@@ -364,9 +364,10 @@ describe("the correction form: O3 in edit mode", () => {
     // The date is never "now plus a month".
     expect(html).not.toContain(de.applications.notice.deadlineLine("Testbewerbung Lea", "15.02.2020"));
 
-    // On step 2 the primary control goes on (Weiter) instead of saving.
+    // On step 2 the primary control goes on instead of saving. organisation-task-list D9: it now
+    // says where it leads ("Weiter zum Hinweis"), where it used to read "Weiter".
     const step2 = renderEdit({ switchTo: true, step: 2 });
-    expect(step2).toContain(">" + de.applications.capture.next + "<");
+    expect(step2).toContain(">" + de.applications.capture.nextToNotice + "<");
     expect(step2).not.toContain(">" + de.applications.edit.save + "<");
   });
 

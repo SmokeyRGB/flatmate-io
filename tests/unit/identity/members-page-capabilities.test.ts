@@ -66,12 +66,12 @@ const liveIssuance = {
   hasRemovedJoiner: false,
 };
 
-function render(flags: Flags): string {
+function render(flags: Flags, boundIssuances: Array<Omit<typeof liveIssuance, "residentProfileId"> & { residentProfileId: string | null }> = []): string {
   const residentList: ResidentListResult = { members, ...flags, leadWithJoinCode: false };
   return renderWithStrings(
     createElement(MembersView, {
       residentList,
-      joinCodeIssuances: flags.canManageJoinCodes ? [liveIssuance] : [],
+      joinCodeIssuances: flags.canManageJoinCodes ? [liveIssuance, ...boundIssuances] : [],
       host: "example.test",
       now: NOW,
       callerIsHouseholdAccount: true,
@@ -140,6 +140,30 @@ describe("the members screen offers each control exactly when its flag is set", 
 });
 
 // Walkthrough 2026-10-05: an old, already deleted reset link was shown on the row as if usable.
+// fix round F6: the invite button hides beside a live bound invitation, and the helper note is
+// shown only to a caller who can issue one.
+describe("the invitation for a prepared profile", () => {
+  const ALL: Flags = { ...NONE, canManageJoinCodes: true, canManageMembers: true, canCreateProfile: true };
+  const bound = (expiresAt: Date) => ({ ...liveIssuance, id: "i2", code: "BOUND-CODE1", residentProfileId: "p4", expiresAt });
+
+  it("no issue button beside a live bound invitation, and the link is shown", () => {
+    const html = render(ALL, [bound(new Date("2026-10-09T12:00:00Z"))]);
+    expect(html).not.toContain(de.members.joinCode.issueForProfile);
+    expect(html).toContain("BOUND-CODE1");
+  });
+
+  it("the issue button is back once that invitation has expired", () => {
+    const html = render(ALL, [bound(new Date("2026-10-01T12:00:00Z"))]);
+    expect(html).toContain(de.members.joinCode.issueForProfile);
+  });
+
+  it("the helper note is the new text, shown with manage_join_codes only", () => {
+    expect(de.members.addResidentHelperInviteNote).toBe("Die Einladung wird gleich mit erstellt — teile danach den Link.");
+    expect(render(ALL)).toContain(de.members.addResidentHelperInviteNote);
+    expect(render({ ...ALL, canManageJoinCodes: false })).not.toContain(de.members.addResidentHelperInviteNote);
+  });
+});
+
 describe("the reset link on a member row", () => {
   type Issuance = Parameters<typeof MembersView>[0]["joinCodeIssuances"][number];
   const resetIssuance = (over: Partial<Issuance>): Issuance => ({
@@ -324,5 +348,26 @@ describe("the founding link on the members screen", () => {
     const html = renderWith([liveIssuance]);
     expect(html).not.toContain(de.members.joinCode.foundingLinkLabel);
     expect(html).not.toContain(de.members.joinCode.foundingLinkHint);
+  });
+
+  // organisation-task-list D8: the generic "share this link only directly" note is advice, not an
+  // alarm. The founding-link caution keeps its red callout.
+  const calloutAround = (html: string, text: string) => {
+    const i = html.indexOf(text);
+    expect(i).toBeGreaterThan(-1);
+    return html.slice(html.lastIndexOf('<div class="callout', i), i);
+  };
+
+  it("renders as callout-info with the Info icon, and not as a caution", () => {
+    const html = renderWith([liveIssuance]);
+    const before = calloutAround(html, de.members.joinCode.warning);
+    expect(before).toContain("callout-info");
+    expect(before).toContain("lucide-info");
+    expect(before).not.toContain("callout-caution");
+  });
+
+  it("leaves the founding-link caution red", () => {
+    const html = renderWith([founding({}), liveIssuance]);
+    expect(calloutAround(html, de.members.joinCode.foundingLinkHint)).toContain("callout-caution");
   });
 });

@@ -455,7 +455,7 @@ export function CaptureForm({
                     else setShown({ code: "name_required", field: "applicantName" });
                   }}
                 >
-                  {t.next}
+                  {t.nextToNotice}
                 </button>
               ) : (
                 <SubmitButton

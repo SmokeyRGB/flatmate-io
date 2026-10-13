@@ -1,18 +1,27 @@
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { f1TargetStatusesFor } from "@/modules/casting/room-transitions";
+import { f1TargetStatusesFor, type RoomStatus } from "@/modules/casting/room-transitions";
 import { listRooms } from "@/modules/casting/repository";
 import { getCurrentSession } from "@/modules/identity/session-cookie";
 import { OrganisationAccessDenied } from "@/app/(org)/organisation-access-denied";
 import { requireOrganisationAccess } from "@/app/(org)/organisation-access";
+import type { Strings } from "@/ui/strings";
 import { getStrings } from "@/ui/strings/request";
 import { LinkPendingHint } from "@/ui/link-pending-hint";
 import { SubmitButton } from "@/ui/submit-button";
-import { removeRoomAction, renameRoomAction, transitionRoomAction } from "./actions";
+import { renameRoomAction, transitionRoomAction } from "./actions";
 import { NewRoomDialog } from "./new-room-dialog";
+import { RemoveRoomForm } from "./remove-room-form";
 
 // Screen O14. FR-1.9–FR-1.11: create/rename/remove rooms; each room's state is its own.
+// organisation-task-list D7: the transition's own name, never "Open"/"Status ändern".
+function transitionLabel(t: Strings["rooms"]["transitions"], from: RoomStatus, to: RoomStatus): string {
+  if (to === "not_available") return t.notAvailable;
+  if (to === "on_hold") return t.pause;
+  return from === "planned" ? t.markFree : t.makeFreeAgain;
+}
+
 export default async function RoomsPage() {
   const s = await getStrings();
   const t = s.rooms;
@@ -52,24 +61,24 @@ export default async function RoomsPage() {
                 <SubmitButton className="btn-link shrink-0">{s.common.rename}</SubmitButton>
               </form>
 
-              <form action={transitionRoomAction} className="flex gap-1">
-                <input type="hidden" name="roomId" value={r.id} />
-                <select name="toStatus" defaultValue={r.status} className="field-input py-1 text-sm">
-                  {/* Options are this room's own legal targets (plus its current status), not
-                      every F1-reachable target across all rooms — see f1TargetStatusesFor. */}
-                  {f1TargetStatusesFor(r.status).map((target) => (
-                    <option key={target} value={target}>
-                      {s.status.room[target]}
-                    </option>
-                  ))}
-                </select>
-                <SubmitButton className="btn-link shrink-0">{t.changeState}</SubmitButton>
-              </form>
+              {/* One form per target: this room's own legal targets (never every F1-reachable target
+                  across all rooms, see f1TargetStatusesFor), minus its current status. */}
+              {f1TargetStatusesFor(r.status)
+                .filter((target) => target !== r.status)
+                .map((target) => (
+                  <form key={target} action={transitionRoomAction}>
+                    <input type="hidden" name="roomId" value={r.id} />
+                    <input type="hidden" name="toStatus" value={target} />
+                    <SubmitButton className="btn btn-secondary py-1">
+                      {transitionLabel(t.transitions, r.status, target)}
+                    </SubmitButton>
+                  </form>
+                ))}
+            </div>
 
-              <form action={removeRoomAction}>
-                <input type="hidden" name="roomId" value={r.id} />
-                <SubmitButton className="btn-link text-destructive">{t.remove}</SubmitButton>
-              </form>
+            {/* Set apart on its own line: the one action that cannot be undone. */}
+            <div className="mt-3 border-t border-border pt-3">
+              <RemoveRoomForm roomId={r.id} label={r.label} />
             </div>
           </li>
         ))}

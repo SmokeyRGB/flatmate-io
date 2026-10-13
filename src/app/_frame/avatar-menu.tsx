@@ -29,7 +29,7 @@ export function AvatarMenu({
 }: {
   displayName: string;
   householdName: string;
-  access: { dashboard: boolean; organisation: boolean; membersList: boolean };
+  access: { dashboard: boolean; organisation: boolean; membersList: boolean; hasProfile: boolean };
   surface: Surface;
   signOutAction: (formData: FormData) => void | Promise<void>;
 }) {
@@ -106,6 +106,9 @@ export function AvatarMenu({
           <LinkPendingHint />
         </Link>
         <LanguageToggle className="avatar-menu-item" />
+        {/* organisation-task-list D11: sign-out stands alone after its own divider, so a misclick on
+            the language row cannot land on it. */}
+        <div className="avatar-menu-divider" />
         <form action={signOutAction}>
           <SubmitButton className="avatar-menu-item" icon={<LogOut className="size-4" />}>
             {s.common.signOut}
