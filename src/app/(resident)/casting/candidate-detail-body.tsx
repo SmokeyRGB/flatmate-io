@@ -10,6 +10,7 @@ import { useLocale, useStrings } from "@/ui/strings/provider";
 import { CardBody } from "./candidate-card-body";
 import { DistributionBar } from "./distribution-bar";
 import { formatExplanation } from "./format-explanation";
+import { OwnRating } from "./own-rating";
 import { StateLine } from "./ranking-board";
 import { Refusal } from "./refusal";
 import { ScoreRing } from "./score-ring";
@@ -48,7 +49,6 @@ export function CandidateDetailBody({
 
 function Content({ detail, canInvite }: { detail: CandidateDetail; canInvite: boolean }) {
   const s = useStrings();
-  const locale = useLocale();
   const t = s.casting;
   const d = t.detail;
   if (detail.kind === "refused") {
@@ -83,27 +83,52 @@ function Content({ detail, canInvite }: { detail: CandidateDetail; canInvite: bo
     />
   );
 
-  if (detail.kind === "unscored") {
-    return (
-      <>
-        <section className="card">
-          <CardBody card={application} />
-        </section>
-        <StateLine state={application.state} />
-        <p className="text-sm text-muted-foreground">{d.needed(detail.needed - detail.n, detail.needed)}</p>
-        <p className="text-sm">{d.participation(detail.n, detail.denominator)}</p>
-        {detail.voters && detail.voters.length > 0 && (
-          <section className="space-y-1">
-            <h3 className="text-sm font-semibold">{d.votersHeading}</h3>
-            <p className="text-sm">{detail.voters.join(", ")}</p>
-          </section>
-        )}
-        <FormerNote count={detail.formerCount} />
-        {invite}
-      </>
-    );
-  }
+  // The own rating sits at ONE position for both kinds, so a re-render that takes the candidate across
+  // quorum keeps its message state (candidate-revise code review: it remounted when the kind flipped).
+  return (
+    <>
+      {detail.kind === "unscored" ? <UnscoredSummary detail={detail} /> : <ScoredSummary detail={detail} />}
+      <OwnRating
+        roundId={detail.round.id}
+        applicationId={application.applicationId}
+        applicantName={application.applicantName}
+        own={detail.own}
+        roundStatus={detail.round.status}
+        state={application.state}
+      />
+      {invite}
+    </>
+  );
+}
 
+function UnscoredSummary({ detail }: { detail: Extract<CandidateDetail, { kind: "unscored" }> }) {
+  const d = useStrings().casting.detail;
+  const { application } = detail;
+  return (
+    <>
+      <section className="card">
+        <CardBody card={application} />
+      </section>
+      <StateLine state={application.state} />
+      <p className="text-sm text-muted-foreground">{d.needed(detail.needed - detail.n, detail.needed)}</p>
+      <p className="text-sm">{d.participation(detail.n, detail.denominator)}</p>
+      {detail.voters && detail.voters.length > 0 && (
+        <section className="space-y-1">
+          <h3 className="text-sm font-semibold">{d.votersHeading}</h3>
+          <p className="text-sm">{detail.voters.join(", ")}</p>
+        </section>
+      )}
+      <FormerNote count={detail.formerCount} />
+    </>
+  );
+}
+
+function ScoredSummary({ detail }: { detail: Extract<CandidateDetail, { kind: "scored" }> }) {
+  const s = useStrings();
+  const locale = useLocale();
+  const t = s.casting;
+  const d = t.detail;
+  const { application } = detail;
   return (
     <>
       <section className="card">
@@ -130,7 +155,6 @@ function Content({ detail, canInvite }: { detail: CandidateDetail; canInvite: bo
       <DistributionBar distribution={detail.distribution} authorship={detail.authorship} />
       <p className="text-sm">{d.participation(detail.n, detail.denominator)}</p>
       <FormerNote count={detail.formerCount} />
-      {invite}
     </>
   );
 }

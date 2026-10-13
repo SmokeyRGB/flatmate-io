@@ -126,7 +126,7 @@ describe("ScreeningDeck markup", () => {
 
 describe("RatingBar", () => {
   it("marks the selected rating with aria-pressed and a non-colour signal, on that one button only", async () => {
-    const { RatingBar } = await import("@/app/(resident)/casting/screening/screening-deck");
+    const { RatingBar } = await import("@/app/(resident)/casting/rating-bar");
     const markup = renderWithStrings(
       createElement(RatingBar, { selected: "good", chosen: null, busy: false, onSubmit: () => {} }),
     );
@@ -139,11 +139,24 @@ describe("RatingBar", () => {
   });
 
   it("marks nothing when the card is unrated", async () => {
-    const { RatingBar } = await import("@/app/(resident)/casting/screening/screening-deck");
+    const { RatingBar } = await import("@/app/(resident)/casting/rating-bar");
     const markup = renderWithStrings(
       createElement(RatingBar, { selected: undefined, chosen: null, busy: false, onSubmit: () => {} }),
     );
     expect(markup).not.toContain('aria-pressed="true"');
+  });
+});
+
+describe("submittedRating", () => {
+  const eventOf = (submitter: { value: string } | null) =>
+    ({ nativeEvent: { submitter } }) as unknown as import("react").FormEvent<HTMLFormElement>;
+
+  it("returns a known value, and null for an unknown value or no submitter", async () => {
+    const { submittedRating } = await import("@/app/(resident)/casting/rating-bar");
+    expect(submittedRating(eventOf({ value: "good" }))).toBe("good");
+    expect(submittedRating(eventOf({ value: "maybe" }))).toBeNull();
+    expect(submittedRating(eventOf({ value: "" }))).toBeNull();
+    expect(submittedRating(eventOf(null))).toBeNull();
   });
 });
 

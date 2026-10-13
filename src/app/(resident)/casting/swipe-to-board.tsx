@@ -1,16 +1,25 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useRef, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
+import { useEffect, useRef, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
+import { escapeClosesCard } from "@/ui/card-keys";
 import { HORIZONTAL_RATIO, SLOP_PX, releaseDecision } from "@/ui/swipe";
 
 // The full page's swipe (a direct link or a reload, design D10): a rightward swipe leads to the
 // scoreboard of the card's round, like the sheet's swipe closes it. There is no scoreboard beneath
 // here, so nothing follows the finger: the release rule is the same (src/ui/swipe.ts) and the
-// result is a navigation. The back link is the control that works without a swipe (P-2).
+// result is a navigation. The back link is the control that works without a swipe (P-2). Escape
+// leads to the scoreboard too, as the sheet's Escape closes it (candidate-revise D7).
 // `touch-action: pan-y` keeps vertical scrolling native, so a vertical scroll is never a swipe.
 export function SwipeToBoard({ href, children }: { href: string; children: ReactNode }) {
   const router = useRouter();
+  useEffect(() => {
+    function onKey(event: KeyboardEvent) {
+      if (escapeClosesCard(event.key, document)) router.replace(href);
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [router, href]);
   const swipe = useRef<{ x: number; y: number; decided: boolean; active: boolean; dx: number; speed: number; lastX: number; lastT: number } | null>(null);
 
   function onPointerDown(event: ReactPointerEvent<HTMLDivElement>) {

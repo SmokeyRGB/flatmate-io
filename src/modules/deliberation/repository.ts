@@ -542,6 +542,8 @@ export type DetailCard = ScreeningCard & { state: VoteCandidate["state"] };
 
 type DetailRound = { id: string; title: string; status: RoundStatus };
 
+export type OwnRating = { rating: VoteValue | null; canChange: boolean };
+
 export type CandidateDetail =
   // Exactly these keys: no vote-derived field of any kind (V-4, AC-5.16).
   | { kind: "hidden"; round: DetailRound; application: { id: string; name: string; state: VoteCandidate["state"] } }
@@ -557,6 +559,9 @@ export type CandidateDetail =
       // The display names of the counted voters who voted, without any rating; null when the round's
       // frozen flag is off.
       voters: string[] | null;
+      // The viewer's own current rating (never another voter's) and whether the database would still
+      // accept a change. A UI hint only: vote_guard stays the authority.
+      own: OwnRating;
     }
   | {
       kind: "scored";
@@ -571,6 +576,9 @@ export type CandidateDetail =
       formerCount: number;
       // Display names per rating; null when the round's frozen flag is off.
       authorship: Record<VoteValue, string[]> | null;
+      // The viewer's own current rating (never another voter's) and whether the database would still
+      // accept a change. A UI hint only: vote_guard stays the authority.
+      own: OwnRating;
     }
   | { kind: "refused"; reason: "not_found" | "not_eligible" | "rules_invalid" }
   | { kind: "refused"; reason: "round_not_available"; status: RoundStatus };
@@ -634,6 +642,15 @@ export async function getCandidateDetail(context: SessionContext, applicationId:
     };
     const counted = tally.countedValues.get(applicationId) ?? [];
     const formerCount = tally.formerCounts.get(applicationId) ?? 0;
+    // The viewer's own entry of the same statement as the score, so the two cannot disagree. canChange
+    // mirrors vote_guard steps 2 (round open) and 7 (application new/screened); an active voter, the
+    // pairing and "not own" are implied by the card being found at all. A UI hint only.
+    const ownRating = counted.find((v) => v.voterId === context.profileId)?.value ?? null;
+    const own: OwnRating = {
+      rating: ownRating,
+      canChange:
+        ownRating !== null && round.status === "open" && (candidate.state === "new" || candidate.state === "screened"),
+    };
     const names = new Map(tally.countedVoters.map((v) => [v.id, v.displayName]));
     const collator = new Intl.Collator("de");
     const namesOf = (voterIds: string[]) => voterIds.map((id) => names.get(id) ?? "").sort(collator.compare);
@@ -659,6 +676,7 @@ export async function getCandidateDetail(context: SessionContext, applicationId:
         denominator: tally.denominator,
         formerCount,
         voters: rules.revealVoteAuthorship ? namesOf(counted.map((v) => v.voterId)) : null,
+        own,
       };
     }
     const distribution = Object.fromEntries(
@@ -684,6 +702,7 @@ export async function getCandidateDetail(context: SessionContext, applicationId:
       ),
       formerCount,
       authorship,
+      own,
     };
   });
 }
