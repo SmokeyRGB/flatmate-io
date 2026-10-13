@@ -922,7 +922,8 @@ h3 {
   }
   /* The top rows by score, as many as there are open rooms: a faint highlight that drifts slowly
      through background-position only, so it moves no layout and no control (AC-5.28). */
-  .ranking-leading {
+  .ranking-leading,
+  .card-banner-celebratory {
     background-image: linear-gradient(
       110deg,
       var(--color-accent),
@@ -941,34 +942,21 @@ h3 {
     }
   }
   /* Start's „Stark gemacht" banner (human, walkthrough 2026-10-13): the top band of the standing
-     card itself, edge to edge, not a box inside it. A soft brand tint with a white sheen drifting
-     through on the scoreboard highlight's keyframes. The sheen mixes toward white, never toward
-     more brand colour, so on the light theme it reads as a glare, not as a warning. */
+     card itself, edge to edge, not a box inside it. Its drift is the scoreboard highlight's
+     (.ranking-leading, shared in the rules above and below): sand, never the terracotta brand
+     tint, which read as a warning on the light theme. */
   .card-banner-celebratory {
-    --banner-tint: color-mix(in srgb, var(--color-primary) 10%, var(--color-card));
     /* Margins are utilities on the element: the card's space-y-* would override them here. */
     padding: 1rem;
     border-radius: calc(1rem - 1px) calc(1rem - 1px) 0 0;
-    border-bottom: 1px solid color-mix(in srgb, var(--color-primary) 25%, transparent);
-    background-color: var(--banner-tint);
-    background-image: linear-gradient(
-      110deg,
-      var(--banner-tint) 35%,
-      color-mix(in srgb, var(--banner-tint), white 55%) 50%,
-      var(--banner-tint) 65%
-    );
-    background-size: 300% 100%;
-    animation: ranking-drift 4s ease-in-out infinite alternate;
+    border-bottom: 1px solid var(--color-border);
   }
   @media (prefers-reduced-motion: reduce) {
-    .ranking-leading {
-      animation: none;
-      background-image: none;
-      background-color: var(--color-accent);
-    }
+    .ranking-leading,
     .card-banner-celebratory {
       animation: none;
       background-image: none;
+      background-color: var(--color-accent);
     }
   }
   

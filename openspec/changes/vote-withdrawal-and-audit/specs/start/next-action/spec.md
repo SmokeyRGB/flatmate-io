@@ -8,10 +8,10 @@ acknowledging that the resident has rated every application:
 - that round still has applications open for voting (`new`/`screened`, not the resident's own);
 - none of them awaits the resident's vote.
 
-The banner is the top band of the standing card itself, edge to edge with a divider beneath, in
-the Design System's celebratory tint: a heading in the brand colour, one line of body text, and no
-icon. A soft white sheen drifts slowly through it, as on the scoreboard's highlighted rows; under
-reduced motion it is the plain tint (human, walkthrough 2026-10-13). It SHALL be worded about the resident's own part and the household's
+The banner is the top band of the standing card itself, edge to edge with a divider beneath, with
+the scoreboard highlight's look: a heading in the brand colour, one line of body text, no icon, and
+the same slow sand-coloured drift as the highlighted rows, never a terracotta tint; under reduced
+motion it is the plain accent (human, walkthrough 2026-10-13). It SHALL be worded about the resident's own part and the household's
 progress, never about an applicant, speed, a value or a count. It SHALL NOT point to results or to
 revising.
 
