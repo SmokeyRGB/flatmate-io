@@ -2,7 +2,7 @@ import { and, eq, sql } from "drizzle-orm";
 import { withSessionContext, type SessionContext } from "@/db/session-context";
 import { castingRound, roundParticipation } from "@/modules/casting/schema";
 import { vote } from "@/modules/deliberation/schema";
-import { insertApplicationAt, type PipelineSetup } from "./pipeline";
+import { eventsOf, insertApplicationAt, type PipelineSetup } from "./pipeline";
 import type { TestHousehold } from "./identity";
 
 // Shared fixtures for F4 change 1's vote tests. G-B1: synthetic data only.
@@ -114,4 +114,13 @@ export function rawVoteInsertSql(v: RawVote, extra: { columns?: string; values?:
 // A votable application (state `new`) in the fixture's round, inserted through the moderator.
 export function votableApplication(s: PipelineSetup, roundId = s.roundId) {
   return insertApplicationAt(s, "new", {}, roundId);
+}
+
+// The vote.* events of an application, oldest first, read through the moderator's context (the
+// 0018 policy hides application-subject events from the household account).
+export async function voteEvents(s: PipelineSetup, applicationId: string) {
+  const rows = await eventsOf(s, applicationId);
+  return rows
+    .filter((e) => e.eventType.startsWith("vote."))
+    .sort((a, b) => a.occurredAt.getTime() - b.occurredAt.getTime());
 }

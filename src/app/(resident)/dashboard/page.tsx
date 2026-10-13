@@ -76,7 +76,12 @@ export default async function DashboardPage({
           )}
           {view.standing?.kind === "phase" && (
             <>
-              {view.standing.allRated && <p className="text-lg font-semibold">{s.start.allRated}</p>}
+              {view.standing.allRated && (
+                <div className="card-banner-celebratory -mx-4 -mt-4 mb-3 space-y-1">
+                  <p className="text-lg font-semibold text-primary">{s.start.allRated}</p>
+                  <p className="text-sm">{s.start.allRatedBody}</p>
+                </div>
+              )}
               {view.standing.waiting && <p className="text-lg font-semibold">{s.start.waitingForApplications}</p>}
               {standingHeadingOf(view.standing, s) && <p className="text-lg font-semibold">{standingHeadingOf(view.standing, s)}</p>}
               {view.standing.distribution.length > 0 && (

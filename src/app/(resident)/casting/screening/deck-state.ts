@@ -1,4 +1,4 @@
-import type { VoteValue } from "@/modules/deliberation/vote-values";
+import { VOTE_VALUES, type VoteValue } from "@/modules/deliberation/vote-values";
 
 // The screening pass's navigation state machine (design D9): pure, so its rules are a unit test,
 // not a rendering test. The deck is fixed when the pass starts (FR-4.4): the state is initialised
@@ -89,4 +89,32 @@ export function deckReducer(state: DeckState, action: DeckAction): DeckState {
       return { ids, ratings, pending: null, index: Math.max(0, Math.min(shifted, ids.length - 1)), phase: "rating" };
     }
   }
+}
+
+// What a key press on the deck does (screening-pass D9, vote-withdrawal-and-audit D4): pure, so the
+// guards are a unit test. The arrows keep their old guards (modifier, text field, pop-over). The
+// digits 1-4 rate the current card in the order the buttons show them, and are ignored in addition
+// while a key repeats, a dialog is open, a refusal shows or a rating is still being recorded
+// (`inFlight` is the synchronous flag, since `pending` only moves after a render). `event.key` is
+// used, so the numpad works too.
+export interface DeckKeyInput {
+  key: string;
+  modifiers: boolean;
+  repeat: boolean;
+  inTextField: boolean;
+  popoverOpen: boolean;
+  dialogOpen: boolean;
+  refusal: boolean;
+  inFlight: boolean;
+}
+
+export type DeckKeyAction = { type: "rate"; value: VoteValue } | { type: "back" } | { type: "forward" } | null;
+
+export function deckKeyAction(input: DeckKeyInput): DeckKeyAction {
+  if (input.modifiers || input.inTextField || input.popoverOpen) return null;
+  if (input.key === "ArrowLeft") return { type: "back" };
+  if (input.key === "ArrowRight") return { type: "forward" };
+  const value = /^[1-4]$/.test(input.key) ? VOTE_VALUES[Number(input.key) - 1] : undefined;
+  if (!value || input.repeat || input.dialogOpen || input.refusal || input.inFlight) return null;
+  return { type: "rate", value };
 }

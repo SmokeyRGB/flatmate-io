@@ -553,6 +553,60 @@ h3 {
     outline: 2px solid var(--color-primary);
     outline-offset: 1px;
   }
+  /* tone="celebrate" (casting page, after a screening pass): the check mark draws itself in
+     ~400 ms and three small stars rise and fade around the icon only. Under reduced motion the
+     mark is simply there and the stars are not drawn. */
+  .toast-celebrate {
+    position: relative;
+    display: inline-flex;
+    flex-shrink: 0;
+  }
+  .toast-check-path {
+    stroke-dasharray: 1;
+    stroke-dashoffset: 1;
+    animation: toast-check-draw 400ms ease-out 150ms forwards;
+  }
+  .toast-star {
+    position: absolute;
+    width: 0.3rem;
+    height: 0.3rem;
+    border-radius: 9999px;
+    background: var(--vote-absolutely);
+    opacity: 0;
+    animation: toast-star-rise 800ms ease-out 250ms forwards;
+  }
+  .toast-star-1 {
+    top: -0.125rem;
+    left: -0.125rem;
+  }
+  .toast-star-2 {
+    top: -0.375rem;
+    left: 50%;
+    animation-delay: 350ms;
+  }
+  .toast-star-3 {
+    top: 0;
+    right: -0.25rem;
+    animation-delay: 450ms;
+  }
+  @keyframes toast-check-draw {
+    to {
+      stroke-dashoffset: 0;
+    }
+  }
+  @keyframes toast-star-rise {
+    0% {
+      opacity: 0;
+      transform: translateY(0.25rem) scale(0.5);
+    }
+    40% {
+      opacity: 1;
+    }
+    100% {
+      opacity: 0;
+      transform: translateY(-0.6rem) scale(1);
+    }
+  }
   @keyframes toast-in {
     from {
       opacity: 0;
@@ -566,6 +620,13 @@ h3 {
   @media (prefers-reduced-motion: reduce) {
     .toast {
       animation: none;
+    }
+    .toast-check-path {
+      animation: none;
+      stroke-dashoffset: 0;
+    }
+    .toast-star {
+      display: none;
     }
   }
   @keyframes skeleton-pulse {
@@ -861,7 +922,8 @@ h3 {
   }
   /* The top rows by score, as many as there are open rooms: a faint highlight that drifts slowly
      through background-position only, so it moves no layout and no control (AC-5.28). */
-  .ranking-leading {
+  .ranking-leading,
+  .card-banner-celebratory {
     background-image: linear-gradient(
       110deg,
       var(--color-accent),
@@ -879,8 +941,19 @@ h3 {
       background-position: 100% 50%;
     }
   }
+  /* Start's „Stark gemacht" banner (human, walkthrough 2026-10-13): the top band of the standing
+     card itself, edge to edge, not a box inside it. Its drift is the scoreboard highlight's
+     (.ranking-leading, shared in the rules above and below): sand, never the terracotta brand
+     tint, which read as a warning on the light theme. */
+  .card-banner-celebratory {
+    /* Margins are utilities on the element: the card's space-y-* would override them here. */
+    padding: 1rem;
+    border-radius: calc(1rem - 1px) calc(1rem - 1px) 0 0;
+    border-bottom: 1px solid var(--color-border);
+  }
   @media (prefers-reduced-motion: reduce) {
-    .ranking-leading {
+    .ranking-leading,
+    .card-banner-celebratory {
       animation: none;
       background-image: none;
       background-color: var(--color-accent);
