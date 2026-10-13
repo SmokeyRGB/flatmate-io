@@ -11,13 +11,25 @@ import { de } from "@/ui/strings";
 // synthetic ones. This file must stay free of DetailSheet and ViewTransition (design D1).
 vi.mock("server-only", () => ({}));
 vi.mock("next/headers", () => ({ cookies: vi.fn() }));
-vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn(), back: vi.fn() }), redirect: vi.fn() }));
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: vi.fn(), back: vi.fn(), replace: vi.fn(), refresh: vi.fn() }),
+  useParams: () => ({}),
+  unstable_rethrow: vi.fn(),
+  redirect: vi.fn(),
+}));
+vi.mock("@/app/(resident)/casting/candidate-actions", () => ({
+  changeRatingAction: vi.fn(),
+  withdrawRatingAction: vi.fn(),
+}));
 vi.mock("@/app/(org)/rounds/[id]/applications/invite-actions", () => ({ inviteApplicationAction: vi.fn() }));
 vi.mock("@/modules/identity/session-cookie", () => ({ getCurrentSession: vi.fn() }));
 vi.mock("@/modules/casting/repository", () => ({ getStartOverview: vi.fn() }));
 vi.mock("@/modules/deliberation/repository", () => ({
   getAwaitingVoteCounts: vi.fn(),
   getCandidateDetail: vi.fn(),
+  VoteError: class VoteError extends Error {},
+  castVote: vi.fn(),
+  withdrawVote: vi.fn(),
 }));
 vi.mock("@/app/holds-permission", () => ({ holdsPermission: vi.fn() }));
 
@@ -50,6 +62,7 @@ function scored(over: Partial<Scored> = {}): Scored {
     explanation: explainScore(WEIGHTS, ["no", "good", "good", "definitely"]),
     formerCount: 0,
     authorship: null,
+    own: { rating: "good", canChange: true },
     ...over,
   };
 }
@@ -64,6 +77,7 @@ function unscored(over: Partial<Unscored> = {}): Unscored {
     denominator: 7,
     formerCount: 0,
     voters: null,
+    own: { rating: "good", canChange: true },
     ...over,
   };
 }
@@ -119,6 +133,23 @@ describe("CandidateDetailBody", () => {
     expect(textOf(html)).toContain(t.hiddenExplanation);
     expect(html).toContain('href="/casting/screening"');
     expect(textOf(withoutSvg(html))).not.toMatch(/\d/);
+  });
+
+  it("hidden: no own-rating label and no rating control, because the viewer holds no rating", async () => {
+    const text = textOf(
+      await render({ kind: "hidden", round: ROUND, application: { id: "a", name: "Hanna", state: "new" } }),
+    );
+    expect(text).not.toContain(t.ownRatingLabel);
+    expect(text).not.toContain(t.withdraw);
+  });
+
+  it("scored and unscored show the own rating section, above the invite control", async () => {
+    for (const html of [await render(scored(), true), await render(unscored(), true)]) {
+      const text = textOf(html);
+      expect(text).toContain(t.ownRatingLabel);
+      expect(text).toContain(t.withdraw);
+      expect(text.indexOf(t.ownRatingLabel)).toBeLessThan(text.indexOf(de.invite.open));
+    }
   });
 
   it("a refusal shows one line, and not_found names nothing", async () => {

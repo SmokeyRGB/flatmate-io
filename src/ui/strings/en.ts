@@ -899,6 +899,22 @@ export const en = {
       arithmeticToggleLabel: "How the score is created",
       arithmeticHeading: "How this score was calculated",
       roundedUp: "(x.5 rounded up)",
+      // candidate-revise D5/D8: the viewer's own rating on the card.
+      ownRatingLabel: "Your rating",
+      notRated: "You have not rated this one.",
+      withdraw: "Withdraw rating",
+      withdrawHeading: "Withdraw rating?",
+      withdrawBody: (name: string) => `Your rating will be withdrawn, and you will rate ${name} again.`,
+      withdrawConfirm: "Withdraw",
+      withdrawCancel: "Cancel",
+      pausedReason: "Voting is paused.",
+      finalReason: (name: string) => `Voting on ${name} is finished. Your rating is final.`,
+      outcome: {
+        notVotable: "Sorry, this application is no longer being voted on. Your rating is final.",
+        roundNotOpen: "Sorry, voting is not open right now. Your rating is unchanged.",
+        notPossible: "Sorry, that is no longer possible here. Your rating is unchanged.",
+        failed: "Sorry, that did not work. Your rating is unchanged.",
+      },
     },
   },
   // F4 change 1: screen C1, the screening pass. The four labels are the settled German ones

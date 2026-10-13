@@ -13,6 +13,7 @@ import {
   castVote,
   getCandidateDetail,
   getRanking,
+  withdrawVote,
   type CandidateDetail,
 } from "@/modules/deliberation/repository";
 import { registerHousehold } from "@/modules/identity/auth";
@@ -385,7 +386,9 @@ describe("getCandidateDetail: the setting on", () => {
   it("an unscored candidate lists who has voted, without any rating", async () => {
     const unscored = expectKind(await getCandidateDetail(viewer.context, b2.id), "unscored");
     expect(unscored.voters).toEqual(["Vera"]);
-    expect(JSON.stringify(unscored)).not.toContain("rather_not");
+    // Nobody else's rating is in the payload; the viewer's own is, and only under `own` (candidate-revise D1).
+    expect(unscored.own.rating).toBe("rather_not");
+    expect(JSON.stringify({ ...unscored, own: undefined })).not.toContain("rather_not");
   });
 
   it("the own application stays not_found with the setting on", async () => {
@@ -455,5 +458,101 @@ describe("getCandidateDetail: former members (Q-6, R-4)", () => {
     expect(back.n).toBe(4);
     expect(back.formerCount).toBe(0);
     expect(back.authorship!.no).toEqual(["Yoko"]);
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+// candidate-revise D1: the viewer's own rating and whether it can still change. Its own household,
+// so the cases above keep their numbers; round status, snapshot and states a case changes are put
+// back in afterEach.
+describe("getCandidateDetail: the own rating (candidate-revise D1)", () => {
+  let s: PipelineSetup;
+  let base: Record<string, unknown>;
+  let vera: Awaited<ReturnType<typeof claimPlainMember>>;
+  let wanda: Awaited<ReturnType<typeof claimPlainMember>>;
+  let xaver: Awaited<ReturnType<typeof claimPlainMember>>;
+  const m = () => s.moderator.context;
+
+  beforeAll(async () => {
+    s = await pipeline({ reveal: false, moderatorName: "Mona" });
+    vera = await claimPlainMember(s.hh, "Vera", accountIds);
+    wanda = await claimPlainMember(s.hh, "Wanda", accountIds);
+    xaver = await claimPlainMember(s.hh, "Xaver", accountIds);
+    base = await readSnapshot(s);
+  });
+
+  afterEach(async () => {
+    await writeSnapshot(s, base);
+    await setRoundStatus(s, s.roundId, "open");
+  });
+
+  // Scored by all four voters: Mona and Vera hold different ratings.
+  async function scoredApp() {
+    const a = await insertApplicationAt(s, "new");
+    await cast(s, m(), a.id, "definitely");
+    await cast(s, vera.context, a.id, "no");
+    await cast(s, wanda.context, a.id, "good");
+    await cast(s, xaver.context, a.id, "good");
+    return a;
+  }
+
+  it("(a) a scored candidate shows each viewer their own rating, not another's", async () => {
+    const a = await scoredApp();
+    const forVera = expectKind(await getCandidateDetail(vera.context, a.id), "scored");
+    const forMona = expectKind(await getCandidateDetail(m(), a.id), "scored");
+    expect(forVera.own).toEqual({ rating: "no", canChange: true });
+    expect(forMona.own).toEqual({ rating: "definitely", canChange: true });
+  });
+
+  it("(b) an unscored candidate shows each viewer their own rating", async () => {
+    // A share of 0.75 of four voters needs three votes, so two ratings stay unscored.
+    await writeSnapshot(s, { ...base, quorumShare: "0.75" });
+    const a = await insertApplicationAt(s, "new");
+    await cast(s, vera.context, a.id, "rather_not");
+    await cast(s, m(), a.id, "good");
+    const forVera = expectKind(await getCandidateDetail(vera.context, a.id), "unscored");
+    const forMona = expectKind(await getCandidateDetail(m(), a.id), "unscored");
+    expect(forVera.own).toEqual({ rating: "rather_not", canChange: true });
+    expect(forMona.own).toEqual({ rating: "good", canChange: true });
+  });
+
+  it("(c) a paused round keeps the rating and offers no change", async () => {
+    const a = await scoredApp();
+    await setRoundStatus(s, s.roundId, "paused");
+    const d = expectKind(await getCandidateDetail(vera.context, a.id), "scored");
+    expect(d.own).toEqual({ rating: "no", canChange: false });
+  });
+
+  it("(d) an invited candidate the viewer rated keeps the rating and offers no change", async () => {
+    const a = await insertApplicationAt(s, "new");
+    await cast(s, vera.context, a.id, "good");
+    await transitionApplication(m(), a.id, "screened");
+    await transitionApplication(m(), a.id, "invited");
+    const d = expectKind(await getCandidateDetail(vera.context, a.id), "unscored");
+    expect(d.own).toEqual({ rating: "good", canChange: false });
+  });
+
+  it("(e) an invited candidate the viewer never rated has no rating and no change", async () => {
+    const a = await insertApplicationAt(s, "invited");
+    const d = expectKind(await getCandidateDetail(vera.context, a.id), "unscored");
+    expect(d.own).toEqual({ rating: null, canChange: false });
+  });
+
+  it("(e2) hiding off, a new candidate the viewer has not rated: no rating, no change", async () => {
+    await writeSnapshot(s, { ...base, hideResultsUntilVoted: false });
+    const a = await insertApplicationAt(s, "new");
+    await cast(s, m(), a.id, "good");
+    const d = expectKind(await getCandidateDetail(vera.context, a.id), "unscored");
+    expect(d.own).toEqual({ rating: null, canChange: false });
+  });
+
+  it("(f) hiding on, a withdrawn rating makes the detail hidden, with exactly its old keys", async () => {
+    const a = await insertApplicationAt(s, "new");
+    await cast(s, vera.context, a.id, "good");
+    expectKind(await getCandidateDetail(vera.context, a.id), "unscored");
+    await withdrawVote(vera.context, { applicationId: a.id });
+    const hidden = expectKind(await getCandidateDetail(vera.context, a.id), "hidden");
+    expect(Object.keys(hidden).sort()).toEqual(["application", "kind", "round"]);
+    expect(Object.keys(hidden.application).sort()).toEqual(["id", "name", "state"]);
   });
 });

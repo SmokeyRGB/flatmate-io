@@ -84,6 +84,10 @@
   Stimme den Namen der abstimmenden Person. Selbst-Redaktion (G-D1) hat in jedem Fall Vorrang —
   die Einstellung ändert nichts an den Leseregeln für die eigene, verknüpfte Bewerbung. Der
   Auskunftsexport (G-D6) bleibt unabhängig von dieser Einstellung immer ohne Urheberschaft.
+- **Eigene Bewertung ändern oder zurückziehen (2026-10-13):** Solange die Abstimmung über die Bewerbung
+  offen ist (Runde offen, Bewerbung `new`/`screened`), kann die Person ihre eigene Bewertung auf D2
+  ändern oder zurückziehen. Das Zurückziehen fragt nach und führt in den Durchlauf (C1); siehe
+  `F4-requirements.md` EC-4.12 und die Menschenentscheidung vom 2026-10-13.
 
 **Abweichende Zustände**
 

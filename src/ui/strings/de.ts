@@ -903,6 +903,23 @@ export const de = {
       arithmeticToggleLabel: "So entsteht der Score",
       arithmeticHeading: "So wurde dieser Score berechnet",
       roundedUp: "(x,5 aufgerundet)",
+      // candidate-revise D5/D8: the viewer's own rating on the card.
+      ownRatingLabel: "Deine Bewertung",
+      notRated: "Du hast nicht bewertet.",
+      withdraw: "Bewertung zurückziehen",
+      withdrawHeading: "Bewertung zurückziehen?",
+      withdrawBody: (name: string) => `Deine Bewertung wird zurückgezogen, und du bewertest ${name} neu.`,
+      withdrawConfirm: "Zurückziehen",
+      withdrawCancel: "Abbrechen",
+      pausedReason: "Die Abstimmung ist pausiert.",
+      finalReason: (name: string) => `Die Abstimmung über ${name} ist abgeschlossen. Deine Bewertung steht fest.`,
+      // The outcome of a change or a withdrawal that was refused or failed. Du-tone, apologising.
+      outcome: {
+        notVotable: "Sorry, über diese Bewerbung wird nicht mehr abgestimmt. Deine Bewertung steht fest.",
+        roundNotOpen: "Sorry, die Abstimmung ist gerade nicht offen. Deine Bewertung ist unverändert.",
+        notPossible: "Sorry, das geht hier nicht mehr. Deine Bewertung ist unverändert.",
+        failed: "Sorry, das hat nicht geklappt. Deine Bewertung ist unverändert.",
+      },
     },
   },
   // F4 change 1: screen C1, the screening pass. The four labels are the settled German ones

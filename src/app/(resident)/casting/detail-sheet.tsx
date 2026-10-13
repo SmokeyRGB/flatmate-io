@@ -11,6 +11,8 @@ import {
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
 } from "react";
+import { escapeClosesCard } from "@/ui/card-keys";
+import { inertOutside } from "@/ui/inert-outside";
 import { useStrings } from "@/ui/strings/provider";
 import { HORIZONTAL_RATIO, SLOP_PX, releaseDecision } from "@/ui/swipe";
 
@@ -19,8 +21,8 @@ import { HORIZONTAL_RATIO, SLOP_PX, releaseDecision } from "@/ui/swipe";
 // inside it, so there is one instance, one enter animation and one focus move per opening.
 //
 // - A fixed right panel (the full width on a phone) over a transparent backdrop, so the scoreboard
-//   stays rendered and visible beneath it. While the panel is mounted its effect marks the board's
-//   wrapper (`#casting-board`, rendered by casting/layout.tsx) `inert`.
+//   stays rendered and visible beneath it. While the panel is mounted its effect marks the whole frame
+//   behind it `inert` (header, bottom nav, board; src/ui/inert-outside.ts), except the backdrop.
 // - Escape, the close button and a tap on the backdrop call `router.back()`, as the browser's back
 //   does, so all four close it the same way.
 // - React <ViewTransition> animates the enter and the exit declaratively, because a navigation is a
@@ -34,29 +36,28 @@ export function DetailSheet({ children }: { children: ReactNode }) {
   const t = useStrings().casting.detail;
   const router = useRouter();
   const panelRef = useRef<HTMLDivElement>(null);
+  const backdropRef = useRef<HTMLDivElement>(null);
   // Set before router.back() after a swipe: the panel is already off-screen, so the exit slide must
   // not play again.
   const [swiped, setSwiped] = useState(false);
   const close = useCallback(() => router.back(), [router]);
 
   useEffect(() => {
-    const board = document.getElementById("casting-board");
-    board?.setAttribute("inert", "");
+    const panel = panelRef.current;
+    const backdrop = backdropRef.current;
+    const restoreInert = panel ? inertOutside(panel, backdrop ? [backdrop] : []) : () => {};
     const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     panelRef.current?.focus();
     return () => {
-      board?.removeAttribute("inert");
+      restoreInert();
       opener?.focus?.();
     };
   }, []);
 
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
-      if (event.key !== "Escape") return;
-      // An open "(?)" popover or the invite dialog takes the Escape first: the browser closes it, and
-      // the card stays open.
-      if (document.querySelector(":popover-open, dialog[open]")) return;
-      close();
+      // An open "(?)" popover or a confirmation dialog takes the Escape first (card-keys.ts).
+      if (escapeClosesCard(event.key, document)) close();
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -156,7 +157,7 @@ export function DetailSheet({ children }: { children: ReactNode }) {
 
   return (
     <>
-      <div className="detail-backdrop" onClick={close} aria-hidden="true" />
+      <div ref={backdropRef} className="detail-backdrop" onClick={close} aria-hidden="true" />
       <ViewTransition enter="detail-slide-in" exit={swiped ? "none" : "detail-slide-out"} default="none">
         <div
           ref={panelRef}
