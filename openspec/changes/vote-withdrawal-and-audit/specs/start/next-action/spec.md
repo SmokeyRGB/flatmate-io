@@ -9,7 +9,8 @@ acknowledging that the resident has rated every application:
 - none of them awaits the resident's vote.
 
 The banner is the Design System's celebratory callout: a heading in the brand colour, one line of
-body text, and no icon. It SHALL be worded about the resident's own part and the household's
+body text, and no icon. A faint lighter band drifts slowly through it, as on the scoreboard's
+highlighted rows; under reduced motion it is the plain tint (human, walkthrough 2026-10-13). It SHALL be worded about the resident's own part and the household's
 progress, never about an applicant, speed, a value or a count. It SHALL NOT point to results or to
 revising.
 

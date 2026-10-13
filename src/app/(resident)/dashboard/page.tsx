@@ -77,7 +77,7 @@ export default async function DashboardPage({
           {view.standing?.kind === "phase" && (
             <>
               {view.standing.allRated && (
-                <div className="callout callout-celebratory flex-col">
+                <div className="callout callout-celebratory callout-celebratory-drift flex-col">
                   <p className="text-lg font-semibold text-primary">{s.start.allRated}</p>
                   <p className="text-sm">{s.start.allRatedBody}</p>
                 </div>
