@@ -15,7 +15,7 @@ import { requireOrganisationAccess } from "@/app/(org)/organisation-access";
 import { holdsPermission } from "@/app/holds-permission";
 import { getStrings } from "@/ui/strings/request";
 import { LinkPendingHint } from "@/ui/link-pending-hint";
-import { SavedToast } from "../../saved-toast";
+import { SavedToast } from "@/ui/saved-toast";
 import { InviteDialog } from "../invite-dialog";
 import { INVITABLE_STATES, INVITE_PERMISSION, showInvite } from "../invite-text";
 import { ApplicantNotice, ThirdPartyNotice } from "../notice";

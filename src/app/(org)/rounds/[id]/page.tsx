@@ -15,7 +15,7 @@ import { getCurrentSession } from "@/modules/identity/session-cookie";
 import { getStrings } from "@/ui/strings/request";
 import { LinkPendingHint } from "@/ui/link-pending-hint";
 import { ApplicationsSection, type ApplicationsView } from "./applications-section";
-import { SavedToast } from "./saved-toast";
+import { SavedToast } from "@/ui/saved-toast";
 
 // Convergence T084/T085: the round-detail screen FR-1.19 (participant names) needs —
 // `getRoundParticipants` existed and was tested at the repository layer, but no route ever called it.

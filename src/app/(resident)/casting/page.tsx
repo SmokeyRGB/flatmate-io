@@ -11,7 +11,7 @@ import { LinkPendingHint } from "@/ui/link-pending-hint";
 import { holdsPermission } from "@/app/holds-permission";
 import { INVITE_PERMISSION } from "@/app/(org)/rounds/[id]/applications/invite-text";
 import { shouldOpenScreening } from "../dashboard/dashboard-view";
-import { SavedToast } from "@/app/(org)/rounds/[id]/saved-toast";
+import { SavedToast } from "@/ui/saved-toast";
 import { RankingBoard } from "./ranking-board";
 
 // The Casting tab (spec `ui/resident-frame`): takes a resident with applications awaiting their

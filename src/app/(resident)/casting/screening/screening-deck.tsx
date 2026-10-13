@@ -331,7 +331,9 @@ export function ScreeningDeck({
   function rate(rating: VoteValue) {
     const current = stateRef.current;
     const id = current.ids[current.index];
-    if (inFlightRef.current || current.pending !== null || refusalRef.current || !id) return;
+    // Not once the pass is done: the deck still shows the last card until the Casting tab loads, and
+    // a key pressed then must not silently change that vote (code review).
+    if (current.phase !== "rating" || inFlightRef.current || current.pending !== null || refusalRef.current || !id) return;
     inFlightRef.current = true;
     setFailed(false);
     setChosen(rating);

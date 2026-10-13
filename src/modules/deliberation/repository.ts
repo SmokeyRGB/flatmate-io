@@ -732,6 +732,7 @@ export async function castVote(
         .from(vote)
         .where(
           and(
+            eq(vote.householdId, context.householdId),
             eq(vote.applicationId, applicationId),
             eq(vote.residentProfileId, profileId),
             eq(vote.stage, "invite"),
@@ -786,7 +787,8 @@ export async function castVote(
 export async function withdrawVote(context: SessionContext, input: { applicationId: string }): Promise<void> {
   if (context.profileId === null) throw new ProfileRequiredError("withdrawVote");
   const profileId = context.profileId;
-  const { applicationId } = input;
+  // `input?.`: a malformed call is invalid_input, never an unmapped TypeError (code review).
+  const applicationId = input?.applicationId;
   if (typeof applicationId !== "string" || !isUuid(applicationId)) throw new VoteError("invalid_input");
   try {
     await withSessionContext(context, async (tx) => {
@@ -801,6 +803,7 @@ export async function withdrawVote(context: SessionContext, input: { application
         .from(vote)
         .where(
           and(
+            eq(vote.householdId, context.householdId),
             eq(vote.applicationId, applicationId),
             eq(vote.residentProfileId, profileId),
             eq(vote.stage, "invite"),

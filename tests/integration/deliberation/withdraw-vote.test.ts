@@ -141,6 +141,13 @@ describe("withdrawVote (AC-4.15)", () => {
     expect((await readVotes(voter.context, app.id))[0].withdrawnAt).toBeNull();
   });
 
+  it("a malformed or missing input is invalid_input, never a TypeError", async () => {
+    const { voter } = await fixture();
+    expect((await refusal(withdrawVote(voter.context, { applicationId: "not-a-uuid" }))).code).toBe("invalid_input");
+    const missing = undefined as unknown as { applicationId: string };
+    expect((await refusal(withdrawVote(voter.context, missing))).code).toBe("invalid_input");
+  });
+
   it("(g) the household account is refused with ProfileRequiredError", async () => {
     const { s, voter } = await fixture();
     const app = await insertApplicationAt(s, "new");
