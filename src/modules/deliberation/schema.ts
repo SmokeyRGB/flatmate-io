@@ -9,14 +9,14 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 import { OWN_PROFILE, PROFILE_PRESENT } from "../../db/rls-predicates";
-import { VOTE_VALUES } from "./vote-values";
+import { VOTE_STAGES, VOTE_VALUES } from "./vote-values";
 
 // Wrapped in (select ...): same shape as every other schema file's HOUSEHOLD_MATCH.
 const HOUSEHOLD_MATCH = sql`household_id = (select current_setting('app.household_id', true)::uuid)`;
 
 // Round one (invite) and round two (offer) use the same scale and the same table
 // (docs/domain/deliberation.md). Only `invite` is written in v0.1.
-export const voteStageEnum = pgEnum("vote_stage", ["invite", "offer"]);
+export const voteStageEnum = pgEnum("vote_stage", VOTE_STAGES);
 export const voteValueEnum = pgEnum("vote_value", VOTE_VALUES);
 
 // One rating per (application, resident profile, stage), C-4.5. There are no foreign keys, like

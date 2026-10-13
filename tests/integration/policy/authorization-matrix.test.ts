@@ -7,6 +7,7 @@ import * as deliberationRepo from "@/modules/deliberation/repository";
 import { VoteError } from "@/modules/deliberation/repository";
 import { insertTestRound } from "../../helpers/applications";
 import { claimPlainMember, insertApplicationAt, setupPipeline } from "../../helpers/pipeline";
+import { setRemoved } from "../../helpers/votes";
 import * as identityRepo from "@/modules/identity/repository";
 import { PermissionDeniedError } from "@/modules/identity/repository";
 import { eq } from "drizzle-orm";
@@ -134,7 +135,7 @@ const NOT_APPLICABLE_CASTING: Record<string, string> = {
 };
 
 // F4 change 1: deliberation/repository.ts. The reads carry their visibility in screening-pass.test.ts
-// and awaiting-vote-counts.test.ts; castVote is the one mutator and is decided below.
+// and awaiting-vote-counts.test.ts; castVote and withdrawVote are the mutators and are decided below.
 const NOT_APPLICABLE_DELIBERATION: Record<string, string> = {
   getAwaitingVoteCounts: "read; visibility tested in tests/integration/deliberation/awaiting-vote-counts.test.ts",
   getScreeningPass: "read; visibility tested in tests/integration/deliberation/screening-pass.test.ts",
@@ -909,6 +910,41 @@ describe("deliberation/repository.ts castVote refuses who may not vote (M6)", ()
     expect(err).toBeInstanceOf(VoteError);
     expect((err as VoteError).code).toBe("not_eligible");
   });
+
+  it("withdrawVote: the household account is refused with ProfileRequiredError", async () => {
+    const s = await setupPipeline(households);
+    const app = await insertApplicationAt(s, "new");
+    await expect(deliberationRepo.withdrawVote(s.hh.context, { applicationId: app.id })).rejects.toThrow(
+      castingRepo.ProfileRequiredError,
+    );
+  });
+
+  it("withdrawVote: a claimed plain resident with no vote gets not_found", async () => {
+    const s = await setupPipeline(households);
+    const resident = await claimPlainMember(s.hh, "PlainW", accountIds);
+    const round = await withSessionContext(s.moderator.context, (tx) => insertTestRound(tx, s.hh.householdId, "open"));
+    const app = await insertApplicationAt(s, "new", {}, round);
+    const err = await deliberationRepo
+      .withdrawVote(resident.context, { applicationId: app.id })
+      .catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(VoteError);
+    expect((err as VoteError).code).toBe("not_found");
+  });
+
+  // The stronger case: a vote exists, so only the rules can refuse. Participation removed after
+  // voting is not_eligible, and the vote stands (EC-4.7).
+  it("withdrawVote: a resident whose participation was removed after voting gets not_eligible", async () => {
+    const s = await setupPipeline(households);
+    const resident = await claimPlainMember(s.hh, "PlainV", accountIds);
+    const app = await insertApplicationAt(s, "new");
+    await deliberationRepo.castVote(resident.context, { roundId: s.roundId, applicationId: app.id, value: "good" });
+    await setRemoved(s.hh, s.roundId, resident.profileId);
+    const err = await deliberationRepo
+      .withdrawVote(resident.context, { applicationId: app.id })
+      .catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(VoteError);
+    expect((err as VoteError).code).toBe("not_eligible");
+  });
 });
 
 // Case name lists, declared after the `it` blocks above for readability but referenced (via
@@ -932,7 +968,7 @@ const CASTING_CASE_NAMES = [
   "updateHouseholdSettings",
 ];
 
-const DELIBERATION_CASE_NAMES = ["castVote"];
+const DELIBERATION_CASE_NAMES = ["castVote", "withdrawVote"];
 
 const IDENTITY_CASE_NAMES = [
   "createResidentProfile",

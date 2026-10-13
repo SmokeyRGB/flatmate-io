@@ -206,6 +206,16 @@ describe("buildDashboardView (start-screen design.md Decision 10, tasks.md 7.4)"
       expect(view.standing).toMatchObject({ kind: "phase", allRated: false });
     });
 
+    // vote-withdrawal-and-audit: a withdrawn vote is awaited again (deliberation's one count), so
+    // Start shows the vote task again and the acknowledgement is gone.
+    it("a withdrawal takes it away", () => {
+      const rated = build(standingOf({ new: 2 }), 0, false, NOW, { r1: 0 });
+      expect(rated.standing).toMatchObject({ kind: "phase", allRated: true });
+      const withdrawn = build(standingOf({ new: 2 }), 0, false, NOW, { r1: 1 });
+      expect(withdrawn.primary).not.toBeNull();
+      expect(withdrawn.standing).toBeNull();
+    });
+
     it("a viewer who may not vote is not congratulated", () => {
       const view = build(standingOf({ new: 2 }, false), 0, false, NOW, { r1: 0 });
       expect(view.standing).toMatchObject({ kind: "phase", allRated: false });

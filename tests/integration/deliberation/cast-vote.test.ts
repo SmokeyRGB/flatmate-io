@@ -11,6 +11,7 @@ import {
   setRemoved,
   setRoundStatus,
   thrownBy,
+  voteEvents,
 } from "../../helpers/votes";
 import { withSessionContext } from "@/db/session-context";
 
@@ -73,6 +74,53 @@ describe("castVote (AC-4.10)", () => {
     const [row] = await readVotes(voter.context, app.id);
     expect(row.withdrawnAt).toBeNull();
     expect(row.value).toBe("definitely");
+    expect((await voteEvents(s, app.id)).map((e) => e.eventType)).toEqual(["vote.cast", "vote.cast"]);
+  });
+
+  // vote-withdrawal-and-audit D2: a same-value re-send is a no-op, in the row and in the log.
+  it("(a) the same value again changes no column, updated_at included, and adds no event", async () => {
+    const { s, voter } = await fixture();
+    const app = await insertApplicationAt(s, "new");
+    await castVote(voter.context, { roundId: s.roundId, applicationId: app.id, value: "good" });
+    const [first] = await readVotes(voter.context, app.id);
+    await castVote(voter.context, { roundId: s.roundId, applicationId: app.id, value: "good" });
+    const rows = await readVotes(voter.context, app.id);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toEqual(first);
+    expect((await voteEvents(s, app.id)).map((e) => e.eventType)).toEqual(["vote.cast"]);
+  });
+
+  it("(b) the same value again after the round was paused is refused round_not_open", async () => {
+    const { s, voter } = await fixture();
+    const app = await insertApplicationAt(s, "new");
+    await castVote(voter.context, { roundId: s.roundId, applicationId: app.id, value: "good" });
+    await setRoundStatus(s, s.roundId, "paused");
+    const err = await refusal(castVote(voter.context, { roundId: s.roundId, applicationId: app.id, value: "good" }));
+    expect(err.code).toBe("round_not_open");
+    expect(err.roundStatus).toBe("paused");
+  });
+
+  it("(c) a first rating writes exactly one vote.cast, with the actor and the payload {stage}", async () => {
+    const { s, voter } = await fixture();
+    const app = await insertApplicationAt(s, "new");
+    await castVote(voter.context, { roundId: s.roundId, applicationId: app.id, value: "good" });
+    const events = await voteEvents(s, app.id);
+    expect(events).toHaveLength(1);
+    expect(events[0].eventType).toBe("vote.cast");
+    expect(events[0].subjectType).toBe("application");
+    expect(events[0].actorAccountId).toBe(voter.accountId);
+    expect(events[0].actorProfileId).toBe(voter.profileId);
+    expect(events[0].payload).toEqual({ stage: "invite" });
+  });
+
+  it("(d) good then no adds one vote.revised, without a value", async () => {
+    const { s, voter } = await fixture();
+    const app = await insertApplicationAt(s, "new");
+    await castVote(voter.context, { roundId: s.roundId, applicationId: app.id, value: "good" });
+    await castVote(voter.context, { roundId: s.roundId, applicationId: app.id, value: "no" });
+    const events = await voteEvents(s, app.id);
+    expect(events.map((e) => e.eventType)).toEqual(["vote.cast", "vote.revised"]);
+    expect(events[1].payload).toEqual({ stage: "invite" });
   });
 });
 
@@ -89,6 +137,8 @@ describe("castVote refusals (AC-4.13, FR-4.15)", () => {
       const [row] = await readVotes(voter.context, app.id);
       expect(row.value).toBe("good");
     }
+    // (e) a refused write records no event.
+    expect((await voteEvents(s, app.id)).map((e) => e.eventType)).toEqual(["vote.cast"]);
   });
 
   it("refuses the voter's own application in screened", async () => {

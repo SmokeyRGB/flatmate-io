@@ -868,6 +868,7 @@ export const en = {
     // B1's acknowledgement after the last open application is rated (human decision 2026-10-06;
     // the exact wording stays open, P-O-04).
     allRated: "Great job — you voted on all applications!",
+    allRatedBody: "That brings your household a good step closer to the decision.",
     noRoundSentence: "No round is currently running.",
     runningWithoutYouSentence: "A round is running, but (not yet) without you.",
     // U-5, `rahmenwerk.md` §2.3: the moderation bridge — visually distinct from the resident's own
@@ -887,6 +888,7 @@ export const en = {
   // AC-5.28), and no "Gewinner". Every number named here maps to a real threshold of the round.
   casting: {
     rankingHeading: "Ranking",
+    ratedToast: "Done! Your votes are in.",
     backToStart: "Back to home",
     votes: votesLabel,
     scoreOf: (n: number) => `out of ${votesLabel(n)}`,

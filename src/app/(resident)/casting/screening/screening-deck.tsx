@@ -24,7 +24,7 @@ import { useStrings } from "@/ui/strings/provider";
 import { CardBody } from "../candidate-card-body";
 import { WeightsList } from "../weights-list";
 import { castVoteAction, type CastVoteResult } from "./actions";
-import { canGoBack, canGoForward, deckReducer, initialDeckState } from "./deck-state";
+import { canGoBack, canGoForward, deckKeyAction, deckReducer, initialDeckState } from "./deck-state";
 
 // One colour class per level (a red-to-green scale from the design system's --vote-* tokens, see
 // globals.css). Colour never stands alone: every level also has its symbol and its label, and the
@@ -134,9 +134,18 @@ export function ScreeningDeck({
   const stackRef = useRef<HTMLDivElement>(null);
   // Read by event handlers only; refreshed after every committed render.
   const stateRef = useRef(state);
+  const refusalRef = useRef(refusal);
   useEffect(() => {
     stateRef.current = state;
+    refusalRef.current = refusal;
   });
+  // Set synchronously before a rating is dispatched and cleared when its result is handled, so a
+  // second key press before the next render cannot send a second rating (`pending` lags a render).
+  const inFlightRef = useRef(false);
+  // True once a rating succeeded in this pass. A ref, not `Object.keys(state.ratings)`: the deck
+  // is never seeded with ratings (`initialDeckState` is called without them), but `dropped`
+  // deletes entries, so the reducer's ratings are not a record of what was rated.
+  const ratedInPassRef = useRef(false);
 
   const currentId = state.ids[state.index];
   const card = currentId ? byId.get(currentId) : undefined;
@@ -146,7 +155,7 @@ export function ScreeningDeck({
   // When the last card is rated (or the last unratable one dropped) the pass leads to the Casting
   // tab (FR-4.18). The existing redirect there sends a resident with new arrivals into a fresh pass.
   useEffect(() => {
-    if (state.phase === "done") router.push("/casting");
+    if (state.phase === "done") router.push(ratedInPassRef.current ? "/casting?rated=1" : "/casting");
   }, [state.phase, router]);
 
   const goBack = useCallback(() => {
@@ -161,17 +170,27 @@ export function ScreeningDeck({
     dispatch({ type: "forward" });
   }, []);
 
-  // ← and → on desktop. Ignored with a modifier key, while the pop-over is open, and when the
-  // event comes from a text field.
+  // ← and → on desktop, and 1-4 to rate. What each key does, and when it is ignored, is
+  // `deckKeyAction` (deck-state.ts). The listener reads `rate` through a ref, so it never holds a
+  // stale closure.
+  const rateRef = useRef<(value: VoteValue) => void>(() => {});
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
-      if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
-      if (event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) return;
       const target = event.target as HTMLElement | null;
-      if (target && (["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName) || target.isContentEditable)) return;
-      if (document.querySelector(":popover-open")) return;
-      if (event.key === "ArrowLeft") goBack();
-      else goForward();
+      const action = deckKeyAction({
+        key: event.key,
+        modifiers: event.ctrlKey || event.metaKey || event.altKey || event.shiftKey,
+        repeat: event.repeat,
+        inTextField: !!target && (["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName) || target.isContentEditable),
+        popoverOpen: document.querySelector(":popover-open") !== null,
+        dialogOpen: document.querySelector("dialog[open]") !== null,
+        refusal: refusalRef.current !== null,
+        inFlight: inFlightRef.current || stateRef.current.pending !== null,
+      });
+      if (action === null) return;
+      if (action.type === "back") goBack();
+      else if (action.type === "forward") goForward();
+      else rateRef.current(action.value);
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -273,7 +292,9 @@ export function ScreeningDeck({
 
 
   function handleResult(result: CastVoteResult, id: string, value: VoteValue) {
+    inFlightRef.current = false;
     if (result.ok) {
+      ratedInPassRef.current = true;
       dispatch({ type: "rated", id, value });
       setChosen(null);
       return;
@@ -304,15 +325,16 @@ export function ScreeningDeck({
     }
   }
 
-  function onSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    // An implicit submit through an aria-disabled button is still a submit: refuse it here.
-    if (stateRef.current.pending !== null || refusal || !card) return;
-    const submitter = (event.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null;
-    const value = submitter?.value;
-    if (!value || !(VOTE_VALUES as readonly string[]).includes(value)) return;
-    const rating = value as VoteValue;
-    const id = card.applicationId;
+  // The one rating path, for the buttons and the digit keys alike, so the two cannot diverge. The
+  // card is read from `stateRef`, never from a render closure: a key press after a rating must
+  // rate the card the deck shows now.
+  function rate(rating: VoteValue) {
+    const current = stateRef.current;
+    const id = current.ids[current.index];
+    // Not once the pass is done: the deck still shows the last card until the Casting tab loads, and
+    // a key pressed then must not silently change that vote (code review).
+    if (current.phase !== "rating" || inFlightRef.current || current.pending !== null || refusalRef.current || !id) return;
+    inFlightRef.current = true;
     setFailed(false);
     setChosen(rating);
     dispatch({ type: "submitted", id });
@@ -324,6 +346,18 @@ export function ScreeningDeck({
       );
       handleResult(result, id, rating);
     });
+  }
+  useEffect(() => {
+    rateRef.current = rate;
+  });
+
+  function onSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    // An implicit submit through an aria-disabled button is still a submit: `rate` refuses it.
+    const submitter = (event.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null;
+    const value = submitter?.value;
+    if (!value || !(VOTE_VALUES as readonly string[]).includes(value)) return;
+    rate(value as VoteValue);
   }
 
   if (refusal) {
