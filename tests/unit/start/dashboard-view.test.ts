@@ -258,7 +258,7 @@ describe("buildDashboardView (start-screen design.md Decision 10, tasks.md 7.4)"
 
     const candidates = build(overview({}), [tasks[2]], true);
     expect(candidates.bridge?.heading).toBe(de.start.bridge.headingSingular);
-    expect(candidates.bridge?.body).toBe(de.org.dashboard.tasks.inviteCandidatesReason("Herbst"));
+    expect(candidates.bridge?.body).toBe(de.org.dashboard.tasks.inviteCandidatesReason);
   });
 
   it("an overdue deadline -> the overdue reason", () => {

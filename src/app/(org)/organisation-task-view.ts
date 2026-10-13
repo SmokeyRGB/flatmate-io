@@ -40,7 +40,7 @@ export function organisationTaskCopy(task: LoadedOrganisationTask, s: Strings): 
     case "invite_candidates":
       return {
         heading: t.tasks.inviteCandidatesHeading,
-        reason: t.tasks.inviteCandidatesReason(task.roundTitle),
+        reason: t.tasks.inviteCandidatesReason,
         href: `/casting?round=${task.roundId}`,
       };
   }

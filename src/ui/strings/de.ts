@@ -237,7 +237,7 @@ export const de = {
         openRoundForRoomHeading: (room: string) => `Suche für ${room} starten`,
         openRoundForRoomReason: "Das Zimmer ist frei, aber in keiner Runde.",
         inviteCandidatesHeading: "Zu Castings einladen",
-        inviteCandidatesReason: (round: string) => `In „${round}“ stehen Bewerbungen vorn — ihr könnt einladen.`,
+        inviteCandidatesReason: "Erste Bewerbungen haben genug Stimmen — ihr könnt jetzt einladen.",
       },
       steps: {
         opened: "Runde eröffnen",
