@@ -83,6 +83,10 @@ describe("TRANSITION_RULES (D6a)", () => {
     expect(Object.fromEntries(TRANSITION_RULES)).toEqual(Object.fromEntries(EXPECTED));
   });
 
+  // Since drizzle/0037 every holder of change_application_state also holds reverse_application_state,
+  // so "a forward-only member refused a backward move" is unwritable in data; this case is the
+  // proof of the backward rule (replaces the former granted-member cases of
+  // application-transition-guard (c) and (i)).
   it("every state_only row requires change_application_state, and reverse_application_state exactly when the move is backward", () => {
     for (const [key, rule] of TRANSITION_RULES) {
       if (rule.kind !== "state_only") continue;

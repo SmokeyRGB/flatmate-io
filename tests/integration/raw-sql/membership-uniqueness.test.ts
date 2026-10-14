@@ -41,12 +41,14 @@ describe("[G-C7 raw SQL] membership carries at most one row per resident_profile
     const { accountId } = await claimResidentProfile(hh.context, profile.id, "test-password-not-real-1234", "de");
     accountIds.push(accountId);
 
+    // A live resident row holds vote (drizzle/0037: CHECKs run before the unique index, so an empty
+    // set would be refused as 23514 before this fixture reached what the test is about).
     let caught: unknown;
     try {
       await withSessionContext(hh.context, (tx) =>
         tx.execute(
           sql`INSERT INTO membership (household_id, account_id, resident_profile_id, is_resident, role, permissions)
-              VALUES (${hh!.householdId}::uuid, ${randomUUID()}::uuid, ${profile.id}::uuid, true, 'member', '{}')`,
+              VALUES (${hh!.householdId}::uuid, ${randomUUID()}::uuid, ${profile.id}::uuid, true, 'member', '{vote}')`,
         ),
       );
     } catch (err) {

@@ -11,7 +11,7 @@ afterEach(async () => {
   hh = undefined;
 });
 
-type PgError = { code?: string; message?: string };
+type PgError = { code?: string; message?: string; constraint_name?: string };
 
 function pgErrorOf(caught: unknown): PgError {
   const err = caught as { code?: string; message?: string; cause?: PgError };
@@ -46,6 +46,7 @@ describe("[G-C7 raw SQL] membership.is_resident and resident_profile_id stay pai
     }
     expect(caught).toBeInstanceOf(Error);
     expect(pgErrorOf(caught).code).toBe("23514");
+    expect(pgErrorOf(caught).constraint_name).toBe("membership_resident_pairing");
   });
 
   it("rejects is_resident = true with a null resident_profile_id (SQLSTATE 23514)", async () => {
@@ -55,8 +56,8 @@ describe("[G-C7 raw SQL] membership.is_resident and resident_profile_id stay pai
     try {
       await withSessionContext(hh.context, (tx) =>
         tx.execute(
-          sql`INSERT INTO membership (household_id, account_id, resident_profile_id, is_resident, role)
-              VALUES (${hh!.householdId}::uuid, ${randomUUID()}::uuid, NULL, true, 'member')`,
+          sql`INSERT INTO membership (household_id, account_id, resident_profile_id, is_resident, role, permissions)
+              VALUES (${hh!.householdId}::uuid, ${randomUUID()}::uuid, NULL, true, 'member', '{vote}')`,
         ),
       );
     } catch (err) {
@@ -64,6 +65,7 @@ describe("[G-C7 raw SQL] membership.is_resident and resident_profile_id stay pai
     }
     expect(caught).toBeInstanceOf(Error);
     expect(pgErrorOf(caught).code).toBe("23514");
+    expect(pgErrorOf(caught).constraint_name).toBe("membership_resident_pairing");
   });
 
   // Deliberate break (argued, not executed — CLAUDE.md forbids dropping a live constraint to prove

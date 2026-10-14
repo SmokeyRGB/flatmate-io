@@ -200,12 +200,14 @@ describe("resolve_join_code / claim_join_code — the password_reset branch, raw
       ),
     );
 
+    // '{vote}': a live resident holds it (drizzle/0037); an empty set would be refused as 23514
+    // before the unique index is reached.
     let caught: unknown;
     try {
       await withSessionContext(hhB.context, (tx) =>
         tx.execute(sql`
           INSERT INTO membership (household_id, account_id, resident_profile_id, is_resident, role, permissions)
-          VALUES (${hhB!.householdId}::uuid, ${randomUUID()}::uuid, ${resident.profileId}::uuid, true, 'member', '{}')
+          VALUES (${hhB!.householdId}::uuid, ${randomUUID()}::uuid, ${resident.profileId}::uuid, true, 'member', '{vote}')
         `),
       );
     } catch (err) {
