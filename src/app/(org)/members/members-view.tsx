@@ -1,4 +1,4 @@
-import { ArrowLeft, DoorOpen, ShieldCheck, TriangleAlert, UserMinus, UserPlus } from "lucide-react";
+import { ArrowLeft, DoorOpen, Info, ShieldCheck, TriangleAlert, UserMinus, UserPlus } from "lucide-react";
 import Link from "next/link";
 import { joinCodeState, removedJoinerCautionApplies } from "@/modules/identity/join-code-state";
 import {
@@ -251,7 +251,8 @@ export function MembersView({
         <input name="displayName" placeholder={t.addResidentPlaceholder} className="field-input flex-1" />
         <SubmitButton className="btn btn-primary shrink-0">{t.addResidentSubmit}</SubmitButton>
       </form>
-      <p className="field-helper">{t.addResidentHelperInviteNote}</p>
+      {/* fix round F6: the note promises an invitation, so only a caller who can issue one sees it. */}
+      {canManageJoinCodes && <p className="field-helper">{t.addResidentHelperInviteNote}</p>}
     </div>
   ) : null;
 
@@ -272,9 +273,11 @@ export function MembersView({
       {/* FR-2.2/S-49: the warning sits beside the links, visible without interaction. C-2.5: this
           is social visibility, never security — no padlock, no "sicher", no "geschützt" anywhere
           in this section (task 3.9). */}
+      {/* organisation-task-list D8: advice, not an alarm, so an info callout; the founding-link,
+          removed-joiner and reset-link cautions below stay red. The text is unchanged. */}
       {!onlyFoundingLinksLive && (
-        <div className="callout callout-caution">
-          <TriangleAlert className="size-4" />
+        <div className="callout callout-info">
+          <Info className="size-4" />
           <p>{t.joinCode.warning}</p>
         </div>
       )}
@@ -492,10 +495,13 @@ export function MembersView({
                 other join-code control (canManageJoinCodes). */}
             {canManageJoinCodes && !m.accountId && m.status === "prepared" && (
               <div className="mt-3 space-y-2">
-                <form action={issueJoinCodeForProfileAction}>
-                  <input type="hidden" name="residentProfileId" value={m.id} />
-                  <SubmitButton className="btn btn-secondary">{t.joinCode.issueForProfile}</SubmitButton>
-                </form>
+                {/* fix round F6: no second invitation beside a live one; it returns once that one is dead. */}
+                {!(boundIssuance && joinCodeState(boundIssuance, now) === "live") && (
+                  <form action={issueJoinCodeForProfileAction}>
+                    <input type="hidden" name="residentProfileId" value={m.id} />
+                    <SubmitButton className="btn btn-secondary">{t.joinCode.issueForProfile}</SubmitButton>
+                  </form>
+                )}
                 {boundIssuance && (
                   <div className="space-y-1">
                     <p className="field-helper">{t.joinCode.issuedForProfileHeading}</p>

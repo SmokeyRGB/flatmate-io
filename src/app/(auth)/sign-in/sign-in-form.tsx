@@ -5,6 +5,13 @@ import { useActionState, useEffect, useRef, useState } from "react";
 import { browserLocalStorage, readStoredHouseholdCode } from "@/app/household-code-storage";
 import { useStrings } from "@/ui/strings/provider";
 import { signInAction, type SignInFormState } from "./actions";
+import {
+  newPrefillSelection,
+  onPrefillFocus,
+  onPrefillInput,
+  onPrefillMouseUp,
+  onPrefillPointerDown,
+} from "./prefill-selection";
 import { PasswordInput } from "@/ui/password-input";
 import { SubmitButton } from "@/ui/submit-button";
 import { LinkPendingHint } from "@/ui/link-pending-hint";
@@ -40,12 +47,17 @@ export function SignInForm() {
   // the person types is what posts. Only an empty field is prefilled. Storage that is missing or
   // throws leaves the field empty (P-2).
   const householdCodeRef = useRef<HTMLInputElement>(null);
+  // D10: a prefilled code is selected on focus, so typing replaces it (identity/device-memory).
+  const prefill = useRef(newPrefillSelection());
   const showHouseholdCode = !showEmail;
   useEffect(() => {
     const input = householdCodeRef.current;
     if (!showHouseholdCode || !input || input.value) return;
     const stored = readStoredHouseholdCode(browserLocalStorage());
-    if (stored) input.value = stored;
+    if (stored) {
+      input.value = stored;
+      prefill.current.active = true;
+    }
   }, [showHouseholdCode, state]); // `state`: React resets an uncontrolled form after each action
 
   return (
@@ -120,6 +132,10 @@ export function SignInForm() {
                 type="text"
                 required
                 ref={householdCodeRef}
+                onPointerDown={() => onPrefillPointerDown(prefill.current)}
+                onFocus={(ev) => onPrefillFocus(prefill.current, ev.currentTarget)}
+                onMouseUp={(ev) => onPrefillMouseUp(prefill.current, ev)}
+                onInput={() => onPrefillInput(prefill.current)}
                 defaultValue={draft.householdCode}
                 placeholder={t.householdPlaceholder}
                 autoCapitalize="characters"

@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { buildDashboardView, pendingVoteCount, shouldOpenScreening, standingHeadingOf } from "@/app/(resident)/dashboard/dashboard-view";
 import { de } from "@/ui/strings";
-import type { OrganisationTask, StartOpenRound, StartOverview } from "@/modules/casting/repository";
+import type { LoadedOrganisationTask } from "@/app/(org)/organisation-tasks";
+import type { StartOpenRound, StartOverview } from "@/modules/casting/repository";
 
 const NOW = new Date("2026-10-01T12:00:00Z");
 
@@ -28,12 +29,12 @@ function awaiting(o: StartOverview, counts: Record<string, number> = {}): Map<st
 // A number stands for that many room tasks; a list is passed through as given.
 function build(
   o: StartOverview,
-  organisationTasks: number | OrganisationTask[] = 0,
+  organisationTasks: number | LoadedOrganisationTask[] = 0,
   organisation = false,
   now = NOW,
   counts = {},
 ) {
-  const tasks: OrganisationTask[] =
+  const tasks: LoadedOrganisationTask[] =
     typeof organisationTasks === "number"
       ? Array.from({ length: organisationTasks }, (_, i) => ({
           kind: "open_round_for_room" as const,
@@ -221,12 +222,16 @@ describe("buildDashboardView (start-screen design.md Decision 10, tasks.md 7.4)"
     });
   });
 
-  it("bridge absent without access; 0 -> all-done; 2 -> plural", () => {
+  // organisation/task-list + start/next-action delta: the empty bridge speaks about the organisation
+  // work and never praises (it sat beside an open vote task in the persona walkthroughs).
+  it("bridge absent without access; 0 -> nothing to organise; 2 -> plural", () => {
     const noAccess = build(overview({}), 3, false);
     expect(noAccess.bridge).toBeNull();
 
     const zero = build(overview({}), 0, true);
-    expect(zero.bridge?.heading).toBe("Alles erledigt – gut gemacht");
+    expect(zero.bridge?.heading).toBe("Gerade ist nichts zu organisieren");
+    expect(zero.bridge?.heading).not.toContain("Alles erledigt");
+    expect(zero.bridge?.body).toBe("");
 
     const two = build(overview({}), 2, true);
     expect(two.bridge?.heading).toBe("2 Sachen warten auf dich");
@@ -238,6 +243,22 @@ describe("buildDashboardView (start-screen design.md Decision 10, tasks.md 7.4)"
     expect(view.bridge?.heading).toBe(de.start.bridge.headingSingular);
     expect(view.bridge?.body).toBe(de.org.dashboard.openFirstRoundBody);
     expect(view.bridge?.body).not.toBe(de.start.bridge.body);
+  });
+
+  it("the count includes the setup and candidate kinds, and the body is the first task's reason", () => {
+    const tasks: LoadedOrganisationTask[] = [
+      { kind: "add_room" },
+      { kind: "invite_flatmates", invitationsOutstanding: false },
+      { kind: "invite_candidates", roundId: "r1", roundTitle: "Herbst" },
+    ];
+    const view = build(overview({}), tasks, true);
+    expect(view.bridge?.heading).toBe(de.start.bridge.headingPlural(3));
+    expect(view.bridge?.body).toBe(de.org.dashboard.tasks.addRoomReason);
+    expect(view.bridge?.buttonHref).toBe("/organization");
+
+    const candidates = build(overview({}), [tasks[2]], true);
+    expect(candidates.bridge?.heading).toBe(de.start.bridge.headingSingular);
+    expect(candidates.bridge?.body).toBe(de.org.dashboard.tasks.inviteCandidatesReason);
   });
 
   it("an overdue deadline -> the overdue reason", () => {

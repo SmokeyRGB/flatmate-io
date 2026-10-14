@@ -249,3 +249,21 @@ describe("the notice on every application (FR-3.23, AC-3.20)", () => {
     }
   });
 });
+
+// organisation-task-list D9: Compliance §4.5's sample text reads "von der WG {Haushaltsname}", which
+// doubled to "von der WG WG Gartenstraße" for a household already named "WG …".
+describe("the Art. 14 sample text names the household once", () => {
+  const text = (household: string) => de.applications.notice.thirdPartyText({ name: "Lea", household, categories: "Name" });
+
+  it("a household already named 'WG …' is not prefixed again", () => {
+    expect(text("WG Gartenstraße")).toContain("von der WG Gartenstraße:");
+    expect(text("WG Gartenstraße")).not.toContain("WG WG");
+    expect(text("wg gartenstraße")).not.toContain("WG wg");
+  });
+
+  it("any other household gets the WG prefix", () => {
+    expect(text("Sonnenhaus")).toContain("von der WG Sonnenhaus:");
+    // "WGartenhaus" does not start with the word "WG".
+    expect(text("WGartenhaus")).toContain("von der WG WGartenhaus:");
+  });
+});

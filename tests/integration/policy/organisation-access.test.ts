@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { renderWithStrings } from "../../helpers/render-with-strings";
 import type { SessionContext } from "@/db/session-context";
 import { claimResidentProfile } from "@/modules/identity/auth";
+import { createRoom } from "@/modules/casting/repository";
 import { createResidentProfile, setMemberRole } from "@/modules/identity/repository";
 import { de } from "@/ui/strings";
 import {
@@ -155,6 +156,10 @@ describe("the organisation area is reached only with an organisation permission"
     hh = await registerTestHousehold();
     const moderator = await claim(hh, "Moderator");
     await setMemberRole(hh.context, hh.accountId, moderator.accountId, "moderator");
+    // organisation/task-list delta: with no undeleted room the moderator's task is "add a room",
+    // and the first-round entry (/rounds/new) is offered only once a room exists. Was: offered with
+    // zero rooms.
+    await createRoom(hh.context, "Room A", { accountId: hh.accountId, profileId: null });
 
     session.context = hh.context;
     expect(await requireOrganisationAccess({ context: hh.context })).toBe(true);

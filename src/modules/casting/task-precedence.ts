@@ -33,6 +33,11 @@ function dropT6BesideT5(tasks: OpenTask[]): OpenTask[] {
   return tasks.filter((t) => t.type !== "T6");
 }
 
+// The one stable tie-break, shared by orderTasks and orderOrganisationTasks.
+function compareKey(a: { key: string }, b: { key: string }): number {
+  return a.key < b.key ? -1 : a.key > b.key ? 1 : 0;
+}
+
 // Dated tasks first (soonest — including overdue — on top), then undated tasks in the fixed rank,
 // ties broken by `key`. Never mutates its input; always returns a new array.
 export function orderTasks(tasks: OpenTask[]): OpenTask[] {
@@ -43,16 +48,47 @@ export function orderTasks(tasks: OpenTask[]): OpenTask[] {
   dated.sort((a, b) => {
     const diff = (a.dueAt as Date).getTime() - (b.dueAt as Date).getTime();
     if (diff !== 0) return diff;
-    return a.key < b.key ? -1 : a.key > b.key ? 1 : 0;
+    return compareKey(a, b);
   });
 
   undated.sort((a, b) => {
     const rankDiff = UNDATED_RANK[a.type] - UNDATED_RANK[b.type];
     if (rankDiff !== 0) return rankDiff;
-    return a.key < b.key ? -1 : a.key > b.key ? 1 : 0;
+    return compareKey(a, b);
   });
 
   return [...dated, ...undated];
+}
+
+export type OrganisationTaskKind =
+  | "add_room"
+  | "invite_flatmates"
+  | "appoint_search_lead"
+  | "open_first_round"
+  | "open_round_for_room"
+  | "invite_candidates";
+
+// organisation-task-list design D2 (P-3, deterministic): one fixed rank, ties broken by `key`
+// (room or round id). No organisation task has a due date in v0.1, so there is no dated half.
+const ORGANISATION_RANK: Record<OrganisationTaskKind, number> = {
+  add_room: 1,
+  invite_flatmates: 2,
+  appoint_search_lead: 3,
+  open_first_round: 4,
+  open_round_for_room: 5,
+  invite_candidates: 6,
+};
+
+// Never mutates its input. `keyOf` supplies the tie-break key (room or round id).
+export function orderOrganisationTasks<T extends { kind: OrganisationTaskKind }>(
+  tasks: readonly T[],
+  keyOf: (task: T) => string = () => "",
+): T[] {
+  return [...tasks].sort(
+    (a, b) =>
+      ORGANISATION_RANK[a.kind] - ORGANISATION_RANK[b.kind] ||
+      compareKey({ key: keyOf(a) }, { key: keyOf(b) }),
+  );
 }
 
 export type Phase =
@@ -119,4 +155,14 @@ export function distributionOf(
     bucket,
     count: totals[bucket],
   }));
+}
+
+export type RoundStep = "waiting" | "voting" | "invited";
+
+// organisation-task-list design D3: v0.1 builds nothing after "invited", so every later phase
+// clamps to it (human decision 2026-10-12: no steps after invited).
+export function roundStepOf(phase: Phase): RoundStep {
+  if (phase === "waiting_for_applications") return "waiting";
+  if (phase === "voting_round_1") return "voting";
+  return "invited";
 }

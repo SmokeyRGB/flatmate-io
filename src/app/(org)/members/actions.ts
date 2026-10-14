@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { holdsPermission } from "@/app/holds-permission";
 import {
   DisplayNameConfirmationMismatchError,
   ResidentProfileNotEligibleForResetError,
@@ -18,6 +19,9 @@ import {
 import { getCurrentSession } from "@/modules/identity/session-cookie";
 import { getStringsFor } from "@/ui/strings/request";
 
+// A link bound to one profile lasts 7 days (O-15's default) and is single-use.
+const BOUND_LINK_VALID_DAYS = 7;
+
 export interface RemoveMemberFormState {
   error: string | null;
 }
@@ -29,16 +33,37 @@ export interface RemoveMemberFormState {
 // a prepared profile. A duplicate display name (FR-1.4) surfaces via Next's error boundary, same as
 // every other unhandled repository error this form's siblings (setMovedOutAction etc.) leave
 // uncaught — not worth a client-component reducer just for this one message.
+//
+// organisation-task-list D8: for a caller who also holds `manage_join_codes`, that profile's
+// single-use invitation is issued right after, so the card shows the link at once. Two repository
+// calls, each its own transaction and never nested (one pooled connection per call chain), and no
+// claim of atomicity: if the second fails, the profile exists, its card keeps offering "Einladung
+// für dieses Profil erzeugen", and the action still reports the profile as created.
 export async function createResidentProfileAction(formData: FormData): Promise<void> {
   const current = await getCurrentSession();
   if (!current) throw new Error("Not signed in");
   const displayName = String(formData.get("displayName") ?? "").trim();
   if (!displayName) return;
 
-  await createResidentProfile(current.context, displayName, {
+  const profile = await createResidentProfile(current.context, displayName, {
     accountId: current.context.accountId,
     profileId: current.context.profileId,
   });
+
+  // issueJoinCode refuses a caller without the permission on its own, the check here only decides
+  // whether to try at all.
+  if (await holdsPermission(current.context, "manage_join_codes")) {
+    try {
+      await issueJoinCode(current.context, current.context.accountId, {
+        validDays: BOUND_LINK_VALID_DAYS,
+        maxUses: 1,
+        residentProfileId: profile.id,
+      });
+    } catch (err) {
+      // The class name only: a driver error can echo the inserted row.
+      console.error("createResidentProfileAction: invitation not issued:", err instanceof Error ? err.name : typeof err);
+    }
+  }
 
   revalidatePath("/members");
 }
@@ -151,7 +176,7 @@ export async function issueJoinCodeForProfileAction(formData: FormData): Promise
   if (!residentProfileId) return;
 
   await issueJoinCode(current.context, current.context.accountId, {
-    validDays: 7,
+    validDays: BOUND_LINK_VALID_DAYS,
     maxUses: 1,
     residentProfileId,
   });

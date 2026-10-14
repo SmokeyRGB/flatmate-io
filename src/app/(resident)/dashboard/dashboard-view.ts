@@ -4,7 +4,9 @@ import {
   phaseOf,
   type OpenTask,
 } from "@/modules/casting/task-precedence";
-import type { OrganisationTask, StartOpenRound, StartOverview } from "@/modules/casting/repository";
+import { organisationTaskCopy } from "@/app/(org)/organisation-task-view";
+import type { LoadedOrganisationTask } from "@/app/(org)/organisation-tasks";
+import type { StartOpenRound, StartOverview } from "@/modules/casting/repository";
 import type { Strings } from "@/ui/strings";
 import { DATE_LOCALES, type Locale } from "@/ui/strings/locales";
 
@@ -100,7 +102,7 @@ function taskViewFor(
 export function buildDashboardView(
   overview: StartOverview | null,
   awaitingVotes: AwaitingVotes,
-  organisationTasks: OrganisationTask[],
+  organisationTasks: LoadedOrganisationTask[],
   access: { organisation: boolean },
   now: Date,
   s: Strings,
@@ -162,15 +164,18 @@ export function buildDashboardView(
   let bridge: DashboardBridgeView | null = null;
   if (access.organisation) {
     const organisationTaskCount = organisationTasks.length;
-    // The first-round task has its own body: it is the organisation tab's own text, read from the
-    // one place it is defined, so Start and the tab say the same thing.
-    const bodyText = organisationTasks.some((t) => t.kind === "open_first_round")
-      ? s.org.dashboard.openFirstRoundBody
-      : s.start.bridge.body;
+    // The body names the first task in the organisation tab's own order, read from the one place its
+    // words are defined (organisationTaskCopy), so Start and the tab say the same thing. A free room
+    // keeps Start's own sentence.
+    const [firstTask] = organisationTasks;
+    const bodyText =
+      !firstTask || firstTask.kind === "open_round_for_room"
+        ? s.start.bridge.body
+        : organisationTaskCopy(firstTask, s).reason;
     bridge = {
       heading:
         organisationTaskCount === 0
-          ? s.start.bridge.allDone
+          ? s.start.bridge.nothingToOrganise
           : organisationTaskCount === 1
             ? s.start.bridge.headingSingular
             : s.start.bridge.headingPlural(organisationTaskCount),

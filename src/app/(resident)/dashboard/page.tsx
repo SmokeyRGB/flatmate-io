@@ -1,13 +1,14 @@
 import { ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { getStartOverview, listOrganisationTasks } from "@/modules/casting/repository";
+import { getStartOverview } from "@/modules/casting/repository";
 import { getAwaitingVoteCounts } from "@/modules/deliberation/repository";
 import { getCurrentSession } from "@/modules/identity/session-cookie";
 import { getRequestLocale, getStrings } from "@/ui/strings/request";
 import { landingPathFor } from "@/app/landing";
 import { LinkPendingHint } from "@/ui/link-pending-hint";
 import { householdFor, identityLabelFor, navigationAccessFor } from "@/app/_frame/session-data";
+import { loadOrganisationTasks } from "@/app/(org)/organisation-tasks";
 import { buildDashboardView, standingHeadingOf } from "./dashboard-view";
 
 // Screen B1 — the resident's Start screen (FR-2.18, FR-2.20-2.24). A household-account session
@@ -29,7 +30,7 @@ export default async function DashboardPage({
   const [overview, awaitingVotes, organisationTasks, access, identity, household] = await Promise.all([
     getStartOverview(current.context),
     getAwaitingVoteCounts(current.context),
-    listOrganisationTasks(current.context),
+    loadOrganisationTasks(current.context),
     navigationAccessFor(current.context),
     identityLabelFor(current.context),
     householdFor(current.context),
