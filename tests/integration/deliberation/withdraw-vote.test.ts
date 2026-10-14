@@ -7,10 +7,10 @@ import {
   VoteError,
   withdrawVote,
 } from "@/modules/deliberation/repository";
+import { setMovedOut } from "@/modules/identity/repository";
 import { cleanupAll, deleteTestAccount, type TestHousehold } from "../../helpers/identity";
 import {
   claimPlainMember,
-  grantPermissions,
   holdTransaction,
   insertApplicationAt,
   setupPipeline,
@@ -157,11 +157,13 @@ describe("withdrawVote (AC-4.15)", () => {
     expect((await readVotes(voter.context, app.id))[0].withdrawnAt).toBeNull();
   });
 
-  it("(h) a resident whose `vote` permission was stripped is refused not_eligible", async () => {
+  // Invariant guard (several refusers, no prescribed break): since drizzle/0037 a live resident
+  // always holds `vote`, so the one way to lose it is the production path, a move-out.
+  it("(h) a moved-out resident is refused not_eligible", async () => {
     const { s, voter } = await fixture();
     const app = await insertApplicationAt(s, "new");
     await castVote(voter.context, { roundId: s.roundId, applicationId: app.id, value: "good" });
-    await grantPermissions(s.hh, voter.accountId, []);
+    await setMovedOut(s.hh.context, s.hh.accountId, voter.accountId);
     expect((await refusal(withdrawVote(voter.context, { applicationId: app.id }))).code).toBe("not_eligible");
     expect((await readVotes(voter.context, app.id))[0].withdrawnAt).toBeNull();
   });

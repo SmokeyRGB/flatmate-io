@@ -728,11 +728,13 @@ export async function castVote(
     throw new VoteError("invalid_input");
   }
   // FR-1.7: the stored `vote` permission, checked first INSIDE the insert's transaction with the
-  // caller's membership locked FOR SHARE (F3 change 2b, design D11): a move-out or a stripped
-  // `vote` committed first is seen, and one in flight is waited for. A stale context (a member who
-  // moved out or was removed while the session lived) has no live membership and lands here. The
-  // household account and a moderator without a resident profile hold no `vote`. Lock order:
-  // membership first, then the trigger's profile/round locks (identity/repository.ts,
+  // caller's membership locked FOR SHARE (F3 change 2b, design D11): a move-out committed first is
+  // seen, and one in flight is waited for. A live resident always stores `vote`
+  // (membership_resident_holds_role_permissions, drizzle/0037), so only a missing live membership
+  // refuses here; the stored-permission check inside stays as defence in depth. A stale context (a
+  // member who moved out or was removed while the session lived) has no live membership and lands
+  // here. The household account and a moderator without a resident profile hold no `vote`. Lock
+  // order: membership first, then the trigger's profile/round locks (identity/repository.ts,
   // revokeMembershipForProfileTx).
   try {
     await withSessionContext(context, async (tx) => {

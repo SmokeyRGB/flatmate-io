@@ -3,22 +3,51 @@ import { join } from "node:path";
 import { sql } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 import { withSessionContext } from "@/db/session-context";
-import {
-  HOUSEHOLD_PERMISSIONS,
-  HOUSEHOLD_PERMISSIONS_AT_0024,
-  MODERATOR_ONLY_PERMISSIONS_AT_0027,
-  MODERATOR_PERMISSIONS,
-  MODERATOR_PERMISSIONS_AT_0027,
-  RESIDENT_PERMISSIONS_AT_0024,
-} from "@/modules/identity/schema";
 import { uuid } from "../../helpers/uuid";
+
+// The sets as 0024, 0027 and 0029 saw them, frozen here: schema.ts holds only the live sets since
+// drizzle/0037, and this test replays history, so it must not follow the live constants.
+const HOUSEHOLD_PERMISSIONS_AT_0024 = ["manage_rooms", "manage_settings"] as const;
+const MODERATOR_PERMISSIONS_AT_0027 = [
+  "manage_rooms",
+  "close_round",
+  "create_application",
+  "change_application_state",
+  "reverse_application_state",
+] as const;
+const MODERATOR_ONLY_PERMISSIONS_AT_0027 = ["reverse_application_state"] as const;
+const RESIDENT_PERMISSIONS_AT_0024: readonly string[] = [];
+// What 0029 backfills: the household eight and the moderator eleven (manage_rounds replaces close_round).
+const HOUSEHOLD_PERMISSIONS = [
+  "manage_voting_procedure",
+  "manage_rooms",
+  "manage_join_codes",
+  "create_resident_profile",
+  "appoint_moderator",
+  "manage_members",
+  "export_subject_access",
+  "issue_password_reset_link",
+] as const;
+const MODERATOR_PERMISSIONS = [
+  "manage_rooms",
+  "manage_join_codes",
+  "create_resident_profile",
+  "appoint_moderator",
+  "manage_members",
+  "export_subject_access",
+  "manage_rounds",
+  "manage_round_participation",
+  "create_application",
+  "change_application_state",
+  "reverse_application_state",
+] as const;
 
 // drizzle/0029 (F3 change 2b, design D3): the backfills, the precondition and the CHECKs, run against
 // the PRE-0029 state. Unlike reverse-permission-backfill.test.ts this is NOT constraint-free: the
 // ordering of 0029's statements is argued against the constraints live at each statement (step 3
 // drops the exact household CHECK before the backfill would violate it), so the temporary copy of
-// `membership` carries the pre-0029 CHECKs, written from the frozen copies of the old sets in
-// schema.ts. Every statement of the migration FILE runs, in file order, with only the table name
+// `membership` carries the pre-0029 CHECKs, written from the frozen copies of the old sets
+// declared above. Every statement of the migration FILE runs, in file order, with only the table name
 // rewritten: this exercises the real statements, not a hand-copied approximation. drizzle/0029 is not
 // edited for this test.
 //

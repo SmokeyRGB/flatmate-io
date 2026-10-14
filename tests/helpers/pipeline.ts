@@ -2,7 +2,6 @@ import { and, eq } from "drizzle-orm";
 import { withSessionContext, type SessionContext } from "@/db/session-context";
 import { claimResidentProfile } from "@/modules/identity/auth";
 import { createResidentProfile } from "@/modules/identity/repository";
-import { membership } from "@/modules/identity/schema";
 import { activityEvent } from "@/modules/audit/schema";
 import { createAndOpenRound, createRoom } from "@/modules/casting/repository";
 import { application } from "@/modules/casting/schema";
@@ -43,14 +42,6 @@ export async function claimPlainMember(hh: TestHousehold, name: string, accountI
     profileId: profile.id,
     context: { accountId, householdId: hh.householdId, profileId: profile.id } as SessionContext,
   };
-}
-
-// The matrix's individual grant (a resident holds `change_application_state` by a grant, which is
-// legal), by direct SQL through the household context.
-export async function grantPermissions(hh: TestHousehold, accountId: string, permissions: string[]) {
-  await withSessionContext(hh.context, (tx) =>
-    tx.update(membership).set({ permissions }).where(eq(membership.accountId, accountId)),
-  );
 }
 
 // Inserts an application straight into the table at any state (through the moderator's context).

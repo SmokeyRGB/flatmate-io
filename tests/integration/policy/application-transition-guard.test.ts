@@ -13,7 +13,6 @@ import { cleanupAll, deleteTestAccount, type TestHousehold } from "../../helpers
 import {
   claimPlainMember,
   eventsOf,
-  grantPermissions,
   insertApplicationAt,
   readApplication,
   settlesWithin,
@@ -64,31 +63,26 @@ describe("transitionApplication: who may change a state (FR-3.24, AC-3.21)", () 
     await expectUntouched(s, row.id, row);
   });
 
-  it("(b) a resident granted only change_application_state moves an application forward", async () => {
+  // (b) used to be "a resident granted only change_application_state moves forward" and (c) "the
+  // same resident is refused going backward": since drizzle/0037 a plain member cannot hold
+  // change_application_state (membership_moderator_only_permissions), so that state is unwritable.
+  // The grant's refusal is in raw-sql/membership-role-integrity.test.ts (a plain member +
+  // change_application_state, + create_application); the backward rule is in
+  // tests/unit/casting/transition-rules.test.ts (every backward edge requires
+  // reverse_application_state, every forward edge does not). (b) keeps the forward move and its event,
+  // by the moderator.
+  it("(b) a moderator moves an application forward, and one event names the moderator", async () => {
     const s = await setupPipeline(households);
-    const member = await claimPlainMember(s.hh, "GrantedMember", accountIds);
-    await grantPermissions(s.hh, member.accountId, ["change_application_state"]);
     const row = await insertApplicationAt(s, "new");
 
-    const result = await transitionApplication(member.context, row.id, "screened");
+    const result = await transitionApplication(s.moderator.context, row.id, "screened");
     expect(result.state).toBe("screened");
     expect((await readApplication(s, row.id)).state).toBe("screened");
     const events = await eventsOf(s, row.id, "application.state_changed");
     expect(events).toHaveLength(1);
-    expect(events[0].actorAccountId).toBe(member.accountId);
-    expect(events[0].actorProfileId).toBe(member.profileId);
-  });
-
-  it("(c) the same resident is refused going backward, screened -> new", async () => {
-    const s = await setupPipeline(households);
-    const member = await claimPlainMember(s.hh, "GrantedMember", accountIds);
-    await grantPermissions(s.hh, member.accountId, ["change_application_state"]);
-    const row = await insertApplicationAt(s, "screened");
-
-    const err = await errorOf(transitionApplication(member.context, row.id, "new"));
-    expect(err).toBeInstanceOf(PermissionDeniedError);
-    expect((err as PermissionDeniedError).message).toContain("reverse_application_state");
-    await expectUntouched(s, row.id, row);
+    expect(events[0].actorAccountId).toBe(s.moderator.accountId);
+    expect(events[0].actorProfileId).toBe(s.moderator.profileId);
+    expect(events[0].payload).toEqual({ fromState: "new", toState: "screened" });
   });
 
   it("(d) a moderator moves backward, one event names the moderator, and the result carries no personal column", async () => {
@@ -182,15 +176,12 @@ describe("transitionApplication: a step that is not built yet (D6a)", () => {
     await expectUntouched(s, row.id, row);
   });
 
-  it("(i) a reopening counts as a way back: a granted resident is refused, a moderator succeeds", async () => {
+  // (i)'s granted-resident half is gone for the reason given at (b) and (c): a plain member cannot
+  // hold the grant, and the guard checks change_application_state before the rule's `requires`, so
+  // it would only repeat (a). The reopening as a way back is the rule table's (the unit test).
+  it("(i) a reopening counts as a way back: a moderator succeeds", async () => {
     const s = await setupPipeline(households);
-    const member = await claimPlainMember(s.hh, "GrantedMember", accountIds);
-    await grantPermissions(s.hh, member.accountId, ["change_application_state"]);
     const rejected = await insertApplicationAt(s, "rejected_by_household");
-
-    const err = await errorOf(transitionApplication(member.context, rejected.id, "screened"));
-    expect(err).toBeInstanceOf(PermissionDeniedError);
-    await expectUntouched(s, rejected.id, rejected);
 
     const result = await transitionApplication(s.moderator.context, rejected.id, "screened");
     expect(result.state).toBe("screened");

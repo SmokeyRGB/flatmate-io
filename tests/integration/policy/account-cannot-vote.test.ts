@@ -1,8 +1,8 @@
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { afterEach, describe, expect, it } from "vitest";
-import { withSessionContext } from "@/db/session-context";
 import { ProfileRequiredError } from "@/modules/casting/repository";
 import { castVote, getAwaitingVoteCounts, getScreeningPass, VoteError } from "@/modules/deliberation/repository";
+import { setMovedOut } from "@/modules/identity/repository";
 import { membership } from "@/modules/identity/schema";
 import { cleanupAll, createNonResidentModerator, deleteTestAccount, type TestHousehold } from "../../helpers/identity";
 import {
@@ -22,15 +22,6 @@ afterEach(async () => {
   accountIds.length = 0;
   households.length = 0;
 });
-
-// Strips the stored `vote` from a live resident membership by direct SQL as the household account:
-// legal until the contract migration makes the resident set's floor `vote`. This is what a row
-// written by old code (a join or claim from a branch without F3 change 2b) looks like.
-async function stripVote(hh: TestHousehold, accountId: string) {
-  await withSessionContext(hh.context, (tx) =>
-    tx.update(membership).set({ permissions: [] }).where(eq(membership.accountId, accountId)),
-  );
-}
 
 // AC-1.5/FR-1.7: the household account cannot cast a vote, by any route the repository exposes.
 // Tested on the real path, castVote: the stored permission `vote` (the resident set, F3 change 2b)
@@ -73,14 +64,15 @@ describe("Only a membership holding vote can vote (FR-1.7, F3 change 2b)", () =>
     expect(await readVotes(s.moderator.context, app.id)).toHaveLength(2);
   });
 
-  // Transition case, labelled as such: 0029's resident floor is still empty, so a live resident row
-  // without `vote` (what old-code joins write) is accepted by the database; the gate then refuses
-  // it. The contract migration makes the row itself impossible.
-  it("transition: a live resident row without vote is refused not_eligible, and records nothing", async () => {
+  // Invariant guard (several refusers, no prescribed break): since drizzle/0037 a live resident row
+  // without `vote` cannot exist (membership_resident_holds_role_permissions), so the one way a
+  // resident loses `vote` is the production path, a move-out. castVote's membership check, the
+  // participation reads and vote_guard each refuse it.
+  it("a moved-out resident is refused not_eligible, and records nothing", async () => {
     const s = await setupPipeline(households);
     const app = await insertApplicationAt(s, "new");
     const resident = await claimPlainMember(s.hh, "Stripped", accountIds);
-    await stripVote(s.hh, resident.accountId);
+    await setMovedOut(s.hh.context, s.hh.accountId, resident.accountId);
 
     const err = await thrownBy(() =>
       castVote(resident.context, { roundId: s.roundId, applicationId: app.id, value: "good" }),
@@ -93,20 +85,26 @@ describe("Only a membership holding vote can vote (FR-1.7, F3 change 2b)", () =>
     expect((await getAwaitingVoteCounts(resident.context)).size).toBe(0);
   });
 
-  // In flight: the household strips `vote` in a held, uncommitted transaction (the profile stays
-  // active and the participation intact, so vote_guard alone would let the vote through). castVote
-  // takes FOR SHARE on the voter's membership inside its transaction, so it waits for that writer
-  // and, once it commits, is refused. A held move-out would not do: vote_guard step 4 locks the
-  // profile and refuses anyway, which makes that variant an invariant guard, not a regression test.
+  // In flight: a held, uncommitted revocation of the voter's membership (the profile stays active
+  // and the participation intact, so vote_guard alone would let the vote through). castVote takes
+  // FOR SHARE on the voter's membership inside its transaction, so it waits for that writer and,
+  // once it commits, is refused. The held row is CONSTRUCTED: a membership-only revocation
+  // (revoked_at set, role member, permissions empty, legal under every CHECK) that stands for the
+  // membership half of a move-out. The real setMovedOut cannot be held here: it also moves the
+  // profile to moved_out, and vote_guard step 4 locks the profile and refuses anyway, which would
+  // make this an invariant guard, not a regression test for the lock.
   // The 2 s wait is timing evidence; the break (the vote check before the transaction, an unlocked
   // read) records the vote.
-  it("in flight: a vote waits for a held removal of its vote permission, then is refused not_eligible", async () => {
+  it("in flight: a vote waits for a held revocation of its membership, then is refused not_eligible", async () => {
     const s = await setupPipeline(households);
     const app = await insertApplicationAt(s, "new");
     const resident = await claimPlainMember(s.hh, "InFlight", accountIds);
 
     const held = holdTransaction(s.hh.context, async (tx) => {
-      await tx.update(membership).set({ permissions: [] }).where(eq(membership.accountId, resident.accountId));
+      await tx
+        .update(membership)
+        .set({ revokedAt: sql`now()`, role: "member", permissions: [] })
+        .where(eq(membership.accountId, resident.accountId));
     });
     await held.started;
     const attempt = castVote(resident.context, { roundId: s.roundId, applicationId: app.id, value: "good" }).then(
