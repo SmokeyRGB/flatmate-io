@@ -126,10 +126,10 @@ Most of the "no instructions needed" evidence is an **AI persona run**, not a hu
 
 | Test | Who actually used it | Where |
 |---|---|---|
-| "The First-Time Voter" (persona "Mika"), 2026-09-15 | **An AI agent** driving Playwright at 390×844 on the Lovable prototype | `coursework/exercise-12/screenshots-3/usability-test-notes.md` |
-| "The Organizer" (persona "Lea") | **An AI agent**, same method | `…/screenshots-moderator-1/usability-test-notes.md` |
+| "The First-Time Voter" (persona "Mika"), 2026-09-15 | **An AI agent** driving Playwright at 390×844 on the Lovable prototype | coursework/exercise-12/screenshots-3/usability-test-notes.md (local only, gitignored) |
+| "The Organizer" (persona "Lea") | **An AI agent**, same method | …/screenshots-moderator-1/usability-test-notes.md (local only, gitignored) |
 | Prototype test by "Viktor" | **A human** (tested the prototype, Resident + Orga view) | `coursework/prototype-test-viktor.md` |
-| **"Testkarte #1", tester "Arne"** (pasted by you 2026-10-14) | **A human**, invite link → end of voting on the Lovable prototype, with a success criterion set in advance (*"I'm right if onboarding, registration → first vote, takes under 3 minutes"* → **worked**). Stuck: the last screen, *"Where/how can I change my votes?"*; expected: the vote scale was not fully intuitive, he did not understand it represents all votes. | your paste (not in the repo yet: save it as `coursework/prototype-test-arne.md`) |
+| **"Testkarte #1", tester "Arne"** (pasted by you 2026-10-14) | **A human**, invite link → end of voting on the Lovable prototype, with a success criterion set in advance (*"I'm right if onboarding, registration → first vote, takes under 3 minutes"* → **worked**). Stuck: the last screen, *"Where/how can I change my votes?"*; expected: the vote scale was not fully intuitive, he did not understand it represents all votes. | your paste, saved as coursework/prototype-test-tester2.md (PR 71) |
 | **Friends**, informally, "from time to time" | **Humans**; feedback went into the next changes | your statement; no notes in the repo [verify which changes] |
 | A "tester" who "switched the language by a misclick" (Oct 12) | **A persona** (confirmed by you), not a human | `openspec/changes/organisation-task-list/proposal.md` |
 | Your own phone tests (Android Brave; swipe iterations) | **You** | sessions 09-24, 10-02 |
