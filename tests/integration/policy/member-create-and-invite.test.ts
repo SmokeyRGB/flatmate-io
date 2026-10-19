@@ -1,9 +1,7 @@
-import { eq, sql } from "drizzle-orm";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { withSessionContext, type SessionContext } from "@/db/session-context";
-import { membership } from "@/modules/identity/schema";
+import { type SessionContext } from "@/db/session-context";
 import { getResidentList, listJoinCodeIssuances } from "@/modules/identity/repository";
-import { cleanupAll, createTestModerator, registerTestHousehold, type TestHousehold } from "../../helpers/identity";
+import { cleanupAll, registerTestHousehold, type TestHousehold } from "../../helpers/identity";
 
 // organisation-task-list D8 / spec identity/member-administration "Adding a resident offers their
 // invitation at once": the create-profile action issues the new profile's single-use bound link as a
@@ -62,25 +60,12 @@ describe("createResidentProfileAction issues the invitation at once", () => {
     expect(links[0]).toMatchObject({ residentProfileId: alex!.id, maxUses: 1, uses: 0, purpose: "join" });
   });
 
-  it("a caller without manage_join_codes gets the profile and no link", async () => {
-    hh = await registerTestHousehold();
-    const moderator = await createTestModerator(hh);
-    // The moderator keeps create_resident_profile and loses only the right to issue links.
-    await withSessionContext(hh.context, (tx) =>
-      tx
-        .update(membership)
-        .set({ permissions: sql`array_remove(permissions, 'manage_join_codes')` })
-        .where(eq(membership.accountId, moderator.accountId)),
-    );
-
-    await create(moderator.context, "Alex");
-
-    expect(await profileNames(hh)).toContain("Alex");
-    expect(await boundLinks(hh)).toHaveLength(0);
-    // The action does not even try (the repository would refuse on its own, so the call count is
-    // what shows the action's own check).
-    expect(repository.issueJoinCode).not.toHaveBeenCalled();
-  });
+  // "a caller without manage_join_codes gets the profile and no link" is gone: since drizzle/0037 a
+  // live moderator always holds manage_join_codes (membership_moderator_holds_role_permissions), so
+  // a holder of create_resident_profile without it cannot exist. The database half is the refusal in
+  // raw-sql/membership-role-integrity.test.ts ("refuses to take manage_members away from a live
+  // moderator": the same constraint, which requires every value of the moderator set); the action's
+  // own check stays as defence in depth (members/actions.ts).
 
   it("the profile survives when issuing the invitation throws", async () => {
     hh = await registerTestHousehold();

@@ -367,7 +367,11 @@ describe("Casting lock order", () => {
     const hold = holdOpen(household.context, async (tx) => {
       await tx
         .update(membership)
-        .set({ role: "member", permissions: sql`'{}'::text[]` })
+        .set({
+          role: "member",
+          // setMemberRole's shape (drizzle/0037: a live resident keeps `vote`, so an empty set is refused).
+          permissions: sql`CASE WHEN ${membership.isResident} THEN ARRAY['vote']::text[] ELSE '{}'::text[] END`,
+        })
         .where(eq(membership.accountId, moderator.accountId));
     });
     await untilHeld(hold);

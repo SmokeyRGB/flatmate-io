@@ -10,7 +10,7 @@ import {
   registerHousehold,
 } from "@/modules/identity/auth";
 import { createResidentProfile } from "@/modules/identity/repository";
-import { membership, residentProfile } from "@/modules/identity/schema";
+import { membership, residentProfile, RESIDENT_PERMISSIONS } from "@/modules/identity/schema";
 import {
   adminClient,
   cleanupAll,
@@ -108,7 +108,10 @@ describe("A provider user created before a failing transaction is deleted again"
 
     // A stray membership already holds this profile's slot, so claim's own membership insert hits
     // membership_resident_profile_id_unique (drizzle/0021) — inside the transaction, after
-    // createUser. The profile itself is still `prepared`, so the pre-check lets it through.
+    // createUser. The profile itself is still `prepared`, so the pre-check lets it through. The stray
+    // row holds the resident set: an empty set on a live resident is refused by
+    // membership_resident_holds_role_permissions (drizzle/0037), and CHECKs run before the unique
+    // index, so the claim would never reach the index this case is about.
     await withSessionContext(hh.context, (tx) =>
       tx.insert(membership).values({
         householdId: hh!.householdId,
@@ -116,7 +119,7 @@ describe("A provider user created before a failing transaction is deleted again"
         residentProfileId: profile.id,
         isResident: true,
         role: "member",
-        permissions: [],
+        permissions: [...RESIDENT_PERMISSIONS],
       }),
     );
 

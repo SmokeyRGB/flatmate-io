@@ -25,7 +25,6 @@ import {
 } from "../../helpers/identity";
 import {
   claimPlainMember,
-  grantPermissions,
   insertApplicationAt,
   type PipelineSetup,
 } from "../../helpers/pipeline";
@@ -581,12 +580,10 @@ describe("getRanking: the highlight follows the round's open rooms (Q-15)", () =
 describe("getRanking: who may ask, and a stale context (V-2)", () => {
   let s: PipelineSetup;
   let viewer: Awaited<ReturnType<typeof claimPlainMember>>;
-  let stripped: Awaited<ReturnType<typeof claimPlainMember>>;
   let revoked: Awaited<ReturnType<typeof claimPlainMember>>;
   beforeAll(async () => {
     s = await sharedPipeline();
     viewer = await claimPlainMember(s.hh, "Teilnehmerin", accountIds);
-    stripped = await claimPlainMember(s.hh, "Ohnerecht", accountIds);
     revoked = await claimPlainMember(s.hh, "Widerrufen", accountIds);
   });
 
@@ -609,12 +606,9 @@ describe("getRanking: who may ask, and a stale context (V-2)", () => {
     }
   });
 
-  it("a resident without the vote permission is refused not_eligible", async () => {
-    await grantPermissions(s.hh, stripped.accountId, []);
-    expect(await getRanking(stripped.context, s.roundId)).toEqual({ kind: "refused", reason: "not_eligible" });
-    expect(await getRanking(stripped.context, null)).toEqual({ kind: "refused", reason: "not_eligible" });
-  });
-
+  // The former "a resident without the vote permission" case is gone: since drizzle/0037 a live
+  // resident always holds `vote`, so that state cannot be written. Its replacement is the revoked
+  // case below ("a context whose membership was revoked ..."), which asserts the same refusals.
   it("a context whose membership was revoked after it was built is refused not_eligible (design D5)", async () => {
     expect((await getRanking(revoked.context, s.roundId)).kind).toBe("board");
     await withSessionContext(s.hh.context, (tx) =>

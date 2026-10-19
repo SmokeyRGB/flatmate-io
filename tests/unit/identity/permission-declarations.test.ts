@@ -3,16 +3,17 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { TRANSITION_RULES } from "@/modules/casting/transitions";
 import {
+  ADMINISTRATION_PERMISSIONS,
+  HOUSEHOLD_ONLY_PERMISSIONS,
+  MODERATOR_ONLY_PERMISSIONS,
   PERMISSIONS,
-  REPLACED_PERMISSIONS,
-  RETIRED_PERMISSIONS,
+  RESIDENT_ONLY_PERMISSIONS,
   ROLE_SETS,
-  type PermissionName,
 } from "@/modules/identity/schema";
 
 // Drift guard (design D10): one declaration of permissions, holders and role sets, and every check
 // in src/ names a key of it. A gate on a misspelled or retired permission, which nobody could ever
-// pass, fails the build here.
+// pass, fails the build here (a retired name is simply not a key; drizzle/0037 removed the last).
 
 const ROOT = join(__dirname, "..", "..", "..");
 const SRC = join(ROOT, "src");
@@ -78,21 +79,19 @@ describe("permission declarations", () => {
     }
   });
 
-  it("every permission literal passed to a check in src/ is declared and not retired", () => {
+  it("every permission literal passed to a check in src/ is declared", () => {
     const found = permissionLiteralsPassedToChecks();
     expect(found.length).toBeGreaterThan(10);
     for (const { file, name } of found) {
       expect(Object.keys(PERMISSIONS), `${name} in ${file}`).toContain(name);
-      expect(RETIRED_PERMISSIONS, `${name} in ${file}`).not.toContain(name);
     }
   });
 
-  it("every `requires` entry of casting's TRANSITION_RULES is declared and not retired", () => {
+  it("every `requires` entry of casting's TRANSITION_RULES is declared", () => {
     for (const [key, rule] of TRANSITION_RULES) {
       if (rule.kind !== "state_only") continue;
       for (const p of rule.requires) {
         expect(Object.keys(PERMISSIONS), `${p} in ${key}`).toContain(p);
-        expect(RETIRED_PERMISSIONS, `${p} in ${key}`).not.toContain(p);
       }
     }
   });
@@ -103,18 +102,19 @@ describe("permission declarations", () => {
     for (const name of Object.keys(PERMISSIONS)) expect(checked, name).toContain(name);
   });
 
-  it("every REPLACED_PERMISSIONS target is declared, no replaced name is, and 0029 carries each over", () => {
-    const file = readdirSync(join(ROOT, "drizzle")).find((f) => f.startsWith("0029_"));
-    expect(file).toBeDefined();
-    const migration = readFileSync(join(ROOT, "drizzle", file as string), "utf8");
-    const updates = migration.split("--> statement-breakpoint").filter((s) => /^\s*UPDATE "membership"/.test(s));
-    for (const [oldName, targets] of Object.entries(REPLACED_PERMISSIONS)) {
-      expect(Object.keys(PERMISSIONS), oldName).not.toContain(oldName);
-      for (const target of targets as readonly PermissionName[]) {
-        expect(Object.keys(PERMISSIONS), target).toContain(target);
-        const carried = updates.some((u) => u.includes(`'${oldName}'`) && u.includes(`'${target}'`));
-        expect(carried, `0029 carries ${oldName} over to ${target}`).toBe(true);
-      }
-    }
+  // Each holder CHECK is built from one group of permissionsHeldOnlyBy. A permission whose holders
+  // match no group (say ["moderator", "resident"]) would be stored under no holder rule at all, so
+  // the four groups must partition the declaration: disjoint, and together every declared name.
+  it("the four holder groups partition the declared permissions", () => {
+    const groups = [
+      MODERATOR_ONLY_PERMISSIONS,
+      HOUSEHOLD_ONLY_PERMISSIONS,
+      ADMINISTRATION_PERMISSIONS,
+      RESIDENT_ONLY_PERMISSIONS,
+    ] as readonly (readonly string[])[];
+    const all = groups.flat();
+    expect(new Set(all).size, "pairwise disjoint").toBe(all.length);
+    expect(all.length, "sizes sum to the declaration").toBe(Object.keys(PERMISSIONS).length);
+    expect([...all].sort()).toEqual(Object.keys(PERMISSIONS).sort());
   });
 });

@@ -15,7 +15,6 @@ import {
 } from "@/modules/casting/repository";
 import { application } from "@/modules/casting/schema";
 import { PermissionDeniedError } from "@/modules/identity/repository";
-import { membership } from "@/modules/identity/schema";
 import { claimResidentProfile } from "@/modules/identity/auth";
 import { createResidentProfile } from "@/modules/identity/repository";
 import {
@@ -205,22 +204,17 @@ describe("captureApplication: what is written (AC-3.1, AC-3.3, AC-3.11)", () => 
 });
 
 describe("captureApplication: who may (AC-3.5)", () => {
-  it("6.5 a plain member is refused for the permission and writes nothing; a granted member succeeds", async () => {
+  // The "a granted member succeeds" half is gone: since drizzle/0037 a plain member cannot hold
+  // create_application (membership_moderator_only_permissions), so the state is unwritable. The
+  // refusal that replaces it is raw-sql/membership-role-integrity.test.ts (plain member +
+  // create_application); the moderator's success is the cases above.
+  it("6.5 a plain member is refused for the permission and writes nothing", async () => {
     const s = await setup();
     const member = await claimMember(s.hh, "PlainMember");
     const input = { roundId: s.roundId, applicantName: "Testbewerbung Mitglied", collectedFrom: "data_subject" };
 
     await expect(captureApplication(member.context, input)).rejects.toThrow(PermissionDeniedError);
     await expectNothingWritten(s);
-
-    await withSessionContext(s.hh.context, (tx) =>
-      tx.update(membership).set({ permissions: ["create_application"] }).where(eq(membership.accountId, member.accountId)),
-    );
-    const created = await captureApplication(member.context, input);
-    expect(created.id).toBeTruthy();
-    const [row] = await rowsOf(s);
-    expect(row.createdByAccountId).toBe(member.accountId);
-    expect(row.createdByProfileId).toBe(member.profileId);
   });
 
   it("6.5 a context naming another profile of the household is refused (a stale session claim), and writes nothing", async () => {

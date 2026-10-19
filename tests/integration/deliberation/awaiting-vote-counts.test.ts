@@ -4,9 +4,10 @@ import { withSessionContext } from "@/db/session-context";
 import { transitionApplication } from "@/modules/casting/repository";
 import { castVote, getAwaitingVoteCounts, getScreeningPass } from "@/modules/deliberation/repository";
 import { vote } from "@/modules/deliberation/schema";
+import { setMovedOut } from "@/modules/identity/repository";
 import { insertTestRound } from "../../helpers/applications";
 import { cleanupAll, deleteTestAccount, type TestHousehold } from "../../helpers/identity";
-import { claimPlainMember, grantPermissions, insertApplicationAt, setupPipeline } from "../../helpers/pipeline";
+import { claimPlainMember, insertApplicationAt, setupPipeline } from "../../helpers/pipeline";
 
 // F4 change 1 tasks 6.6: T-5, "awaiting my vote" per round, from deliberation. The deck and the
 // count share one definition (awaitingVoteTx), so the map must equal the deck size. The cases
@@ -75,7 +76,7 @@ describe("getAwaitingVoteCounts", () => {
 
   // Copilot round on PR #54: Start's acknowledgement needs an explicit 0 to tell "nothing
   // awaits" from "the count was refused", so the two must differ in the map.
-  it("an eligible voter with nothing awaiting gets an explicit 0, and a voter stripped of `vote` gets no entry", async () => {
+  it("an eligible voter with nothing awaiting gets an explicit 0, and a moved-out voter gets no entry", async () => {
     const { s, voter } = await fixture();
     const app = await insertApplicationAt(s, "new");
     await castVote(voter.context, { roundId: s.roundId, applicationId: app.id, value: "good" });
@@ -88,7 +89,9 @@ describe("getAwaitingVoteCounts", () => {
     await insertApplicationAt(s, "new");
     expect((await getAwaitingVoteCounts(voter.context)).get(s.roundId)).toBe(1);
 
-    await grantPermissions(s.hh, voter.accountId, []);
+    // Invariant guard (several refusers, no prescribed break): since drizzle/0037 a live resident
+    // always holds `vote`, so the one way to lose it is the production path, a move-out.
+    await setMovedOut(s.hh.context, s.hh.accountId, voter.accountId);
     const refused = await getAwaitingVoteCounts(voter.context);
     expect(refused.has(s.roundId)).toBe(false);
     expect(refused.size).toBe(0);

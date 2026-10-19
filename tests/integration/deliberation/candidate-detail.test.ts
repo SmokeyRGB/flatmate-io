@@ -27,7 +27,7 @@ import {
   testEmail,
   type TestHousehold,
 } from "../../helpers/identity";
-import { claimPlainMember, grantPermissions, insertApplicationAt, type PipelineSetup } from "../../helpers/pipeline";
+import { claimPlainMember, insertApplicationAt, type PipelineSetup } from "../../helpers/pipeline";
 import { setRoundStatus } from "../../helpers/votes";
 
 // F5 candidate-detail, task 6.4: getCandidateDetail, the detail card's one read. It runs the same
@@ -115,7 +115,7 @@ describe("getCandidateDetail: the setting off (the default)", () => {
   let viewer: Awaited<ReturnType<typeof claimPlainMember>>;
   let w: Awaited<ReturnType<typeof claimPlainMember>>;
   let x: Awaited<ReturnType<typeof claimPlainMember>>;
-  let stripped: Awaited<ReturnType<typeof claimPlainMember>>;
+  let ohnerecht: Awaited<ReturnType<typeof claimPlainMember>>;
   let a1: Awaited<ReturnType<typeof insertApplicationAt>>; // scored 2/1/0/1
   let a2: Awaited<ReturnType<typeof insertApplicationAt>>; // unscored, the viewer voted
   let a3: Awaited<ReturnType<typeof insertApplicationAt>>; // rejected, results visible
@@ -129,10 +129,10 @@ describe("getCandidateDetail: the setting off (the default)", () => {
     viewer = await claimPlainMember(s.hh, "Vera", accountIds);
     w = await claimPlainMember(s.hh, "Wanda", accountIds);
     x = await claimPlainMember(s.hh, "Xaver", accountIds);
-    stripped = await claimPlainMember(s.hh, "Ohnerecht", accountIds);
-    await grantPermissions(s.hh, stripped.accountId, []);
+    ohnerecht = await claimPlainMember(s.hh, "Ohnerecht", accountIds);
     base = await readSnapshot(s);
-    // Voters: Mona, Vera, Wanda, Xaver (Ohnerecht is a participant too, so the denominator is 5).
+    // Voters: Mona, Vera, Wanda, Xaver; Ohnerecht is a participant who casts no vote, so the
+    // denominator is 5.
     a1 = await insertApplicationAt(s, "new", {
       age: 27,
       messageRaw: "Hallo, ich suche ein Zimmer.",
@@ -158,6 +158,8 @@ describe("getCandidateDetail: the setting off (the default)", () => {
     await writeSnapshot(s, base);
     await setRoundStatus(s, s.roundId, "open");
     await updateHouseholdSettings(s.hh.context, { revealVoteAuthorship: false }, hhActor(s.hh));
+    // Ohnerecht is moved out by one case; a no-op when Ohnerecht is live.
+    await reactivateMember(s.hh.context, s.hh.accountId, ohnerecht.accountId).catch(() => undefined);
   });
 
   it("shows the same numbers as the scoreboard, for a scored and an unscored candidate", async () => {
@@ -269,8 +271,13 @@ describe("getCandidateDetail: the setting off (the default)", () => {
     expect(own?.applicationId).toBe(a1.id);
   });
 
-  it("a resident without the vote permission is refused not_eligible", async () => {
-    expect(await detail(a1.id, stripped.context)).toEqual({ kind: "refused", reason: "not_eligible" });
+  // Invariant guard (several refusers, no prescribed break): since drizzle/0037 a live resident
+  // always holds `vote`, so the one way to lose it is a move-out (the production path). The
+  // detail's membership read, the participation reads and the rank rules each refuse it. afterEach
+  // reactivates Ohnerecht, so the later cases keep the denominator of 5.
+  it("a moved-out resident is refused not_eligible", async () => {
+    await setMovedOut(s.hh.context, s.hh.accountId, ohnerecht.accountId);
+    expect(await detail(a1.id, ohnerecht.context)).toEqual({ kind: "refused", reason: "not_eligible" });
   });
 
   it("a round that is not open or paused is refused with its status", async () => {

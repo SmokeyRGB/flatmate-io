@@ -260,6 +260,13 @@
       "when": 1791465722776,
       "tag": "0036_account_locale_check",
       "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1791979700905,
+      "tag": "0037_role_permissions_contract",
+      "breakpoints": true
     }
   ]
 }

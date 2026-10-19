@@ -84,19 +84,10 @@ describe("getOrganisationApplication (design D5)", () => {
     );
   });
 
-  it("a member granted only change_application_state gets the row", async () => {
-    const s = await setup();
-    const member = await claimMember(s.hh, "StateChanger");
-    await withSessionContext(s.hh.context, (tx) =>
-      tx
-        .update(membership)
-        .set({ permissions: ["change_application_state"] })
-        .where(eq(membership.accountId, member.accountId)),
-    );
-    const row = await getOrganisationApplication(member.context, s.roundId, s.applicationId);
-    expect(row).not.toBeNull();
-    expect(row!.id).toBe(s.applicationId);
-  });
+  // "a member granted only change_application_state gets the row" is gone: since drizzle/0037 a plain
+  // member cannot hold that grant (membership_moderator_only_permissions), so the state is
+  // unwritable. The refusal that replaces it is raw-sql/membership-role-integrity.test.ts (plain
+  // member + change_application_state); the permission-based read stays shown by the moderator case.
 
   it("another household's application id gives null", async () => {
     const s = await setup();

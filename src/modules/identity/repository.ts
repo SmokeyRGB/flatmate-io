@@ -443,7 +443,9 @@ export class HouseholdAccountCannotVoteError extends Error {
 // Matrix row „Vote abgeben / ändern": the stored permission `vote`, the resident set (a moderator
 // who is also a resident holds it through that set; the household account and a moderator without
 // a resident profile hold none). It reads the caller's live membership FOR SHARE in `tx`, so a
-// move-out or a stripped `vote` committed first is seen and one in flight is waited for.
+// move-out committed first is seen and one in flight is waited for. The `vote` check on the row is
+// defence in depth: a live resident always stores `vote` (membership_resident_holds_role_permissions,
+// drizzle/0037), so only a missing live membership can refuse here.
 export async function assertAccountCanVoteTx(tx: Tx, context: SessionContext): Promise<void> {
   const row = await readLiveMembershipTx(tx, context, true);
   if (!row || !membershipHoldsPermission(row, "vote")) {

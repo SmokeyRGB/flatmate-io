@@ -51,7 +51,9 @@ export async function createResidentProfileAction(formData: FormData): Promise<v
   });
 
   // issueJoinCode refuses a caller without the permission on its own, the check here only decides
-  // whether to try at all.
+  // whether to try at all. The branch is unreachable while the matrix gives manage_join_codes and
+  // create_resident_profile to the same roles (drizzle/0037 enforces both sets); kept so that moving
+  // one of the two later cannot make a caller's profile creation fail.
   if (await holdsPermission(current.context, "manage_join_codes")) {
     try {
       await issueJoinCode(current.context, current.context.accountId, {

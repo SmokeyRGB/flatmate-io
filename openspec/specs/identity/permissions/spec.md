@@ -6,7 +6,9 @@ of permissions; a membership stores the union of the sets of the roles it occupi
 reads only those stored permissions, and the database refuses a membership that contradicts its
 roles. Seeded lazily on first touch, describing behaviour that exists rather than restating the
 requirement packets.
+
 ## Requirements
+
 ### Requirement: Voting eligibility, role and permissions are three independent things
 
 A membership SHALL carry voting eligibility and a role as independent attributes, plus its stored
@@ -138,13 +140,14 @@ exactly its ✅ column, since the matrix gives the household account no ⬜. `ma
 replaces the earlier name `close_round`, which gated creating and opening a round as well, and
 `manage_voting_procedure` replaces `manage_settings`, which named every setting while only the
 procedure exists. A replaced name is **retired**: it grants nothing, no check may name it, and the
-contract step removes it from stored memberships. Actions not yet built get their permission when
+contract step of its rename removed it from stored memberships; the database refuses storing a
+name that is not declared. Actions not yet built get their permission when
 they are built, as a new row.
 
 **The model is built to change.** Permissions are expected to be added, moved between roles, split,
 renamed and retired as the product grows. Each of these SHALL be a change to the one declaration
-(the permission rows with their holders, the role sets, and a record of replaced names with what
-replaced them) plus one migration that carries the stored memberships along — never a change to
+(the permission rows with their holders, the role sets, and, only between a rename's expand and
+contract migrations, a record of replaced names with what replaced them) plus one migration that carries the stored memberships along — never a change to
 the checks, screens or flags beyond the one action concerned. A rename or split SHALL carry every
 holder of the old name over to the new name(s) its role may hold, in the same migration.
 
@@ -308,6 +311,8 @@ any membership row that:
 - is the administering membership and holds a permission outside the household set (the matrix
   gives the household account no ⬜ at all);
 - is revoked and still holds a permission or the moderator role;
+- holds a permission that is not declared, a retired name such as `close_round` or
+  `manage_settings` included;
 - holds a permission whose declared holders exclude its role: a moderator-only permission
   (`manage_rounds`, `manage_round_participation`, `create_application`, `change_application_state`,
   `reverse_application_state`) on a row that is not a moderator; a household-only permission
@@ -318,21 +323,9 @@ any membership row that:
   Together: a plain resident row holds the resident set and nothing else.
 
 The constraints SHALL be derived from the one declaration of permissions, holders and sets, so a
-move between roles changes the declaration and the constraints together.
-
-**Transition.** Other branches sharing the development database still write the earlier sets. Until
-a later contract step, therefore: a live household or moderator row is required to hold only what
-both the earlier and the new set contain (the household's `manage_rooms`; the
-moderator's `manage_rooms`, `create_application`, `change_application_state`,
-`reverse_application_state`); the retired `close_round` and `manage_settings` stay on the rows that
-hold them, and the household set may still contain `manage_settings`; and the holder rule is not
-yet enforced for the permissions those branches' tests still grant to plain residents
-(`manage_rooms`, `create_application`, `change_application_state`). A resident
-row is required to hold nothing yet (old code stores the empty resident set). A row short
-of its new values is accepted and simply denied the actions they gate. The household set's upper
-bound (nothing outside the eight, plus the retired `manage_settings`) and the holder rule for every other permission hold from this
-change on. The contract step requires the full sets (`vote` on every live resident), strips the retired names and every organising
-permission still held by a plain resident, and enforces the holder rule for all permissions.
+move between roles changes the declaration and the constraints together. Every declared
+permission SHALL fall under exactly one holder rule the database enforces, so a permission cannot
+escape enforcement by being declared with an unforeseen combination of holders.
 
 A moderator missing its rights, a moved-out person keeping one, or a resident holding a role-bound
 right is therefore a refused write, not a state the application has to cope with. Sources: the
@@ -341,26 +334,31 @@ that a moderator should have, something has significantly gone wrong before"*); 
 (✅ = *„immer"*, ❌ = not grantable).
 
 #### Scenario: Removing a permission from a moderator is refused
-- **WHEN** a live moderator membership's stored permissions are written without
-  `create_application` or without `reverse_application_state`, by the application or by direct SQL
+- **WHEN** a live moderator membership's stored permissions are written without any permission of
+  the moderator set (for example `manage_join_codes`, `create_application` or
+  `reverse_application_state`), by the application or by direct SQL
 - **THEN** the database refuses the write
 
-#### Scenario: Until the contract step, a set missing the new values is accepted but grants nothing new
-- **WHEN** a live household row holding only `manage_rooms` and `manage_settings` (what old code
-  registers), or a live
-  moderator holding only the five earlier values, is written by direct SQL
-- **THEN** the database accepts it, and that membership is refused every action gated by a
-  permission it lacks
+#### Scenario: A live resident without the vote is refused
+- **WHEN** a live resident membership (a member or a moderator with a resident profile) is written
+  without `vote`, by direct SQL
+- **THEN** the database refuses the write; a resident loses `vote` only by losing the membership
+  (moving out or removal), which clears every permission
+
+#### Scenario: A retired or undeclared permission cannot be stored
+- **WHEN** any membership, the household account and a moderator included, is written with
+  `close_round`, `manage_settings` or any other name that is not a declared permission, by direct
+  SQL
+- **THEN** the database refuses the write
 
 #### Scenario: Making someone moderator without the permissions is refused
 - **WHEN** a membership's role is set to moderator by direct SQL without adding the permissions
 - **THEN** the database refuses the write
 
 #### Scenario: The household set is exact
-- **WHEN** the administering membership's stored permissions are written without `manage_rooms`,
-  or with `manage_rounds`, `create_application` or `reverse_application_state` added
-- **THEN** the database refuses the write (until the contract step the set is exact from above
-  only: a household row short of its new values is accepted, see the transition scenario)
+- **WHEN** the administering membership's stored permissions are written without any of its eight
+  permissions, or with `manage_rounds`, `create_application` or `reverse_application_state` added
+- **THEN** the database refuses the write
 
 #### Scenario: A revoked membership keeps nothing
 - **WHEN** a revoked membership is written with a stored permission or with the moderator role
@@ -368,9 +366,9 @@ that a moderator should have, something has significantly gone wrong before"*); 
 
 #### Scenario: A resident cannot be granted a moderator-only permission
 - **WHEN** a live member (not a moderator) is written with `reverse_application_state`,
-  `manage_round_participation` or `manage_rounds`, by direct SQL
-- **THEN** the database refuses the write (and, from the contract step on, the same for
-  `create_application` and `change_application_state`)
+  `manage_round_participation`, `manage_rounds`, `create_application` or
+  `change_application_state`, by direct SQL
+- **THEN** the database refuses the write
 
 #### Scenario: Only a resident membership can hold the vote
 - **WHEN** the household account, or a moderator without a resident profile, is written with
@@ -383,10 +381,17 @@ that a moderator should have, something has significantly gone wrong before"*); 
 
 #### Scenario: A plain member cannot be granted member administration
 - **WHEN** a live member (neither administering nor moderator) is written with `manage_join_codes`,
-  `create_resident_profile`, `appoint_moderator`, `manage_members` or `export_subject_access`, by
-  direct SQL
-- **THEN** the database refuses the write (and the same for `manage_voting_procedure`; from the
-  contract step on also for `manage_rooms`)
+  `create_resident_profile`, `appoint_moderator`, `manage_members`, `export_subject_access`,
+  `manage_voting_procedure` or `manage_rooms`, by direct SQL
+- **THEN** the database refuses the write
+
+#### Scenario: Existing memberships are brought to the exact sets
+- **WHEN** the migration that makes the sets exact runs
+- **THEN** every live membership holds every permission of its roles' sets; a moderator that held
+  `manage_settings` holds `manage_voting_procedure`; no membership holds `close_round`,
+  `manage_settings` or any other undeclared name; no plain member holds anything but `vote`; every
+  other stored permission is unchanged; and the migration reports, before it changes anything, how
+  many rows each step will touch
 
 ### Requirement: The administering membership never acts as a resident profile
 
@@ -405,4 +410,3 @@ applications first, stays out of the household account's reach. Sources: ADR-013
 #### Scenario: Registration creates no profile for the administering membership
 - **WHEN** a household is registered
 - **THEN** its administering membership is created without a resident profile, as before
-
