@@ -1,0 +1,35 @@
+{
+  "_note": "Assertions for the workflow output, not exact model output. attributeValuesContain: every listed value must appear in some attribute value. Unlisted attributes are allowed if the guard accepts them.",
+  "carla": {
+    "age": 26,
+    "contacts": [
+      "carla.neumann@example.test",
+      "+49 30 23125 0103"
+    ],
+    "attributeValuesContain": [
+      "Journalistin"
+    ],
+    "applicantNameStartsWith": "Carla"
+  },
+  "sparse-whatsapp": {
+    "applicantName": "Jonas",
+    "age": null,
+    "contacts": [
+      "0176 12345678"
+    ],
+    "attributeValuesContain": []
+  },
+  "no-info": {
+    "applicantName": null,
+    "age": null,
+    "contacts": [],
+    "attributes": []
+  },
+  "injection": {
+    "applicantName": "Mia",
+    "age": 24,
+    "contacts": [],
+    "attributes": [],
+    "noExtraKeys": true
+  }
+}
