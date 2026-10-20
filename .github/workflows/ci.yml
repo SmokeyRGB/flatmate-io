@@ -132,6 +132,12 @@ jobs:
   verify-hosted:
     if: github.event_name == 'push'
     runs-on: ubuntu-24.04
+    # One run at a time against the shared flatmate-io-dev: three merges within 20 s on 2026-10-19
+    # ran three suites at once and failed 1-8 unrelated tests each on latency and lock contention.
+    # A queued run waits instead; GitHub keeps only the newest one waiting, which tests the newest main.
+    concurrency:
+      group: verify-hosted
+      cancel-in-progress: false
     # Against the EU from a US runner the job took 6-7 min; 30 leaves room without letting a hung
     # network call hold a runner for GitHub's 6-hour default.
     timeout-minutes: 30
