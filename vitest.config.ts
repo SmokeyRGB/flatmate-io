@@ -35,7 +35,8 @@ export default defineConfig({
     // I/O, so that job raises it via VITEST_MAX_WORKERS (.github/workflows/ci.yml). The ceiling is
     // Supabase's, not the runner's: each worker holds up to 10 pooler connections, and Auth
     // rate-limits sign-ins per IP, which every worker shares — lower the number if that job starts
-    // failing on 429s or connection limits rather than on assertions.
+    // failing on 429s, connection limits or unanswered Auth requests rather than on assertions
+    // (8 → 2 on 2026-10-20 for the last of these: dev is a free-tier t3.nano).
     //
     // `verify` (every pull request, against the disposable local stack started in the runner,
     // openspec/changes/ci-local-database) leaves VITEST_MAX_WORKERS unset: with no network
