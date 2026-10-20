@@ -21,9 +21,12 @@ import { vi } from "vitest";
 // It bounds EVERY provider call in the file, not only the dropped ones: fixtures, the unfaulted
 // calls inside the exercised operation, and the forward of a `forward-then-drop`. From a US CI
 // runner against the shared EU flatmate-io-dev, those ordinary calls went past 3s and failed as
-// "did not answer" (verify-hosted on main, 2026-10-14 to 2026-10-20). 8s is the basis
-// tests/setup.ts uses: six times the slowest request GoTrue logged.
-export const FAULT_TEST_DEADLINE_MS = 8000;
+// "did not answer" (verify-hosted on main, 2026-10-14 to 2026-10-20). 7s is over five times the
+// slowest request GoTrue logged, and stays strictly below the lost-response wrapper's 8s
+// (tests/setup.ts): at a tie, which deadline ended a slow call would depend on timer order, and
+// the wrapper could resend or throw its own error first. At 7s the application's abort always wins,
+// as it did at 3s.
+export const FAULT_TEST_DEADLINE_MS = 7000;
 
 // Call at the top of each fault-injection file. Each `drop-before` waits out one whole deadline
 // and a test drops up to six requests in a row, so the file's test timeout grows with it.
