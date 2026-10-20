@@ -138,10 +138,11 @@ jobs:
     concurrency:
       group: verify-hosted
       cancel-in-progress: false
-    # Against the EU from a US runner the job takes about 20 min (2026-10); 30 leaves room without
-    # letting a hung network call hold a runner for GitHub's 6-hour default. Queue time behind the
-    # concurrency group does not count against it.
-    timeout-minutes: 30
+    # Against the EU from a US runner the suite took 19-28 min on 8 workers (2026-10); 2 workers
+    # (below) make it several times longer. 90 leaves room without letting a hung network call
+    # hold a runner for GitHub's 6-hour default. Queue time behind the concurrency group does not
+    # count against it.
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
 
@@ -167,8 +168,13 @@ jobs:
       - run: npm run verify
         env:
           # Workers for the network-bound test suite; see vitest.config.ts's maxWorkers comment.
-          # Trial value (PR #19): the runner's default of 3 left it mostly idle on I/O.
-          VITEST_MAX_WORKERS: "8"
+          # Was 8 (trial, PR #19). Lowered to 2 on 2026-10-20: flatmate-io-dev is a free-tier
+          # t3.nano (burstable CPU, ~0.5 GB RAM shared by Postgres and Auth), and its Auth stopped
+          # keeping up with 8 workers hashing passwords at once (requests unanswered after 8s per
+          # main run: 0 on 2026-10-13, 49 on #69, 274 on #74). The resend wrapper in tests/setup.ts
+          # tripled the load on exactly those calls. The project stays on the free tier (human
+          # decision, 2026-10-20), so the load has to fit the instance, not the other way round.
+          VITEST_MAX_WORKERS: "2"
           # Must now be the flatmate-io-dev pooler string (app_runtime, port 6543). Update it at
           # Settings > Secrets and variables > Actions; a stale production value makes the run
           # fail fast in tests/setup.ts rather than writing to production.
