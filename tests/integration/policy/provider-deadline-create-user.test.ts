@@ -10,12 +10,11 @@ import {
   testEmail,
   type TestHousehold,
 } from "../../helpers/identity";
-import { injectProviderFault, type FaultInjectorHandle } from "../../helpers/provider-fault";
+import { injectProviderFault, applyFaultTestDeadline, type FaultInjectorHandle } from "../../helpers/provider-fault";
 
 // auth-provider-deadline design.md D5 / tasks.md 4.2: a lost `createUser` answer must leave no
-// account behind and must not block the address for a retry. AUTH_PROVIDER_DEADLINE_MS=3000 (D12)
-// — above dev's observed 1.3s, well inside the 60s test timeout.
-process.env.AUTH_PROVIDER_DEADLINE_MS = "3000";
+// account behind and must not block the address for a retry.
+applyFaultTestDeadline();
 
 const PASSWORD = "test-password-not-real-1234";
 
