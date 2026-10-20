@@ -32,7 +32,6 @@ tables:
       created_by_profile_id: { category: "🟠", purpose: "Zurechenbarkeit (ADR-004)", legal_basis: "Art. 6(1)(f) DSGVO", retention: "an Application.retention_until gebunden" }
       retention_until: { category: "⚙️" }
       created_at: { category: "⚙️" }
-      deleted_at: { category: "⚙️" }
       applicant_name: { category: "🔴", purpose: "Identifikation im Screening (Compliance §6.2)", legal_basis: "Art. 6(1)(b) DSGVO", retention: "180 Tage nach Rundenabschluss (Compliance §5.3)" }
       age: { category: "🔴", purpose: "Passung zur WG-Struktur (Compliance §6.2)", legal_basis: "Art. 6(1)(b) und (f) DSGVO", retention: "180 Tage nach Rundenabschluss (Compliance §5.3)" }
       contact_email: { category: "🔴", purpose: "Einladung, Terminabsprache, Absage; Identitätsnachweis bei Betroffenenanfragen (Compliance §6.2)", legal_basis: "Art. 6(1)(b) DSGVO", retention: "180 Tage nach Rundenabschluss (Compliance §5.3)" }

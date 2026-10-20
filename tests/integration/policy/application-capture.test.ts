@@ -131,7 +131,6 @@ describe("captureApplication: what is written (AC-3.1, AC-3.3, AC-3.11)", () => 
     expect(row.createdAt.getTime()).toBeGreaterThanOrEqual(before - 60_000);
     expect(row.retentionUntil).toBeNull();
     expect(row.becameResidentId).toBeNull();
-    expect(row.deletedAt).toBeNull();
     // Deliberate break: make the repository insert `source` from input, and this fails because the
     // raw input above says "paste_parser" (argued: it needs an edit to the repository and the new
     // columns on dev).

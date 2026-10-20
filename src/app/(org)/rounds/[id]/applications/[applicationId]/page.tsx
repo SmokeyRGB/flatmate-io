@@ -17,6 +17,7 @@ import { getStrings } from "@/ui/strings/request";
 import { LinkPendingHint } from "@/ui/link-pending-hint";
 import { SavedToast } from "@/ui/saved-toast";
 import { InviteDialog } from "../invite-dialog";
+import { DeleteDialog } from "./delete-dialog";
 import { INVITABLE_STATES, INVITE_PERMISSION, showInvite } from "../invite-text";
 import { ApplicantNotice, ThirdPartyNotice } from "../notice";
 
@@ -86,11 +87,13 @@ export default async function ApplicationDetailPage({
   const context = current.context;
   // The same for „Einladen" (F5 candidate-invite): only a holder of change_application_state, and
   // only while the application can still be invited.
-  const [householdRow, canEdit, canChangeState] = await Promise.all([
+  // And for „Löschen" (F3 application-deletion): only a holder of delete_application, any state.
+  const [householdRow, canEdit, canChangeState, canDelete] = await Promise.all([
     thirdParty ? getHousehold(context) : Promise.resolve(null),
     holdsPermission(context, "create_application"),
     // Read only when the state could be invited at all.
     INVITABLE_STATES.includes(application.state) ? holdsPermission(context, INVITE_PERMISSION) : false,
+    holdsPermission(context, "delete_application"),
   ]);
 
   const invitable = showInvite(canChangeState, application.state);
@@ -112,10 +115,10 @@ export default async function ApplicationDetailPage({
 
       {updatedMessage && <SavedToast param="updated" message={updatedMessage} />}
 
-      {/* The two actions on the application sit together at the top (human walkthrough 2026-10-06):
+      {/* The actions on the application sit together at the top (human walkthrough 2026-10-06):
           „Bearbeiten" for create_application, „Einladen" for change_application_state while the
-          application can still be invited. */}
-      {(canEdit || invitable) && (
+          application can still be invited, „Löschen" for delete_application. */}
+      {(canEdit || invitable || canDelete) && (
         <div className="flex flex-wrap items-center gap-2">
           {canEdit && (
             <Link href={`/rounds/${id}/applications/${applicationId}/edit`} className="btn btn-secondary">
@@ -125,6 +128,9 @@ export default async function ApplicationDetailPage({
           )}
           {invitable && (
             <InviteDialog roundId={id} applicationId={application.id} applicantName={application.applicantName} />
+          )}
+          {canDelete && (
+            <DeleteDialog roundId={id} applicationId={application.id} applicantName={application.applicantName} />
           )}
         </div>
       )}

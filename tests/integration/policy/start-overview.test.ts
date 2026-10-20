@@ -42,7 +42,7 @@ async function claim(household: TestHousehold, name: string): Promise<{
 async function insertApplication(
   household: TestHousehold,
   writer: SessionContext,
-  fields: { roundId: string; state: ApplicationState; becameResidentId?: string | null; deletedAt?: Date | null },
+  fields: { roundId: string; state: ApplicationState; becameResidentId?: string | null },
 ) {
   const [row] = await withSessionContext(writer, (tx) =>
     tx
@@ -58,7 +58,6 @@ async function insertApplication(
           {
             state: fields.state,
             becameResidentId: fields.becameResidentId ?? null,
-            deletedAt: fields.deletedAt ?? null, // kept until change 4 drops the column
           },
         ),
       )
@@ -239,9 +238,8 @@ describe("getStartOverview (start-screen design.md Decision 4)", () => {
     expect(overview?.standing).toBeNull();
   });
 
-  // (g), a deleted application absent from every count, is dropped with the T-5 count: nothing sets
-  // `application.deleted_at` (F3 change 3 D1) and F3 change 4 drops the column. The standing keeps
-  // its `deleted_at IS NULL` filter until then.
+  // (g), a deleted application absent from every count, is dropped with the T-5 count: a deleted
+  // application is a deleted row (F3 change 4), so no count has a filter to test.
 
   it("(h) a phase_deadline_at set on the round is returned", async () => {
     hh = await registerTestHousehold();

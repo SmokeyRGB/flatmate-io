@@ -62,6 +62,12 @@ function permissionLiteralsPassedToChecks(): { file: string; name: string }[] {
         }
       }
     }
+    // casting's shared guard (withLockedApplication) takes the permission as an argument, so its
+    // literal sits in a guard object `{ permission: "...", notFound }`, not in a check call. Only that
+    // shape is matched, so an unrelated `permission` key elsewhere in src is not counted.
+    for (const lit of text.matchAll(/\bpermission:\s*"([a-z]+(?:_[a-z]+)*)",\s*notFound\b/g)) {
+      found.push({ file: file.slice(ROOT.length + 1).replace(/\\/g, "/"), name: lit[1] });
+    }
   }
   return found;
 }

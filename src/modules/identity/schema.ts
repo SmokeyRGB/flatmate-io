@@ -80,6 +80,8 @@ export const PERMISSIONS = {
   change_application_state: { holders: ["moderator"] },
   // „Application.status zurücknehmen" (drizzle/0027)
   reverse_application_state: { holders: ["moderator"] },
+  // „Application löschen" (FR-3.17: not grantable to a plain resident or the household account)
+  delete_application: { holders: ["moderator"] },
   // „Vote abgeben / ändern": the resident set's first permission ("resident" = is_resident)
   vote: { holders: ["resident"] },
 } as const satisfies Record<string, { holders: readonly Holder[] }>;
@@ -111,6 +113,7 @@ export const ROLE_SETS = {
     "create_application",
     "change_application_state",
     "reverse_application_state",
+    "delete_application",
   ],
   resident: ["vote"],
 } as const satisfies Record<string, readonly PermissionName[]>;

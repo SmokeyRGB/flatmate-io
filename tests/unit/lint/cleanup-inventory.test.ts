@@ -5,64 +5,18 @@
 // new insert in registerHousehold) now fails this test until someone adds it to the right list,
 // instead of silently orphaning rows the way join_code_issuance did twice (4a9724f, 29792fa).
 //
-// This is textual/regex parsing of the .ts source, not a real TS/AST parser — same honesty
+// This is textual/regex parsing of the .ts source (the parser is tests/helpers/schema-tables.ts, shared
+// with application-deletion-inventory.test.ts), not a real TS/AST parser — same honesty
 // tradeoff as scripts/lint/session-context.ts and import-boundary.ts. Where the parse genuinely
 // cannot see something (a table inserted by a function registerHousehold CALLS rather than
 // inserts into directly), that is called out in a comment below rather than silently trusted.
-import { readFileSync, readdirSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { HOUSEHOLD_SCOPED_TABLES } from "../../helpers/identity";
+import { MODULES_DIR, parseSchemaTables, type ParsedTable } from "../../helpers/schema-tables";
 
 const ROOT = join(__dirname, "..", "..", "..");
-const MODULES_DIR = join(ROOT, "src", "modules");
-
-interface ParsedTable {
-  name: string;
-  varName: string;
-  moduleFile: string;
-  hasHouseholdId: boolean;
-}
-
-// Splits each src/modules/*/schema.ts on `export const <var> = pgTable("<name>", ...)` and treats
-// the text up to the next such match (or EOF) as that table's own definition — good enough as
-// long as schema.ts keeps one `pgTable(` call per exported table, which every module here does
-// today (comment, not enforced: if that ever stops being true this parse silently misclassifies).
-// "Declares household_id" is a literal substring check for `"household_id"` as a column name
-// within that chunk (covers both a plain household_id column and household_settings' own
-// household_id-as-primary-key) — this also technically matches the literal
-// `current_setting('app.household_id', ...)` string inside a *different* table's RLS policy
-// constant, but those constants (HOUSEHOLD_MATCH etc.) are declared once, above every pgTable(
-// call, never inside one, so they never land inside any table's own chunk.
-function parseSchemaTables(): ParsedTable[] {
-  const tables: ParsedTable[] = [];
-  for (const moduleName of readdirSync(MODULES_DIR)) {
-    const schemaPath = join(MODULES_DIR, moduleName, "schema.ts");
-    let content: string;
-    try {
-      content = readFileSync(schemaPath, "utf8");
-    } catch {
-      continue; // not every module dir necessarily has a schema.ts
-    }
-    const moduleFile = `src/modules/${moduleName}/schema.ts`;
-    const defRe = /export const (\w+) = pgTable\(\s*\n?\s*"([a-z_]+)"/g;
-    const matches = [...content.matchAll(defRe)];
-    for (let i = 0; i < matches.length; i++) {
-      const match = matches[i];
-      const [, varName, name] = match;
-      const start = match.index!;
-      const end = i + 1 < matches.length ? matches[i + 1].index! : content.length;
-      const chunk = content.slice(start, end);
-      tables.push({
-        name,
-        varName,
-        moduleFile,
-        hasHouseholdId: /"household_id"/.test(chunk),
-      });
-    }
-  }
-  return tables;
-}
 
 // activity_event is the one deliberate exception: FR-0.13 makes it append-only (RESTRICTIVE
 // policies plus FORCE ROW LEVEL SECURITY on the table itself), so a test transaction could not

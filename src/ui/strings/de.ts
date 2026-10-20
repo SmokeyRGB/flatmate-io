@@ -600,6 +600,22 @@ export const de = {
         profile_required: "Bewerbungen können nur Bewohner:innen bearbeiten.",
       },
     },
+    // F3 application-deletion (design D6), wording confirmed by the human 2026-10-20. A plain confirm,
+    // not type-to-confirm (that stays with removing a member).
+    delete: {
+      trigger: "Löschen",
+      heading: (name: string) => `„${name}“ löschen?`,
+      body: "Die Bewerbung und alles, was dazu gespeichert ist, wird endgültig gelöscht. Das lässt sich nicht rückgängig machen.",
+      confirm: "Endgültig löschen",
+      confirmPending: "Wird gelöscht …",
+      toast: "Bewerbung gelöscht.",
+      // One calm sentence per action code (feedback_german_ui_error_tone: apologise, du-tone).
+      refusal: {
+        not_found: "Sorry, diese Bewerbung gibt es nicht mehr.",
+        denied: "Sorry, du darfst keine Bewerbungen löschen.",
+        failed: "Sorry, das hat nicht geklappt. Bitte versuch es noch einmal.",
+      },
+    },
     // Only a code and at most a field name ever reach the form, never a typed value (D4). One
     // text per code; the field is named by the field-level text below where it helps.
     errors: {

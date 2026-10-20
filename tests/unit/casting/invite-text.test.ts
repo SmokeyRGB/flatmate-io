@@ -73,7 +73,7 @@ describe("the permission behind „Einladen“", () => {
     );
     expect(board).toMatch(/holdsPermission\(current\.context, INVITE_PERMISSION\)/);
     expect(o5).toMatch(/holdsPermission\(context, INVITE_PERMISSION\)/);
-    expect(o5).toMatch(/const \[householdRow, canEdit, canChangeState\]/);
+    expect(o5).toMatch(/const \[householdRow, canEdit, canChangeState, canDelete\]/);
     expect(o5).toMatch(/showInvite\(canChangeState, application\.state\)/);
   });
 });

@@ -585,6 +585,21 @@ export const en = {
         profile_required: "Only residents can edit applications.",
       },
     },
+    // F3 application-deletion (design D6), wording confirmed by the human 2026-10-20. A plain confirm,
+    // not type-to-confirm (that stays with removing a member).
+    delete: {
+      trigger: "Delete",
+      heading: (name: string) => `Delete “${name}”?`,
+      body: "The application and everything stored with it will be deleted for good. This cannot be undone.",
+      confirm: "Delete for good",
+      confirmPending: "Deleting …",
+      toast: "Application deleted.",
+      refusal: {
+        not_found: "Sorry, this application no longer exists.",
+        denied: "Sorry, you are not allowed to delete applications.",
+        failed: "Sorry, that didn't work. Please try again.",
+      },
+    },
     // Only a code and at most a field name ever reach the form, never a typed value (D4). One
     // text per code; the field is named by the field-level text below where it helps.
     errors: {
