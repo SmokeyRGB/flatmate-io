@@ -5,10 +5,10 @@ import { SignInError, claimResidentProfile, signIn } from "@/modules/identity/au
 import { createResidentProfile } from "@/modules/identity/repository";
 import { session } from "@/modules/identity/schema";
 import { cleanupAll, deleteTestAccount, registerTestHousehold, type TestHousehold } from "../../helpers/identity";
-import { injectProviderFault, type FaultInjectorHandle } from "../../helpers/provider-fault";
+import { injectProviderFault, applyFaultTestDeadline, type FaultInjectorHandle } from "../../helpers/provider-fault";
 
-// auth-provider-deadline design.md D3/D9/D11 / tasks.md 5.3. AUTH_PROVIDER_DEADLINE_MS=3000 (D12).
-process.env.AUTH_PROVIDER_DEADLINE_MS = "3000";
+// auth-provider-deadline design.md D3/D9/D11 / tasks.md 5.3.
+applyFaultTestDeadline();
 
 const PASSWORD = "test-password-not-real-1234";
 

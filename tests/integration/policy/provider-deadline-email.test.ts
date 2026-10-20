@@ -14,10 +14,10 @@ import {
   testEmail,
   type TestHousehold,
 } from "../../helpers/identity";
-import { injectProviderFault, type FaultInjectorHandle } from "../../helpers/provider-fault";
+import { injectProviderFault, applyFaultTestDeadline, type FaultInjectorHandle } from "../../helpers/provider-fault";
 
-// auth-provider-deadline design.md D6 / tasks.md 6.3. AUTH_PROVIDER_DEADLINE_MS=3000 (D12).
-process.env.AUTH_PROVIDER_DEADLINE_MS = "3000";
+// auth-provider-deadline design.md D6 / tasks.md 6.3.
+applyFaultTestDeadline();
 
 const PASSWORD = "test-password-not-real-1234";
 

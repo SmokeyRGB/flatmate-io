@@ -5,10 +5,10 @@ import { JoinError, claimResidentProfile, redeemPasswordReset } from "@/modules/
 import { createResidentProfile, issuePasswordResetLink, listJoinCodeIssuances } from "@/modules/identity/repository";
 import { session } from "@/modules/identity/schema";
 import { adminClient, cleanupAll, deleteTestAccount, registerTestHousehold, type TestHousehold } from "../../helpers/identity";
-import { injectProviderFault, type FaultInjectorHandle } from "../../helpers/provider-fault";
+import { injectProviderFault, applyFaultTestDeadline, type FaultInjectorHandle } from "../../helpers/provider-fault";
 
-// auth-provider-deadline design.md D8 / tasks.md 8.3. AUTH_PROVIDER_DEADLINE_MS=3000 (D12).
-process.env.AUTH_PROVIDER_DEADLINE_MS = "3000";
+// auth-provider-deadline design.md D8 / tasks.md 8.3.
+applyFaultTestDeadline();
 
 const PASSWORD = "test-password-not-real-1234";
 

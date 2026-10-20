@@ -15,6 +15,27 @@
 // second copy of a PUT sets the same values. A resent createUser applies only if the first copy
 // never arrived; if it did arrive, email_exists fails the test loudly. Either way the fault still
 // holds: the application's own deadline ends its wait, and the answer never reaches it.
+import { vi } from "vitest";
+
+// The application deadline a fault-injection test file runs under (design.md D12 chose 3000).
+// It bounds EVERY provider call in the file, not only the dropped ones: fixtures, the unfaulted
+// calls inside the exercised operation, and the forward of a `forward-then-drop`. From a US CI
+// runner against the shared EU flatmate-io-dev, those ordinary calls went past 3s and failed as
+// "did not answer" (verify-hosted on main, 2026-10-14 to 2026-10-20). 7s is over five times the
+// slowest request GoTrue logged, and stays strictly below the lost-response wrapper's 8s
+// (tests/setup.ts): at a tie, which deadline ended a slow call would depend on timer order, and
+// the wrapper could resend or throw its own error first. At 7s the application's abort always wins,
+// as it did at 3s.
+export const FAULT_TEST_DEADLINE_MS = 7000;
+
+// Call at the top of each fault-injection file. Each `drop-before` waits out one whole deadline
+// and a test drops up to six requests in a row, so the file's test timeout grows with it.
+// vi.setConfig lasts for the current file only.
+export function applyFaultTestDeadline(): void {
+  process.env.AUTH_PROVIDER_DEADLINE_MS = String(FAULT_TEST_DEADLINE_MS);
+  vi.setConfig({ testTimeout: 6 * FAULT_TEST_DEADLINE_MS + 60000 });
+}
+
 export interface SeenRequest {
   method: string;
   url: string;

@@ -7,10 +7,10 @@ import { account, session } from "@/modules/identity/schema";
 import { activityEvent } from "@/modules/audit/schema";
 import type { CurrentSession } from "@/modules/identity/session-cookie";
 import { adminClient, cleanupAll, deleteTestAccount, registerTestHousehold, type TestHousehold } from "../../helpers/identity";
-import { injectProviderFault, type FaultInjectorHandle } from "../../helpers/provider-fault";
+import { injectProviderFault, applyFaultTestDeadline, type FaultInjectorHandle } from "../../helpers/provider-fault";
 
-// auth-provider-deadline design.md D7 / tasks.md 7.2. AUTH_PROVIDER_DEADLINE_MS=3000 (D12).
-process.env.AUTH_PROVIDER_DEADLINE_MS = "3000";
+// auth-provider-deadline design.md D7 / tasks.md 7.2.
+applyFaultTestDeadline();
 
 const PASSWORD = "test-password-not-real-1234";
 

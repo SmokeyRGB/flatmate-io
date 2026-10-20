@@ -45,8 +45,8 @@ vi.mock("@/ui/strings/request", async () => {
 // calls. So the suite runs the application with a deadline longer than all three attempts here
 // (24s): this wrapper resends first, and the application's deadline only ends a request the
 // wrapper has already given up on. Set on every file, not `??=`, because a fault-injection test
-// sets 3000 at module load (auth-provider-deadline design.md D12) and process.env outlives a test
-// file within a worker.
+// sets its own at module load (applyFaultTestDeadline, tests/helpers/provider-fault.ts) and
+// process.env outlives a test file within a worker.
 process.env.AUTH_PROVIDER_DEADLINE_MS = "30000";
 // Join tests must not share record_join_attempt's null-IP bucket (limit 20 per 15 minutes on one
 // key). The header name is fixed for the suite; a test that builds request Headers puts a fresh

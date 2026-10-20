@@ -3,14 +3,14 @@ import { AccountSettingsError, changeResidentEmail, claimResidentProfile, signIn
 import { createResidentProfile } from "@/modules/identity/repository";
 import type { CurrentSession } from "@/modules/identity/session-cookie";
 import { cleanupAll, deleteTestAccount, registerTestHousehold, testEmail, type TestHousehold } from "../../helpers/identity";
-import { injectProviderFault, type FaultInjectorHandle } from "../../helpers/provider-fault";
+import { FAULT_TEST_DEADLINE_MS, injectProviderFault, applyFaultTestDeadline, type FaultInjectorHandle } from "../../helpers/provider-fault";
 
 // auth-provider-deadline design.md D12 / tasks.md 6.4: without the deadline, a changeResidentEmail
 // whose write is lost holds membership/account/session for up to 300s, and a concurrent signIn for
 // the same account (which needs the same membership row FOR SHARE) waits that whole time. With the
 // deadline, the lock is held only for as long as the (bounded) resolution sequence takes.
-process.env.AUTH_PROVIDER_DEADLINE_MS = "3000";
-const DEADLINE_MS = 3000;
+applyFaultTestDeadline();
+const DEADLINE_MS = FAULT_TEST_DEADLINE_MS;
 
 let hh: TestHousehold | undefined;
 let residentAccountId: string | undefined;
@@ -82,5 +82,5 @@ describe("a lost provider request releases its locks within the deadline, not 30
     const emailChangeErr = await emailChangePromise;
     expect(emailChangeErr).toBeInstanceOf(AccountSettingsError);
     expect((emailChangeErr as AccountSettingsError).code).toBe("provider_unavailable");
-  }, 60000);
+  });
 });
