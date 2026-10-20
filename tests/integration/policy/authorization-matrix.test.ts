@@ -280,6 +280,29 @@ describe("authorization matrix (M6): every exported casting/identity mutator dec
       expect(callers).toEqual([]);
     });
 
+    // application-deletion (D3 step 6): the audit half of deleteApplication ends nothing by itself
+    // and checks no permission, so only casting's deleteApplication (permission, row lock) may
+    // call it. Break: call it from a file under src/app and this fails.
+    it("redactApplicationEventsTx (audit) has no caller outside audit and casting's repository", () => {
+      expect(srcAppReferencesName("redactApplicationEventsTx")).toBe(false);
+      const allowed = [
+        join(ROOT, "src", "modules", "audit", "repository.ts"),
+        join(ROOT, "src", "modules", "casting", "repository.ts"),
+      ];
+      const files: string[] = [];
+      const walk = (dir: string) => {
+        for (const entry of readdirSync(dir)) {
+          const full = join(dir, entry);
+          if (statSync(full).isDirectory()) walk(full);
+          else if (/\.(ts|tsx)$/.test(entry) && !allowed.includes(full)) files.push(full);
+        }
+      };
+      walk(join(ROOT, "src"));
+      walk(join(ROOT, "scripts"));
+      const callers = files.filter((f) => /\bredactApplicationEventsTx\b/.test(readFileSync(f, "utf8")));
+      expect(callers).toEqual([]);
+    });
+
     it("the four casting query ports have no caller outside casting and deliberation's repository", () => {
       for (const name of ["listVoterRoundsTx", "listVoteCandidatesTx", "getRoundTallyBasisTx", "getVoteCandidateCardTx"]) {
         expect(srcAppReferencesName(name), `${name} is referenced under src/app`).toBe(false);
@@ -518,6 +541,27 @@ describe("authorization matrix (M6): every exported casting/identity mutator dec
       expect(row.applicantName).toBe("Testbewerbung Matrix");
     });
 
+    // application-deletion (FR-3.17): deletion is the moderator's alone. A plain resident is refused
+    // on the permission, before the row is read, and the application is intact. Break: remove the
+    // permission check from the guard and the row is gone.
+    it("deleteApplication", async () => {
+      const room = await castingRepo.createRoom(hh.context, "Room A", adminActor);
+      const round = await castingRepo.createAndOpenRound(moderator.context, "Round", [room.id], moderatorActor);
+      const { id } = await castingRepo.captureApplication(moderator.context, {
+        roundId: round.id,
+        applicantName: "Testbewerbung Matrix",
+        collectedFrom: "data_subject",
+      });
+      await expectDenied(
+        castingRepo.deleteApplication(residentCtx, { roundId: round.id, applicationId: id }),
+        "delete_application",
+      );
+      const rows = await withSessionContext(moderator.context, (tx) =>
+        tx.select().from(application).where(eq(application.id, id)),
+      );
+      expect(rows).toHaveLength(1);
+    });
+
     it("updateHouseholdSettings", async () => {
       await expect(
         castingRepo.updateHouseholdSettings(residentCtx, { quorumShare: "0.6" }, residentActor),
@@ -598,6 +642,14 @@ describe("authorization matrix (M6): every exported casting/identity mutator dec
           collectedFrom: "data_subject",
         }),
       ).rejects.toThrow(castingRepo.ProfileRequiredError);
+      // application-deletion: refused before any query, and the application is intact.
+      await expect(
+        castingRepo.deleteApplication(hh.context, { roundId: round.id, applicationId: id }),
+      ).rejects.toThrow(castingRepo.ProfileRequiredError);
+      const rows = await withSessionContext(moderator.context, (tx) =>
+        tx.select().from(application).where(eq(application.id, id)),
+      );
+      expect(rows).toHaveLength(1);
     });
 
     // Moderator column: rooms, rounds, participants and applications allowed ...
@@ -620,6 +672,22 @@ describe("authorization matrix (M6): every exported casting/identity mutator dec
       await castingRepo.inviteApplication(moderator.context, { roundId: round.id, applicationId: id });
       const removable = await castingRepo.createRoom(moderator.context, "Room M6", moderatorActor);
       await castingRepo.removeRoom(moderator.context, removable.id, moderatorActor);
+    });
+
+    // application-deletion (FR-3.17): the moderator column holds delete_application.
+    it("a moderator may delete an application", async () => {
+      const room = await castingRepo.createRoom(moderator.context, "Room M7", moderatorActor);
+      const round = await castingRepo.createAndOpenRound(moderator.context, "Round", [room.id], moderatorActor);
+      const { id } = await castingRepo.captureApplication(moderator.context, {
+        roundId: round.id,
+        applicantName: "Testbewerbung Matrix",
+        collectedFrom: "data_subject",
+      });
+      await castingRepo.deleteApplication(moderator.context, { roundId: round.id, applicationId: id });
+      const rows = await withSessionContext(moderator.context, (tx) =>
+        tx.select().from(application).where(eq(application.id, id)),
+      );
+      expect(rows).toHaveLength(0);
     });
 
     // ... but not the voting procedure (no individual grant exists here).
@@ -965,6 +1033,7 @@ const CASTING_CASE_NAMES = [
   "transitionApplication",
   "inviteApplication",
   "updateApplication",
+  "deleteApplication",
   "updateHouseholdSettings",
 ];
 

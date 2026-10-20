@@ -8,6 +8,7 @@ import {
   payloadKeysWithoutValueRule,
   PayloadValidationError,
   recordActivityEvent,
+  redactApplicationEventsTx,
   redactExpiredActivityEvents,
 } from "@/modules/audit/repository";
 import { insertTestRound, syntheticApplication } from "../../helpers/applications";
@@ -133,6 +134,21 @@ describe("vote event payloads (G-D7)", () => {
         expect((caught as Error).message).not.toContain(SENTINEL);
       });
     }
+  }
+});
+
+// F3 change 4 (application-deletion, FR-3.20, AC-3.18, G-D7): the tombstone carries no payload at
+// all. Break: give `application.deleted` a key in PAYLOAD_ALLOWLIST and the value-rule coverage
+// case above fails (a key with no rule is refused, but must be named).
+describe("application.deleted payload (G-D7)", () => {
+  it("accepts an empty payload", () => {
+    expect(() => assertPayloadAllowed("application.deleted", {})).not.toThrow();
+  });
+
+  for (const key of ["applicantName", "source", "collectedFrom", "fields", "fromState", "stage", "value"]) {
+    it(`refuses the key "${key}"`, () => {
+      expect(() => assertPayloadAllowed("application.deleted", { [key]: "x" })).toThrow(PayloadValidationError);
+    });
   }
 });
 
@@ -262,5 +278,69 @@ describe("ActivityEvent retention redaction (FR-0.13, EC-0.6, G-D8)", () => {
     );
 
     expect(redactedCount).toBe(0);
+  });
+
+  // application-deletion (D3 step 6, D4): the same nulling scoped to ONE application. Application B
+  // is past its retention too, so the policy would admit its events: the scoping is the function's,
+  // not the policy's. Break: remove "application.created" from REDACTABLE_KEYS and the nulling
+  // assertion fails; drop the subject filter in redactApplicationEventsTx and B's row changes.
+  it("redactApplicationEventsTx nulls source/collectedFrom of that application's creation entry only", async () => {
+    const householdId = uuid();
+    seededHouseholds.push(householdId);
+    const profileId = uuid();
+    const actorAccountId = uuid();
+    const pastDate = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    const context = { accountId: actorAccountId, householdId, profileId };
+
+    const [a, b] = await withSessionContext(context, async (tx) => {
+      const roundId = await insertTestRound(tx, householdId);
+      const rows = [];
+      for (const label of ["A", "B"]) {
+        const [row] = await tx
+          .insert(application)
+          .values(
+            syntheticApplication(
+              { householdId, roundId, createdByAccountId: actorAccountId, createdByProfileId: profileId },
+              { state: "new", retentionUntil: pastDate, applicantName: `Redaction ${label}` },
+            ),
+          )
+          .returning();
+        rows.push(row);
+      }
+      return rows;
+    });
+
+    const record = (subjectId: string, eventType: string, payload: Record<string, unknown>) =>
+      withSessionContext(context, (tx) =>
+        recordActivityEvent(tx, {
+          householdId,
+          eventType,
+          subjectType: "application",
+          subjectId,
+          actorAccountId,
+          actorProfileId: profileId,
+          payload,
+        }),
+      );
+    const created = { source: "manual_form", collectedFrom: "data_subject" };
+    const createdA = await record(a.id, "application.created", created);
+    const updatedA = await record(a.id, "application.updated", { fields: ["age"] });
+    const movedA = await record(a.id, "application.state_changed", { fromState: "new", toState: "screened" });
+    const createdB = await record(b.id, "application.created", created);
+
+    const count = await withSessionContext(context, (tx) => redactApplicationEventsTx(tx, a.id));
+    expect(count).toBe(1);
+
+    const read = async (id: string) =>
+      (await withSessionContext(context, (tx) => tx.select().from(activityEvent).where(eq(activityEvent.id, id))))[0];
+    const afterCreatedA = await read(createdA.id);
+    expect(afterCreatedA.payload).toEqual({ source: null, collectedFrom: null });
+    expect(afterCreatedA.occurredAt).toEqual(createdA.occurredAt);
+    expect(afterCreatedA.actorAccountId).toBe(actorAccountId);
+    // field names and state names are not personal data: byte-identical
+    expect((await read(updatedA.id)).payload).toEqual({ fields: ["age"] });
+    expect((await read(movedA.id)).payload).toEqual({ fromState: "new", toState: "screened" });
+    // another application's entry is untouched
+    expect((await read(createdB.id)).payload).toEqual(created);
   });
 });

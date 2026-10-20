@@ -1,4 +1,4 @@
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, sql, type SQL } from "drizzle-orm";
 import type { PgTransaction } from "drizzle-orm/pg-core";
 import { activityEvent } from "./schema";
 import {
@@ -24,8 +24,9 @@ type Tx = PgTransaction<any, any, any>;
 const PAYLOAD_ALLOWLIST: Readonly<Record<string, readonly string[]>> = {
   "application.state_changed": ["fromState", "toState"],
   // F3 (application-capture, D7): enum values only (G-D7) — the intake path and the collection
-  // source. Never the name, a contact, the message or an attribute. Deliberately NOT in
-  // REDACTABLE_KEYS: whether deletion redacts them is change 4's decision.
+  // source. Never the name, a contact, the message or an attribute. Both keys are in
+  // REDACTABLE_KEYS (application-deletion, D4): they describe the person's case, so end-of-retention
+  // redaction and a manual deletion null them.
   "application.created": ["source", "collectedFrom"],
   // F3 (application-pipeline, D4, FR-3.22, AC-3.19): a correction names the CHANGED FIELDS from a
   // fixed list of eight (`fields`, an array of names) and never a value, old or new (G-D7). The
@@ -35,6 +36,9 @@ const PAYLOAD_ALLOWLIST: Readonly<Record<string, readonly string[]>> = {
   // (applicantName, age, messageRaw, attributes); the history of collectedFrom is reconstructible
   // from application.created plus each later entry that names it (EC-3.6).
   "application.updated": ["fields"],
+  // F3 (application-deletion, FR-3.20, AC-3.18, G-D7): the tombstone of a deleted application. Empty:
+  // the subject id, the actor and the time are columns, and no value of the person ever enters it.
+  "application.deleted": [],
   // F1 event types (identity/casting modules) — registered here, the one write path, per FR-1.20.
   "resident_profile.created": [],
   "resident_profile.status_changed": ["fromStatus", "toStatus"],
@@ -206,9 +210,17 @@ export async function recordActivityEvent(tx: Tx, input: RecordEventInput) {
 // the test that was passing at the time (it asserted the wrong behavior; corrected alongside).
 const REDACTABLE_KEYS: Readonly<Record<string, readonly string[]>> = {
   "application.state_changed": [],
+  // application-deletion, D4 (Compliance §5.6 rule 3): the intake path and the collection channel
+  // describe the person's case. `application.updated` (field names), `application.state_changed`
+  // (state names) and `vote.*` (stage) carry no personal field, so nothing is registered for them.
+  "application.created": ["source", "collectedFrom"],
 };
 
-export async function redactExpiredActivityEvents(tx: Tx): Promise<number> {
+// The one loop that nulls the registered keys. Only `subjectIdFilter` differs between the two
+// callers, so end-of-retention redaction and a manual deletion cannot drift apart. The update
+// policy `activityevent_append_only_update` stays the single gate: it permits the UPDATE only for
+// an application whose `retention_until` has passed.
+async function nullRegisteredKeys(tx: Tx, subjectIdFilter: SQL): Promise<number> {
   let redactedCount = 0;
 
   for (const [eventType, keys] of Object.entries(REDACTABLE_KEYS)) {
@@ -222,11 +234,7 @@ export async function redactExpiredActivityEvents(tx: Tx): Promise<number> {
         and(
           eq(activityEvent.eventType, eventType),
           eq(activityEvent.subjectType, "application"),
-          sql`${activityEvent.subjectId} IN (
-            SELECT ${application.id} FROM ${application}
-            WHERE ${application.retentionUntil} IS NOT NULL
-              AND ${application.retentionUntil} < now()
-          )`,
+          subjectIdFilter,
         ),
       )
       .returning({ id: activityEvent.id });
@@ -235,4 +243,23 @@ export async function redactExpiredActivityEvents(tx: Tx): Promise<number> {
   }
 
   return redactedCount;
+}
+
+export async function redactExpiredActivityEvents(tx: Tx): Promise<number> {
+  return nullRegisteredKeys(
+    tx,
+    sql`${activityEvent.subjectId} IN (
+      SELECT ${application.id} FROM ${application}
+      WHERE ${application.retentionUntil} IS NOT NULL
+        AND ${application.retentionUntil} < now()
+    )`,
+  );
+}
+
+// application-deletion, D3 step 6: the same nulling, scoped to one application. The caller
+// (casting's deleteApplication) has ended that application's retention on the row it holds locked,
+// in the same transaction, so the update policy admits it. Nothing else may call this
+// (tests/integration/policy/authorization-matrix.test.ts checks the call sites).
+export async function redactApplicationEventsTx(tx: Tx, applicationId: string): Promise<number> {
+  return nullRegisteredKeys(tx, eq(activityEvent.subjectId, applicationId));
 }

@@ -126,6 +126,7 @@ individual grant) remains only for the moderator (the voting procedure).
 | `create_application` | `Application` anlegen | — | ✅ | moderator |
 | `change_application_state` | `Application.status` ändern (vorwärts) | — | ✅ | moderator |
 | `reverse_application_state` | `Application.status` zurücknehmen | — | ✅ | moderator |
+| `delete_application` | `Application` löschen | — | ✅ | moderator |
 | `vote` | `Vote` abgeben / ändern (and the screening pass that collects it) | — | ✅ if a resident | a resident membership (`is_resident`) |
 
 The resident set is `vote`: a resident votes and takes part in the casting, and that is all a
@@ -162,7 +163,7 @@ adjusts the constraints. No check, screen or flag SHALL have to change for it, s
 them names a permission, never a role. Sources: `03-PRD.md` §4.0.1; `domain/identity.md` §2.1
 (*„vorbelegt"*; P-O-10 2026-09-14; human decisions 2026-09-22, 2026-09-28, 2026-09-29 and
 2026-10-01); S-04 and FR-1.8 (both amended 2026-10-01: no individual grant to residents); FR-1.3,
-FR-1.12, FR-1.27, FR-3.1, FR-3.24; EC-1.7.
+FR-1.12, FR-1.27, FR-3.1, FR-3.17, FR-3.24; EC-1.7.
 
 #### Scenario: Moving a permission between roles touches no check
 - **WHEN** a later decision moves a permission from the household set to the moderator set
@@ -184,9 +185,9 @@ FR-1.12, FR-1.27, FR-3.1, FR-3.24; EC-1.7.
 
 #### Scenario: The household account holds no application permission
 - **WHEN** the household account's permissions are checked for `manage_rounds`,
-  `manage_round_participation`, `create_application`, `change_application_state` or
-  `reverse_application_state`
-- **THEN** all five are refused
+  `manage_round_participation`, `create_application`, `change_application_state`,
+  `reverse_application_state` or `delete_application`
+- **THEN** all six are refused
 
 #### Scenario: The household account does not run rounds
 - **WHEN** the household account tries to create, open or close a round, or add a participant
@@ -245,7 +246,7 @@ decisions of 2026-09-29, 2026-10-01 and 2026-10-06.
 #### Scenario: Joining through the founding link stores the moderator set
 - **WHEN** a resident joins through the household's founding link
 - **THEN** the new membership's role is moderator and its stored permissions are `vote` plus the
-  eleven moderator permissions, exactly what an appointment of a member stores
+  twelve moderator permissions, exactly what an appointment of a member stores
 
 #### Scenario: Registration stores the household set
 - **WHEN** a household is registered
@@ -258,13 +259,13 @@ decisions of 2026-09-29, 2026-10-01 and 2026-10-06.
 - **THEN** its stored permissions include `manage_rooms`, `manage_join_codes`,
   `create_resident_profile`, `appoint_moderator`, `manage_members`, `export_subject_access`,
   `manage_rounds`, `manage_round_participation`, `create_application`, `change_application_state`
-  and `reverse_application_state`, and it may run rounds and their participants, manage rooms,
-  capture and move applications forward and back, administer members, profiles, moderators and
+  `reverse_application_state` and `delete_application`, and it may run rounds and their
+  participants, manage rooms, capture, move applications forward and back and delete them, administer members, profiles, moderators and
   join links, and trigger a subject-access export
 
 #### Scenario: Demotion revokes the moderator set
 - **WHEN** a moderator is set back to member
-- **THEN** its stored permissions no longer include those eleven nor `close_round`, each of those
+- **THEN** its stored permissions no longer include those twelve nor `close_round`, each of those
   actions is refused, and the resident set (`vote`) is still held
 
 #### Scenario: Moving out revokes everything
@@ -295,6 +296,11 @@ decisions of 2026-09-29, 2026-10-01 and 2026-10-06.
 - **THEN** every live moderator holds it, no other membership does, and no other stored permission
   of any membership has changed
 
+#### Scenario: Existing moderators receive the deletion permission
+- **WHEN** the migration adding `delete_application` runs
+- **THEN** every live moderator holds it, no other membership does, no other stored permission of
+  any membership has changed, and from then on a live moderator without it is refused
+
 #### Scenario: Existing memberships receive the per-row permissions
 - **WHEN** the migration introducing one permission per matrix row runs
 - **THEN** every live administering membership holds the eight household values; every live
@@ -315,7 +321,7 @@ any membership row that:
   `manage_settings` included;
 - holds a permission whose declared holders exclude its role: a moderator-only permission
   (`manage_rounds`, `manage_round_participation`, `create_application`, `change_application_state`,
-  `reverse_application_state`) on a row that is not a moderator; a household-only permission
+  `reverse_application_state`, `delete_application`) on a row that is not a moderator; a household-only permission
   (`issue_password_reset_link`) on a row that is not the administering membership; a
   household-or-moderator permission (`manage_voting_procedure`, `manage_rooms`, `manage_join_codes`,
   `create_resident_profile`, `appoint_moderator`, `manage_members`, `export_subject_access`) on a row
@@ -366,8 +372,8 @@ that a moderator should have, something has significantly gone wrong before"*); 
 
 #### Scenario: A resident cannot be granted a moderator-only permission
 - **WHEN** a live member (not a moderator) is written with `reverse_application_state`,
-  `manage_round_participation`, `manage_rounds`, `create_application` or
-  `change_application_state`, by direct SQL
+  `manage_round_participation`, `manage_rounds`, `create_application`,
+  `change_application_state` or `delete_application`, by direct SQL
 - **THEN** the database refuses the write
 
 #### Scenario: Only a resident membership can hold the vote

@@ -57,6 +57,11 @@ export const applicationCollectedFromEnum = pgEnum("application_collected_from",
   "third_party",
 ]);
 
+// Every table with an `application_id` column. `deleteApplication` deletes their rows in its one
+// transaction; tests/unit/lint/application-deletion-inventory.test.ts fails when this list and the
+// schemas disagree (design D5).
+export const APPLICATION_DEPENDENT_TABLES = ["vote"] as const;
+
 export const application = pgTable(
   "application",
   {
@@ -79,7 +84,6 @@ export const application = pgTable(
     // authoritative source. No DB default; nothing sets it yet (the retention slice will).
     retentionUntil: date("retention_until"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-    deletedAt: timestamp("deleted_at", { withTimezone: true }),
     // Applicant columns of docs/domain/casting.md §2.2. Personal data (data-inventory.yml).
     // Empty optional fields are NULL, never '' (assumption A4).
     applicantName: text("applicant_name").notNull(),

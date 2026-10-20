@@ -24,13 +24,16 @@ export default async function RoundDetailPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams?: Promise<{ saved?: string }>;
+  searchParams?: Promise<{ saved?: string; deleted?: string }>;
 }) {
   const s = await getStrings();
   const { id } = await params;
   // ?saved=<application id> after a capture. Anything that is not a uuid is ignored (no toast, no
   // link): the value comes from the URL, so it is never trusted as a path segment.
-  const savedParam = (await searchParams)?.saved;
+  const query = await searchParams;
+  const savedParam = query?.saved;
+  // ?deleted=1 after an application was deleted (F3 application-deletion). Any other value shows no toast.
+  const deleted = query?.deleted === "1";
   const savedId = typeof savedParam === "string" && isUuid(savedParam) ? savedParam : null;
   const current = await getCurrentSession();
   if (!current) redirect("/sign-in");
@@ -104,6 +107,8 @@ export default async function RoundDetailPage({
             link={{ href: `/rounds/${id}/applications/${savedId}`, label: s.applications.viewSaved }}
           />
         )}
+
+        {deleted && <SavedToast param="deleted" message={s.applications.delete.toast} />}
 
         {section && <ApplicationsSection strings={s} roundId={id} canCapture={canCapture} {...section} />}
       </div>

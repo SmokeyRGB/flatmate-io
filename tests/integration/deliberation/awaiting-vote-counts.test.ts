@@ -71,8 +71,8 @@ describe("getAwaitingVoteCounts", () => {
   });
 
   // Case (g), a deleted application absent from the count, is not ported as a test: nothing sets
-  // `application.deleted_at` (F3 change 3 D1) and F3 change 4 drops the column, so no new read
-  // names it (design Risks).
+  // `application.deleted_at` (F3 change 3 D1) and F3 change 4 dropped the column: a deleted
+  // application is a deleted row, so no read has a filter to test.
 
   // Copilot round on PR #54: Start's acknowledgement needs an explicit 0 to tell "nothing
   // awaits" from "the count was refused", so the two must differ in the map.

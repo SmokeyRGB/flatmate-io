@@ -267,6 +267,20 @@
       "when": 1791979700905,
       "tag": "0037_role_permissions_contract",
       "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1792485033704,
+      "tag": "0038_delete_application_permission",
+      "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1792571433704,
+      "tag": "0039_drop_application_deleted_at",
+      "breakpoints": true
     }
   ]
 }

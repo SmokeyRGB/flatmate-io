@@ -37,8 +37,35 @@ const MIGRATION_0024 = readMigration("0024_");
 const MIGRATION_0027 = readMigration("0027_");
 const MIGRATION_0029 = readMigration("0029_");
 const MIGRATION_0037 = readMigration("0037_");
+const MIGRATION_0038 = readMigration("0038_");
+const MIGRATION_0039 = readMigration("0039_");
 
-// History: the sets as 0024, 0027 and 0029 wrote them, frozen.
+// History: the sets as 0024, 0027, 0029 and 0037 wrote them, frozen.
+const MODERATOR_PERMISSIONS_AT_0037 = [
+  "manage_rooms",
+  "manage_join_codes",
+  "create_resident_profile",
+  "appoint_moderator",
+  "manage_members",
+  "export_subject_access",
+  "manage_rounds",
+  "manage_round_participation",
+  "create_application",
+  "change_application_state",
+  "reverse_application_state",
+] as const;
+const MODERATOR_ONLY_AT_0037 = [
+  "reverse_application_state",
+  "manage_rounds",
+  "manage_round_participation",
+  "create_application",
+  "change_application_state",
+] as const;
+const DECLARED_AT_0037 = [
+  ...HOUSEHOLD_PERMISSIONS,
+  ...MODERATOR_PERMISSIONS_AT_0037.filter((p) => !(HOUSEHOLD_PERMISSIONS as readonly string[]).includes(p)),
+  "vote",
+] as const;
 const MODERATOR_PERMISSIONS_AT_0024 = [
   "manage_rooms",
   "close_round",
@@ -121,13 +148,19 @@ function updatesOf(migration: string): string[] {
   return migration.split("--> statement-breakpoint").filter((stmt) => /^\s*UPDATE "membership"/.test(stmt));
 }
 
-describe("the live CHECKs (drizzle/0037) hold exactly the schema.ts constants", () => {
-  it("the moderator CHECK holds exactly the moderator set, all eleven", () => {
+describe("the live CHECKs (drizzle/0037, 0038) hold exactly the schema.ts constants", () => {
+  it("the moderator CHECK holds exactly the moderator set, all twelve", () => {
     expect(literalsIn(constraintBody("membership_moderator_holds_role_permissions"))).toEqual([
       sorted(MODERATOR_PERMISSIONS),
     ]);
-    expect(MODERATOR_PERMISSIONS).toHaveLength(11);
-    expect(constraintBodyIn(MIGRATION_0037, "membership_moderator_holds_role_permissions")).toBeDefined();
+    expect(MODERATOR_PERMISSIONS).toHaveLength(12);
+    // 0038 re-adds it, so the last file is 0038; 0037's is the frozen eleven.
+    expect(literalsIn(constraintBodyIn(MIGRATION_0038, "membership_moderator_holds_role_permissions"))).toEqual([
+      sorted(MODERATOR_PERMISSIONS),
+    ]);
+    expect(literalsIn(constraintBodyIn(MIGRATION_0037, "membership_moderator_holds_role_permissions"))).toEqual([
+      sorted(MODERATOR_PERMISSIONS_AT_0037),
+    ]);
   });
 
   it("the household CHECK is exact: the eight as floor and as ceiling", () => {
@@ -148,15 +181,10 @@ describe("the live CHECKs (drizzle/0037) hold exactly the schema.ts constants", 
     expect(literalsIn(constraintBody("membership_moderator_only_permissions"))).toEqual([
       sorted(MODERATOR_ONLY_PERMISSIONS),
     ]);
-    expect(sorted(MODERATOR_ONLY_PERMISSIONS)).toEqual(
-      sorted([
-        "reverse_application_state",
-        "manage_rounds",
-        "manage_round_participation",
-        "create_application",
-        "change_application_state",
-      ]),
-    );
+    expect(sorted(MODERATOR_ONLY_PERMISSIONS)).toEqual(sorted([...MODERATOR_ONLY_AT_0037, "delete_application"]));
+    expect(literalsIn(constraintBodyIn(MIGRATION_0037, "membership_moderator_only_permissions"))).toEqual([
+      sorted(MODERATOR_ONLY_AT_0037),
+    ]);
     expect(literalsIn(constraintBody("membership_household_only_permissions"))).toEqual([
       sorted(HOUSEHOLD_ONLY_PERMISSIONS),
     ]);
@@ -171,9 +199,12 @@ describe("the live CHECKs (drizzle/0037) hold exactly the schema.ts constants", 
     expect(ADMINISTRATION_PERMISSIONS).toContain("manage_rooms");
   });
 
-  it("the declared-names CHECK holds exactly the fourteen declared permissions", () => {
+  it("the declared-names CHECK holds exactly the fifteen declared permissions", () => {
     expect(literalsIn(constraintBody("membership_declared_permissions"))).toEqual([sorted(Object.keys(PERMISSIONS))]);
-    expect(Object.keys(PERMISSIONS)).toHaveLength(14);
+    expect(literalsIn(constraintBodyIn(MIGRATION_0037, "membership_declared_permissions"))).toEqual([
+      sorted(DECLARED_AT_0037),
+    ]);
+    expect(Object.keys(PERMISSIONS)).toHaveLength(15);
     expect(Object.keys(PERMISSIONS)).not.toContain("close_round");
     expect(Object.keys(PERMISSIONS)).not.toContain("manage_settings");
   });
@@ -192,17 +223,17 @@ describe("drizzle/0037's data statements use the literals of the constants", () 
     expect(carryOver).toContain("role = 'moderator'");
   });
 
-  it("backfills the household eight, the moderator eleven and vote for live residents", () => {
+  it("backfills the household eight, the moderator eleven (frozen) and vote for live residents", () => {
     expect(literalsIn(household)).toContainEqual(sorted(HOUSEHOLD_PERMISSIONS));
     expect(household).toContain("role = 'household_admin'");
-    expect(literalsIn(moderator)).toContainEqual(sorted(MODERATOR_PERMISSIONS));
+    expect(literalsIn(moderator)).toContainEqual(sorted(MODERATOR_PERMISSIONS_AT_0037));
     expect(moderator).toContain("role = 'moderator'");
     expect(literalsIn(resident)).toContainEqual(sorted(RESIDENT_PERMISSIONS));
     expect(resident).toContain("is_resident");
   });
 
   it("strips every undeclared name from every row, and reduces live plain members to vote", () => {
-    expect(literalsIn(strip)).toContainEqual(sorted(Object.keys(PERMISSIONS)));
+    expect(literalsIn(strip)).toContainEqual(sorted(DECLARED_AT_0037));
     expect(literalsIn(plainMember)).toContainEqual(sorted(RESIDENT_PERMISSIONS));
     expect(plainMember).toContain("role = 'member'");
   });
@@ -211,8 +242,8 @@ describe("drizzle/0037's data statements use the literals of the constants", () 
     const report = MIGRATION_0037.split("--> statement-breakpoint").find((stmt) => /^\s*DO \$\$/m.test(stmt)) ?? "";
     const literals = literalsIn(report);
     expect(literals).toContainEqual(sorted(HOUSEHOLD_PERMISSIONS));
-    expect(literals).toContainEqual(sorted(MODERATOR_PERMISSIONS));
-    expect(literals).toContainEqual(sorted(Object.keys(PERMISSIONS)));
+    expect(literals).toContainEqual(sorted(MODERATOR_PERMISSIONS_AT_0037));
+    expect(literals).toContainEqual(sorted(DECLARED_AT_0037));
     expect(literals).toContainEqual(["close_round", "manage_settings"]);
     expect((report.match(/RAISE NOTICE/g) ?? []).length).toBe(5);
   });
@@ -220,12 +251,51 @@ describe("drizzle/0037's data statements use the literals of the constants", () 
   // The replay test (raw-sql/role-permissions-contract.test.ts) redirects only the quoted name
   // "membership" to a scratch table. An unquoted reference would hit the real table, scoped by RLS
   // to an empty household, and pass silently (design D3).
-  it("every non-comment line that names the table quotes it", () => {
-    const code = MIGRATION_0037.split(/\r?\n/).filter((line) => !line.trimStart().startsWith("--"));
+  it.each([
+    ["0037", MIGRATION_0037],
+    ["0038", MIGRATION_0038],
+  ])("every non-comment line of %s that names the table quotes it", (_name, migration) => {
+    const code = migration.split(/\r?\n/).filter((line) => !line.trimStart().startsWith("--"));
     for (const line of code) {
       expect(line.replaceAll('"membership"', ""), line).not.toMatch(/\bmembership\b/);
     }
     expect(code.join("\n")).toContain('"membership"');
+  });
+});
+
+describe("drizzle/0038 (delete_application) and 0039 (drop deleted_at)", () => {
+  const statements = MIGRATION_0038.split("--> statement-breakpoint");
+  const indexOf = (re: RegExp) => statements.findIndex((stmt) => re.test(stmt));
+
+  it("its backfill adds exactly delete_application, and only to live moderators", () => {
+    const updates = updatesOf(MIGRATION_0038);
+    expect(updates).toHaveLength(1);
+    expect(literalsIn(updates[0])).toEqual([["delete_application"], ["delete_application"]]);
+    expect(updates[0]).toContain("revoked_at IS NULL AND role = 'moderator'");
+  });
+
+  it("runs declared, then moderator-only, then backfill, then the moderator floor", () => {
+    const declared = indexOf(/ADD CONSTRAINT "membership_declared_permissions"/);
+    const only = indexOf(/ADD CONSTRAINT "membership_moderator_only_permissions"/);
+    const backfill = indexOf(/^\s*UPDATE "membership"/);
+    const floor = indexOf(/ADD CONSTRAINT "membership_moderator_holds_role_permissions"/);
+    expect([declared, only, backfill, floor].every((i) => i >= 0)).toBe(true);
+    expect(declared).toBeLessThan(only);
+    expect(only).toBeLessThan(backfill);
+    expect(backfill).toBeLessThan(floor);
+  });
+
+  it("re-adds the three constraints it owns, and no other", () => {
+    expect([...MIGRATION_0038.matchAll(/ADD CONSTRAINT "([a-z_]+)"/g)].map((m) => m[1]).sort()).toEqual([
+      "membership_declared_permissions",
+      "membership_moderator_holds_role_permissions",
+      "membership_moderator_only_permissions",
+    ]);
+  });
+
+  it("0039 is exactly the one DROP COLUMN IF EXISTS of application.deleted_at", () => {
+    const code = MIGRATION_0039.split(/\r?\n/).filter((line) => line.trim() !== "" && !line.trimStart().startsWith("--"));
+    expect(code).toEqual(['ALTER TABLE "application" DROP COLUMN IF EXISTS "deleted_at";']);
   });
 });
 
@@ -295,11 +365,13 @@ describe("the history of 0024, 0027 and 0029 stays pinned to frozen literals", (
     expect(HOUSEHOLD_PERMISSIONS).not.toContain("close_round");
   });
 
-  it("0024, 0027, 0029 and 0037 contain no bound-parameter placeholder ($1): drizzle-kit drops a check() parameter", () => {
+  it("0024, 0027, 0029, 0037, 0038 and 0039 contain no bound-parameter placeholder ($1): drizzle-kit drops a check() parameter", () => {
     expect(MIGRATION_0024).not.toMatch(/\$\d/);
     expect(MIGRATION_0027).not.toMatch(/\$\d/);
     expect(MIGRATION_0029).not.toMatch(/\$\d/);
     expect(MIGRATION_0037).not.toMatch(/\$\d/);
+    expect(MIGRATION_0038).not.toMatch(/\$\d/);
+    expect(MIGRATION_0039).not.toMatch(/\$\d/);
   });
 });
 

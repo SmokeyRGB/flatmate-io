@@ -1,6 +1,6 @@
 import { and, asc, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { isUuid, withSessionContext, type SessionContext } from "@/db/session-context";
-import { PayloadValidationError, recordActivityEvent } from "@/modules/audit/repository";
+import { PayloadValidationError, recordActivityEvent, redactApplicationEventsTx } from "@/modules/audit/repository";
 import {
   assertHasPermission,
   assertHasPermissionTx,
@@ -10,7 +10,7 @@ import {
   membershipHoldsPermission,
   PermissionDeniedError,
 } from "@/modules/identity/repository";
-import { householdSettings, membership, residentProfile } from "@/modules/identity/schema";
+import { householdSettings, membership, residentProfile, type PermissionName } from "@/modules/identity/schema";
 import {
   parseApplicationInput,
   type ParsedApplication,
@@ -22,7 +22,14 @@ import {
   CORRECTABLE_FIELDS,
   type CorrectableField,
 } from "./application-changes";
-import { application, castingRound, castingRoundStatusEnum, room, roundParticipation } from "./schema";
+import {
+  application,
+  APPLICATION_DEPENDENT_TABLES,
+  castingRound,
+  castingRoundStatusEnum,
+  room,
+  roundParticipation,
+} from "./schema";
 import type { VotingProcedureField } from "./settings-fields";
 import { ruleFor, type ApplicationState } from "./transitions";
 import { assertF1RoomTransitionAllowed, type RoomStatus } from "./room-transitions";
@@ -289,7 +296,7 @@ export async function getOrganisationApplication(
 // two guards, and a "list or one" switch is the merged read change 2's D5 warns against.
 //
 // Lists the columns O4 shows and nothing else: never `message_raw` or `attributes`. There is no
-// `deleted_at IS NULL` filter, like getOrganisationApplication (change 4 drops the column).
+// `deleted_at` filter: the column is gone, a deleted application is a deleted row.
 export async function listOrganisationApplications(context: SessionContext, roundId: string) {
   if (context.profileId === null) return null;
   if (typeof roundId !== "string" || !isUuid(roundId)) return null;
@@ -485,14 +492,21 @@ async function applyTransitionTx(
   return updated;
 }
 
-// The one preamble of every state change of an application (transitionApplication,
-// inviteApplication): one place for the order the guards run in, so the two cannot drift.
+// What a state change of an application needs: transitionApplication and inviteApplication.
+const TRANSITION_GUARD = {
+  permission: "change_application_state",
+  notFound: () => new ApplicationTransitionError("not_found"),
+} as const;
+
+// The one preamble of every write to an existing application (transitionApplication,
+// inviteApplication, deleteApplication): one place for the order the guards run in, so they cannot
+// drift. Each caller names the permission it needs and the error for "no such row".
 //   - a profile-less session is refused BEFORE any query (G-D15/ADR-014), so the error names the
 //     missing profile instead of arriving as "not found" once RLS hides the row;
 //   - a malformed id is `not_found`, before any query. `roundId: null` means "no round predicate";
 //     any other value must be a UUID, so a caller that names a round can never lose the predicate;
 //   then ONE transaction:
-//   a. the caller's live membership is read FOR SHARE and must hold `change_application_state`,
+//   a. the caller's live membership is read FOR SHARE and must hold `guard.permission`,
 //      BEFORE the row is read, so a member without it learns nothing about the row (not even its
 //      state);
 //   b. the row is read FOR UPDATE with the household predicate, and the round predicate unless
@@ -504,6 +518,7 @@ async function withLockedApplication<T>(
   context: SessionContext,
   caller: string,
   ids: { applicationId: string; roundId: string | null },
+  guard: { permission: PermissionName; notFound: () => Error },
   fn: (tx: Tx, current: { id: string; householdId: string; state: ApplicationState }) => Promise<T>,
 ): Promise<T> {
   if (context.profileId === null) throw new ProfileRequiredError(caller);
@@ -513,10 +528,10 @@ async function withLockedApplication<T>(
     !isUuid(applicationId) ||
     (roundId !== null && (typeof roundId !== "string" || !isUuid(roundId)))
   ) {
-    throw new ApplicationTransitionError("not_found");
+    throw guard.notFound();
   }
   return withSessionContext(context, async (tx) => {
-    await assertHasPermissionTx(tx, context, "change_application_state");
+    await assertHasPermissionTx(tx, context, guard.permission);
 
     const [current] = await tx
       .select({
@@ -533,7 +548,7 @@ async function withLockedApplication<T>(
         ),
       )
       .for("update");
-    if (!current) throw new ApplicationTransitionError("not_found");
+    if (!current) throw guard.notFound();
 
     return fn(tx, current);
   });
@@ -550,7 +565,7 @@ async function withLockedApplication<T>(
 // membership (FOR SHARE) -> household_settings -> casting_round -> room -> application:
 //   captureApplication: INSERT, membership FOR SHARE -> round FOR SHARE;
 //   updateApplication / transitionApplication: membership FOR SHARE -> application FOR UPDATE;
-//   deleteApplication (change 4) OBLIGATION: takes FOR UPDATE (or DELETE ... RETURNING).
+//   deleteApplication: the same membership FOR SHARE -> application FOR UPDATE, then the votes.
 // Raw SQL as app_runtime is bound by RLS (household) only: the application-level rules do not
 // apply there (ADR-004 layering), as for every table.
 //
@@ -560,8 +575,12 @@ export async function transitionApplication(
   applicationId: string,
   toState: ApplicationState,
 ) {
-  return withLockedApplication(context, "transitionApplication", { applicationId, roundId: null }, (tx, current) =>
-    applyTransitionTx(tx, context, current, toState),
+  return withLockedApplication(
+    context,
+    "transitionApplication",
+    { applicationId, roundId: null },
+    TRANSITION_GUARD,
+    (tx, current) => applyTransitionTx(tx, context, current, toState),
   );
 }
 
@@ -599,7 +618,7 @@ export async function inviteApplication(
 ): Promise<{ alreadyInvited: boolean }> {
   // `?? ""`: a missing round id must stay a refusal (not_found), never become null = no predicate.
   const ids = { applicationId: input?.applicationId, roundId: input?.roundId ?? "" };
-  return withLockedApplication(context, "inviteApplication", ids, async (tx, current) => {
+  return withLockedApplication(context, "inviteApplication", ids, TRANSITION_GUARD, async (tx, current) => {
     if (current.state === "invited") return { alreadyInvited: true };
     if (current.state === "new") {
       const screened = await applyTransitionTx(tx, context, current, "screened");
@@ -612,6 +631,102 @@ export async function inviteApplication(
     }
     throw new ApplicationTransitionError("not_invitable");
   });
+}
+
+export type ApplicationDeletionErrorCode = "not_found";
+
+// Code only, no id and no value in the message (as ApplicationTransitionError).
+export class ApplicationDeletionError extends Error {
+  readonly code: ApplicationDeletionErrorCode;
+  constructor(code: ApplicationDeletionErrorCode) {
+    super(`Application deletion refused: ${code}`);
+    this.name = "ApplicationDeletionError";
+    this.code = code;
+  }
+}
+
+// F3 `application-deletion`, FR-3.17-FR-3.20, AC-3.15-AC-3.18, G-D4, G-E5 (design D3). THE one
+// deletion entry point: a real deletion, in ONE transaction, of the application row and everything
+// that references it. Takes NO actor: both ids come from `context`. Returns nothing.
+//
+// Order: withLockedApplication's guards (profile before any query, ids, then the permission
+// `delete_application` on the membership FOR SHARE BEFORE the row is read, so a member without it
+// learns nothing, not even whether the row exists, then the row FOR UPDATE with the household and
+// round predicates; no row is `not_found`). Then, in the same transaction:
+//   1. every table in APPLICATION_DEPENDENT_TABLES: DELETE WHERE application_id AND household_id;
+//   2. the application's retention ends now (`retention_until` = yesterday on the locked row), which
+//      is what the append-only update policy requires before an event payload may be changed, and
+//      the earlier events' personal payload keys are nulled (redactApplicationEventsTx);
+//   3. the application row itself;
+//   4. one `application.deleted` tombstone: subject id, actor and time as columns, payload empty
+//      (G-D7). `round_id` stays null, as for every other application event.
+//
+// LOCK ORDER: membership FOR SHARE -> application FOR UPDATE -> vote rows, the order every writer
+// of `application` takes (openRoundTx). The FOR UPDATE is the obligation drizzle/0028 puts on this
+// function: castVote/withdrawVote take the application FOR SHARE in `vote_guard` before the vote
+// row, so a vote in flight holds this lock off until it commits, and the step-1 DELETE then sees it.
+// Without the lock the DELETE would not see an uncommitted vote and it would commit as an orphan.
+//
+// Writers of the same state, pairwise:
+//   the application row: updateApplication, transitionApplication and inviteApplication take the
+//     same FOR UPDATE, so each is serialised against this; one that arrives after the commit finds
+//     no row (not_found); captureApplication writes a different row;
+//   vote rows: castVote/withdrawVote hold the application FOR SHARE first (above); a raw UPDATE of
+//     a vote cannot be ordered and may lose a deadlock (40P01), which is safe (0028);
+//   event payloads: the only other writer is redactExpiredActivityEvents (retention), which writes
+//     the same nulls, so the pair is idempotent;
+//   new events about the application: each is written in a transaction that holds the application
+//     lock (transition, correction) or FOR SHARE (vote.*), so none lands after the tombstone.
+//
+// Atomicity: everything runs in one withSessionContext, so any failure leaves every row as it was.
+// A SQL error is rethrown as an ApplicationWriteError (SQLSTATE and constraint, never a value).
+// Raw SQL as app_runtime is bound by RLS (household) only, so the permission is application-level
+// like every casting permission (ADR-004 layering).
+export async function deleteApplication(
+  context: SessionContext,
+  input: { roundId: string; applicationId: string },
+): Promise<void> {
+  // `?? ""`: a missing round id must stay a refusal (not_found), never become null = no predicate.
+  const ids = { applicationId: input?.applicationId, roundId: input?.roundId ?? "" };
+  await withLockedApplication(
+    context,
+    "deleteApplication",
+    ids,
+    { permission: "delete_application", notFound: () => new ApplicationDeletionError("not_found") },
+    async (tx, current) => {
+      try {
+        for (const table of APPLICATION_DEPENDENT_TABLES) {
+          await tx.execute(
+            sql`DELETE FROM ${sql.identifier(table)}
+                WHERE application_id = ${current.id}::uuid AND household_id = ${context.householdId}::uuid`,
+          );
+        }
+        await tx
+          .update(application)
+          .set({ retentionUntil: sql`current_date - 1` })
+          .where(and(eq(application.id, current.id), eq(application.householdId, context.householdId)));
+        await redactApplicationEventsTx(tx, current.id);
+        const deleted = await tx
+          .delete(application)
+          .where(and(eq(application.id, current.id), eq(application.householdId, context.householdId)))
+          .returning({ id: application.id });
+        // The row lock held since the guard makes this exactly one row.
+        if (deleted.length !== 1) throw new ApplicationDeletionError("not_found");
+        await recordActivityEvent(tx, {
+          householdId: current.householdId,
+          eventType: "application.deleted",
+          subjectType: "application",
+          subjectId: current.id,
+          actorAccountId: context.accountId,
+          actorProfileId: context.profileId,
+          payload: {},
+        });
+      } catch (err) {
+        if (err instanceof ApplicationDeletionError || err instanceof PayloadValidationError) throw err;
+        throw toApplicationWriteError(err);
+      }
+    },
+  );
 }
 
 // FR-1.9: create, rename, remove — the moderator's room CRUD (manage_rooms).
@@ -1698,8 +1813,8 @@ export async function getStartOverview(context: SessionContext): Promise<StartOv
 
     let standing: StartStanding | null = null;
     if (activeRound) {
-      // §3.1's phase/distribution, computed from state counts. Excludes deleted applications
-      // and — V-1, design.md Decision 7 — the viewer's own past application: `IS DISTINCT FROM`,
+      // §3.1's phase/distribution, computed from state counts. Excludes — V-1, design.md
+      // Decision 7 — the viewer's own past application: `IS DISTINCT FROM`,
       // never Drizzle's `ne()` (which compiles to `<>` and silently drops every NULL row, i.e.
       // nearly every application, since `became_resident_id` is null until `moved_in`). Under
       // A-2.4 (one account per membership) the profile id is the account's whole redaction set
@@ -1708,7 +1823,6 @@ export async function getStartOverview(context: SessionContext): Promise<StartOv
         sql`SELECT state, count(*)::int AS count FROM application
             WHERE round_id = ${activeRound.id}::uuid
               AND household_id = ${context.householdId}::uuid
-              AND deleted_at IS NULL
               AND became_resident_id IS DISTINCT FROM ${profileId}::uuid
             GROUP BY state`,
       );
